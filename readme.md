@@ -145,12 +145,14 @@ at the [Getting Started][getting_started] section of the parasail-dev-guide.
 
 ## License
 
-ParaSail is primarily distributed under the terms of both the MIT license
-and the Apache License (Version 2.0), with portions covered by various
-BSD-like licenses.
+ParaSail is primarily distributed under the terms of the ParaSail Copyright, the ParaSail Copyright 2 and the ParaSail Copyright Lib.
 
-See [LICENSE-APACHE](LICENSE-APACHE), [LICENSE-MIT](LICENSE-MIT), and
-[COPYRIGHT](COPYRIGHT) for details.
+See [ParaSail Copyright][PC], [ParaSail Copyright 2][PC2], and
+[ParaSail Copyright Lib](PCL) for details.
+
+[PC] : https://github.com/parasail-lang/parasail/blob/main/parasail_copyright.txt
+[PC2] : https://github.com/parasail-lang/parasail/blob/main/parasail_copyright2.txt
+[PCL] : https://github.com/parasail-lang/parasail/blob/main/parasail_copyright_lib.txt
 
 ## Trademark
 
