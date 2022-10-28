@@ -3,7 +3,6 @@
 - WIP readme (readme.md)
 - WIP dev guide (parasail-dev-guide.md)
 - github actions (build interp, compiler, examples -> notif when something is broken)
-- find more TODOs
 - @sttaft : compose compact, expressive, fully packed example snippet --> top of readme.md
 - discussion about repo clean up / split -> (parasail, ada2x, parython etc)
 - create releases from github actions --> release github page (interp, compiler with install script for platform (linux, win) + ?what?)
