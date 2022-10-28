@@ -1,3 +1,9 @@
+<br/><br/>
+<div align="center">
+	<img width=450px"  src="https://github.com/parasail-lang/parasail/blob/main/documentation/logo/parasail_logo.svg" alt="Awesome">
+</div>
+<br><br>
+
 # The ParaSail Programming Language
 
 This is the main source code repository for ParaSail. It contains the compiler, the interpreter, the standard library, and documentation.
