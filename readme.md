@@ -1,6 +1,6 @@
 <br/><br/>
 <div align="center">
-	<img width=450px"  src="https://github.com/parasail-lang/parasail/blob/main/documentation/logo/parasail_logo.svg" alt="Awesome">
+	<img width=200px"  src="https://github.com/parasail-lang/parasail/blob/main/documentation/logo/parasail_logo.svg" alt="Awesome">
 </div>
 <br><br>
 
