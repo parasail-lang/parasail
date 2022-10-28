@@ -145,6 +145,7 @@ at the [Getting Started][getting_started] section of the parasail-dev-guide.
 
 ## License
 
+<<<<<<< HEAD
 ParaSail is primarily distributed under the terms of the ParaSail Copyright, the ParaSail Copyright 2 and the ParaSail Copyright Lib.
 
 See [ParaSail Copyright][PC], [ParaSail Copyright 2][PC2], and
@@ -153,6 +154,11 @@ See [ParaSail Copyright][PC], [ParaSail Copyright 2][PC2], and
 [PC] : https://github.com/parasail-lang/parasail/blob/main/parasail_copyright.txt
 [PC2] : https://github.com/parasail-lang/parasail/blob/main/parasail_copyright2.txt
 [PCL] : https://github.com/parasail-lang/parasail/blob/main/parasail_copyright_lib.txt
+=======
+ParaSail is primarily distributed under the Apache License (Version 2.0).
+
+See [LICENSE-APACHE](LICENSE-APACHE) for details.
+>>>>>>> f8d5bd69944e55c332464e3efd7c00ae81bfc776
 
 ## Trademark
 
