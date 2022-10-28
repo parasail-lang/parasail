@@ -7,6 +7,7 @@
 - @sttaft : compose compact, expressive, fully packed example snippet --> top of readme.md
 - discussion about repo clean up / split -> (parasail, ada2x, parython etc)
 - create releases from github actions --> release github page (interp, compiler with install script for platform (linux, win) + ?what?)
+- ref manual says 8.0. We are at ... ~ 9.3 (What should be done about it?)
 
 Discussion backlog:
 
