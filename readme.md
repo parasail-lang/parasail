@@ -4,10 +4,11 @@ This is the main source code repository for ParaSail. It contains the compiler, 
 
 **Note: this README is for _users_ rather than _contributors_.
 If you wish to _contribute_ to the compiler, you should read the
-[Getting Started][gettingstarted] section of the parasail-dev-guide instead.
+[Getting Started][getting_started] section of the parasail-dev-guide instead.
 You can ask for help at [Gitter][gitter].**
 
 [gitter]: https://gitter.im/parasail-lang/community
+[getting_started]: https://https://github.com/parasail-lang/parasail/parasail-dev-guide.md
 
 ```
 import Clock;
@@ -138,9 +139,9 @@ The ParaSail community congregates in a few places:
 ## Contributing
 
 If you are interested in contributing to the ParaSail project, please take a look
-at the [Getting Started][gettingstarted] guide in the [parasail-dev-guide].
+at the [Getting Started][getting_started] section of the parasail-dev-guide.
 
-[parasail-dev-guide]: https://rustc-dev-guide.rust-lang.org
+
 
 ## License
 
