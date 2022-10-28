@@ -129,10 +129,10 @@ Todo
 The ParaSail community congregates in a few places:
 
 * [Stack Overflow] - Direct questions about using the language.
-* [gitter] - General discussion and broader questions.
+* [Gitter] - General discussion and broader questions.
 
 [Stack Overflow]: https://stackoverflow.com/questions/tagged/parasail
-[gitter]: https://gitter.im/parasail-lang/community
+[Gitter]: https://gitter.im/parasail-lang/community
 
 
 ## Contributing
