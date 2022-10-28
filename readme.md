@@ -16,7 +16,7 @@ You can ask for help at [Gitter][gitter].**
 [gitter]: https://gitter.im/parasail-lang/community
 [getting_started]: https://github.com/parasail-lang/parasail/blob/main/parasail-dev-guide.md
 
-```
+```ada
 import Clock;
 
 interface Dining_Philosophers<Num_Phils : Univ_Integer := 5; Context<>> is
