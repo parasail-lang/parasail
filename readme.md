@@ -8,7 +8,7 @@ If you wish to _contribute_ to the compiler, you should read the
 You can ask for help at [Gitter][gitter].**
 
 [gitter]: https://gitter.im/parasail-lang/community
-[getting_started]: https://https://github.com/parasail-lang/parasail/parasail-dev-guide.md
+[getting_started]: https://github.com/parasail-lang/parasail/blob/main/parasail-dev-guide.md
 
 ```
 import Clock;
