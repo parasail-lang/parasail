@@ -8379,6 +8379,7 @@ func PSL::Test::Test_Atomic(X, Y : Univ_Integer) is
 
 end func PSL::Test::Test_Atomic
 interface PSL::Core::Unsigned_64<> is
+    //  64-bit unsigned type (i.e. mod 2**64), with *no* "null" value.
     op "+"(Right : Unsigned_64) -> Unsigned_64
       is import(#identity)
 
@@ -8575,13 +8576,13 @@ interface PSL::Core::Modular<Modulus : Unsigned_64> is
     op "*"(Left, Right : Modular) -> Result : Modular
 
     op "/"(Left, Right : Modular) -> Result : Modular
-      is import("/")
+      is import(#uns_divide)
 
     op "mod"(Left, Right : Modular) -> Modular
-      is import("mod")
+      is import(#uns_mod)
 
     op "rem"(Left, Right : Modular) -> Modular
-      is import("rem")
+      is import(#uns_mod)
 
     op "**"(Left : Modular; Right : Univ_Integer) -> Result : Modular
 
@@ -8592,12 +8593,12 @@ interface PSL::Core::Modular<Modulus : Unsigned_64> is
     op "*="(var Left : Modular; Right : Modular)
 
     op "/="(var Left : Modular; Right : Modular) 
-      is import("/=")
+      is import(#uns_assign_divide)
 
     op "**="(var Left : Modular; Right : Univ_Integer)
 
     op "=?"(Left, Right : Modular) -> Ordering
-      is import("=?")
+      is import(#uns_compare)
 
     op ">>"(Modular; Modular) -> Modular is import(">>")
 
@@ -8609,19 +8610,19 @@ interface PSL::Core::Modular<Modulus : Unsigned_64> is
     op "not"(M : Modular) -> Modular
 
     func Min(Left, Right : optional Modular) -> optional Modular
-      is import(#min)
+      is import(#uns_min)
     func Max(Left, Right : optional Modular) -> optional Modular
-      is import(#max)
+      is import(#uns_max)
 
     func Hash(Val : Modular) -> Univ_Integer
       is import(#identity)
 
     func To_String(Val : optional Modular) -> Univ_String
-      is import(#to_string_int)
+      is import(#to_string_uns)
 
     func From_String(Str : Univ_String) -> optional Modular
 
-    func Print(X : Modular) is import(#print_int)
+    func Print(X : Modular) is (Print(To_String(X)))
     func Println(X : Modular) is (Println(To_String(X)))
 
     func First() -> Modular
@@ -8822,7 +8823,7 @@ class PSL::Core::Modular is
     // These operations are needed so Modular satifies
     // requirements of "Countable" interface, but these
     // operations are not directly callable (if they were callable,
-    // we would have ambiguity when adding an Modular to an int-literal).
+    // we would have ambiguity when adding a Modular to an int-literal).
 
     op "+"(Left : Modular; Right : Univ_Integer) -> Result : Modular is
         return (Content => (Left.Content + Right) mod Modulus)
