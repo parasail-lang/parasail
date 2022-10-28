@@ -147,12 +147,12 @@ at the [Getting Started][getting_started] section of the parasail-dev-guide.
 
 ParaSail is primarily distributed under the terms of the ParaSail Copyright, the ParaSail Copyright 2 and the ParaSail Copyright Lib.
 
-See [ParaSail Copyright][PC], [ParaSail Copyright 2][PC2], and
-[ParaSail Copyright Lib](PCL) for details.
+See [ParaSail Copyright], [ParaSail Copyright 2], and
+[ParaSail Copyright Lib] for details.
 
-[PC] : https://github.com/parasail-lang/parasail/blob/main/parasail_copyright.txt
-[PC2] : https://github.com/parasail-lang/parasail/blob/main/parasail_copyright2.txt
-[PCL] : https://github.com/parasail-lang/parasail/blob/main/parasail_copyright_lib.txt
+[ParaSail Copyright]: https://github.com/parasail-lang/parasail/blob/main/parasail_copyright.txt
+[ParaSail Copyright 2]: https://github.com/parasail-lang/parasail/blob/main/parasail_copyright2.txt
+[ParaSail Copyright Lib]: https://github.com/parasail-lang/parasail/blob/main/parasail_copyright_lib.txt
 
 ## Trademark
 
