@@ -1,0 +1,278 @@
+func Hyper_Qsort (var Node_Group; var Vec : Dis_Vector) is
+
+   var Shuffler : Sort_Shuffler := Create(Node_Group, Vec);
+
+   //  Hyper_Qsort
+
+   //  Build up a histogram
+
+   var Histo_Coll : Dis_Sort_Histo (Node_Group) := Create(
+               (Vec.GC, Distrib_Obj_Id => Vec.Distrib_Obj_Id);
+
+   Histo : Histos.Histogram
+     (Size => Natural'Max (10, 2 * Vec.GC.Total_Size));
+      //  This default-init'ed object is also used as the identity.
+      //  We set a size of twice the total number of cores to get
+      //  adequate granularity.
+
+   const Sum_Of_Node_Sizes : Positive := Vec.GC.Total_Size;
+
+   const My_Shard : Shard_Index_Type := Shard_Index_Type (My_Index);
+
+   var Cum_Weight : Natural := 0;
+
+   var Prev_Elems : Natural := 0;
+
+   var Bucket_Index : Positive := 1;
+
+   var Bucket_Remainder : Natural := 0;
+
+   var Cur_Bucket : Histos.Bucket_Type;
+
+   //  Length/starting/ending points for local shard
+   var Local_Shard_Length : Natural;
+
+   var Local_First_Bucket : Natural;
+   var Local_First_Remainder : Natural;
+
+   func Add_One_Value (var Accum : Histos.Histogram;
+                            Index : Index_Type) is
+   //  Add one value to the Histogram
+
+      Accum.Add_Value (Vec.Element (Index));
+   end Add_One_Value;
+
+   //  Iterate in parallel over local indices 1 to Vec.Length, in chunks.
+   //  Call Add_One_Value to add a single value to the accumulator.
+   //  Will call Combiner to combine accumulators built up
+   //  in parallel (some day doing a tree-wise combination in case
+   //  the number of threads on a given node is very large).
+   //  The node/shard-level result is shared with other nodes/shards
+   //  and then combined into a single global accumulator, namely Histo.
+   Histo_Coll.Distrib_Reduce
+     (Histo, First => 1, Last => Vec.Length,
+      Add_One_Value => Add_One_Value);
+
+   if Debug then
+      //  Display histogram
+      Println (My_Index | ": Histogram before sorting:");
+      Histo.Dump_Histo;
+   end if;
+
+   //  Now compute Shard_Boundary for each new shard's values.
+
+   //  Initialize the zero-th high-bound
+   Shuffler.Shard_Boundary (0) := Histo.Min_Value;
+
+   for I in 1 .. Num_Shards loop
+      const Node_Index : Node_Index_Type := Node_Index_Type (I);
+      const Node_Weight : Positive :=
+        Vec.GC.Node_Size (Node_Index);
+      const Weight_Offset : Positive := Cum_Weight + Node_Weight;
+      const Cum_Elems : Natural :=
+        Histo.Num_Values * Weight_Offset / Sum_Of_Node_Sizes;
+      var Node_Elems : Natural := Cum_Elems - Prev_Elems;
+
+      if Debug then
+         Println (My_Index | ": for Node" | I |
+           ", Weight_Offset =" |
+           Weight_Offset | ", Cum_Elems =" | Cum_Elems |
+           ", Node_Elems =" | Node_Elems);
+      end if;
+
+      if Node_Index = My_Index then
+         Local_Shard_Length := Node_Elems;
+         //  Remember starting point for local shard
+         Local_First_Bucket := Bucket_Index;
+         Local_First_Remainder := Bucket_Remainder;
+      end if;
+
+      while Node_Elems > Bucket_Remainder loop
+         Node_Elems := Node_Elems - Bucket_Remainder;
+         Cur_Bucket := Histo.Nth_Bucket (Bucket_Index);
+         Bucket_Index := Bucket_Index + 1;
+         Bucket_Remainder := Cur_Bucket.Count;
+      end loop;
+
+      //  Current bucket now has enough elements left in it.
+      Bucket_Remainder := Bucket_Remainder - Node_Elems;
+
+      //  Set the high bound by simple interpolation.
+      //  TBD: Could do a more complex interpolation based
+      //       on local "slope" of histogram.
+      Shuffler.Shard_Boundary (I) := Cur_Bucket.Low_Bound +
+        Histo.Bucket_Width *
+          Elem_Type (Cur_Bucket.Count - Bucket_Remainder) /
+          Elem_Type (Cur_Bucket.Count);
+
+      if Debug then
+         Println (My_Index | ": Shard_Boundary (" |
+           I | " ) = " | Shuffler.Shard_Boundary (I));
+      end if;
+
+      //  Remember Cum_Weight and Cum_Elems
+      Cum_Weight := Weight_Offset;
+      Prev_Elems := Cum_Elems;
+   end loop;
+
+   //  Create transfer matrix using Shard boundaries
+   func Shard_Destination (Val : Elem_Type)
+     -> Shard_Index_Type is
+      //  TBD: Use binary search at some point
+
+      for I in 1 .. Num_Shards loop
+         if Val < Shuffler.Shard_Boundary (I) then
+            return I;
+         end if;
+      end loop;
+      return Num_Shards;
+   end Shard_Destination;
+
+   for I in Vec.First_Index .. Vec.Last_Index
+     concurrent (Chunk_Index in 1 .. Num_Chunks)
+   loop
+      //  Add index to appropriate transfer vector
+      Shuffler.Transfer_Matrix (Chunk_Index).
+        To_Shard (Shard_Destination (Vec.Element (I))).
+          Add_Element (I);
+   end loop;
+
+   //  Send "append" messages to other shards
+   Shuffler.Assemble_And_Send_Streams
+     (Time_Stamp => Shuffler.Time_Stamps (My_Index) + 1);
+
+   //  Compute the local shard's chunk boundaries
+   Shuffler.Chunk_Boundary (0) := Shuffler.Shard_Boundary (My_Shard - 1);
+   Bucket_Index := Local_First_Bucket;
+   Bucket_Remainder := Local_First_Remainder;
+   Prev_Elems := 0;
+   for I in 1 .. Num_Chunks loop
+      const Cum_Elems : Natural :=
+        Local_Shard_Length * I / Num_Chunks;
+      var Chunk_Elems : Natural := Cum_Elems - Prev_Elems;
+
+      if Debug then
+         Println (My_Index | ": for Chunk" | I |
+           ", Cum_Elems =" | Cum_Elems |
+           ", Chunk_Elems =" | Chunk_Elems);
+      end if;
+      while Chunk_Elems > Bucket_Remainder loop
+         Chunk_Elems := Chunk_Elems - Bucket_Remainder;
+         Cur_Bucket := Histo.Nth_Bucket (Bucket_Index);
+         Bucket_Index := Bucket_Index + 1;
+         Bucket_Remainder := Cur_Bucket.Count;
+      end loop;
+
+      //  Current bucket now has enough elements left in it.
+      Bucket_Remainder := Bucket_Remainder - Chunk_Elems;
+
+      //  Set the high bound by simple interpolation.
+      //  TBD: Could do a more complex interpolation based
+      //       on local "slope" of histogram.
+      Shuffler.Chunk_Boundary (I) := Cur_Bucket.Low_Bound +
+        Histo.Bucket_Width *
+          Elem_Type (Cur_Bucket.Count - Bucket_Remainder) /
+          Elem_Type (Cur_Bucket.Count);
+
+      if Debug then
+         Println (My_Index | ": Chunk_Boundary (" |
+           I | " ) = " | Shuffler.Chunk_Boundary (I));
+      end if;
+
+      //  Remember Cum_Elems
+      Prev_Elems := Cum_Elems;
+   end loop;
+
+   if Debug
+     and then Shuffler.Chunk_Boundary (Num_Chunks) !=
+       Shuffler.Shard_Boundary (My_Shard)
+   then
+      Println (My_Index | ": Last chunk boundary =" |
+        Shuffler.Chunk_Boundary (Num_Chunks));
+      Println (My_Index | ": Shard boundary =" |
+        Shuffler.Shard_Boundary (My_Shard));
+   end if;
+
+   //  Initialize new vectors for each chunk by
+   //  scanning index vector targeting current shard.
+
+   if Debug then
+      var Total_Local : Index_Vectors.Elem_Index := 0;
+
+      for TM of Shuffler.Transfer_Matrix loop
+         Total_Local += TM.To_Shard (My_Shard).Num_Elements;
+      end loop;
+      Println (My_Index | ": creating" | Num_Chunks |
+        " new local chunks from index vectors of total length" |
+        Total_Local);
+   end if;
+
+   for Chunk_Index in 1 .. Num_Chunks concurrent loop
+      ref Chunk_Vec : Dis_Vec.Local_Vector =>
+        Shuffler.Transfer_Matrix (Chunk_Index).New_Vector;
+      const Low_Bound : Elem_Type :=
+        Shuffler.Chunk_Boundary (Chunk_Index - 1);
+      const High_Bound : Elem_Type :=
+        Shuffler.Chunk_Boundary (Chunk_Index);
+
+      for I in 1 .. Num_Chunks loop
+         ref Xfr_Vec : Index_Vectors.Vector =>
+           Shuffler.Transfer_Matrix (I).To_Shard (My_Shard);
+
+         for J in 1 .. Xfr_Vec.Num_Elements loop
+            const Val : Elem_Type :=
+                     Vec.Element (Xfr_Vec (J));
+
+            if Val >= Low_Bound and then Val < High_Bound
+            then
+               Chunk_Vec.Append (Val);
+            end if;
+         end loop;
+      end loop;
+   end loop;
+
+   //  Now pull in values from messages from other shards
+   while (for some TS of Shuffler.Time_Stamps =>
+            TS < Shuffler.Time_Stamps (My_Index)) loop
+      Shuffler.Handle_Queued_Messages (Wait_For_Message => #true);
+   end loop;
+
+   //  Set the original vector to empty
+   Vec.Set_Empty;
+
+   //  Now sort the chunks
+   for Chunk_Index in 1 .. Num_Chunks concurrent loop
+      ref Chunk_Vec : Dis_Vec.Local_Vector =>
+        Shuffler.Transfer_Matrix (Chunk_Index).New_Vector;
+
+      func Before (Left, Right : Dis_Vec.Index_Type)
+        -> Boolean is
+        (Chunk_Vec.Nth_Element (Left) <
+           Chunk_Vec.Nth_Element (Right));
+
+      func Swap (Left, Right : Dis_Vec.Index_Type) is
+         const Tmp : Elem_Type :=
+           Chunk_Vec.Nth_Element (Left);
+
+         Set_Nth_Element
+           (Chunk_Vec, Left, Chunk_Vec.Nth_Element (Right));
+         Set_Nth_Element (Chunk_Vec, Right, Tmp);
+      end Swap;
+
+      if Debug then
+         Println (My_Index |
+           ": About to sort sequentially chunk" |
+           Chunk_Index | " of length" |
+           Chunk_Vec.Length);
+      end if;
+
+      Quicksort (1, Chunk_Vec.Length, Before, Swap);
+   end loop;
+
+   //  Append the chunks in order
+   for I in 1 .. Num_Chunks loop
+      Vec.Append_Local_Vector
+        (Shuffler.Transfer_Matrix (I).New_Vector);
+   end loop;
+
+end func Hyper_Qsort;

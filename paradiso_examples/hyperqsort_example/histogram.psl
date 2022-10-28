@@ -1,0 +1,672 @@
+interface Histogram <Value_Type is Summable<>> is
+
+   type Natural is Integer {Natural >= 0};
+   type Positive is Integer {Positive > 0};
+
+   type Count_Type is Natural;
+
+   func Create(Size : Count_Type) -> Histogram;
+
+   type Index_Type_Base is Natural;
+   type Index_Type is Index_Type_Base {Index_Type > 0};
+
+   op "=?" (Left, Right : Histogram) -> Ordering;
+
+   func Combine (var Left : Histogram; Right : Histogram);
+
+   func Add_Value (var Accum : Histogram; Value : Value_Type);
+
+   func Min_Value (Histo : Histogram) -> optional Value_Type;
+
+   func Max_Value (Histo : Histogram) -> optional Value_Type;
+
+   func Average_Value (Histo : Histogram) -> Value_Type;
+     //  Zero if no values
+
+   func Sum_Of_Squares (Histo : Histogram) -> Value_Type;
+
+   func Num_Values (Histo : Histogram) -> Count_Type;
+
+   interface Bucket_Type<> is
+      const Low_Bound : Value_Type;
+      const Count : Count_Type;
+   end interface Bucket_Type
+
+   func First_Low_Bound (Histo : Histogram) -> optional Value_Type;
+   //  The low bound of the first non-zero bucket.
+
+   func Last_High_Bound (Histo : Histogram) -> optional Value_Type;
+   //  The high bound of the last non-zero bucket
+
+   func Num_Buckets_In_Use (Histo : Histogram) -> Index_Type_Base;
+   //  Number of buckets, counting only buckets from leftmost to rightmost
+   //  with a non-zero count.  Initially one.
+
+   func Nth_Bucket (Histo : Histogram; Index : Index_Type)
+     {Index <= Histo.Num_Buckets_In_Use()} -> Bucket_Type
+   //  Return Nth bucket, starting from the first non-zero bucket.
+
+   op "indexing" (Histo : Histogram; Index : Index_Type) -> Bucket_Type
+     is Nth_Bucket;
+
+   func Bucket_Width (Histo : Histogram) -> Value_Type;
+   //  This is zero when there are zero or one
+   //  distinct values in the histogram.
+
+   func Count_Max (Histo : Histogram) -> Count_Type;
+   //  Maximum count in any bucket
+
+   func Normalize (var Histo : Histogram);
+      //  Shift Counts array so first-non-zero-bucket = 1.
+
+   func Dump_Histo
+     (Histo : Histogram;
+      Max_Stars : Positive := 40;
+      Num_Digits : Positive := 10);
+   //  Dump the histogram using '*' to indicate number of values
+   //  in a given bucket, limited to a maximum of "Max_Stars" for
+   //  a given bucket.
+   //  Display the floating point values with Num_Digits.
+   //  Will use scientific notation if the largest value
+   //  is not in 0.1 .. 10 ** (Num_Digits-1).
+
+   func Dump_Diffs (Left, Right : Histogram);
+   //  Show how two histograms differ --  TBD: this is for debugging
+
+end interface Histogram;
+class Histogram is
+
+   type Count_Array is Array <Count_Type, Indexed_By => Index_Type>
+
+   const Size : Count_Type;
+
+   var Num_Values : Count_Type := 0;
+   var Count_Max : Count_Type := 0;  //  Max value in Counts array
+
+   var Min_Value : optional Value_Type := null;
+   var Max_Value : optional Value_Type := null;
+   var Sum : Value_Type := From_Int(0);
+   var Sum_Of_Squares : Value_Type := From_Int(0);
+
+   var First_Low_Bound : Value_Type := From_Int(0);
+      //  This value is irrelevant when Num_Values == 0
+   var Bucket_Width : Value_Type := From_Int(0);
+      //  This is zero when number of distinct values is <= 1
+
+   var First_Non_Zero_Bucket : Index_Type;
+      //  Index of leftmost non-zero bucket; lower-numbered buckets
+      //  are used for wrap-around.
+
+   var Num_Buckets_In_Use : Index_Type_Base := 0;
+      //  Counting only buckets from leftmost bucket
+      //  with a non-zero count to rightmost with non-zero count
+
+   var Counts : Count_Array;
+   //  Counts is actually a circular buffer, going First_Non_Zero .. Size,
+   //  wrapping around to use 1 .. First_Non_Zero - 1.
+
+   const Debug : Boolean := #false;
+
+   func Abs_Next_Power_Of_Two (Diff : Value_Type) -> Value_Type is
+      //  {Value_Type#Machine_Radix == 2}
+         //  TBD: For now presume radix == power of 2
+   //  Round abs (Diff) up to next power of 2
+
+      //  return 2.0 ** Value_Type'Exponent (Diff);
+      const Abs_Diff := |Diff|;
+      const Two : Value_Type := From_Int(2);
+
+      for I in 0 .. Integer::Range.Last forward loop
+         const Pow := Two ** I;
+
+         if Pow >= Diff then
+            return Pow;
+         end if;
+      end loop;
+      {#false}
+   end func Abs_Next_Power_Of_Two;
+
+   func Compute_Value_Index
+     (Accum : Histogram; Value : Value_Type) -> Index_Type is
+      //  Compute index as a func of Value and fields of Accum
+      //  First_Non_Zero_Bucket, First_Low_Bound, Bucket_Width, and Size.
+
+      if Accum.Bucket_Width == From_Int(0) then
+         return Accum.First_Non_Zero_Bucket;
+      else
+         return (Accum.First_Non_Zero_Bucket + 
+           Floor_To_Int ((Value - Accum.First_Low_Bound) /
+              Accum.Bucket_Width) - 1) mod Accum.Size + 1;
+      end if;
+   end func Compute_Value_Index;
+
+   func Adjust_For_New_Bounds
+     (var Accum : Histogram; New_Min, New_Max : Value_Type) is
+   //  Expand the bucket width and adjust other attributes of histogram
+   //  as necessary to accommodate new Min/Max values.
+      {Accum.Min_Value is null or else New_Min <= Accum.Min_Value}
+      {Accum.Max_Value is null or else New_Max >= Accum.Max_Value}
+
+      var New_Bucket_Width : Value_Type := Accum.Bucket_Width;
+
+   // begin Adjust_For_New_Bounds
+
+      if Accum.Min_Value is null
+        or else Accum.Max_Value is null
+        or else New_Min < Accum.Min_Value
+        or else New_Max > Accum.Max_Value
+      then
+         if Debug then
+            Println ("Adjusting for new bounds, New_Min = " | New_Min |
+                      ", New_Max = " | New_Max);
+         end if;
+         Check(Accum, "Before adjust");
+         //  Need to compute a new bucket width
+         if New_Max == New_Min then
+            //  All values are the same
+            Accum.Bucket_Width := From_Int(0);
+            Accum.First_Low_Bound := New_Min;
+            Accum.Num_Buckets_In_Use := 1;
+         else
+            //  Not all values are the same.
+            //  Compute a new bucket width.
+            New_Bucket_Width :=
+              Abs_Next_Power_Of_Two
+                ((New_Max - New_Min) / From_Int (Accum.Size));
+
+            //  Check if bucket width is big enough.
+            if Floor_To_Int (New_Max / New_Bucket_Width) -
+              Floor_To_Int (New_Min / New_Bucket_Width) >=
+                Accum.Size
+            then
+               //  Bucket width is too small
+               New_Bucket_Width := New_Bucket_Width * From_Int(2);
+            end if;
+
+            //  Bucket width should not decrease
+            {New_Bucket_Width >= Accum.Bucket_Width};
+
+            //  Compute new low bound of first non-zero bucket
+            const New_First_Low_Bound : Value_Type :=
+              New_Bucket_Width * From_Int (Floor_To_Int
+                                (New_Min / New_Bucket_Width));
+
+            const New_Num_Buckets_In_Use : Index_Type :=
+              Floor_To_Int ((New_Max - New_First_Low_Bound) /
+                New_Bucket_Width) + 1;
+            {New_Num_Buckets_In_Use <= Accum.Size};
+
+            if New_Bucket_Width > Accum.Bucket_Width then
+               //  Need to combine old buckets
+               var New_Counts : Count_Array := [for I in 1 .. Accum.Size => 0]
+               const New_First_Non_Zero_Bucket : Index_Type :=
+                 (Accum.Size - New_Num_Buckets_In_Use) / 2 + 1;
+                  //  Center the values in the Counts array
+
+               Accum.Count_Max := 0;
+               //  Accumulate into new buckets
+               for I in 0 .. Accum.Num_Buckets_In_Use - 1 forward loop
+                  const Old_Index : Index_Type :=
+                    (Accum.First_Non_Zero_Bucket + I - 1) mod
+                       Accum.Size + 1;
+                  const Old_Low_Bound : Value_Type :=
+                    Accum.First_Low_Bound +
+                      From_Int (I) * Accum.Bucket_Width;
+                  const New_Offset : Index_Type_Base :=
+                    Floor_To_Int
+                       ((Old_Low_Bound - New_First_Low_Bound) /
+                           New_Bucket_Width);
+                  const New_Index : Index_Type :=
+                    (New_First_Non_Zero_Bucket + New_Offset - 1) mod
+                       Accum.Size + 1;
+
+                  New_Counts [New_Index] += Accum.Counts [Old_Index];
+                  Accum.Count_Max := Max
+                    (Accum.Count_Max, New_Counts [New_Index]);
+               end loop;
+               Accum.Counts := New_Counts;
+               Accum.Bucket_Width := New_Bucket_Width;
+               Accum.First_Non_Zero_Bucket := New_First_Non_Zero_Bucket;
+            elsif New_Min < Accum.Min_Value then
+               //  Need to compute new non-first-zero index
+               Accum.First_Non_Zero_Bucket :=
+                 Compute_Value_Index (Accum, New_Min);
+            end if;
+
+            Accum.First_Low_Bound := New_First_Low_Bound;
+            Accum.Num_Buckets_In_Use := New_Num_Buckets_In_Use;
+         end if;
+         Accum.Min_Value := New_Min;
+         Accum.Max_Value := New_Max;
+      end if;
+      Check(Accum, "After Adjust");
+   end func Adjust_For_New_Bounds;
+
+   func Check(Histo : Histogram; Label : Univ_String) is
+   //  Make sure that all counts are zero outside
+   //  First_Non_Zero_Bucket .. First_Non_Zero_Bucket + Num_Buckets_In_Use - 1
+
+      const End_Bucket_Unwrapped :=
+        Histo.First_Non_Zero_Bucket + Histo.Num_Buckets_In_Use - 1;
+
+      const End_Bucket_Wrapped :=
+        (End_Bucket_Unwrapped - 1) mod Histo.Size + 1;
+
+      for I in 1 .. Histo.Size loop
+         
+         if I > End_Bucket_Unwrapped then
+            null;  --  Should be zero
+         elsif I < Histo.First_Non_Zero_Bucket
+           and then I > End_Bucket_Wrapped
+         then
+            null;  --  Should be zero
+         else
+            --  Need not be zero, so continue loop
+            continue loop;
+         end if;
+
+         if Histo.Counts[I] != 0 then
+            Println("`(Label): Histo[`(I)] != 0, First_NZ = `(
+              Histo.First_Non_Zero_Bucket), Num_In_Use = `(
+              Histo.Num_Buckets_In_Use)");
+            {#false}
+         end if;
+      end loop;
+   end func Check
+
+ exports
+
+   func Create(Size : Count_Type) -> Histogram is
+     ((Size => Size,
+       First_Non_Zero_Bucket => Size/2 + 1,
+       Counts => Create(1 .. Size, 0)));
+      //  We arbitrarily start first non-zero bucket in the middle.
+      //  TBD: should defaults be able to use earlier components?
+
+   func Num_Values (Histo : Histogram) -> Count_Type
+     is (Histo.Num_Values);
+
+   func Min_Value (Histo : Histogram) -> optional Value_Type
+     is (Histo.Min_Value);
+
+   func Max_Value (Histo : Histogram) -> optional Value_Type
+     is (Histo.Max_Value);
+
+   func First_Low_Bound (Histo : Histogram) -> optional Value_Type
+     is (Histo.First_Low_Bound);
+
+   func Num_Buckets_In_Use (Histo : Histogram) -> Index_Type_Base
+     is (Histo.Num_Buckets_In_Use);
+
+   func Bucket_Width (Histo : Histogram) -> Value_Type
+     is (Histo.Bucket_Width);
+
+   func Count_Max (Histo : Histogram) -> Count_Type
+     is (Histo.Count_Max);
+
+
+   func Add_Value (var Accum : Histogram; Value : Value_Type) is
+
+      if Accum.Min_Value is null
+          or else
+         Value not in Accum.Min_Value .. Accum.Max_Value
+      then
+         //  Adjust histogram bounds to encompass new value
+         Adjust_For_New_Bounds
+           (Accum,
+            New_Min => Min (Accum.Min_Value, Value),
+            New_Max => Max (Accum.Max_Value, Value));
+      end if;
+
+      //  Now incorporate new value into histogram
+      const Value_Index : Index_Type :=
+        Compute_Value_Index (Accum, Value);
+
+      Accum.Counts [Value_Index] := Accum.Counts [Value_Index] + 1;
+      Accum.Count_Max :=
+        Max (Accum.Count_Max, Accum.Counts [Value_Index]);
+      Accum.Num_Values += 1;
+      Accum.Sum += Value;
+      Accum.Sum_Of_Squares += Value * Value;
+      Check(Accum, "Add_Value");
+   end func Add_Value;
+
+   func Combine (var Left : Histogram; Right : Histogram) is
+
+      if Right.Min_Value is null then
+         //  Nothing to do
+         return;
+      end if;
+
+      if Left.Min_Value is null
+           or else
+         Right.Min_Value < Left.Min_Value
+           or else
+         Right.Max_Value > Left.Max_Value
+      then
+         //  Might have to widen the buckets
+         Adjust_For_New_Bounds
+           (Left,
+            New_Min => Min (Left.Min_Value, Right.Min_Value),
+            New_Max => Max (Left.Max_Value, Right.Max_Value));
+      end if;
+
+      //  Copy over the buckets from the Right accum into the Left accum
+      for I in 0 .. Right.Num_Buckets_In_Use - 1 forward loop
+         const Right_Low_Bound : Value_Type :=
+           Right.First_Low_Bound +
+             From_Int (I) * Right.Bucket_Width;
+         const Right_Index : Index_Type :=
+           (Right.First_Non_Zero_Bucket + I - 1) mod
+              Right.Size + 1;
+         const Left_Index : Index_Type :=
+           Compute_Value_Index (Left, Right_Low_Bound);
+
+         Left.Counts [Left_Index] += Right.Counts [Right_Index];
+         Left.Count_Max :=
+           Max (Left.Count_Max, Left.Counts [Left_Index]);
+      end loop;
+
+      Left.Num_Values += Right.Num_Values;
+      Left.Sum += Right.Sum;
+      Left.Sum_Of_Squares += Right.Sum_Of_Squares;
+      Check(Right, "Combine-Right");
+      Check(Left, "Combine-Left");
+   end func Combine;
+
+   func Average_Value (Histo : Histogram) -> Value_Type is
+
+      if Histo.Num_Values == 0 then
+         return From_Int(0);
+      else
+         return Histo.Sum / From_Int (Histo.Num_Values);
+      end if;
+   end func Average_Value;
+
+   func Sum_Of_Squares (Histo : Histogram) -> Value_Type is
+     (Histo.Sum_Of_Squares);
+
+   func Nth_Bucket (Histo : Histogram; Index : Index_Type)
+     -> Bucket_Type is
+      const Index_To_Use : Index_Type :=
+        (Index + Histo.First_Non_Zero_Bucket - 2) mod Histo.Size + 1;
+
+      return Bucket_Type::
+        (Low_Bound =>
+           Histo.First_Low_Bound + From_Int (Index - 1) * Histo.Bucket_Width,
+         Count => Histo.Counts [Index_To_Use]);
+   end func Nth_Bucket;
+
+   func Last_High_Bound (Histo : Histogram) -> optional Value_Type is
+   //  The high bound of the last non-zero bucket
+
+      if Histo.First_Low_Bound is null then
+         return null;
+      else
+          return Histo.First_Low_Bound +
+           From_Int (Histo.Num_Buckets_In_Use) * Histo.Bucket_Width;
+      end if;
+   end func Last_High_Bound;
+
+   func Normalize (var Histo : Histogram) is
+      //  Shift Counts array so first-non-zero-bucket == 1.
+
+      if Histo.First_Non_Zero_Bucket != 1 then
+         const Copy := Histo;
+         const Old_Counts : Count_Array := Histo.Counts;
+
+         for I in 1 .. Histo.Size loop
+            Histo.Counts [I] := Old_Counts
+              [(Histo.First_Non_Zero_Bucket + I - 2) mod Histo.Size + 1];
+         end loop;
+         Histo.First_Non_Zero_Bucket := 1;
+         Check (Histo, "Normalize");
+         if Copy != Histo then
+            Println("Differences after Normalize:");
+            Dump_Diffs (Copy, Histo);
+         end if;
+      end if;
+   end func Normalize;
+
+   op "=?" (Left, Right : Histogram) -> Ordering is
+   //  Return equal if would be equal after normalizing
+
+      if Left.Size != Right.Size then
+         return #unordered;
+      end if;
+      for I in 1 .. Left.Size loop
+         if Left.Counts
+              [(Left.First_Non_Zero_Bucket + I - 2) mod Left.Size + 1] !=
+            Right.Counts
+              [(Right.First_Non_Zero_Bucket + I - 2) mod Right.Size + 1]
+         then
+            return #unordered;
+         end if;
+      end loop;
+      return #equal;
+   end op "=?";
+
+   func Dump_Histo
+     (Histo : Histogram;
+      Max_Stars : Positive := 40;
+      Num_Digits : Positive := 10) is
+   //  Dump the histogram using '*' to indicate number of values
+   //  in a given bucket, limited to a maximum of "Max_Stars" for
+   //  a given bucket.
+   //  Display the floating point values with Num_Digits.
+   //  Will use scientific notation if the largest value
+   //  is not in 0.1 .. 10 ** (Num_Digits-1).
+
+      func Log_Base_10 (Val : Value_Type) -> Univ_Integer is
+         const Ten : Value_Type := From_Int (10);
+
+         for I in 0 .. Integer::Range.Last forward loop
+            //  Println ("In Log_Base_10, I = `(I)");
+            if Ten ** I > Val then
+               return Max (0, I-1);
+            end if;
+            //  Println ("In Log_Base_10, Ten**I = `(Ten**I)");
+         end loop;
+         {#false}
+      end func Log_Base_10;
+
+      const Biggest : Value_Type :=
+        Max (abs (Histo.Min_Value), abs (Histo.Max_Value));
+
+      const Ten : Value_Type := From_Int (10);
+      const Use_Scientific_Notation : Boolean :=
+        Biggest not in Ten ** (-1) .. Ten ** (Num_Digits - 1);
+
+      const Width : Positive :=
+        (if Use_Scientific_Notation then Num_Digits + 8 else Num_Digits + 4);
+
+      const Aft : Natural :=
+        (if Use_Scientific_Notation then Width - 6
+         elsif Biggest < From_Int(1) then Num_Digits
+         else Num_Digits - 1 - 
+             Log_Base_10 (Biggest));
+
+      func Padded_Image (Val : Value_Type) -> Univ_String is
+      //  Image of Val, expanded to Width, using scientific notation
+      //  if Use_Scientific_Notation is True.
+         
+         var Result : Univ_String;
+
+         if Use_Scientific_Notation then
+            //  TBD: Scientific notation ??
+            Result := To_String (Val)
+         else
+            Result := To_String (Val)
+         end if;
+
+         if |Result| < Width then
+            return (Width - |Result|) * ' ' | Result;
+         elsif |Result| > Width then
+            return Result [1 .. Width-2] | "**";
+         else
+            return Result;
+         end if;
+      end func Padded_Image;
+
+   // begin Dump_Histo
+
+      //  Display histogram
+      Println ("Histogram:");
+
+      if Histo.Num_Values == 0 then
+         Println (" No values in histogram.");
+         return;  //  Quit now
+      end if;
+
+      Println (" Num values:" | Histo.Num_Values |
+        ", Min:" | Padded_Image (Histo.Min_Value) |
+        ", Max:" | Padded_Image (Histo.Max_Value));
+
+      Println (" Average:" | Padded_Image (Histo.Average_Value()) |
+        ", Sum of Sq.:" | Padded_Image (Histo.Sum_Of_Squares()));
+
+      Println (" Bucket width:" | Padded_Image (Histo.Bucket_Width) |
+        ", Num buckets:" | Histo.Num_Buckets_In_Use |
+        ", Count max:" | Histo.Count_Max);
+
+      for Buck in 1 .. Histo.Num_Buckets_In_Use forward loop
+         const Bucket := Histo [Buck];
+         const Star_Count : Natural :=
+           (if Histo.Count_Max <= Max_Stars then Bucket.Count
+            else Bucket.Count * Max_Stars / Histo.Count_Max);
+
+         Println ("  >=" | Padded_Image (Bucket.Low_Bound) |
+           " " | Star_Count * '*');
+      end loop;
+
+   end func Dump_Histo;
+
+   func Dump_Diffs (Left, Right : Histogram) is
+   //  Show how two histograms differ //  TBD: this is for debugging
+
+      if Left.Num_Values != Right.Num_Values then
+         Println ("  Num_Values: " | Left.Num_Values | " != " |
+           Right.Num_Values);
+      end if;
+      if Left.Count_Max != Right.Count_Max then
+         Println ("  Count_Max: " | Left.Count_Max | " != " |
+           Right.Count_Max);
+      end if;
+      if Left.Min_Value != Right.Min_Value then
+         Println ("  Min_Value: " | Left.Min_Value | " != " |
+           Right.Min_Value);
+      end if;
+      if Left.Max_Value != Right.Max_Value then
+         Println ("  Max_Value: " | Left.Max_Value | " != " |
+           Right.Max_Value);
+      end if;
+      if Left.Sum != Right.Sum then
+         Println ("  Sum: " | Left.Sum | " != " |
+           Right.Sum);
+      end if;
+      if Left.Sum_Of_Squares != Right.Sum_Of_Squares then
+         Println ("  Sum_Of_Squares: " | Left.Sum_Of_Squares | " != " |
+           Right.Sum_Of_Squares);
+      end if;
+      if Left.First_Low_Bound != Right.First_Low_Bound then
+         Println ("  First_Low_Bound: " | Left.First_Low_Bound | " != " |
+           Right.First_Low_Bound);
+      end if;
+      if Left.Bucket_Width != Right.Bucket_Width then
+         Println ("  Bucket_Width: " | Left.Bucket_Width | " != " |
+           Right.Bucket_Width);
+      end if;
+      if Left.First_Non_Zero_Bucket != Right.First_Non_Zero_Bucket then
+         Println ("  First_Non_Zero_Bucket: " |
+           Left.First_Non_Zero_Bucket | " != " |
+           Right.First_Non_Zero_Bucket);
+      end if;
+      if Left.Num_Buckets_In_Use != Right.Num_Buckets_In_Use then
+         Println ("  Num_Buckets_In_Use: " | Left.Num_Buckets_In_Use | " != " |
+           Right.Num_Buckets_In_Use);
+      end if;
+      if (for some I of Left.Counts.Bounds =>
+            Left.Counts[I] != Right.Counts[I])
+      then
+         var Norm_Left : Histogram := Left;
+         var Norm_Right : Histogram := Right;
+      
+         Normalize (Norm_Left);
+         Normalize (Norm_Right);
+         if (for some I of Norm_Left.Counts.Bounds =>
+               Norm_Left.Counts[I] != Norm_Right.Counts[I])
+         then
+            Println ("  Counts: ");
+            for I in Norm_Left.Counts.Bounds forward loop
+               Println ("`(Norm_Left.Counts [I]) `(Norm_Right.Counts [I])");
+            end loop;
+         end if;
+      
+      end if;
+   end func Dump_Diffs;
+end class Histogram;
+
+import Histogram;
+
+func Test_Histo(Len : Univ_Integer := 100; Num_Rand : Univ_Integer := 6) is
+
+   --  For Random
+   const Seed := Len * Num_Rand;
+   var Gen : Random := Start (Seed => Seed);
+
+   type Flt_Histo is Histogram <Value_Type => Float>;
+      --  Flt_Histo has one discriminant, Size.
+      --  The low and high bounds, and the width of each bucket will
+      --  automatically shift to accommodate values as they are added.
+      --  The bounds will be a multiple of the bucket width.
+      --  The widths of the buckets will double as needed to fit all
+      --  of the values, so one outlier could cause the buckets to
+      --  become very wide.  One could imagine eventually recognizing
+      --  outliers somehow, and e.g., limiting bounds to 2 or 3 std. devs.
+      --  from the mean.
+
+   var Histo : Flt_Histo := Create(Size => 20);
+   var Histo2 : Flt_Histo := Create(Size => 20);
+   var Histo3 : Flt_Histo := Create(Size => 20);
+   const Histo_Identity : Flt_Histo := Histo;
+
+   Println ("Seed =" | Seed);
+
+   for I in 1 .. Len forward loop
+      var Val : Float := 0.0;
+
+      for J in 1 .. Num_Rand loop
+         Val += Next_Real (Gen);
+      end loop;
+      Histo.Add_Value (Val * 10.0);
+      Histo2.Add_Value (Val * 10.0);
+
+      if I != Len
+        and then (I mod (Len / 5) == 0 or else I <= 4)
+      then
+         Dump_Histo (Histo);
+
+         --  Combine histograms
+         Histo3.Combine (Histo2);
+
+         --  Reset histogram (should not be necessary?)
+         Histo2 := Histo_Identity;
+      end if;
+   end loop;
+
+   --  Do final combination
+   Histo3.Combine (Histo2);
+
+   Dump_Histo (Histo);
+
+   if Histo3 != Histo then
+      Println
+        ("Histogram created by Combine not same as one using Add_Value:");
+      Println ("Differences: ");
+      Dump_Diffs (Histo, Histo3);
+   else
+      Println
+        ("Histogram created by Combine matches one using Add_Value.");
+   end if;
+
+end func Test_Histo;

@@ -1,0 +1,129 @@
+interface Fifo_Queue<Element_Type is Assignable<>> is
+  // First-in, First-out queue
+    op "[]"() -> Fifo_Queue;
+      // Create an empty queue
+
+    op "|="(var Fifo_Queue; Elem : Element_Type);
+      // Add an element to the queue
+
+    op "<|="(var Fifo_Queue; var Elem : optional Element_Type)
+      {Elem not null; Elem' is null};
+      // Move an element into the queue
+
+    func Remove_First(var Fifo_Queue) -> optional Element_Type;
+      // Remove first element of the queue.
+      // Return null if queue is empty.
+
+end interface Fifo_Queue;
+
+class Fifo_Queue is
+    var Data : Vector<optional Element_Type>;
+    var Next : Univ_Integer;
+    const Debug : Boolean := #false;
+  exports
+    // Invariant:
+
+    // {for all I in Next .. Length(Data) => Data[I] not null}
+
+    op "[]"() -> Fifo_Queue is
+      // Create an empty queue
+        if Debug then
+            Println("\n \"[]\": Created empty queue");
+        end if;
+        return (Data => [], Next => 1);
+    end op "[]";
+
+    op "|="(var Fifo_Queue; Elem : Element_Type) is
+      // Add an element to the queue
+        Fifo_Queue.Data |= Elem;
+        if Debug then
+            Println("\n \"|=\": Queue next " | Fifo_Queue.Next |
+              ", len " | Length(Fifo_Queue.Data));
+        end if;
+    end op "|=";
+
+    op "<|="(var Fifo_Queue; var Elem : optional Element_Type) is
+      // Move an element into the queue
+        {Elem not null}
+        Fifo_Queue.Data <|= Elem;
+        if Debug then
+            Println("\n \"<|=\": Queue next " | Fifo_Queue.Next |
+              ", len " | Length(Fifo_Queue.Data));
+        end if;
+        {Elem is null};
+    end op "<|=";
+
+    func Remove_First(var Fifo : Fifo_Queue) 
+      -> Result : optional Element_Type is
+      // Remove first element of the queue
+        if Debug then
+            Println("\n Before Remove_First: Queue next " | Fifo.Next |
+              ", len " | Length(Fifo.Data));
+        end if;
+        case Fifo.Next =? Length(Fifo.Data) of
+          [#less] =>
+            Result <== Fifo.Data[Fifo.Next];
+            Fifo.Next += 1;
+          [#equal] =>
+            Result <== Fifo.Data[Fifo.Next];
+            // Queue now empty, so reinitialize it
+            Fifo.Data := [];
+            Fifo.Next := 1;
+          [#greater] =>
+            // Queue is empty
+            Result := null;
+        end case;
+        if Debug then
+            Println("\n After Remove_First: Queue next " | Fifo.Next |
+              ", len " | Length(Fifo.Data));
+        end if;
+    end func Remove_First;
+end class Fifo_Queue;
+
+interface Fifo_Queue::IO<> is
+    func Print_Queue(Q : Fifo is Fifo_Queue<Imageable>);
+end interface Fifo_Queue::IO;
+
+class Fifo_Queue::IO is
+  exports
+    func Print_Queue(Q : Fifo is Fifo_Queue<Imageable>) is
+        Print("[");
+        var Sep := "";
+        for E in Q forward loop
+            Print(Sep | E);
+            Sep := ", ";
+        end loop;
+        Println("]");
+    end func Print_Queue;
+end class Fifo_Queue::IO;
+
+import Fifo_Queue::IO::*;
+
+func Test_Fifo (X, Y, Z : Univ_Integer) is
+            
+    type UI_Fifo is Fifo_Queue<Univ_Integer>;
+
+    var Q : UI_Fifo := [X, Y, Z];
+
+    Print("Initial Queue: "); Print_Queue(Q);
+
+    loop
+        const Elem := Q.Remove_First();
+        Println("Removed " | Elem);
+        if Elem is null then
+            exit loop;
+        end if;
+        Print("Queue now: "); Print_Queue(Q);
+        if Elem == Y then
+            Println("Adding back another " | X);
+            Q |= X;
+            Print("Queue now: "); Print_Queue(Q);
+        end if;
+    end loop;
+
+end func Test_Fifo;
+
+import Test_Fifo;
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Fifo (20, 10, 30);
+end func main;

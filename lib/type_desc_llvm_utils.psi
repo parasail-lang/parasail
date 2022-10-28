@@ -1,0 +1,142 @@
+import PSL::Short_Names::*
+import PSC::LLVM_Printer
+import PSC::LLVM_Top_Level_Op
+import PSC::Reflection
+
+interface PSC::Type_Desc_LLVM_Utils<> is
+   //  Routines for generating LLVM to access information
+   //  from type descriptors, generate and test for null, 
+   //  make indirect calls through type-descriptor tables, etc.
+
+   //  Declare the LLVM types used for type descriptors, etc.
+   func Declare_Type_Desc_LLVM_Types (var LL : LLVM_Printer);
+
+   //  Get Nth item from type descriptor
+   func Get_Nth_Type_Area_Item_Physical_Address
+      (var TLO : LLVM_Top_Level_Op;
+       Gets, TDesc : String;
+       Locator : Reflection::Object_Locator)
+
+   //  Place a pointer to the type descriptor at Loc
+   //  relative to Cur_Type_Desc, in the LLVM identifier Desc
+   func Get_Type_Desc_Or_Op_Map
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Cur_Type_Desc : String;
+       Loc : Reflection::Object_Locator;
+       Desc : String);
+
+   //  Place a pointer to the formal type descriptor at Loc
+   //  relative to Cur_Type_Desc, in the LLVM identifier Desc
+   func Get_Formal_Type_Or_Op_Map
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Cur_Type_Desc : String;
+       Loc : Reflection::Object_Locator;
+       Desc : String);
+
+   //  Place a pointer to the nested type descriptor at Loc
+   //  relative to Cur_Type_Desc, in the LLVM identifier Desc
+   func Get_Nested_Type_Or_Op_Map
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Cur_Type_Desc : String;
+       Loc : Reflection::Object_Locator;
+       Desc : String);
+
+   //  Put a local Null for the type identified by Desc into Nullreg
+   //  presuming that the current context is in llvm reg "%_Context"
+   func Get_Local_Null
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Desc : String;
+       Nullreg : String);
+
+   //  Put a large local Null into Nullreg
+   //  presuming that the current context is in llvm reg "%_Context"
+   func Get_Large_Local_Null
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Nullreg : String);
+
+   //  Put a Null for the type identified by Desc into Nullreg
+   //  using the region of the Source object
+   func Get_Null_In_Region
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Desc : String;
+       Nullreg : String;
+       Source : String);
+
+   //  Put a large Null into Nullreg
+   //  using the region of the Source object
+   //  The optional parameter Last_Label, if non-null, is the last label
+   //  in the sequence of LLVM instructions that compute the value
+   //  in Nullreg, as needed for a "phi" instruction.
+   func Get_Large_Null_In_Region
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Nullreg : String;
+       Source : String;
+       Last_Label : optional String := null);
+
+   //  Put a boolean result into Result_Bit, appropriate to either
+   //  "is null" (For_Not_Null => #false) or "not null" (For_Not_Null => #true)
+   //  based on type descriptor in Desc and value to test in Arg
+   func Test_For_Null
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Desc : String;
+       Arg : String;
+       Result_Bit : String;
+       For_Not_Null : Boolean := #false);
+
+   //  Put a boolean result into Result_Bit, appropriate to either
+   //  "is null" (For_Not_Null => #false) or "not null" (For_Not_Null => #true)
+   //  for a "large" potentially null value.
+   func Test_For_Large_Null
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Arg : String;
+       Result_Bit : String;
+       For_Not_Null : Boolean := #false);
+
+   //  Put into Str_Val a string based on Str_Id_Val
+   //  using In_Same_Region_As for region, if non-null
+   func Get_Str
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Str_Id_Val : String;
+       Str_Val : String;
+       In_Same_Region_As : optional String := null);
+
+   //  Other routines to implement "in line":
+   //  - get_type_desc_or_op_map when area is an enclosing type
+
+   //  Would be worth having versions that would allow something
+   //  like stg-rgn "0" to represent allocated on stack.
+   //  Especially new_object and copy_object and assign_word (LHS 0)
+   //  Might not want to actually use stg-rgn 0, in case components
+   //  need a stg-rgn, so could perhaps use a special value of length,
+   //  or some other flag in the object header.
+
+   //  These are probably harder to do inline, though we might be able
+   //  to fast path certain cases (especially when object is small):
+   //  - create_polymorphic_obj
+   //                 --  the large-local-null and rgn_of_large_obj should be
+   //                 --  inline.
+   //  - assign_word  --  if type is small or LHS is special, just do assign.
+   //                 --  if LHS is big region 0, nothing to release
+   //  - copy_object  --  if type is small or obj is big null, is trivial
+   //                 NOTE: this does *not* do reclamation -- it returns a copy
+   //  - concat_string
+   //  - assign_concat_string
+   //  - new_object  -- if type is small, trivial (comes from Create_Obj_Op)
+   //  - execute_compiled_nth_op_of_type
+   //  - create_lock_for_obj
+   //  - create_polymorphic_obj
+   //  - move_object -- if type is small, trivial;
+   //                   if type is large and both are null, do nothing.
+   //  - finalize_stg_rgn -- if nothing to free, should be almost trivial
+
+end interface PSC::Type_Desc_LLVM_Utils

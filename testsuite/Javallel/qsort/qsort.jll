@@ -1,0 +1,163 @@
+// Example Javallel program -- QuickSort
+// Thanks to R. McKinley for enhanced conversion of testSort
+
+// Copyright (C) 2011-2013, AdaCore, New York, NY
+// To be used only for Personal, Academic, or Evaluation Purposes;
+// Not for Commercial Production Use.
+// Report errors at http://www.javallel.org
+
+class interface Sorting<Indexable<Comparable<>, Countable<>> as ArrayType> {
+    void quicksort(var ArrayType A);
+          // Sort Arr according to the sorting op "<" which returns
+          // True if Left must appear before Right in the sorted order.
+          // "<" returns False if Left need not appear before Right.
+}
+
+class Sorting {
+  public
+    void quicksort(var ArrayType A) {
+        // Handle short arrays directly.  Partition longer arrays.
+        for Slice<ArrayType> Arr => A[..] while length(Arr) > 1 {
+            if length(Arr) == 2 {
+               if Arr[Arr.Last] < Arr[Arr.First] {
+                   // Swap elements
+                   Arr[Arr.First] <=> Arr[Arr.Last];
+               }
+            } else {
+               // Partition array
+               final Mid = Arr[Arr.First + length(Arr)/2];
+               var Left = Arr.First;
+               var Right = Arr.Last;
+               until Left > Right {
+                   var NewLeft = Right+1;
+                   var NewRight = Left-1;
+
+                 then
+
+                   // Find item in left half to swap
+                   for I in Left .. Right forward {
+                       if not (Arr[I] < Mid) {
+                           // Found an item that can go into right partitition
+                           NewLeft = I;
+                           if Mid < Arr[I] {
+                               // Found an item that *must* go into right part
+                               break;
+                           }
+                       }
+                   }
+                 ||  
+                   // Find item in right half to swap
+                   for J in Left .. Right reverse {
+                       if not (Mid < Arr[J]) {
+                           // Found an item that can go into left partitition
+                           NewRight = J;
+                           if Arr[J] < Mid {
+                               // Found an item that *must* go into left part
+                               break;
+                           }
+                       }
+                   }
+
+                 then 
+                 
+                   if NewLeft > NewRight {
+                       // Nothing more to swap
+                       // break and recurse on two partitions
+                       Left = NewLeft;
+                       Right = NewRight;
+                       break;
+                   }
+                 
+                   // Swap items
+                   Arr[NewLeft] <=> Arr[NewRight];
+                 
+                   // continue looking for items to swap
+                   Left = NewLeft + 1;
+                   Right = NewRight - 1;
+               }
+               
+               // At this point, "Right" is right end of left partition
+               // and "Left" is left end of right partition
+               // and the partitions don't overlap
+               // and neither is the whole array
+               // and everything in the left partition can precede Mid
+               // and everything in the right partition can follow Mid
+               // and everything between the partitions is equal to Mid.
+               {> Left > Right;
+                Right < Arr.Last;
+                Left > Arr.First <}
+
+                {> (for all I in Arr.First .. Right => not (Mid < Arr[I]));
+                (for all J in Left .. Arr.Last => not (Arr[J] < Mid));
+                (for all K in Right+1 .. Left-1 => 
+                  not (Mid < Arr[K]) and not (Arr[K] < Mid)) <}
+               
+             then
+               // continue with two halves in parallel
+               continue with Arr => Arr[Arr.First .. Right];
+             ||
+               continue with Arr => Arr[Left .. Arr.Last];
+            }
+        }
+    }
+}
+
+void testSort(UnivInteger len) {
+    // For Random
+    final mult = 7**5;
+    final md = 2**31 - 1;
+    var ran = Random.start(len, mult, md);
+
+    println("Seed = " + len + ", mult = " + mult + ", md = " + md);
+
+    type MySorter is Sorting<Vector<UnivInteger>>;
+    var Vector<UnivInteger> vec = [];
+
+    for i in 0..<len {
+        vec |= ran.next() mod 100;
+    }
+
+    var vec2 = vec;
+
+    println("Before sort, vec = ");
+    for i in 0 ..< vec.length() forward {
+        print(" " + vec[i]);
+        if i < vec.length() {
+            print(",");
+            if i mod 10 == 9 {
+                println("");
+            }
+        }
+    }
+    println("");
+
+    MySorter.quicksort(vec);
+    {> (for all i in 1 ..< vec.length() => vec[i-1] <= vec[i]) <}
+
+    println("After sort, vec = ");
+    for i in 0 ..< vec.length() forward {
+        print(" " + vec[i]);
+        if i < vec.length() {
+            print(",");
+            if i mod 10 == 9 {
+                println("");
+            }
+        }
+    }
+    println("");
+
+    MySorter.quicksort(vec2);
+
+    println("After 2nd sort, vec2 = ");
+    for i in 0 ..< vec2.length() forward {
+        print(" " + vec2[i]);
+        if i < vec2.length() {
+            print(",");
+            if i mod 10 == 9 {
+                println("");
+            }
+        }
+    }
+    println("");
+
+}

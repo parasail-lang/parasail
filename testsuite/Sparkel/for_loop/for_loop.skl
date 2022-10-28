@@ -1,0 +1,51 @@
+func First_Time
+  (var Seen : Countable_Set<Univ_Integer>;
+          I : Univ_Integer) 
+  return Boolean
+is
+    if I in Seen then
+	-- Already seen it
+	return #False;
+    end if;
+
+    Seen |= I;
+    return #True;
+end func First_Time;
+
+proc Test_For_Loop(X, Y : Univ_Integer) is
+
+    Println("unordered loop:");
+    for I in X..Y loop
+	Println("I = " | I);
+    end loop;
+
+    Println("forward loop:");
+    for I in X..Y forward loop
+	Println("I = " | I);
+    end loop;
+
+    Println("reverse loop:");
+    for I in X..Y reverse loop
+	Println("I = " | I);
+    end loop;
+
+    Println("parallel loop:");
+    for I in X..Y parallel loop
+	Println("I = " | I);
+    end loop;
+
+    Println("then/while loop:");
+    for I := X then I+1 while I <= Y loop
+	Println("I = " | I);
+    end loop;
+
+    var Seen : Countable_Set<Univ_Integer> := [];
+    Println("then/while loop, combinations of powers of 2 and 3:");
+    for I := X then 2*I || 3 * I while 
+      I <= Y and then First_Time(Seen, I) loop
+	-- Only print it the first time
+	-- Println("I = " | I | ", Seen = " | Count(Seen));
+	Println("I = " | I);
+    end loop;
+
+end proc Test_For_Loop;

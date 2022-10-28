@@ -1,0 +1,44 @@
+interface Countable<> is
+    op "+"(Left : Countable; Right : Univ_Integer) -> Countable
+      is import("+");
+    op "+"(Left : Univ_Integer; Right : Countable) -> Countable
+      is import("+");
+    op "-"(Left : Countable; Right : Countable) -> Univ_Integer
+      is import("-");
+    op "-"(Left : Countable; Right : Univ_Integer) -> Countable
+      is import("-");
+end interface Countable;
+
+interface Interval<Bound_Type is Countable<>> is
+    op ".."(Left, Right : Bound_Type) -> Interval;
+    func First(I : Interval) -> Bound_Type;
+    func Last(I : Interval) -> Bound_Type;
+end interface Interval;
+    
+class Interval<Bound_Type is Countable<>> is
+    const Low_Bound : Bound_Type;
+    const High_Bound : Bound_Type;
+  exports
+    op ".."(Left, Right : Bound_Type) -> Interval is
+	return (Low_Bound => Left, High_Bound => Right);
+    end op "..";
+
+    func First(I : Interval) -> Bound_Type is
+	return I.Low_Bound;
+    end func First;
+	
+    func Last(I : Interval) -> Bound_Type is
+	return I.High_Bound;
+    end func Last;
+
+end class Interval;
+
+func Test_Interval(Left, Right : Univ_Integer) is
+    var I1 : Interval<Univ_Integer> := Left..Right;
+    var I2 : Interval<Univ_Integer> := First(I1)*2 .. Last(I1)*2;
+    Print("First(I2) = " | First(I2) | ", Last(I2) = " | Last(I2) | "\n");
+end func Test_Interval;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Interval (10, 20);
+end func main;

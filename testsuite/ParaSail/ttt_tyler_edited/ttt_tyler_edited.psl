@@ -1,0 +1,87 @@
+interface Tic_Tac_Toe<> is
+	func Create() -> Tic_Tac_Toe;
+	//Sets all the values so the player can start playing
+	func DrawGameBoard(Game : Tic_Tac_Toe);
+	//Renders the Game Board
+	func Flip_Coin(var Game : Tic_Tac_Toe);
+	//Picks who goes first at start of game
+	func Take(var Game : Tic_Tac_Toe;
+          Row : Univ_Integer ; Column : Univ_Integer);
+	//Lets player select the box the want to claim
+end interface Tic_Tac_Toe;
+
+class Tic_Tac_Toe is
+	var Slots : Vector<Univ_Character>;
+	var Running : Boolean;
+	exports
+	func Create() -> Tic_Tac_Toe is
+           var Game : Tic_Tac_Toe :=
+             (Slots => [for I in 1..9 => ' '], Running => #true);
+           Println("Game Started.");
+
+           Game.DrawGameBoard();
+           Game.Flip_Coin();
+           return Game;
+	end func Create; 
+
+	func Flip_Coin(var Game : Tic_Tac_Toe) is
+	//figure out how to use int and rand numbers to randomize this
+		Println("You get the first move.");
+		Println("Type take(x,y) for the slot you want");
+		Println("	ex. Take(1,1)")
+	end func Flip_Coin;
+	
+	func DrawGameBoard(Game : Tic_Tac_Toe) is
+		Println("_|___1___|___2___|___3___|");
+		Println(" |       |       |       |");
+		Println("1|   "|Game.Slots[1]|"   |   "|Game.Slots[2]|
+                  "   |   "|Game.Slots[3]|"   |");
+		Println(" |       |       |       |");
+		Println("-|-------|-------|-------|");
+		Println(" |       |       |       |");
+		Println("2|   "|Game.Slots[4]|"   |   "|Game.Slots[5]|
+                  "   |   "|Game.Slots[6]|"   |");
+		Println(" |       |       |       |");
+		Println("-|-------|-------|-------|");
+		Println(" |       |       |       |");
+		Println("3|   "|Game.Slots[7]|"   |   "|Game.Slots[8]|
+                  "   |   "|Game.Slots[9]|"   |");
+		Println(" |       |       |       |");
+		Println("-|-------|-------|-------|");
+
+	end func DrawGameBoard;
+
+	func Take(var Game : Tic_Tac_Toe;
+          Row : Univ_Integer ; Column : Univ_Integer) is
+		Game.Slots[Row * Column] := 'X'
+	end func Take;
+
+end class Tic_Tac_Toe;
+
+func help() is
+      Println("Type \"start\" to begin");
+      Println("")
+end func help;
+
+func start() is
+    var Game : Tic_Tac_Toe := Create();
+
+    loop
+        const Command : Univ_String := Readln();
+        if Command == "quit" then
+            exit loop;
+        end if;
+        if Command[1..5] == "take(" then
+            const Row : Univ_Integer := From_String(Command[6..6]);
+            const Col : Univ_Integer := From_String(Command[8..8]);
+            Println("Taking row " | Row | " and column " | Col);
+            Game.Take(Row, Col);
+            Game.DrawGameBoard();
+        end if;
+    end loop;
+
+end func start;
+
+func main(Args : Basic_Array<Univ_String>) is
+   start ();
+end func main;

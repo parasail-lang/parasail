@@ -1,0 +1,150 @@
+// The following example is an implementation of Dijkstra's shortest path
+// algorithm in a directed graph with positive distances.
+
+interface Shortest_Paths<Graph is WGraph<Assignable<>, Float<>>> is
+
+   type Node_Id is Graph::Node_Id;
+   type Distance is Graph::Weight;
+
+   type Path is new Doubly_Linked_List <Node_Id>;
+
+   func Shortest_Path
+     (G : Graph; Source : Node_Id; Target : Node_Id)
+        {not Is_Empty(Successors(G[Source]))}
+       -> Path;
+
+end interface Shortest_Paths;
+
+class Shortest_Paths is
+  exports
+   func Shortest_Path
+     (G : Graph; Source : Node_Id; Target : Node_Id) -> Path
+   is
+      const All := Node_Range(G);
+      var Reached  : Array<Boolean, Indexed_By => Node_Id> :=
+        Create(All, #false);
+
+      // The set of nodes whose shortest distance to the source is known.
+
+      var Reached_From : Array<optional Node_Id, Indexed_By => Node_Id> :=
+        Create(All, null);
+      const Distance_Last := 10.0E10;  // TBD; Distance'Last
+      var So_Far   : Array<Distance, Indexed_By => Node_Id> :=
+        Create(All, Distance_Last);
+      var The_Path : Path := [];
+      var Nearest_Distance : Distance;
+      var Next     : Node_Id;
+   
+      So_Far[Source]  := 0.0;
+
+      while not Reached[Target] loop
+         Nearest_Distance := Distance_Last;
+
+         // Find closest node not reached yet, by iterating over all nodes.
+         // A more efficient algorithm uses a priority queue for this step.
+
+         Next := Source;
+         for N in All_Nodes(G) loop
+            if not Reached[N]
+              and then So_Far[N] < Nearest_Distance then
+                 Next := N;
+                 Nearest_Distance := So_Far[N];
+            end if;
+         end loop;
+
+         if Nearest_Distance == Distance_Last then  
+            // No next node found, graph is not connected
+            Println("Graph is not connected");
+            return [];
+         else
+            Reached[Next] := #true;
+         end if;
+
+         // Update minimum distance to newly reachable nodes.
+
+         const Dist_Next := So_Far[Next];
+         for To in Successors(G, Next) concurrent loop
+            if not Reached[To] then
+               const Dist_To := Dist_Next + G.Edge_Weight(Next, To);
+
+               if Dist_To < So_Far[To] then
+                  Reached_From[To] := Next;
+                  So_Far[To] := Dist_To;
+               end if;
+            end if;
+         end loop;
+      end loop;
+
+      // Rebuild path from target to source.
+
+      var N : Node_Id := Target;
+
+      while N != Source loop
+         N := Reached_From[N];
+         Prepend (The_Path, N);
+      end loop;
+
+      return The_Path;
+   end func Shortest_Path;
+end class Shortest_Paths;
+
+func help() is
+   Println("Test_Path \"abbccddeefacdf\" \"af\"");
+end func help;
+
+func Test_Path(Graph_Str : Univ_String; From_To : Univ_String) is
+   const Len := Length(Graph_Str);
+   {Len mod 2 == 0}
+
+   {Length(From_To) == 2}
+   type GChar is WGraph<Univ_Character, Float>;
+
+   var G : GChar := [];
+   var Node_Map :
+     Map<Key_Type => Univ_Character, Value_Type => GChar::Node_Id> := [];
+
+   Println("Build up the graph, given pairs of characters");
+   var I := 1;
+   while I < Len loop
+      const From := Graph_Str[I];
+      const To := Graph_Str[I+1];
+      if From not in Node_Map then
+         Node_Map[From] := G.Add_Node(From);
+      end if;
+      if To not in Node_Map then
+         Node_Map[To] := G.Add_Node(To);
+      end if;
+      G.Add_Edge(From => Node_Map[From], To => Node_Map[To], Weight => 1.0);
+      I += 2;
+   end loop;
+
+   Println("Here is the graph");
+   for N in All_Nodes(G) loop
+      for S in Successors(G, N) loop
+         Println(G[N] | " -> " | G[S] | "<" | G.Edge_Weight(N, S) | ">;");
+      end loop;
+   end loop;
+
+   Println("These are the roots:");
+   for N in Roots(G) loop
+      Print(" " | G[N]);
+   end loop;
+   Print('\n');
+   
+   const From_Node := Node_Map[From_To[1]];
+   const To_Node := Node_Map[From_To[2]];
+
+   {From_Node not null}
+   {To_Node not null}
+
+   Println("Now determine shortest path between " | G[From_Node] | " and " |
+     G[To_Node]);
+
+   type SP is Shortest_Paths<GChar>;
+   const Path := SP::Shortest_Path(G, Source => From_Node, Target => To_Node); 
+
+   for P in Path forward loop
+      Print(G[P] | " -> ");
+   end loop;
+   Println("" | G[To_Node]);
+end func Test_Path;

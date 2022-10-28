@@ -1,0 +1,142 @@
+interface PSL::Core::Boolean<> is
+    op "from_univ"(Lit : Univ_Enumeration) 
+      {Lit in [#false, #true]}
+      -> Boolean is import(#bool_from_univ)
+
+    op "to_univ"(Val : Boolean) -> Univ_Enumeration 
+      is import(#bool_to_univ)
+
+    op "=?"(Left, Right : Boolean) -> Ordering
+      is import("=?")
+        // NOTE: #true > #false
+
+    op "not"(Boolean) -> Boolean is import("not")
+    op "and"(Left, Right : Boolean) -> Boolean is import("and")
+    op "or"(Left, Right : Boolean) -> Boolean is import("or")
+    op "xor"(Left, Right : Boolean) -> Boolean is import("xor")
+
+    op "and="(var Left : Boolean; Right : Boolean)
+    op "or="(var Left : Boolean; Right : Boolean)
+    op "xor="(var Left : Boolean; Right : Boolean)
+
+    func Hash(Val : Boolean) -> Univ_Integer
+      is import(#identity)
+
+    // For Imageable
+    func To_String(Val : optional Boolean) -> Univ_String
+    func From_String(Str : Univ_String) -> optional Boolean
+
+    // Operators for Countable
+    op "+"(Left : Univ_Integer; Right : Boolean) -> Boolean 
+      is import("+")
+    op "+"(Left : Boolean; Right : Univ_Integer) -> Boolean 
+      is import("+")
+    op "-"(Left, Right : Boolean) -> Univ_Integer 
+      is import("-")
+    op "-"(Left : Boolean; Right : Univ_Integer) -> Boolean 
+      is import("-")
+
+    func Min(Left, Right : optional Boolean) -> optional Boolean
+      is import(#min)
+    func Max(Left, Right : optional Boolean) -> optional Boolean
+      is import(#max)
+
+    // TBD: These should be properties some day (e.g. Boolean#first).
+    func First()->Boolean
+    func Last()->Boolean
+
+    op ".."(Left, Right : Boolean) -> Countable_Set<Boolean>
+    op "<.."(Left, Right : Boolean) -> Countable_Set<Boolean>
+    op "..<"(Left, Right : Boolean) -> Countable_Set<Boolean>
+    op "<..<"(Left, Right : Boolean) -> Countable_Set<Boolean>
+    op "|"(Left, Right : Boolean) -> Countable_Set<Boolean>
+end interface PSL::Core::Boolean
+
+class PSL::Core::Boolean is
+    type Boolean_Set is Countable_Set<Boolean>
+
+  exports
+    op "and="(var Left : Boolean; Right : Boolean) is
+        Left := Left and Right
+    end op "and="
+
+    op "or="(var Left : Boolean; Right : Boolean) is
+        Left := Left or Right
+    end op "or="
+
+    op "xor="(var Left : Boolean; Right : Boolean) is
+        Left := Left xor Right
+    end op "xor="
+
+    func To_String(Val : optional Boolean) -> Univ_String is
+        if Val is null then
+            return "null"
+        elsif Val then
+            return "#true"
+        else
+            return "#false"
+        end if
+    end func To_String
+
+    func From_String(Str : Univ_String) -> optional Boolean is
+        if Str == "#true" then
+            return #true
+        elsif Str == "#false" then
+            return #false
+        else
+            return null
+        end if
+    end func From_String
+
+    func First()->Boolean is
+        return #false
+    end func First
+
+    func Last()->Boolean is
+        return #true
+    end func Last
+
+    // NOTE: For implementation reasons, we put these here rather than defining
+    //       them in the interface using "is in Countable_Set<Boolean>"
+    op ".."(Left, Right : Boolean) -> Countable_Set<Boolean> is
+        return Boolean_Set::".."(Left, Right)
+    end op ".."
+
+    op "<.."(Left, Right : Boolean) -> Countable_Set<Boolean> is
+        return Boolean_Set::"<.."(Left, Right)
+    end op "<.."
+
+    op "..<"(Left, Right : Boolean) -> Countable_Set<Boolean> is
+        return Boolean_Set::"..<"(Left, Right)
+    end op "..<"
+    op "<..<"(Left, Right : Boolean) -> Countable_Set<Boolean> is
+        return Boolean_Set::"<..<"(Left, Right)
+    end op "<..<"
+
+    op "|"(Left, Right : Boolean) -> Countable_Set<Boolean> is
+        return Boolean_Set::"|"(Left, Right)
+    end op "|"
+end class PSL::Core::Boolean
+
+func PSL::Test::Test_Boolean(UX, UY : Univ_Enumeration) is
+    const X : Boolean := UX
+    const Y : Boolean := UY
+
+    Println("not " | X | " = " | (not X))
+    if X != Y then
+       Println("not " | Y | " = " | (not Y))
+    end if
+    Println(X | " and " | Y | " = " | (X and Y))
+    Println(X | " or " | Y | " = " | (X or Y))
+    Println(X | " xor " | Y | " = " | (X xor Y))
+
+    var XX := X
+    XX and= Y
+    Println(X | " and= " | Y | " = " | XX)
+    XX := X
+    XX or= Y
+    Println(X | " or= " | Y | " = " | XX)
+    XX := X
+    XX xor= Y
+    Println(X | " xor= " | Y | " = " | XX)
+end func PSL::Test::Test_Boolean

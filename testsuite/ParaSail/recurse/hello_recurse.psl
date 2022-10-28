@@ -1,0 +1,6 @@
+func main (Basic_Array<Univ_String>) is
+    //  Printing out a string is too complicated, so we just print "42"
+    Recurse(42);
+
+end func main;
+

@@ -1,0 +1,149 @@
+//  Each cube has a position and a rotation.  The position of the next
+//  cube is constrained by the position of the prior cube/rotation.
+interface Big_Cube_State<> is
+   type Turn is Enum<[#straight, #up, #right, #down, #left]>;
+   type Cube_Index is Integer<1..27>;
+   type Dist_From_Origin is Integer<0..2>;
+   type Dim is Modular<3>;
+   type Delta is Integer<-1 .. +1>;
+   type Position is Array<Dist_From_Origin, Indexed_By => Dim>;
+   type Univ_Position is Array<Univ_Integer, Indexed_By => Dim>;
+
+   var Cur_Position : Position := [0, 0, 0];
+   var Cur_Axis : Dim := 0;  //  Going parallel to the "X" axis initially
+   var Cur_Direction : Delta := +1;  //  +1 = away from 0, -1 toward 0
+
+   var Turn_History : Vector<Turn> := [];
+   var Pos_History : Vector<Position> := [];
+   var Occupants :
+      Array<Array<Array<optional Cube_Index,
+        Indexed_By => Dist_From_Origin>,
+          Indexed_By => Dist_From_Origin>,
+            Indexed_By => Dist_From_Origin> :=
+        [for X in Dist_From_Origin =>
+          [for Y in Dist_From_Origin =>
+            [for Z in Dist_From_Origin =>
+               X == 0 and then Y == 0 and then Z == 0? 1 : null]]];
+
+   const New_Axis : Array<Array<Dim, Indexed_By => Dim>,
+                                      Indexed_By => Turn> :=
+     [#straight => [0, 1, 2],
+      #up       => [1, 2, 0],
+      #right    => [2, 0, 1],
+      #down     => [1, 2, 0],
+      #left     => [2, 0, 1]];  //  new axis after a turn
+
+   const New_Direction : Array<Delta, Indexed_By => Turn> :=
+     [#straight => +1,
+      #up       => +1,
+      #right    => +1,
+      #down     => -1,
+      #left     => -1];  //  new direction after a turn
+
+   const Makes_A_Turn : Array<Boolean, Indexed_By => Cube_Index> :=
+     [#false, #false, #true,  #false, #true,
+      #false, #true,  #false, #true,  #true,
+      #true,  #true,  #false, #true,  #false,
+      #true,  #true,  #true,  #false, #true,
+      #true,  #false, #true,  #true,  #true,
+      #false, #false];
+
+   func Initial_State() -> Big_Cube_State is (());
+end interface Big_Cube_State;
+
+concurrent interface Count<> is
+   func Is_Max(locked var C : Count; New_Count : Univ_Integer) -> Boolean
+   func The_Max(locked C : Count) -> Univ_Integer
+   func Create() -> Count
+end interface Count
+   
+concurrent class Count is
+   var The_Max : Univ_Integer := 0;
+  exports
+   func Create() -> Count is
+      return (The_Max => 0)
+   end func Create
+
+   func Is_Max(locked var C : Count; New_Count : Univ_Integer) -> Boolean is
+      if New_Count >= C.The_Max then
+         C.The_Max := New_Count
+         return #true
+      else
+         return #false
+      end if
+   end func Is_Max
+
+   func The_Max(locked C : Count) -> Univ_Integer is
+      return C.The_Max
+   end func The_Max
+end class Count
+
+import Count, Big_Cube_State::*;
+func Cube_Puzzle() is
+   var Longest : Count := Create();
+
+  *Next_Cube*
+   for (Index := Cube_Index::First() while Index <= Cube_Index::Last();
+                                                  //  Index of cube
+        State := Big_Cube_State::Initial_State()) // Overall state of "big" cube
+    forward loop
+      if Is_Max (Longest, Index)
+        and then Index == 3 ** 3
+      then
+         Println("Start with Index = `(Index)");
+         ref Pos => State.Cur_Position
+         Println("Cur Pos = `(Pos[0]), `(Pos[1]), `(Pos[2])");
+         Println("Cur Axis = `(State.Cur_Axis), Dir = `(State.Cur_Direction)");
+         Print("Turns:");
+         for each T of State.Turn_History forward loop
+            Print(" " | T);
+         end loop
+         Println("");
+         Print("Positions:");
+         for each P of State.Pos_History forward loop
+            Print(" [`(P[0]),`(P[1]),`(P[2])]");
+         end loop
+         Println("");
+      end if;
+     *Next_Rotation*
+      for Rotate in Turn {(not Makes_A_Turn[Index]) == (Rotate == #straight)}
+        concurrent loop  //  Try each rotation of this cube
+         // Println("Start with Rotate = `(Rotate)");
+         const Next_Axis := New_Axis[Rotate][State.Cur_Axis];
+         const Next_Dir := New_Direction[Rotate]*State.Cur_Direction;
+         const New_Pos : Univ_Position := [for D in Dim =>
+                           D == Next_Axis?
+                             [[State.Cur_Position[D]]] + [[Next_Dir]] :
+                             [[State.Cur_Position[D]]]];
+         // Println(
+         //   "Try New_Pos = `(New_Pos[0]), `(New_Pos[1]), `(New_Pos[2])");
+         if (for all D in Dim => New_Pos[D] in Dist_From_Origin)
+           and then State.Occupants[New_Pos[0]][New_Pos[1]][New_Pos[2]] is null
+         then
+            //  The new position is still within the 3x3x3 volume
+            //  and the new position is unoccupied.
+            //  Compute the new state based on the old direction
+            //  and the selected rotation.
+            const Next_Pos : Position := [for D in Dim => New_Pos[D]];
+
+            continue loop Next_Cube with
+             (Index => Index + 1,
+              State =>
+               (Cur_Position => Next_Pos,
+                Cur_Axis => Next_Axis,
+                Cur_Direction => Next_Dir,
+                Turn_History => State.Turn_History | Rotate,
+                Pos_History => State.Pos_History | Next_Pos,
+                Occupants => [for X in Dist_From_Origin =>
+                             [for Y in Dist_From_Origin =>
+                              [for Z in Dist_From_Origin =>
+                               X == New_Pos[0]
+                                 and then
+                               Y == New_Pos[1]
+                                 and then
+                               Z == New_Pos[2]?
+                                 Index : State.Occupants[X][Y][Z]]]]));
+         end if;
+      end loop Next_Rotation;
+   end loop Next_Cube;
+end func Cube_Puzzle;

@@ -1,0 +1,177 @@
+interface PSL::Containers::Index_Pair
+  <Index1_Type is Countable<>; Index2_Type is Countable<>> is
+  // Two countable indices which can be combined to form an 2D array index
+    const Index1 : Index1_Type
+    const Index2 : Index2_Type
+
+    func Nth_Pair
+      (Bounds1 : Countable_Range<Index1_Type>;
+       Bounds2 : Countable_Range<Index2_Type>;
+       N : Univ_Integer) -> optional Index_Pair
+      // Return Nth Pair given bounds for each of 2 index types
+      // when N goes from 1 to Length(Bounds1) * Length(Bounds2)
+      // presuming second index varies fastest.
+      // Return null if N out of range.
+
+    func Pair_Position
+      (Bounds1 : Countable_Range<Index1_Type>;
+       Bounds2 : Countable_Range<Index2_Type>;
+       Pair : Index_Pair) -> optional Univ_Integer
+      // Return position of Pair within bounds
+      // presuming Pair.Index1 in Bounds1 and Pair.Index2 in Bounds2
+      // and second index varies fastest.
+      // Return null if Pair out of range.
+
+end interface PSL::Containers::Index_Pair
+
+class PSL::Containers::Index_Pair is
+  exports
+    func Nth_Pair
+      (Bounds1 : Countable_Range<Index1_Type>;
+       Bounds2 : Countable_Range<Index2_Type>;
+       N : Univ_Integer) -> optional Index_Pair is
+      // Return Nth Pair given bounds for each of 2 index types
+      // when N goes from 1 to Length(Bounds1) * Length(Bounds2).
+      // Return null if N out of range.
+        const Len2 := Length (Bounds2)
+        if N <= 0 or else N > Length(Bounds1) * Len2 then
+            return null
+        else
+            const I1 := (N-1) / Len2
+            const I2 := (N-1) rem Len2
+            return (Index1 => Bounds1.First + I1,
+                    Index2 => Bounds2.First + I2)
+        end if
+    end func Nth_Pair
+
+    func Pair_Position
+      (Bounds1 : Countable_Range<Index1_Type>;
+       Bounds2 : Countable_Range<Index2_Type>;
+       Pair : Index_Pair) -> optional Univ_Integer is
+      // Return position of Pair within bounds (starting at 1)
+      // presuming Pair.Index1 in Bounds1 and Pair.Index2 in Bounds2
+      // and second index varies fastest.
+      // Return null if Pair out of range.
+        if Pair.Index1 not in Bounds1 then
+            var IO := IO::Get_IO()
+            IO.Stderr.Println
+              (Pair.Index1 | " not in " | Bounds1.First | ".." | Bounds1.Last)
+            return null
+        elsif Pair.Index2 not in Bounds2 then
+            var IO := IO::Get_IO()
+            IO.Stderr.Println
+              (Pair.Index2 | " not in " | Bounds2.First | ".." | Bounds2.Last)
+            return null
+        else
+            return (Pair.Index1-Bounds1.First) * Length(Bounds2) + 
+              (Pair.Index2-Bounds2.First) + 1
+        end if
+    end func Pair_Position
+
+end class PSL::Containers::Index_Pair
+
+interface PSL::Containers::Index_Pair_Set<Pair is Index_Pair<>> is
+  // Set of index pairs
+    func Create(Bounds1 : Countable_Range<Pair::Index1_Type>;
+                Bounds2 : Countable_Range<Pair::Index2_Type>)
+      -> Index_Pair_Set
+
+    op "[]"() -> Index_Pair_Set
+
+    func Count(Index_Pair_Set) -> Univ_Integer
+
+    func Is_Empty(Index_Pair_Set) -> Boolean
+
+    func First(Index_Pair_Set)
+      -> optional Pair
+    func Last(Index_Pair_Set)
+      -> optional Pair
+    
+    func Remove_First(var Index_Pair_Set)
+      -> optional Pair
+    func Remove_Last(var Index_Pair_Set)
+      -> optional Pair
+    func Remove_Any(var Index_Pair_Set)
+      -> optional Pair
+end interface PSL::Containers::Index_Pair_Set
+
+class PSL::Containers::Index_Pair_Set is
+  // Set of index pairs
+    const Bounds1 : Countable_Range<Pair::Index1_Type>
+    const Bounds2 : Countable_Range<Pair::Index2_Type>
+    var First : Univ_Integer
+    var Last : Univ_Integer
+
+    func Nth_Pair(Index_Pair_Set; N : Univ_Integer) -> Pair is
+      // Return Nth Pair of original Index_Pair_Set
+      // when N goes from 1 to Length(Bounds1) * Length(Bounds2).
+      // Return null if N out of range.
+        return Nth_Pair(Index_Pair_Set.Bounds1, Index_Pair_Set.Bounds2, N)
+    end func Nth_Pair
+
+  exports
+    func Create(Bounds1 : Countable_Range<Pair::Index1_Type>;
+                Bounds2 : Countable_Range<Pair::Index2_Type>)
+      -> Index_Pair_Set is
+        return (Bounds1 => Bounds1, Bounds2 => Bounds2,
+                First => 1, Last => Length(Bounds1) * Length(Bounds2))
+    end func Create
+
+    op "[]"() -> Index_Pair_Set is
+        return
+          (Bounds1 =>
+             Pair::Index1_Type::First()+1 .. Pair::Index1_Type::First(),
+           Bounds2 =>
+             Pair::Index2_Type::First()+1 .. Pair::Index2_Type::First(),
+           First => 1,
+           Last => 0)
+    end op "[]"
+
+    func Count(Index_Pair_Set) -> Univ_Integer is
+        return Index_Pair_Set.Last - Index_Pair_Set.First + 1
+    end func Count
+
+    func Is_Empty(Index_Pair_Set) -> Boolean is
+        return Index_Pair_Set.First > Index_Pair_Set.Last
+    end func Is_Empty
+
+    func First(Index_Pair_Set)
+      -> optional Pair is
+        return Nth_Pair(Index_Pair_Set, Index_Pair_Set.First)
+    end func First
+
+    func Last(Index_Pair_Set)
+      -> optional Pair is
+        return Nth_Pair(Index_Pair_Set, Index_Pair_Set.Last)
+    end func Last
+
+    func Remove_First(var Index_Pair_Set)
+      -> Result : optional Pair is
+        if Is_Empty(Index_Pair_Set) then
+            Result := null
+        else
+            Result := Nth_Pair(Index_Pair_Set, Index_Pair_Set.First)
+            Index_Pair_Set.First += 1
+        end if
+    end func Remove_First
+
+    func Remove_Last(var Index_Pair_Set)
+      -> Result : optional Pair is
+        if Is_Empty(Index_Pair_Set) then
+            Result := null
+        else
+            Result := Nth_Pair(Index_Pair_Set, Index_Pair_Set.Last)
+            Index_Pair_Set.Last -= 1
+        end if
+    end func Remove_Last
+
+    func Remove_Any(var Index_Pair_Set)
+      -> optional Pair is
+        if Count(Index_Pair_Set) mod 2 == 1 then
+            return Remove_First(Index_Pair_Set)
+        else
+            return Remove_Last(Index_Pair_Set)
+        end if
+    end func Remove_Any
+
+end class PSL::Containers::Index_Pair_Set

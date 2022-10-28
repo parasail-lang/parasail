@@ -1,0 +1,10 @@
+func Test_Simp_Loop(X : Integer) is
+    for J in 1..X loop
+	var I : Integer := J;
+	Println("I = " | I);
+    end loop;
+end func Test_Simp_Loop;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Simp_Loop (10);
+end func main;

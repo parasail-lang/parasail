@@ -1,0 +1,314 @@
+// Example ParaSail modules for physical units checking -- units.psl
+
+// Copyright (C) 2011-2014, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+interface Dimensions<> is
+    // Vector of exponents for MKS dimensions
+    // TBD: Dim_Enum should be a module parameter
+    type Dim_Enum is Enum<[#meters, #kilos, #seconds]>;
+    op "[]"() -> Dimensions;
+    op "+"(Left, Right : Dimensions) -> Dimensions;
+    op "-"(Left, Right : Dimensions) -> Dimensions;
+    op "*"(Left : Dimensions; Right : Univ_Integer) -> Result : Dimensions;
+    op "/"(Left : Dimensions; Right : Univ_Integer) -> Result : Dimensions;
+    op "=?"(Left, Right : Dimensions) -> Ordering;
+    op "indexing"(ref D : Dimensions; Index : Dim_Enum) -> ref Univ_Integer;
+    op "var_indexing"(ref var D : Dimensions; Index : Dim_Enum) 
+      -> ref var Univ_Integer;
+end interface Dimensions;
+
+class Dimensions is
+    // Vector of exponents for MKS dimensions
+    // TBD: Dim_Enum should be a module parameter
+    var Dim_Arr : Array<Univ_Integer, Indexed_By => Dim_Enum>;
+  exports
+    op "[]"() -> Dimensions is
+	return (Dim_Arr => Create(Dim_Enum, 0));
+    end op "[]";
+
+    op "+"(Left, Right : Dimensions) -> Result : Dimensions is
+	Result := Left;
+	for I in Dim_Enum loop
+	    Result[I] += Right[I];
+	end loop;
+    end op "+";
+
+    op "-"(Left, Right : Dimensions) -> Result : Dimensions is
+	Result := Left;
+	for I in Dim_Enum loop
+	    Result[I] -= Right[I];
+	end loop;
+    end op "-";
+
+    op "*"(Left : Dimensions; Right : Univ_Integer) -> Result : Dimensions is
+	Result := [];
+	for I in Dim_Enum loop
+	    Result[I] := Left[I] * Right;
+	end loop;
+    end op "*";
+
+    op "/"(Left : Dimensions; Right : Univ_Integer) -> Result : Dimensions is
+	Result := [];
+	for I in Dim_Enum loop
+	    Result[I] := Left[I] / Right;
+	end loop;
+    end op "/";
+
+    op "=?"(Left, Right : Dimensions) -> Ordering is
+	// Return #equal or #unordered (there is no further ordering defined)
+	for I in Dim_Enum loop
+	    case Left[I] =? Right[I] of
+	      [#equal] => null;
+	      [..] => return #unordered;
+	    end case;
+	end loop;
+	return #equal;
+    end op "=?";
+
+    op "indexing"(ref D : Dimensions; Index : Dim_Enum) 
+      -> ref Univ_Integer is
+	return D.Dim_Arr[Index];
+    end op "indexing";
+
+    op "var_indexing"(ref var D : Dimensions; Index : Dim_Enum) 
+      -> ref var Univ_Integer is
+	return D.Dim_Arr[Index];
+    end op "var_indexing";
+
+end class Dimensions;
+
+interface Basic_Units<Dimension : Dimensions> is
+    // Real value with associated vector of exponents specifying the MKS unit.
+    // Preconditions do the units checking
+    // TBD: Using assertions rather than preconditions for now
+
+    func Val(Univ : Univ_Real) -> Basic_Units;
+    op "to_univ"(Val : Basic_Units) -> Univ_Real;
+    op "+"(Left, Right : Basic_Units) -> Basic_Units;
+    op "-"(Left, Right : Basic_Units) -> Basic_Units;
+    op "+"(Right : Basic_Units) -> Basic_Units;
+    op "-"(Right : Basic_Units) -> Basic_Units;
+    op "abs"(Right : Basic_Units) -> Basic_Units;
+    func Hash(Val : Basic_Units) -> Univ_Integer;
+    op "=?"(Left, Right : Basic_Units) -> Ordering;
+    func To_String(Val : Basic_Units) -> Univ_String;
+    func From_String(Str : Univ_String) -> Basic_Units;
+
+    op "+"(Left : Basic_Units; Right : Right_Type is Basic_Units<>)
+      -> Basic_Units;  // Dimensions must match
+    op "-"(Left : Basic_Units; Right : Right_Type is Basic_Units<>)
+      -> Basic_Units;  // Dimensions must match
+
+
+end interface Basic_Units;
+
+interface Unitless<> extends Basic_Units<[]> is
+    op "from_univ"(Univ : Univ_Real) -> Unitless;
+    op "*"(Left : Unitless; Right : Unitless) -> Unitless;
+    op "/"(Left : Unitless; Right : Unitless) -> Unitless;
+end interface Unitless;
+
+interface Units<Dimension : Dimensions> extends Basic_Units<Dimension> is
+    op "*"(Left : Unitless; Right : Units) -> Units;
+    op "*"(Left : Units; Right : Unitless) -> Units;
+    op "/"(Left : Units; Right : Unitless) -> Units;
+
+    op "*"(Left : Units; Right : Right_Type is Units<>)
+      -> (Result : Result_Type is
+            Units<Dimension + Right_Type::Dimension>);
+
+    op "/"(Left : Units; Right : Right_Type is Units<>)
+      -> (Result : Result_Type is 
+            Units<Dimension - Right_Type::Dimension>);
+
+    op "**"(Left : Units; <Right : Univ_Integer>) 
+      -> (Result : Result_Type is Units<Dimension*Right>);
+
+end interface Units;
+
+class Basic_Units is
+    // Real value with associated vector of exponents specifying the MKS unit.
+    // Preconditions do the units checking
+    // TBD: Using assertions rather than preconditions for now
+    const Value : Univ_Real;
+  exports
+    func Val(Univ : Univ_Real) -> Basic_Units is
+	return (Value => Univ);
+    end func Val;
+
+    op "to_univ"(Val : Basic_Units) -> Univ_Real is
+	return Val.Value;
+    end op "to_univ";
+
+    op "+"(Left, Right : Basic_Units) -> Basic_Units is
+	return (Value => Left.Value + Right.Value);
+    end op "+";
+	
+    op "-"(Left, Right : Basic_Units) -> Basic_Units is
+	return (Value => Left.Value - Right.Value);
+    end op "-";
+
+    op "+"(Right : Basic_Units) -> Basic_Units is
+	return Right;
+    end op "+";
+
+    op "-"(Right : Basic_Units) -> Basic_Units is
+	return (Value => - Right.Value);
+    end op "-";
+
+    op "abs"(Right : Basic_Units) -> Basic_Units is
+        return (Value => abs Right.Value);
+    end op "abs";
+
+    op "=?"(Left, Right : Basic_Units) -> Ordering is
+        return Left.Value =? Right.Value;
+    end op "=?";
+
+    func Hash(Val : Basic_Units) -> Univ_Integer is
+        return Hash(Val.Value);
+    end func Hash;
+
+    func To_String(Val : Basic_Units) -> Univ_String is
+	return Univ_Real::To_String(Val.Value);
+    end func To_String;
+
+    func From_String(Str : Univ_String) -> Basic_Units is
+	return (Value => Univ_Real::From_String(Str));
+    end func From_String;
+
+    op "+"(Left : Basic_Units; Right : Right_Type is Basic_Units<>)
+      -> Basic_Units is  // Dimensions must match
+        {Dimension == Right_Type::Dimension}
+        return (Value => Left.Value + Right.Value);
+    end op "+";
+
+    op "-"(Left : Basic_Units; Right : Right_Type is Basic_Units<>)
+      -> Basic_Units is  // Dimensions must match
+        {Dimension == Right_Type::Dimension}
+        return (Value => Left.Value - Right.Value);
+    end op "-";
+
+end class Basic_Units;
+
+class Unitless is
+  exports
+    op "from_univ"(Univ : Univ_Real) -> Unitless is 
+        return Val(Univ);
+    end op "from_univ";
+
+    op "*"(Left : Unitless; Right : Unitless) -> Unitless is
+        return Val( [[Left]] * [[Right]] );
+    end op "*";
+
+    op "/"(Left : Unitless; Right : Unitless) -> Unitless is
+        return Val( [[Left]] / [[Right]] );
+    end op "/";
+end class Unitless;
+
+class Units is
+  exports
+    op "*"(Left : Unitless; Right : Units) -> Units is
+	return Val([[Left]] * [[Right]]);
+    end op "*";
+
+    op "*"(Left : Units; Right : Unitless) -> Units is
+	return Val([[Left]] * [[Right]]);
+    end op "*";
+
+    op "/"(Left : Units; Right : Unitless) -> Units is
+	return Val([[Left]] / [[Right]]);
+    end op "/";
+
+    op "*"(Left : Units; Right : Right_Type is Units<>)
+      -> (Result : Result_Type is
+            Units<Dimension + Right_Type::Dimension>) is
+	{Dimension + Right_Type::Dimension == Result_Type::Dimension}
+	return Result_Type::Val([[Left]] * [[Right]]);
+    end op "*";
+
+    op "/"(Left : Units; Right : Right_Type is Units<>)
+      -> (Result : Result_Type is
+            Units<Dimension - Right_Type::Dimension>) is
+	{Dimension - Right_Type::Dimension == Result_Type::Dimension}
+	return Result_Type::Val([[Left]] / [[Right]]);
+    end op "/";
+
+    op "**"(Left : Units; <Right : Univ_Integer>) 
+      -> (Result : Result_Type is Units<Dimension * Right>) is
+	{Dimension * Right == Result_Type::Dimension}
+	return Result_Type::Val([[Left]] ** Right);
+    end op "**";
+
+end class Units;
+
+func Test_Units() is
+    type Len is Units<Dimension => [#meters => 1]>;
+    type Tim is Units<Dimension => [#seconds => 1]>;
+    type Mass is Units<[#kilos => 1]>;
+    type Speed is Units<Dimension => [#meters => 1, #seconds => -1]>;
+    type Accel is Units<Dimension => [#meters => 1, #seconds => -2]>;
+    type Force is Units<[#meters => 1, #kilos => 1, #seconds => -2]>;
+    type Energy is Units<[#meters => 2, #kilos => 1, #seconds => -2]>;
+
+    var L : Len;
+    const T := Tim::Val(3.0);
+    const S : Speed := Val(9.0);
+    const g := Accel::Val(9.0);
+
+    L := S * T;
+
+    Println("L = S * T = 9.0 * 3.0 = " | L);
+
+    const V : Speed := g * T;
+    const m := Mass::Val(5.0);
+    const E : Energy := 0.5 * m * V ** 2;
+
+    Println("V = g * T = 9.0 * 3.0 = " | V | 
+      ", E = 0.5 * m * V**2 = 0.5 * " | m | " * " | V | "**2 = " | E);
+
+    const F : Force := E / L;
+
+    Println("F = E / L = " | E | " / " | L | " = " | F);
+    
+    const F2 := 0.5 * m * V ** 2 / L;
+
+    Println("F2 = 0.5 * m * V ** 2 / L = " | 0.5 * m * V**2 | 
+      " / " | L | " = " | F2);
+
+    const Force_Diff : Force := 0.5 * m * V**2 / L - m * g;
+    
+    Println("Force_Diff = 0.5 * m * V ** 2 / L - m*g = " | E | " / " | L | 
+      " - " | m | " * " | g | " = " | Force_Diff);
+
+end func Test_Units;
+
+func Test_Bad_Units() is
+    type Len is Units<Dimension => [#meters => 1]>;
+    type Tim is Units<Dimension => [#seconds => 1]>;
+    type Speed is Units<Dimension => [#meters => 1, #seconds => -1]>;
+    type Accel is Units<Dimension => [#meters => 1, #seconds => -2]>;
+    type Mass is Units<[#kilos => 1]>;
+    type Energy is Units<[#meters => 2, #kilos => 1, #seconds => -2]>;
+
+    var L : Len;
+    var Three := 3.0;
+    const T := Tim::Val(Three);
+    const S := Speed::Val(9.0);
+    const g := Accel::Val(9.0);
+
+    L := T * T;  -- Error
+
+    Println("L = T * T = 3.0 * 3.0 = " | L);
+
+    const V : Speed := g * T;
+    const m := Mass::Val(5.0);
+    Println("V = g * T = 9.0 * 3.0 = " | V);
+
+    const E : Energy := V ** 2;  -- Error
+
+    Println("E = V ** 2.0 = 27.0 ** 2 = " | E);
+end func Test_Bad_Units;
+    
+

@@ -1,0 +1,85 @@
+We want to pass in the right stuff (context mainly, but also params) to
+the parasail_main_routine.  We need an operation for creating a large
+object, which could initialize a local region if it didn't exist, or we
+could have a separate operation to initialize a local region.  This would be
+helped by having a flag on a routine saying whether it needed a local region.
+We need an operation to take a large object and return a word pointer.
+We need operation to check for null (this might be inline), which needs
+a typedesc to decide whether is large or small.
+We need a start-parallel-call, add-parallel-call, start-parallel-block,
+add-parallel-block.
+
+We eventually need a universal-string which doesn't do a protected object
+call every time it is used.
+
+More details:
+
+1) main_supp.c should call a routine to create the initial context/tcb.
+2) compiler should set flag saying that a local region is required
+2.5) need a way for llvm code generator to initialize type descriptors
+   may need to include type declaration for type descriptor.
+   This is very complicated.  Better might be to stick with
+   arrays of integers, or some kind of iterator or equivalent
+   to provide data in form that both Ada and llvm (and ParaSail) can
+   swallow.  New idea: Use streaming to represent as a stream array, and then
+   load type descriptor at run-time.  Needs a unique identifier, which can be
+   used as the stream representation for a Type_Descriptor_Ptr.  
+   On 'Read the index should be filled in.
+   Each llvm file should have a local table for strings and type-descriptors
+   and global constants and ...  
+   Each llvm file should have an @llvm.global_ctors entry which builds the
+   local tables by iterating through the stream/string representations,
+   or perhaps just makes one call to an out-of-line routine that does that.
+   --
+   local indices are assigned as code generator makes a reference to
+   a type descriptor, string, or constant.  At end each one is emitted
+   as a "weak_odr" with a unique name, and a static (internal) table 
+   is created for type descriptors, etc., which will be indexed by the
+   indices returned on each reference.  This static table needs to be
+   declared before it is initialized, since we don't know how big it will be.
+   However if llvm is buffered up anyway, then we won't have this problem.
+
+   Interface:  Give type descriptor/string/global constant and table to be
+               updated and get back a local index, which is an index into
+               table of type descriptors/strings/constants.
+               At end, iterate through table in forward order which gives
+               name and byte array to be written into weak_odr.
+               Iterate second time to produce table that has references to
+               global byte arrays.
+               "Name" for type descriptor is representation of type
+                      for string is string itself
+                      for constant is image of constant and
+                        representation of type
+               Probably also generate a short alias for ease of use,
+               though it is not clear these are allowed for "weak_odr"
+               
+
+               Create an entry in llvm.global_ctors which passes 2 tables
+               (and their length), one with the pointer to the constant byte
+               arrays, and one to be filled in with pointers (or indices) to
+               the type descriptors (or whatever value is to be passed into
+               other builtin operations).
+               
+   
+   From_String for Univ_Enum should make sure to uniquify the string.
+   So it isn't quite the identity.  To_String is definitely the identity.
+2.6) "nocapture" on the "params" parameter might be useful.
+   static_link parameter should be const*;
+   params should also be const* if no outputs
+3) there should be a simple-to-call routine to create a local region,
+   given a context and a local area; need local area to know whether
+   we have already created a region for this local area.  
+   Perhaps should pass in space for
+   the local region "object" (TBD?)  Local area has pointer to local
+   region (pointer to local context not as helpful, since that changes
+   as a side effect of creating a new region); not sure why!  The only
+   use seems to be when starting up a new thread, we try to create a link
+   to the enclosing region, which actually isn't used any more because
+   we have an "innermost stg rgn" for each server.
+4) Need out-of-line operations for create local null given type desc
+   and local context, create obj, copy obj, move obj, swap obj.
+   Exactly what parameters?  We could create some of these wrappers in
+   C and then call the interpreter routines.
+5) Need out-of-line operations for start/add parallel call/block.
+   These currently take an instruction, but should be changed to take
+   separate parameters.

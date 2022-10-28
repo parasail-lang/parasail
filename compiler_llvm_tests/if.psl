@@ -1,0 +1,7 @@
+func Bool_To_Int(B : Boolean) -> Univ_Integer is
+   if B then
+      return 1;
+   else
+      return 0;
+   end if;
+end func Bool_To_Int;

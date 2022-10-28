@@ -1,0 +1,53 @@
+func Agg_With_Iterator() is
+    Println("X : Countable_Set := [1, 3, 5]");
+    var X : Countable_Set<Univ_Integer> := [1, 3, 5];
+    Println("Squares := [for I in X => I**2]");
+    var Squares : Countable_Set<Univ_Integer> := [for I in X => I**2];
+
+    for (I in 1..Count(Squares); S in Squares) forward loop
+	Println("Squares[" | I | "] = " | S);
+    end loop;
+
+    var M : Map<Univ_Integer, Univ_Integer> := [for I in X, I*2 => I**2];
+    var M2 : Map<Univ_Integer, Univ_Integer> := [for I in X => I**2];
+
+    Println("M := [for I in X, I*2 => I**2]");
+    for each [I => S] of M loop
+	Println("M[" | I | "] = " | S);
+    end loop;
+
+    Println("M2 := [for I in X => I**2]");
+    for each [I => S] of M2 loop
+	Println("M2[" | I | "] = " | S);
+    end loop;
+
+    var N : Map<Univ_Integer, Univ_Integer> :=
+      [for each [I => S] of M, I => S**2];
+
+    Println("N := [for each [I => S] of M, I => S**2]");
+    for each [I => S] of N loop
+	Println("N[" | I | "] = " | S);
+    end loop;
+
+    Println("N2 := [for each S of M => S**2]");
+    var N2 : Map<Univ_Integer, Univ_Integer> :=
+      [for each S of M => S**2];
+
+    for each [I => S] of N2 loop
+	Println("N2[" | I | "] = " | S);
+    end loop;
+
+    var V1 : Vector<Univ_Integer> := [for I in 0..5 reverse => I**3];
+
+    Print("V1 := [for I in 0..5 reverse => I**3] = ");
+    for each E of V1 forward loop
+        Print(E | " ");
+    end loop;
+    Print('\n');
+    
+end func Agg_With_Iterator;
+
+
+func main(Args : Basic_Array<Univ_String>) is
+   Agg_With_Iterator ();
+end func main;

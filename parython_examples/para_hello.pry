@@ -1,0 +1,14 @@
+def Para_Hello() :
+    Print("Hello ") || Print("World ");
+    Println("");
+end def Para_Hello;
+
+def Slow_Print(S : Univ_String) :
+    Print(S);
+end def Slow_Print;
+
+def Para_Hello2() :
+    Slow_Print("Hello ") || Slow_Print("World ")
+  then :
+    Println("");
+end def Para_Hello2;

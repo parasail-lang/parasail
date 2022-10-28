@@ -1,0 +1,14 @@
+with "shared_compiled";
+project Compiled_A2X_Main_With_Interp is
+
+   for Object_Dir use Shared_Compiled'Object_Dir;
+   for Exec_Dir use "bin";
+   package Builder renames Shared_Compiled.Builder;
+   package Compiler renames Shared_Compiled.Compiler;
+   package Linker renames Shared_Compiled.Linker;
+
+   for Source_Dirs use ("../parser", "../parser/gen", "../semantics",
+     "../interpreter", "../ada202x_parser", "../ada202x_parser/gen");
+   for Main use ("compiled_a2x_main_with_interp.adb");
+
+end Compiled_A2X_Main_With_Interp;

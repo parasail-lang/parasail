@@ -1,0 +1,21 @@
+func Test_Aggr() is
+    var Agg : Vector<Univ_Integer> := [1, 2, 3];
+    var Enum_Tab1 : Vector<Univ_Enumeration> := [#red, #green, #blue];
+    var Enum_Tab2 : Array<Univ_Enumeration, Indexed_By => Univ_Integer> := 
+      [2 => #red, 3 => #green, 5 => #blue];
+    Println("Length(Agg) = " | Length(Agg));
+    Println("Length(Enum_Tab1) = " | Length(Enum_Tab1));
+    for I in 1..Length(Agg) forward loop
+	Println("Agg[" | I | "] = " | Agg[I]);
+	Println("Enum_Tab1[" | I | "] = " | Enum_Tab1[I]);
+    end loop;
+    Enum_Tab2[7] := #orange;
+    Println("Length(Enum_Tab2) = " | Length(Enum_Tab2));
+    for I in Enum_Tab2.Bounds() forward loop
+	Println("Enum_Tab2[" | I | "] = " | Enum_Tab2[I]);
+    end loop;
+end func Test_Aggr;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Aggr();
+end func main;

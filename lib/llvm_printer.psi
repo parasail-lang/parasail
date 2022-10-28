@@ -1,0 +1,364 @@
+import PSC::*, PSL::Short_Names::*
+
+//  Use one LLVM_Printer per source file.
+interface PSC::LLVM_Printer<> is
+   type Code_Index is Reflection::Routine::Code_Index
+   type Convention_Descriptor is Reflection::Routine::Convention_Descriptor
+   type TLO_Index_Type is Integer<1..1_000_000>  // Index into vector of TLOs
+   type LLVM_Pos is Pair<Int,Int>  // Position within LLVM code (PSIR,Instr)
+
+   interface Op_Info<> is
+      const Module_Name_Local_Index : Int;
+      const Op_Name_Local_Index     : Int;
+      const Has_Internal_Precond    : Bool;
+      const Conv_Desc               : Convention_Descriptor;
+      const Func_Type               : String;
+   end interface Op_Info;
+
+   //  Size of master, in words
+   const Master_Size_In_Words := 3;
+
+   //  Offset of Master within PSVM frame
+   const Master_Offset_In_Words := 3;
+
+   //  First offset for up-level references in LLVM frame record
+   const First_Uplevel_Ref_Offset := 4;
+   //  Prior four words are used for:
+   //   Offset 0 => static link    (used for multi-level uplevels)
+   //   Offset 1 => param area     (used for up-level parameter refs)
+   //   Offset 2 => local stg_rgn  (used by Store_Local_Null)
+   //   Offset 3 => ptr to master  (used by add_parallel from a nested block)
+
+   //  Max number of LLVM "metadata" nodes needed per top-level operation.
+   const Max_MD_Nodes_Per_TLO := 200;
+
+   var PFT : Reflection::Per_File_Table<Reflection::Type_Descriptor>
+   type Per_File_Constants is
+     Reflection::Per_File_Table<Reflection::Streamable_Value>
+   var PFC : Per_File_Constants  // Anonymous constants
+   var PFS : Per_File_String_Table<>
+   
+   //  Aliases for anon constants, at most one per TLO
+   type Anon_Aliases_Map is Ordered_Map<TLO_Index_Type, Int>
+   var PFC_Aliases : Vector<Anon_Aliases_Map> := []
+
+   //  Map from names of constants to their values
+   var Constants : Map<String, Reflection::Streamable_Value> := [];
+
+   //  ParaSail Source level debugging information in the llvm
+   var LLVM_Debug : Bool;
+
+   //  Generate code for Check_Not_Null and Check_Nested_Block
+   var Doing_Run_Time_Checks : Bool;
+
+   //  Try to use stack rather than a stg-rgn for large local objects
+   var Use_Stack_For_Objects : Bool;
+
+   //  How much to indent upon entering a func
+   var Fn_Indent : Int;
+
+   //  TBD: per-file tables for Routines (maybe?)
+
+   //  Create name of nested block based on code index and function name
+   func Get_Block_Name(I : Code_Index;
+     Is_Internal_Precond : Bool;
+     Fn_Name : String) -> String;
+
+   //  Create a new printer
+   //  Each file should have its own printer
+   //  llvm functions will indent N_Spaces
+   func Create
+     (N_Spaces : Int;
+      LLVM_Debug, Doing_Run_Time_Checks, Use_Stack_For_Objects : Bool)
+     -> LLVM_Printer;
+
+   //  Incorporate tables from one top-level-op into per-file tables
+   func Incorporate_TLO_Tables(var P : LLVM_Printer;
+     TLO_Index : TLO_Index_Type;
+     TLO_T : Reflection::Per_File_Table<Reflection::Type_Descriptor>;
+     TLO_C : Per_File_Constants;
+     TLO_S : Per_File_String_Table;
+     LLVM : ZVector<ZVector<String>>;
+     Type_Index_Usage : Vector<LLVM_Pos>;
+     String_Index_Usage : Vector<LLVM_Pos>;
+     Func_Decls : Ordered_Map<String, String>;
+     Const_Decls : Set<String>;
+     Local_Funcs : Set<String>;
+     Module_Op_Info : Map<String, LLVM_Printer::Op_Info>;
+     MD_Nodes : ZVector<String>;
+     Source_Position_Nodes : Map<Int, String>;
+     Subprogram_MDs : ZVector<String>;
+     Last_MD_Node_Num : Int);
+     
+   //  You should declare all functions you call.
+   //  This will only declare each unique string once
+   //  Example:
+   //  P.Declare("Func", "void @Func(i64*, i64*, i64*)")
+   //  Will not declare functions that are defined locally
+   func Declare(var P : LLVM_Printer; FName, FDecl : String)
+
+   //  return the size of the Module_Op_Info map
+   //  equal to the number of unique [LLVM_Name]s passed to Add_Module_Op
+   func Module_Op_Info_Size(P : LLVM_Printer) -> Int;
+
+   //  return the number of local functions that have an internal precondition.
+   //  Those functions have a corresponding block with
+   //  name *_.0internal_precond
+   func Num_Internal_Preconds(P : LLVM_Printer) -> Result : Int;
+
+   //  Add global constant to later be streamed to the top of the file
+   //  Don't include the @" and ". Just use the name
+   func Add_Constant(var P : LLVM_Printer; Name : String;
+      Val : Reflection::Streamable_Value);
+   
+   //  return constant names mapped to stream sizes
+   func Get_Constants(var P : LLVM_Printer) -> Map<String, Int>;
+
+   //  Create stream for anon constant if large, non-string.
+   //  Add stream to Constant_Streams and return length of stream if large.
+   //  Return 0 if small or string.
+   func Create_Anon_Const_Stream(var P : LLVM_Printer;
+      Anon_Const_Name : String;
+      Anon_Const_Val  : Reflection::Streamable_Value) -> Int;
+
+   //  Call after last instruction, then you can use |= to add
+   //  code to the top of the file
+   func Begin_Top_Of_File_Initializations(var P : LLVM_Printer);
+
+   //  Add an llvm instruction to the buffer
+   //  Code added to the LLVM_Printer will be put at the top of the file
+   //  One newline will be added after the given String
+   func Add_Instr(var P : LLVM_Printer; Instr : String);
+   op "|="(var P : LLVM_Printer; Instr : String) is Add_Instr;
+
+   //  Add zvector of code to top of file.
+   //  One newline will be added after the given vector
+   func Add_Vec(var P : LLVM_Printer; Vec : ZVector<String>);
+   op "|="(var P : LLVM_Printer; Vec : ZVector<String>) is Add_Vec;
+
+   //  Dump to file
+   //  Don't use one Printer on multiple source files
+   func Dump(var P : LLVM_Printer; Source_File_Name, Output_File_Name : String)
+
+end interface PSC::LLVM_Printer;
+
+interface PSC::LLVM_Func_Key<> is
+  //  Unique key for each LLVM func (i.e. routine/nested block)
+   const PSVM_Routine  : Reflection::Decl;
+   const Block_Region  : Reflection::Region::Region_Index;
+   const Start_Src_Pos : Reflection::Source_Position;
+
+   //  For Hashable<>:
+   op "=?"(Left, Right : LLVM_Func_Key) -> Ordering is
+     (Left.PSVM_Routine != Right.PSVM_Routine?
+        Left.PSVM_Routine =? Right.PSVM_Routine :
+      Left.Block_Region != Right.Block_Region?
+        Left.Block_Region =? Right.Block_Region :
+        Left.Start_Src_Pos =? Right.Start_Src_Pos);
+   func Hash(LLVM_Func_Key) -> Univ_Integer is
+     (Hash(LLVM_Func_Key.PSVM_Routine) +
+       Hash(LLVM_Func_Key.Block_Region) +
+       Hash(LLVM_Func_Key.Start_Src_Pos))
+end interface PSC::LLVM_Func_Key
+
+//  Use one LLVM_Top_Level_Op per top-level operation (TLO).
+interface PSC::LLVM_Top_Level_Op<> is
+   type Code_Index is Reflection::Routine::Code_Index
+   type Convention_Descriptor is Reflection::Routine::Convention_Descriptor
+   type TLO_Index_Type is LLVM_Printer::TLO_Index_Type
+
+   const Op_Body : Reflection::Decl
+       //  Decl representing body of top-level operation
+
+   const TLO_Index : TLO_Index_Type
+       //  Unique index of this TLO within overall set of TLOs of file
+
+   //  Per-TLO tables of types, constants, and strings.
+   //  These eventually get merged into single tables for whole file.
+   var TLO_T : Reflection::Per_File_Table<Reflection::Type_Descriptor>
+   type Per_TLO_Constants is
+     Reflection::Per_File_Table<Reflection::Streamable_Value>
+   var TLO_C : Per_TLO_Constants
+   var TLO_S : Per_File_String_Table<>
+   
+   //  ParaSail Source level debugging information in the llvm
+   var LLVM_Debug : Bool;
+
+   //  Generate code for Check_Not_Null and Check_Nested_Block
+   var Doing_Run_Time_Checks : Bool;
+
+   //  Try to use stack rather than a stg-rgn for large local objects
+   var Use_Stack_For_Objects : Bool;
+
+   //  Determines maximum size of routine that is inlined on call.
+   var Max_Instrs_For_Inlining : Reflection::Routine::Code_Length := 0;
+
+   //  First MetaData node number to use for this top-level op
+   const TLO_First_MD_Node_Num : Int
+
+   //  TBD: per-TLO tables for Routines (maybe?)
+   type LLVM_Func_Tree_Type is Node_Tree<Key_Type => LLVM_Func_Key>;
+     //  Hierarchical Tree of LLVM functions (which represent whole
+     //  PSVM routines as well as nested blocks thereof).
+
+   type LLVM_Func_Node_Id is LLVM_Func_Tree_Type::Node_Id;
+
+   var LLVM_Func_Tree : LLVM_Func_Tree_Type := []
+     //  Hierarchical Tree of LLVM functions (which represent whole
+     //  PSVM routines as well as nested blocks thereof).
+
+   //  Mapping from Begin_Nested_Block_Op to block node id
+   //  for a given operation.
+   var Nested_Block_Nodes : Map<LLVM_Func_Node_Id,
+                                Map<Code_Index, LLVM_Func_Node_Id>> := []
+
+   //  Which VM registers are up-level referenced
+   var Uplevels :
+     Map<LLVM_Func_Node_Id,
+         Ordered_Set<Reflection::VM_Reg_Num>> := []
+
+   //  Assigned frame offsets for uplevel-ref'ed VM registers
+   var VM_Frame_Offsets : Map<LLVM_Func_Node_Id,
+                              Map<Reflection::VM_Reg_Num,
+                                  Reflection::Offset_Within_Area>> := [];
+
+   //  Which Param offsets are up-level referenced
+   var Uplevel_Params :
+     Map<LLVM_Func_Node_Id,
+         Ordered_Set<Reflection::Offset_Within_Area>> := []
+
+   //  Assigned frame offsets for uplevel-ref'ed reg parameters
+   var VM_Param_Frame_Offsets : Map<LLVM_Func_Node_Id,
+                                 Ordered_Map<Reflection::Offset_Within_Area,
+                                    Reflection::Offset_Within_Area>> := [];
+
+   //  Which LLVM functions need to store a pointer to their master
+   //  object to support up-level references.
+   var Uplevel_Ref_To_Master : Ordered_Set<LLVM_Func_Node_Id> := []
+
+   var Num_Inlines : Int := 0;  // Number of inlinings within TLO
+   var Inlining_Reg_Adjustment : Reflection::VM_Reg_Num := 0;
+                                // Adjustment needed to make reg#'s unique
+
+   //  Create a new TLO object
+   //  Each TLO should have its own obj
+   //  llvm functions will indent N_Spaces
+   func Create(Op_Body : Reflection::Decl; TLO_Index : TLO_Index_Type;
+               N_Spaces : Int;
+               LLVM_Debug, Doing_Run_Time_Checks, Use_Stack_For_Objects : Bool;
+               TLO_First_MD_Node_Num : Int)
+     -> LLVM_Top_Level_Op;
+
+   //  Add an llvm instruction to the buffer
+   //  One newline will be added after the given String
+   func Add_Instr(var P : LLVM_Top_Level_Op; Instr : String);
+   op "|="(var P : LLVM_Top_Level_Op; Instr : String) is Add_Instr;
+
+   //  Remember that most recent instruction ended with a type index
+   func Ends_With_Type_Index(var P : LLVM_Top_Level_Op);
+
+   //  Remember that most recent instruction ended with a string index
+   func Ends_With_String_Index(var P : LLVM_Top_Level_Op);
+
+   //  Define function and necessary initialization
+   func Begin_Function(var P : LLVM_Top_Level_Op; Fn_Name : String;
+                       Func_Node : LLVM_Func_Node_Id;
+                       Frame_Size : Int; Uses_Rgn : Bool; Line_Number : Int;
+                       Func_Profile : optional String := null;
+                       Is_Internal : Bool);
+
+   //  Add closing brace, place labels,
+   //  and reset function specific internal variables
+   //  Preceded_By_Terminator returns #true if Instr is preceded by
+   //  a "terminating" instruction.  If not, one will be inserted
+   func End_Function(var P : LLVM_Top_Level_Op;
+                     Preceded_By_Terminator : func(Instr : Int) -> Boolean)
+
+   //  Start an inlined call
+   func Begin_Inlined_Call(var P : LLVM_Top_Level_Op;
+                           Unique_Inline_Id : String);
+
+   //  Finish an inlined call
+   //  Preceded_By_Terminator returns #true if Instr identifies an instruction
+   //  that is preceded by a terminating instruction.
+   func End_Inlined_Call
+     (var P : LLVM_Top_Level_Op;
+      Preceded_By_Terminator : func(Instr : Int) -> Boolean);
+
+   //  Add a label to be jumped to and return the label name, including the '%'
+   //  Skip_Amt is in units of PSIR instructions, not llvm instructions
+   func Add_Label(var P : LLVM_Top_Level_Op;
+                  Skip_Amt : Int) -> String;
+
+   //  Probe for a label in this range
+   //  Only knows about labels added via Add_Label.
+   //  Labels defined manually will not be detected.
+   func Has_Label(P : LLVM_Top_Level_Op;
+                  R : Countable_Range<Int>) -> Bool;
+
+   //  Progress to next PSIR instruction
+   func Next_PSIR_Instr(var P : LLVM_Top_Level_Op);
+
+   //  You should declare all functions you call.
+   //  This will only declare each unique string once
+   //  Example:
+   //  P.Declare("Func", "void @Func(i64*, i64*, i64*)")
+   //  Will not declare functions that are defined locally
+   func Declare(var P : LLVM_Top_Level_Op; FName, FDecl : String)
+
+   //  Note the location of a Begin_Nested_Block_Op to later be split
+   //  into multiple llvm functions
+   func Begin_Nested_Block_Op(var P : LLVM_Top_Level_Op;
+      Block_Node : LLVM_Func_Node_Id; I : Code_Index;
+      CBI : Reflection::Code_Block_Info; Is_Internal_Precond : Bool);
+
+   //  Return #true if the PSIR instuction at I is in a Nested Block
+   func In_Nested_Block(P : LLVM_Top_Level_Op; I : Code_Index) -> Bool;
+
+   //  Return true iff I is within a Nested Block 
+   //  and that block uses the Storage Region
+   func Block_Uses_Rgn(P : LLVM_Top_Level_Op; I : Code_Index) -> Bool;
+
+   //  return null if not inside block.
+   //  return the nested level if inside a block
+   func Block_Nested_Level(P : LLVM_Top_Level_Op; I : Code_Index)
+     -> optional Int;
+
+   //  Only give the name (no type necessary)
+   //  Declare every constant you use.
+   //    Duplicates are thrown out
+   //    if it's defined in this file it won't get declared
+   //    if it's not defined in this file it will get declared
+   //  Name will be be checked against names passed to Add_Constant
+   //  so make sure the string formatting matches
+   //  Example: P.Declare_Const("Math::Pi");
+   func Declare_Const(var P : LLVM_Top_Level_Op; Name : String);
+
+   //  Add module and op names to be output into table
+   //  and reconstructed at run time
+   //  Also record Has_Internal_Precond flag and Conv_Desc for the func.
+   //  Also record "type" of function (func profile w/out a name).
+   func Add_Module_Op(var P : LLVM_Top_Level_Op;
+      Module_Name, Op_Name, LLVM_Name : String;
+      Has_Internal_Precond : Bool;
+      Conv_Desc : Convention_Descriptor;
+      Func_Type : String);
+
+   //  Declare an anonymous constant; return its index in table of local
+   //  constants.
+   func Decl_Anon_Const(var P : LLVM_Top_Level_Op;
+     Locator : Reflection::Object_Locator; Info : Reflection::Const_Info)
+     -> Per_TLO_Constants::Local_Index
+
+   //  Check if a function has been defined in this file with [Name].
+   func Has_Func(P : LLVM_Top_Level_Op; Name : String) -> Bool;
+
+   //  Set the Source line and column number before each instruction
+   //  For debugging information in the output
+   func Set_Debug(var P : LLVM_Top_Level_Op; L, C : Int);
+
+   //  Copy Per-TLO information into per-file information
+   func Finish_One_TLO(var TLO : LLVM_Top_Level_Op; var LL : LLVM_Printer);
+
+end interface PSC::LLVM_Top_Level_Op;
+

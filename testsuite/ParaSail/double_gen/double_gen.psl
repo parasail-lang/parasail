@@ -1,0 +1,36 @@
+interface Double_Gen
+  <Val_Type is Imageable<>; Vec_Type is Vector<Imageable>> is
+    func Print_Vec(V : Vec_Type);
+    func Print_Val(Val : Val_Type);
+end interface Double_Gen;
+
+class Double_Gen is
+  exports
+    func Print_Vec(V : Vec_Type) is
+        Print("[");
+        for I in 1..Length(V) forward loop
+            Print((I == 1? "": ", ") | V[I]);
+        end loop;
+        Println("]");
+    end func Print_Vec;
+
+    func Print_Val(Val : Val_Type) is
+        Println("" | Val);
+    end func Print_Val;
+end class Double_Gen;
+
+func Test_DG(X : Univ_Integer) is
+    type IDG is Double_Gen<Univ_Integer, Vector<Univ_Integer>>;
+
+    Print("X = ");
+    IDG::Print_Val(X);
+
+    const Vec : Vector<Univ_Integer> := [X, X+1, X+2];
+
+    Print("[X, X+1, X+2] = ");
+    IDG::Print_Vec(Vec);
+end func Test_DG;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_DG (10);
+end func main;

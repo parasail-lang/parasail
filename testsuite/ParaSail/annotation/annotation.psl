@@ -1,0 +1,13 @@
+func Test_Annotations() is
+    var X := 3;
+    {X == 3}
+    var Y := X * 2;
+    type Short is Univ_Integer {Short in -128 .. +127};
+    {Y == X * 2}
+    {Y == X * 2 + 1}
+    Println("X = " | X | ", Y = " | Y);
+end func Test_Annotations;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Annotations();
+end func main;

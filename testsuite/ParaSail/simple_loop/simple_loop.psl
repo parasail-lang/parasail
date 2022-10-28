@@ -1,0 +1,28 @@
+//  Simple test of "for" loop using then/while
+func Loop(N : Univ_Integer) -> Univ_Integer is
+   var Sum := 0;
+   for I := 1 then I + 1 while I <= N loop
+      Sum := Sum + I;
+   end loop
+   return Sum;
+end func Loop;
+
+func main(Args : Basic_Array<Univ_String>) is
+   //  Call "Loop(N)" for each argument (converted to Univ_Integer)
+   for I := 1 then I + 1 while I <= |Args| concurrent loop
+       const Val : optional Univ_Integer := From_String(Args[I])
+       if Val not null then
+           Print("Sum of I in 1.."); Print(Val); Print(" = ");
+           Print(Loop(Val)); Print('\n');
+       else
+           Print("'"); Print(Args[I]); Print("' not a valid integer\n");
+       end if
+   end loop
+
+   //  If no args, call Loop(4)
+   if |Args| <= 0 then
+      Print("Sum of I in 1..4 = ");
+      Print(Loop(4));
+      Print('\n');
+   end if;
+end func main;

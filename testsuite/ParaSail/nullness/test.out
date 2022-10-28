@@ -1,0 +1,3 @@
+Count(X) = 2
+N.Data not null, Length(N.Data) = 9
+N.Data is null

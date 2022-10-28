@@ -1,0 +1,26 @@
+Int8_Array::Dump():
+Bits_Per_Elem = 8
+Elems_Per_Word = 8
+Mask = 0xFF
+Spreader = 0xFF
+Int16_Array::Dump():
+Bits_Per_Elem = 16
+Elems_Per_Word = 4
+Mask = 0xFFFF
+Spreader = 0xFFFF
+UChar_Array::Dump():
+Bits_Per_Elem = 31
+Elems_Per_Word = 2
+Mask = 0x7FFFFFFF
+Spreader = 0x7FFFFFFF
+Info_Type::Dump_Constant_Info():
+ Bit_Field_Sizes: [#Hash => 32, #Length => 24, #Kind => 3]
+ Bit_Field_Ranges: [#Hash => 0..4294967295, #Length => 0..16777215, #Kind => 0..7]
+ Bit_Field_Defaults: [#Hash => 0, #Length => 0, #Kind => 0]
+ Bit_Field_Offsets: [#Hash => 0, #Length => 32, #Kind => 56]
+U = 'tab	', |U| = 4, U[4] = '	'
+X = 'this is a string', X[3] = 'i', X[6..7] = 'is'
+About to indent 4 and then print 'hello'
+    hello
+Here are seven x's: xxxxxxx
+Here are 6 y's: yyyyyy

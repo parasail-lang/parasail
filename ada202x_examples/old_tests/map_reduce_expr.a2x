@@ -1,0 +1,47 @@
+package Pair is
+    type Pair is record
+      Sq : Univ_Integer;
+      Sum : Univ_Integer;
+    end record;
+end Pair;
+
+procedure Test_MR_Expr() is
+    const Sum_Of_Sqs : Univ_Integer := (for I in 1..10 => <0> + I**2);
+    const Fact5 : Univ_Integer := (for I in 1..5 => <1> * I);
+    const First_10_Are_Even : Boolean := (for I in 1..10 =>
+                                        <#True> and then I mod 2 = 0);
+    const Vec_Of_Squares : Vector<Pair> :=
+      (for I in 1..10 forward => <[]> |
+        [(Sq => I**2, Sum => (for J in 1..I => <0> + J**2))]);
+      -- equiv to:
+      -- [for I in 1..10 forward =>
+        -- (Sq => I**2, Sum => (for J in 1..I => <0> + J**2))];
+    
+    Println("Sum of first 10 squares = " | Sum_Of_Sqs);
+
+    Println("Factorial of 5 = " | Fact5);
+
+    Println("First_10_Are_Even = " | First_10_Are_Even);
+
+    Println("Vector of squares and partial sums = ");
+    for each [I => V] of Vec_Of_Squares forward loop
+        Println(I | " => (" | V.Sq | ", " | V.Sum | ")");
+    end loop;
+
+    -- tbd: Println(" or all on one line:")
+
+    -- tbd: Println((for (each V of Vec_Of_Squares; Sep := "" then ", ")
+      -- tbd: forward => <"["> | (Sep | "(" | V.Sq | ", " | V.Sum | ")")) | "]")
+
+    func Square(N : Univ_Integer {N >= 0}) return Univ_Integer is
+        return (for I in 1 ..< 2*N {I mod 2 = 1} => <0> + I);
+    end Square; 
+
+    Println("Sum of first N odd numbers");
+    for I in 1..10 forward loop
+        Println(I | " => " | Square(I));
+    end loop;
+
+    Println("All even numbers are not odd = " |
+      (for all I in 1..100 {I mod 2 = 0} => I mod 2 != 1));
+end Test_MR_Expr;

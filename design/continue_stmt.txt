@@ -1,0 +1,120 @@
+We have re-re-thought the issue of continuing an outer loop, and have concluded
+that our original semantics were just about right.  If you continue an
+outer loop from a sequential context, it is the moral equivalent of a "goto"
+to the last statement of the specified loop.  On the other hand, if you
+do a continue of an outer loop from a parallel context, the outer loop better
+allow new values to be specified, and after queuing up a new iteration
+with the new values, the current iteration of the *innermost* loop is exited.  
+
+One overall principle is that a "continue" statement doesn't create any
+"new" picothreads, but it may effectively shift one from an inner loop
+to an outer loop.  In sequential code, this is roughly equivalent to
+a "goto."  In a parallel context, this is equivalent to queuing up one
+new thread and killing off the current one.
+
+We are still not quite doing *exactly* the "right" thing.  Ideally, if
+all of the iterations of a concurrent loop, or both sides of "||" finish
+with a "continue" of some outer construct, then there should be no
+thread "left" to do the code that comes after the concurrent loop
+or "||".  If we don't create a separate thread for one arm of the "||"
+then for one "side" the "continue" is local while for the other side
+it involves exiting a nested block.  It would be ideal if these had the
+same semantics, but right now, they aren't quite the same.
+
+---------
+
+Skip count after an exit?  How to deal with it in compiled code.
+We should record all possible skip counts on a wait-for-parallel
+and then at run-time have the equivalent of a "case" statement.
+
+---- 7/9/2014
+Continue statements in ParaSail are interesting.  The current semantics is
+described as creating a new "work item" on the target loop.  The question
+is what happens to the inner loops, if the target loop is an outer loop?
+If the skipped loops are concurrent, then we have already "continued" them.
+But if the skipped-over loops are *not* concurrent, then we should probably
+"continue" them rather than skipping them.  The simplest way to continue
+an inner loop is to jump to the "continue" address, which will start up another
+iteration before exiting the nested block.
+
+Now what about continuing an enclosing loop that does *not* need new values?
+What does that mean?  Does it mean we want to bypass something?  Is it
+preemptive?  If the loop is concurrent, the next iteration has already been
+spawned.  If the loop is sequential, but the inner loop is concurrent,
+is this a race condition?  What exactly does it mean?  Clearly the
+innermost loop iteration is complete.  But does it mean that
+when the inner loop is complete, we want to bypass the code that
+follows it?  If *every* iteration does a continue of the outer loop, does
+that change the story.  The master can be a place to accumulate a "summary"
+outcome.  We already need to lock the master if we have multiple servers
+serving its sub-threads, so presumably the outcome "summarizing" can
+be handled the same way.  Now the question is what should the summary be?
+If one of the threads does not continue the outer loop, then should we
+proceed?  It seems that the desired semantics should be that continue
+is never preemptive, and the innermost loop that is continued keeps
+running.  Only when all of the iterations continue an outer loop does
+it bypass the code after the inner loop body.  That will probably be TBD
+for now.
+
+So what does this mean in detail?
+
+A continue in a sequential loop must start the next iteration going
+in any case, and then it could set the outcome to reflect a multi-level
+exit, but that should be overridable.  This is different from the exit
+associated with a exit or return statement, which is clearly terminating
+of any not-yet-finished iterations.
+
+We could, for now, disallow continuing an outer loop which didn't need
+new values -- probably safest.
+
+So we find the innermost loop, and complain if that doesn't match the
+target loop if there are no values.  If there are values, we create
+the next for-loop iteration, and then treat it like a regular "continue."
+
+We need to compute the number of continues properly.  Currently that is
+computed in the static semantic phase.  The PSVM op code at the "continue
+loc" must be a skip op or an exit op.  This "fixup" happens at the
+end of a for-loop, just before initiating the next for-loop iteration.
+
+If there are any continues for an outer loop, then it might make sense
+to initialize the outcome for the loop to "all iters continued an outer loop"
+and overwrite that with "normal" if a loop iteration finishes normally without
+continuing an outer loop.  That implies we need two targets, one for
+outer-level continues, and one for innermost-level continues.  The
+intermost-level continues set the "continue-state" to "normal."
+
+On the other hand, if a loop never executes, do we want to bypass the
+code following the loop?  And shouldn't a filter "{blah}" be equivalent to
+"if not blah then continue end if"?  So this argues for just doing a simple
+"continue" after creating a new "work item" on the outer loop.  And
+continuing an outer loop without new values would be disallowed, as it
+is bound to create confusion.
+
+Another question -- does a continue of an outer loop with values automatically
+initiate concurrency?  That seems to be the case as it would most naturally
+be implemented.  That is trouble if the loop is not safe for concurrent
+execution!  Essentially continuing an outer loop is a way of starting
+concurrent execution, and must be treated as such, since it doesn't terminate
+the current loop.
+
+So...  We convert a continue of an outer loop with values into an
+"add next" and then as a continue of the innermost loop.
+A continue of an outer loop marks the loop as potentially concurrent
+(we need to do this during the static phase).  We disallow continues
+of outer loops without providing new values.
+
+Unfortunately, reading "continue loop Outer with XXX" really feels
+like a transfer of control, and if done in a sequential loop, it would
+be surprising if further work happens in the inner loop.  So perhaps we
+should simply disallow continuing an outer loop if any of the loops being
+skipped over are sequential.  That will probably reduce the likelihood of
+error.  If we find a ground-swell of support for skipping over sequential
+loops, we can try to decide what it means.  Alternatively, we leave it as
+is, and continuing from a sequential loop specifically is asking for just
+one solution, and can easily run into a blind alley.
+
+Let's think about existing work-list algorithms.  They iterate through the
+successors of a node and add them to the work list.  Why does this need
+to be in parallel?  for I in successors(Node) loop
+                      continue loop Outer with I
+                    end loop

@@ -1,0 +1,10 @@
+proc Test_Case(X : Univ_Integer) is
+   case X is
+     when 1..2 =>
+	Println("X in 1..2");
+     when 3 | 5..7 =>
+	Println("X in 3 | 5..7");
+     when others =>
+	Println("X in ..");
+   end case;
+end proc Test_Case;

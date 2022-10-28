@@ -1,0 +1,162 @@
+// Example ParaSail program -- QuickSort
+
+// Copyright (C) 2011-2016, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+interface Sorting<Array_Type is Indexable<Comparable<>, Countable<>>> is
+    func Quicksort(var A : Array_Type);
+          // Sort Arr according to the sorting op "<" which returns
+          // True if Left must appear before Right in the sorted order.
+          // "<" returns False if Left need not appear before Right.
+end interface Sorting;
+
+class Sorting is
+  exports
+    func Quicksort(var A : Array_Type) is
+        // Handle short arrays directly.  Partition longer arrays.
+        for Arr : Slice<Array_Type> => A[..] while Length(Arr) > 1 loop
+            if Length(Arr) == 2 then
+               if Arr[Arr.Last] < Arr[Arr.First] then
+                   // Swap elements
+                   Arr[Arr.First] <=> Arr[Arr.Last];
+               end if;
+            else
+               // Partition array
+               const Mid := Arr[Arr.First + Length(Arr)/2];
+               var Left := Arr.First;
+               var Right := Arr.Last;
+               until Left > Right loop
+                   var New_Left := Right+1;
+                   var New_Right := Left-1;
+
+                 then 
+
+                   // Find item in left half to swap
+                   for I in Left .. Right forward loop
+                       if not (Arr[I] < Mid) then
+                           // Found an item that can go into right partitition
+                           New_Left := I;
+                           if Mid < Arr[I] then
+                               // Found an item that *must* go into right part
+                               exit loop;
+                           end if;
+                       end if;
+                   end loop;
+                 ||  
+                   // Find item in right half to swap
+                   for J in Left .. Right reverse loop
+                       if not (Mid < Arr[J]) then
+                           // Found an item that can go into left partitition
+                           New_Right := J;
+                           if Arr[J] < Mid then
+                               // Found an item that *must* go into left part
+                               exit loop;
+                           end if;
+                       end if;
+                   end loop;
+
+                 then 
+                 
+                   if New_Left > New_Right then
+                       // Nothing more to swap
+                       // Exit loop and recurse on two partitions
+                       Left := New_Left;
+                       Right := New_Right;
+                       exit loop;
+                   end if;
+                 
+                   // Swap items
+                   Arr[New_Left] <=> Arr[New_Right];
+                 
+                   // continue looking for items to swap
+                   Left := New_Left + 1;
+                   Right := New_Right - 1;
+               end loop;
+               
+               // At this point, "Right" is right end of left partition
+               // and "Left" is left end of right partition
+               // and the partitions don't overlap
+               // and neither is the whole array
+               // and everything in the left partition can precede Mid
+               // and everything in the right partition can follow Mid
+               // and everything between the partitions is equal to Mid.
+               {Left > Right;
+                Right < Arr.Last;
+                Left > Arr.First}
+
+                {(for all I in Arr.First .. Right => not (Mid < Arr[I]));
+                (for all J in Left .. Arr.Last => not (Arr[J] < Mid));
+                (for all K in Right+1 .. Left-1 => 
+                  not (Mid < Arr[K]) and not (Arr[K] < Mid))}
+               
+             then
+               // continue with two halves in parallel
+               continue loop with Arr => Arr[Arr.First .. Right];
+             ||
+               continue loop with Arr => Arr[Left .. Arr.Last];
+            end if;
+        end loop;
+    end func Quicksort;
+end class Sorting;
+
+func Test_Sort(Len : Univ_Integer) is
+    // For Random
+    const Mult := 7**5;
+    const Mod := 2**31 - 1;
+    var Ran := Random::Start(Len, Mult, Mod);
+
+    Println("Seed = " | Len | ", Mult = " | Mult | ", Mod = " | Mod);
+
+    type My_Sorter is Sorting<Vector<Univ_Integer>>;
+    var Vec : Vector<Univ_Integer> := [];
+
+    for I in 1..Len loop
+        Vec |= Next(Ran) mod 100;
+    end loop;
+
+    var Vec2 := Vec;
+
+    Println("Before sort, Vec = ");
+    for I in 1 .. Length(Vec) forward loop
+        Print(" " | Vec[I]);
+        if I < Length(Vec) then
+            Print(",");
+            if I mod 10 == 0 then
+                Print('\n');
+            end if;
+        end if;
+    end loop;
+    Print("\n");
+
+    My_Sorter::Quicksort(Vec);
+    {(for all I in 1 ..< Length(Vec) => Vec[I] <= Vec[I+1])}
+
+    Println("After sort, Vec = ");
+    for I in 1 .. Length(Vec) forward loop
+        Print(" " | Vec[I]);
+        if I < Length(Vec) then
+            Print(",");
+            if I mod 10 == 0 then
+                Print('\n');
+            end if;
+        end if;
+    end loop;
+    Print("\n");
+
+    My_Sorter::Quicksort(Vec2);
+
+    Println("After 2nd sort, Vec2 = ");
+    for I in 1 .. Length(Vec2) forward loop
+        Print(" " | Vec2[I]);
+        if I < Length(Vec2) then
+            Print(",");
+            if I mod 10 == 0 then
+                Print('\n');
+            end if;
+        end if;
+    end loop;
+    Print("\n");
+
+end func Test_Sort;
+

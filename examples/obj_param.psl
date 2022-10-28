@@ -1,0 +1,48 @@
+interface My_Range<> is
+   var First : Univ_Integer;
+   var Last : Univ_Integer;
+   func Remove_First(var My_Range) -> optional Univ_Integer
+   op ".."(First, Last : Univ_Integer) -> My_Range is ((First, Last))
+end interface My_Range
+
+class My_Range is
+ exports
+   func Remove_First(var My_Range) -> Result : optional Univ_Integer is
+       if My_Range.First > My_Range.Last then
+          return null
+       end if
+       Result := My_Range.First
+       My_Range.First += 1
+   end func Remove_First
+end class My_Range
+
+interface My_Integer<R : My_Range := -2**31 .. +2**31-1> is
+   func First() -> Univ_Integer is (R.First)
+   func Last() -> Univ_Integer is (R.Last)
+   const Length := R.Last - R.First + 1
+   op "[..]"() -> My_Range is (R)
+   op "from_univ"(Univ : Univ_Integer) -> My_Integer
+     is import (#identity)
+   op "to_univ"(Int : My_Integer) -> Univ_Integer
+     is import (#identity)
+   op "=?"(Left, Right : My_Integer) -> Ordering
+     is import ("=?")
+   func My_Len() -> Univ_Integer is (Length)
+end interface My_Integer;
+
+import My_Integer, My_Range
+func main(Args : Basic_Array<Univ_String>) is
+   Println("Starting obj_param");
+   var X : My_Integer := My_Integer::First() + 7
+   type Short_Int is My_Integer<10 .. 20>
+
+   Println ("First few elements of My_Integer:")
+   for Z in My_Integer forward loop
+       Print (Z); Print(' ');
+       if Z >= X then
+          exit loop
+       end if
+   end loop
+   Println("")
+   Print ("Short_Int::Length = "); Print(Short_Int::Length); Print('\n')
+end func main

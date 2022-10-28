@@ -1,0 +1,2549 @@
+ParaScope -- ParaSail Static Catcher of Programming Errors
+
+We would like to do more static analysis of ParaSail.
+One approach is to do it on the PSVM.  We could do a CodePeer-like
+analysis, where we would break up into basic blocks, identify loops,
+assign a "current" value number to each slot in the local area,
+as well as for each component, each constant (compile-time or per-instance),
+etc.  We would have to track refs as well though they don't change value,
+or more precisely, there are never any phis or kappas for them.
+
+We don't have to infer pre/post conditions at this point, but we would like
+to infer "global" variable usage for nested procedures and loop bodies.
+
+Our frame condition assumption is there is no effect on a visible component
+of X if X' as a whole is not in a postcondition nor is X.Component'.
+To merely say X.Component is updated one would write "X.Component' is
+func(...)"  Now what about query functions of X?
+How do we know if those are affected?  Must specify all of them?
+
+-------
+
+Getting started...
+
+If we want to write it in ParaSail, then we should be able to re-use some
+of the compiler infrastructure.  We need to determine where basic blocks
+start and end, and create a control-flow graph ("dot" output?).
+We need a computation table and stacks for each "object."
+We need value-set tables for current basic block and for each edge.
+We need a propagation algorithm.
+
+The notion of an "object" in PSVM includes (cf. kinds of locators) :
+  1) Parameter or uplevel parameter
+  2) Local or Uplevel Local slot
+  3) Selected component of an object
+  4) Indexed component of an object
+  5) Some known subset of an object (e.g. a slice)
+  6) Some unknown subset of an object (e.g. arbitrary ref-returning func)
+  7) A per-type parameter or constant
+  8) A global constant
+
+Let's start from the end goal and work backward.
+
+We want to know whether any implicit or explicit checks will fail.
+We need to have explict checking code (essentially like assertions),
+and a flag or other mechanism for indicating whether they pass or fail.
+This implies having a value number for each object accessible in any given
+instruction (local_area, param_area, base_reg, ...), and a value set for
+each value number.  Using a stack for each object seems reasonable, with
+assignment updating all of the aliases.  We need value numbers for addresses
+(aka names) as well.
+
+If we find a problem we need some way to report it, so we need a
+name for every slot corresponding to a user-visible variable and a way
+of displaying a value number which will use user-visible names as much
+as possible.  For constants we can have a map from value number to constants
+that equal it.  For variables, each time we load or store a value we can
+update the set of user-visible variables associated with a given value
+number.  
+
+We would like to know the type of each value number.  We would like to know
+the value set (and the object set) at any given point.  The value set should
+have a bool indicating whether null is possible, and a separate set of
+non-null values.  If the non-null value set is empty, then we know the
+value is null.  We also want to know whether the value allows null, and
+hence whether it is "undefined" rather than null.  Even values that allow
+null might be undefined -- for example the result of an operation that
+returns a known-small value might be truly undefined.
+
+How do we represent values that are composite?  We can represent them by
+their components.  However, since we permit recursive types, there is
+a limit on this.  We may need some kind of "wildcard" mechanism.
+We also want to represent the results of various
+function calls, but that is not particularly a special case.  We need
+a value number for an object as a whole.  At a minimum the "null" value
+is associated with the object as a whole.  Probably give a separate
+value number to the object as a whole and to each component that is
+assigned, copied, or passed separately.  Referencing a component requires
+(and ensures) that the object as a whole is not null.
+
+So how does the final pass work?  We walk the control flow graph, or
+merely the PSVM instructions?  And what about nested blocks?  These are
+always effectively inlined.  We build up edge value mappings and iterate
+until everything stabilizes.  There are no "cross" edges.
+
+----------
+
+Some optimizations:
+
+For a loop, to avoid excess queuing, we can "unroll" some number of iterations
+by generating the next value(s) some number of times, appropriate to the size of
+the loop body, saving the values produced in local variables.  If there are
+more iterations than in a single unrolling, then a Start_Parallel of the
+next chunk would be invoked, before calling a nested block representing
+one execution of the loop body.  In other words we would have a nested block
+for a chunk, and a separate one for a single iteration.
+
+For recursion, we would inline the recursive calls some number of levels
+to get to the point where we have a sufficiently large "distance" between
+the beginning of the body and a recursive call.  Another approach would be
+to add a hidden parameter which is initialized to the number of levels,
+and a parallel call would only be made when the level count gets to zero.
+This might argue for a conditional-parallel flag in the PSVM call instruction.
+ Each iteration turns into a call on the nested block
+representing the loop body.  
+
+----------
+
+Given a control-flow graph, with nodes and edges:
+
+For each node:
+   start and ending PSVM statement of basic block
+   set of edge IDs
+
+For each edge:
+   "From" and "To" node IDs
+   Value-Number => Value-set mapping
+
+For each operation
+   Value-Number definition table
+
+Kinds of value number:
+   "Known" Op, External param value/ref, Invalid
+   "Call" effect/(ref)result, Phi, Kappa.
+
+Stack for each local-area slot, "ref" target
+
+For each statement
+   Initialize state from preconditions and non-nullness of formals.
+
+   Really only need value numbers on checks (not-null, assertion/nested block)
+   including checks implicit in call and return (pre/post-cond).
+   Might want a list of value numbers representing the list of
+   conditions in the assertion/pre/post-cond.
+   Also value number on conditional branches.
+
+Temporary while processing a basic block:
+   Value-Number => Value-Set mapping
+   Propagation support.
+
+In each basic block, PVP:
+   Walk statements looking for checks and calls/returns.
+   See what we know about value numbers at that point.
+   Then process each conditional branch and save
+     val-num->Val-set mapping in edge
+
+In each basic block, SSA:
+   Loop identification
+
+   Liveness -- Determine what is defined/killed in each basic block,
+   and iterate until stable.
+
+   Placing Phis -- 
+
+   Walk statements, value numbering as we go.
+   We have a stack for each local area slot and each var parameter.
+   Value numbers are stored on checks, calls, returns.
+   
+   Check each fetch for "invalid" value.
+   could perhaps best be handled in SSA phase, since invalid doesn't require
+   any data flow, since an invalid value doesn't "flow" through data
+   (is that right?  Need to worry about null values in non-optional objs,
+    but these are illegal to even "fetch.")
+
+   What about situation where one arm initializes and other doesn't?
+   This isn't an error if phi-input-context implies that "bad" path
+   isn't live.  That doesn't seem like a job for SSA.  Perhaps it
+   can create a value number to represent requirement that path be
+   dead.  If we are filling a "phi" node with an "invalid" value
+   then we need to know that that phi node arises from a place where
+   the invalid path is dead.
+
+-----------
+
+We have started doing value numbering.
+Various issues have arisen:
+  1) For calls, we really need to know how many parameters are relevant, and
+     their modes, etc.
+     Would the number of outputs and inputs be adequate?  No, we need
+     to know what addresses should be given new value numbers, and we
+     need to know the component relationships when a ref is returned.
+     So we need to distinguish "var" and "ref" and "ref const" on inputs.
+     For outputs we need to distinguish normal vs. ref.
+     Perhaps we can just point at a routine that has the relevant information.
+     
+  2) How do components relate to their enclosing object?
+     If we fetch a value of a component, and there is no value in the AV map,
+     should we try to see whether an enclosing object has a value, and
+     use that and build up a component value from it?
+     Should we remove the value of all components when we assign to an
+     enclosing object?  That seems simplest.
+
+     When we assign to a component, we should enter a new value for the
+     enclosing object, namely some kind of aggregate.  If two addresses
+     have identical large objects, and then we assign the same thing to the
+     same component, we should end up with the same value number.  That implies
+     we create a new aggregate value by combining a base aggregate value
+     and a component offset and a new value for that component.  But order
+     shouldn't matter, so it is more of a mapping.  And if we replace an old
+     value of a component, we want that to take the old component value's place.
+     Is there a reason to have the individual components directly in the
+     AV Map?  Why not just have them in the aggregate?
+
+     An aggregate needs a base value if the object as a whole is the result
+     of a call, for example.  But then when we start fetching components out
+     of it, we want to "reify" the component values.  But that doesn't actually
+     change the value, so we don't want to update the aggregate.
+
+     Perhaps components are never stored separately.  But then we need to
+     keep calling Get_Unique_Id for them.  Or we allow a value number to
+     be updated -- not easy, since it is a member of a set -- how are we
+     intending to handle phi inputs?  With a separate map of phi-vn-id to 
+     vector of inputs?  If we do that, we could do the same thing for
+     aggregate value numbers -- have components that don't appear in the
+     aggregate have their own mapping from aggregate VNs to "component" VNs.
+
+     Actually, anything can have a component, so we won't have an aggregate
+     VN until we *store* into a component.  We could start from an empty
+     aggregate VN when we create an object.  We probably need some kind of
+     "tag" because objects of different tags are #unordered, even if they have
+     identical components.  This implies that type-descriptors are going
+     to start having value numbers too!
+
+     So to summarize: We never have component addresses appearing in the
+     main AV_table.  We always go up to the root object, and then find/create
+     component values on the way back down.  But that seems painful.  Why
+     not cache component address->value mapping in the main AV map?
+     We need to know that it is just a cache, which is wiped when a new value
+     is stored into an enclosing object.  
+
+     So let's try again: We look only in the current AV map for a component
+     address.  If we find it, we are done.  Otherwise we look for the
+     enclosing object.  If we find that, we see whether that object is an
+     aggregate-VN and the component's value is in the VN's map.  If so,
+     we add that to the current AV map and return it.  If not, we create
+     a component_VN and add that to the current AV map, and return it.
+     If we don't find the enclosing object, and it is itself a component,
+     we repeat this process.
+
+     When we assign to an object, we need to wipe out or inactivate the
+     subcomponents.  How do we do that efficiently?  Do we maintain a set of
+     active addresses somehow?  We could have a mapping from address to all
+     component addresses based on it.  When do component addresses get added
+     to this?  When we add them to the current AV map?  It is always safe
+     to remove component-addr mappings from the current AV map, as they can
+     always be reconstructed.  It is a pure cache.
+
+     Once we create a new AV map for a block, we will walk it and create the
+     component-tree for each object that has any component addrs in the AV map.
+
+     It is guaranteed that if a component addr appears in an AV map, the
+     enclosing object appears in it as well, and the value of the component
+     addr can be recomputed based on the value of the enclosing object.
+
+-----
+     Trouble with component values vs. addresses:
+     What exactly is the difference?
+     What is the base address vs. the base value?
+     Can you store into a component address, as well as fetch from it?
+     If so, how does that work?
+     Currently when we have a locator that is a base-reg + offset, we
+     fetch the *value* of the base and use that as the base-addr for a
+     component address.  This makes it hard to store into such an object.
+     This implies either we introduce the notion of a pointer or an object
+     "id," or some notion of "copy-back."
+
+     So how would an object "id" work?  Perhaps this is the notion of an
+     "lvalue."  Something that is updatable.  Alternatively, we allow a fetch
+     from an address to imply fetches from each of the enclosing addresses
+     as well.  That seems the most straightforward.  But then we have to
+     have two meanings for "copy_word" if we want to carry an address over.
+     Make_Copy is different from Copy_Word then, at least for a composite
+     object.  We have Assign_Word, Copy_Word, Make_Copy_In_Stg_Rgn_Op,
+     Move_Obj, and Swap_Obj.  Which are used for what?
+      * Make_Copy_In_Stg_Rgn_Op is used for assignment-by-copy,
+         - is used stand-alone to initialize a local variable
+         - is followed by a Copy_Word if initializing a new component
+         - is followed by an Assign_Word if overwriting an existing obj
+      * Copy_Word is used when destination is:
+         - a new component,
+         - a parameter,
+         - a small local variable
+         - after a Make_Copy for a new (possibly large) object
+         - after a call for a new (small or large) result
+         - after a create_obj initializing a new (large) object
+      * Assign_Word is used when the target might be large, and
+        might already have a non-null value.
+         - after a call 
+         - after a make_copy
+         - after a create_obj
+      * Move_Obj is used when a "<==" operation is used as statement or
+        as component of aggregate
+      * Swap_Obj is used when a "<=>" is used
+        
+    Create_Obj is an interesting example, in that the object exists, is
+    updatable, but might not be in its final "resting place." 
+    This implies that an object "id" is created by Create_Obj, even before
+    there is a permanent address.  Also, "move" might be thought of as
+    preserving the object id, though that is not really necessary.
+
+    So does the "value" for a large object include the object id?  Yes.
+    And perhaps that is about it, plus the mapping from component to
+    value.  A component "address" is the object id plus the offset.
+    So the "base" is the object-id value.
+    But note that we don't *know* what is the actual ID.
+    So what does Create_Obj do?  It creates an obj-id which is different
+    each time it is evaluated.  What does that look like from a value
+    number point of view?  Do we want to do what CodePeer does, in terms
+    of bumping some counter, based on some passed-in value?  Do we need 
+    a passed-in value, if we know there is no aliasing?  We want the value
+    number to be unique.  Does this imply that having the mapping "inside"
+    the aggregate value number is adequate?  Is a "component_val_VN" essentially
+    like an "unknown" VN or an "input" VN which relies on the aggregate VN?
+    If we add the value to the mapping, then we can get it back easily enough.
+    Both Unknown_VN and Input_VN include an address, so it is redundant to
+    have a "Component_Val_VN" as well, perhaps.  Input_VN is appropriate
+    for inputs, and Unknown_VNs are appropriate for components of objects
+    returned from calls?  Or should we use Component_Vals for all of these?
+    Input_VN/Unknown_VN/Component_Val all represent similar ideas.  We are
+    using Unknown_VNs for errors.  
+
+    We may want to distinguish an object id from the current value of an
+    object, since an assignment to a component creates a new value,
+    but not a new object id, presumably.  So the current "value" includes
+    the object id, plus any value assigned to components.  Exactly how does
+    that work?  When we store into a component of a composite object,
+    what happens?  Presume initially its value is "Input" or "Unknown"
+    or "Call".  What is its new value?  And how is the component address
+    represented?  It has a base addr and a selector. What is the base addr
+    in a component store?  Do we want the address VN to be the same
+    each time we reference a given component?  Yes, because when we ask for
+    its value again, we want to get back the same thing, even if intermediate
+    "store"s to other components have occurred.  
+
+    If we always use the "initial" value as the base address, that should
+    work.  But if we update the value associated with the original address,
+    how will we find it?  If the aggregate value always includes an
+    "original" value field, then we can use that.  On the other hand, when
+    we assign an entirely new value to the object, as opposed to just updating
+    one of its components, the new value should not preserve the "original
+    value."  Similarly, when we invoke "Make_Copy_...," the original value
+    should be changed.
+
+---
+    To provide unique object ids, we need to implicitly pass an object-id
+    to each call that returns a large object, or has a large object as a
+    "var" parameter.  Each Create_Object, or Call that produces a new object,
+    should take the prior object as an input.  Some particular Input_VN
+    should represent the implicitly passed object-id.
+
+    If we never store into a component of an object, there is no particular
+    challenge.  But once we store into a component, we have an issue with
+    tracking this new component value, without losing track of the original
+    object id.  Also Copy_Word can be used multiple times to simply copy the
+    object id into a base register.  What happens if we do a store into a
+    component identified by a copied address, and then use copy again later?
+    We are clearly talking about the same object.
+
+    We currently have a VN_To_Component_Map which keeps track of which
+    component *addresses* are in the AV map, and when we change the value
+    of the object as a whole, we wipe out the cache of info on its components,
+    and then wipe out the VN_To_Component_Map entry as well.  At the start
+    of a basic block, we reinitialize the VN_To_Component_Map to identify
+    all of the component addresses in the AV map.
+
+    When we store into a component, we are using "fetch value" to get the
+    value of the base object.  This could work if we have the convention that
+    we use the *value* of a composite object (i.e. its object id) as the
+    *address* of an aggregate which contains the map.  But we must remove this
+    aggregate from the AV map when we change the object-id of the
+    composite object, in the same way that we eliminate all of the 
+    components (and sub-components?).
+
+    Perhaps the notion of an "aggregate" is overkill.  Why not just store
+    the values of the components in the AV map, non-redundantly?  What is
+    the downside of that?  We will need to be able to deal with aliasing
+    of indexed components.  When looking up an indexed component, we will
+    have to include all aliases.  That implies a stack rather than a mapping.
+    Updating an indexed component should inactivate all selected components,
+    and updating a selected component should inactivate all indexed components.
+    Updating a dynamic indexed component should effectively inactivate
+    all other indexed components.  Updating a statically indexed component
+    should effectively inactivate dynamically indexed components.
+
+    Where should we store the counters?  Is it better to have a single
+    structure with selected components and indexed components?  We still
+    need unique value numbers to represent unknown selected components
+    or unknown indexed components.  So that implies some kind of
+    revision number as part of the address or the unknown value.
+    Do we really want "unknown" values or rather combined values (Kappas)?
+    The conflict between selected and indexed produces unknown values,
+    but the conflict between two indexed should produce a kappa node or
+    equivalent.  Also, we have non-"indexing" ref-returning calls, and these
+    conflict with everything except an identical call.  This implies two
+    separate revision numbers, where store into selected bumps one,
+    store into indexed bumps the other, and store into general ref bumps
+    both.  Unknown values for selected use the indexed rev count,
+    unknown values for indexed use the selected rev count, and
+    unknown values for general ref uses the sum of the two.
+    On join points, we take the max of the two predecessors for each?
+    Or do we include a basic block # in there to ensure uniqueness.
+    Yes, we probably need to do that, and a phi would be like a "store"
+    and would use the local bb#.  
+
+    If we want to "inactivate" entries in the AV map, then we need to
+    include the revision numbers in the address as well as the "unknown"
+    values.  If we avoid putting components in the AV map altogether, then
+    we have less of an issue.  But we still need to deal with aliasing.
+    If we have all of the values in some kind of "aggregate" then we
+    can fairly easily handle aliasing, bump appropriate rev numbers, wipe out
+    existing values, etc.  When we copy an object, we can copy the whole
+    aggregate tree.  For a constant object, we can create an aggregate
+    to represent the constant value, either all at once, or in a lazy fashion.
+
+    Could we eliminate object numbers from the aggregates, and just
+    have a tree of values, so that we could share the subaggregates?
+    If so, we would need to break sharing if either is updated.  Simpler
+    would be to copy aggregate without any changes, but that would also
+    require that there be no object-ids in the aggregate.  We could also
+    copy subobjects so constructed.
+
+    So what is the structure of this "aggregate"?  We could have a mapping
+    for selected components, a stack for dynamically indexed components,
+    interspersed with individual elements that would have a mapping for
+    statically-indexed components (order doesn't matter for these).
+    We would also probably want some kind of revision "count" for unknown
+    values.  We would want a way of "merging" two aggregates, which might
+    require basic block #'s associated with rev counts.
+
+    Relevant operations on the "aggregate" include storing components (both
+    small and large), fetching components (small and large), copying, wiping.
+    If we want copying to be efficient, then storing a large component should
+    not store the object id, but rather should create another aggregate.
+    This is somewhat of a different case than a normal Copy_Word, in that
+    we know we are not just copying around references, but are actually storing
+    into a component of a larger object.  [It might be nice if there were
+    a flag or equivalent on a Copy_Word to indicate that the destination
+    is not an intermediary.]  This implies we don't need to have the level
+    of indirection we presume for top-level objects.  However, we still need
+    to be able to represent addresses, as used in a "ref."  But that shouldn't
+    create a difficulty, since that just uses the address-VN associated with
+    the locator.  A bigger challenge is how to pass one of these as
+    a non-var parameter.  But that isn't a huge problem, as we don't have to
+    worry about updates in that case, so again we don't need the level of
+    indirection provided by the object-id model.
+
+    We need to distinguish null from non-null, and check for null on each
+    fetch, store, or store-address, of a component.
+
+    Consider Store_Value(component-addr, value):
+    The Base_Obj field of a component-addr might be another component, or
+    it might be an Input, a Call, an Unknown, or a Component_Val (?).
+    The Selector might be a simple int literal, or an indexed selector.
+    If the base-obj is another component, we can specify it via a
+    component-addr instead of a component-val.  We can use Unknown or
+    Input if the base obj is Unknown or Input.  However, what if the
+    base obj is Input, but we have made a change to the object?  Perhaps
+    we should always use Unknown, presuming each Unknown is considered
+    unique, even if the address is the same.  It would be nice if the
+    Unknown had some sort of source position, perhaps of the last update
+    made.  We need to presume that an Unknown is added to the aggregate
+    so it can be found again if no intervening updates occurred.
+
+    We might want separate mapping(s) of unknowns, which are wiped out
+    as appropriate.  Adding an unknown should never invalidate anything else.
+
+    OK, so we store something in a selected component.
+      0) We find the base object's aggregate, and create it if none exists
+         a) We assert that the base object is not null (that is, we add
+           such an assertion to the list of assertions for the current
+           instruction)
+      1) we wipe out all indexed components
+      2) we replace the corresponding selected component in the map
+         a) if it is a small object, we replace it with the new value
+         b) if it is a large object, we find the aggregate associated
+            with the new value, if any, and move it into the map
+            If there is no aggregate, we could either:
+              i) create an empty aggregate
+              ii) keep some link to the original value (this relates to what
+                  happens when an object is copied), such as the original
+                  VN plus modification count(s).
+    Suppose we store something in an "indexing" indexed component.
+      0) as above
+      1) wipe out all selected components and non-"indexing" indexed components
+      2) add component to stack of "indexing" components
+         a) if statically indexed, look at top of stack, 
+            i) if a map of statically-indexed components, add to that map
+            ii) if not, create map of statically-indexed components with this
+         b) if dynamically indexed, push new value on top of stack, replace
+            old value if has same index value.
+
+    Consider Fetch_Value(component-addr) -> value:
+      1) We find the base object's aggregate, and create if none exists
+         a) Add assertion that base object is non-null
+      2) If a selected component:
+         a) look up selector in map
+            i) if found, return it if small or null
+            ii) if found and large and non-null (i.e. is aggregate) then
+                 return address (how is this distinct from a ref? -- it isn't
+                 but ref will be de-ref'ed eventually)
+            iii) if not found, and is small return an "unknown" associated
+                 with address and rev-count, and enter it into map
+            iv) if not found and large, return address (nothing will change
+                before we use this address one way or another).
+            ==> Unfortunately, we don't know small or large, so need to do
+                same thing, i.e. unknown with given address (or possibly Input)
+            ==> Might be nice to have copy_word for address, copy_word for
+                large object, copy_word for small object.  But we don't
+                always *know* at compile time whether an object is small
+                or large.
+      3) If an "indexing" component:
+         a) scan the stack of indexed components
+         b) if fetching a static value
+            i) if top is static map, and match is found, return it
+            ii) if top is static and not found, ignore this entry; look deeper
+            iii) if top is non-static, include this in vector of possibilities
+                 and look deeper
+            iv) when looking deeper:
+                 1) if next entry is static, stop with match or ignore
+                 2) if next entry is dynamic, include and keep looking
+         c) if fetching a dynamic value
+            i) return value if top matches
+            ii) if top doesn't match, include possible values and look deeper
+                1) if next entry is dynamic and matches, stop now
+                2) if next entry is static or doesn't match, include values
+                   and keep looking
+         d) if reach bottom with never finding an exact match, add unknown
+            to end of list of values and add it to the unknown map at bottom
+            of stack (there may need to be a "rev" count on
+            this unknown-map entry -- no I guess not if it is wiped
+            when we update a non-indexing component of the object).
+      4) If a non-indexing indexed component:
+          a) we have a matching non-indexing indexed component, return it
+          b) otherwise, return unknown and add to map of unknowns.
+
+    We should have three counts, one for number of indexing-component stores,
+    one for number of selected-component stores, and one for other
+    indexed stores.  When creating an "unknown" object we would compute
+    the following:
+      a) For indexing-component stores -- add # of selected-component stores
+           and non-indexing indexed stores
+      b) For selected-component stores -- add # of indexed stores of any kind
+      c) For non-indexing indexed-component stores -- add all 3 counts
+    Unknown selected-component values can go in regular map.
+    Unknown indexing-component values can go in map at bottom of indexing stack.
+    Unknown non-indexing indexed-component values can go in their own map.
+
+    Aggregate values need to last from basic block to basic block, and
+    be merged when appropriate.  They basically need to be managed
+    as though they are part of the AV Map, and perhaps they should be.
+    They would be associated with the base object VN.  
+
+    Copy object and create object should both take the current value of
+    a pseudo variable, whose address could be any unique VN, so we might
+    as well pick the int-literal 1, or a negative parameter, or one with
+    code nesting level of -1.  It should be initialized to an Input_VN.
+    The result of copy object/create object should be stored back into
+    this pseudo variable.  Phis will be produced at join points.  If a
+    call returns an object, it should be stored into this pseudo variable,
+    but that may be difficult to do if we are not sure the object is a
+    large object.  We could also make it an extra output of the call node.
+    It is not entirely clear it is worth worrying about calls.  I guess the
+    important thing is that if the exact same call is performed twice,
+    we don't want the two calls to be treated the same.  But how do we know
+    the call is returning a large object?  We don't.  So that means we need
+    to split at some other point, or in some other way.  For a call, we
+    know the type of the outputs, and whether they were refs.  We could try
+    to figure out whether the object has multiple components, or has
+    operations that would be considered indexing -- i.e. has a "ref"
+    result.
+
+---- Value numbers and object IDs ----
+
+Here is another approach:  Expressions that might return a large object have
+two results, a "value number" and an "object id."  Two identical calls
+produce the same value, but different object ids in general.  A create object
+returns a standard value, but a different object id.  A copy object preserves
+the same value, but produces a new object id.  Storing into a component
+causes the value associated with the enclosing object to change.  Fetching
+a component only depends on the value of the enclosing object.
+Effectively the object-id is an implicit level of indirection.
+
+Complex numbers are an interesting example.  They can be viewed as pure
+values, where Real_Part and Imag_Part might be selectors and clearly we
+would like to come up with value numbers for these that don't get confused
+by the object-id in the middle.  Even after we update the Imag_Part, we might
+still want to be able to fetch the Real_Part(F(3)) and have it be equivalent
+to all other Real_Part(F(3)) calls.  This implies some kind of "underlying"
+value which is used for selection when nothing has overwritten the field
+of interest.  This underlying value is wiped out for indexing by updating
+by selector, and for selection by updating with indexing, as described
+above.  But if the updates didn't affect the component of interest, the
+value of that component should be a function of the original value
+of the object as a whole.
+             
+--  14-Jan-2015  more on object ids  --
+
+If we use this approach to object-ids and values, what is the representation
+for a value after we assign into a component, and how are component obj-ids
+and values represented in the AV_Map?  Note that we might have postconditions
+characterizing a composite value returned by a function.  When we copy an
+object, we might have information about some of its components.  It would
+be nice if we "move" an object or a component we can preserve most of its
+information.
+
+The AV_Map maps addresses of locals and parameters to values.  However, if
+they might be composite, we actually map local/param addresses first to
+object ids, and then from object-ids to values.
+Perhaps we want a separate thing called an "OV_Map" -- object-to-value map.
+This will make fork/join more complicated.
+
+A value can be a literal, the result of a call, or a newly created (empty)
+object.  If we start from the same empty object, and make the same component
+assignments, it would be nice if we ended up with the same value.
+
+The representation for a composite value needs to work across basic-block
+boundaries, and support fork/join.  It also needs to support updates along
+different dimensions, thereby destroying what was known about some other
+dimension.
+
+Proposal:
+   Composite value is represented by:
+     - a "base" value (value number)
+     - one or more component values, organized in a stack or a map,
+       indexed by a component "id" -- a selector, indexing, or other
+       ref computation --  actually, other ref computations always
+       result in a new value for the whole composite object
+       * There should perhaps be three different kinds of composite value,
+         based on the kind of component id used with them.
+         Selectors only need a map; indexing needs a stack where static
+         elements can be handled with maps at various points in the stack;
+         other ref computations only need one such component id and the
+         pre-update base value.
+       * There is a fourth kind, namely a (frozen) value number
+
+   Operations:
+     - Update value of component via assignment using object-id/component-id
+        * This might cause freezing if the component id is of a different
+          dimension, producing a new composite value containing only this
+          one component value.
+        * This might cause a copy of a component's composite value
+          coming from a frozen composite value of an enclosing object
+        * This might simply add/replace an element in the composite value
+          component map/stack
+     - Fetch value given a object-id/component id.
+        * This might just return an existing value for the component
+            or
+        * This might cause freezing and then replace the composite value
+            with a value number identifying this frozen composite value.
+        * This might return a value number identifying an existing
+          frozen value for the encloser, and the component id of the component
+     - Copy composite value
+        * This assigns a new object id, and creates a copy of the composite
+          value.
+     - Create new empty composite value
+        * This assigns a new object id, and returns the "empty" composite value
+          (*not* the same thing as a null value)
+     - Move composite value
+        * This assigns a new object id, can move the composite value as
+          its initial value, and set the old object-id to have the null value.
+          (it would be too much trouble to try to reuse the object-id, and
+           copying is possible in any case).
+          Care is needed if old and new might overlap.
+     - Swap composite values
+        * Swap the composite values associated with the two object ids.
+          Beware if one encloses the other!
+
+     - End of basic block
+        * Move AV_Map, including all composite values, into table
+
+     - Start basic block that is not a join point
+        * Copy the AV_Map, including all composite values, from the predecessor
+        * Optimization: Move the AV_Map if this is the only successor.
+
+     - Start basic block that is a join point
+        * If same object-id has different values, freeze either one which
+          is composite.  If they are still different, simply drop the
+          associated value; if they are the same, preserve the value.
+
+   A composite value is "frozen" when necessary (e.g. when it is passed as
+   a parameter, or a component value is needed that cannot be based on the
+   base value, or at the end of a basic block, or when we change the
+   "dimension" of component ids we are using), at which point it is
+   assigned a value number (cannot assign a "real" value number until it is
+   frozen, because objects in the Value-Number Table are read only).
+   We can store these unfrozen composite values in a separate table indexed
+   by object ids.
+
+   Component values are represented as a (frozen) value for the object as a
+   whole, and then the component id, unless the component has been assigned
+   its own value.
+
+   What if the component itself is composite and has been updated, so it
+   doesn't have a simple value?  Presumably we represent that in a
+   (sub)component map with an appropriate base value.  When do we "freeze" such
+   a nested composite value?  Presumably when we need the value for something,
+   as with the "outer" composite value.  But what if we "freeze" the
+   enclosing object?  In that frozen composite object, we will presumably find
+   this nested composite value.  It has not yet been assigned a value number,
+   but hopefully when we try to find the "current" value of the component,
+   we will look in the base value and produce a value number for
+   that component.  Alternatively, we copy the composite value for
+   the component so we can add more to it.  The base value for a nested
+   composite object is an interesting issue.  We will want to go back
+   as far as we can until we find a value or a composite value that we
+   should use as our base.  Whether to "copy" or "freeze" the component's
+   underlying composite value should be based on whether we can still
+   update it, since we are updating a component of the component that
+   is of the same "dimension."  So it comes down to essentially the same
+   rule, we freeze only if we need to, otherwise we copy the underlying
+   value if we need to modify it, or we just use it as is to retrieve the
+   value of some subcomponent.
+
+   When a composite value is frozen, effectively so are all of its
+   subcomponents.  Question: Must we freeze the whole object, when we
+   really only need a frozen value of a component?  It seems we could
+   choose to freeze the component, and replace its value with this
+   frozen component value, which seems more appropriate.
+
+   How are unfrozen composite values found?
+   Should there be a separate mapping from object_id to
+     unfrozen composite values, which at end of a basic
+     block gets frozen?  Would we always check for unfrozen
+     values first, or instead always remove
+     any frozen value from the AV_Map before we create an
+     unfrozen value?  The latter seems safer and avoids
+     confusion.
+
+   Do we need the same duality for components within a composite value?
+   Or can we have one possible Composite_Value which is
+     "Frozen_Composite_Value" which has the Base_VN and nothing more?
+     Perhaps calling it "Composite" is a misnomer, since we might not know
+     whether the value is composite or not.  Perhaps call it a "Base_Value"
+     or a "Simple_Value" -- decided to call it "Original_Value."
+
+   For the AV_Map, we want both, because we need to freeze everything that
+   is unfrozen at basic block boundaries.  For a component map, we don't
+   need to freeze the component values, since we are freezing the enclosing
+   structure.  It is also easy to support both for the "current" basic
+   block.  It is more trouble to support both for every component
+   of a composite value.
+
+   It might still be simpler to freeze the component values when freezing
+   the composite value.  This would keep the structure of a frozen composite
+   value simpler, as well as the hash and equivalence testing.  We probably
+   still want to "look through" frozen composite values to try to find the
+   value number of a component, rather than giving up immediately.
+
+   What sorts of new ParaSail types should we define?
+
+   - Updatable_Value  -- Has a base VN
+   -- Original_Value  -- Has only the base VN
+   -- Updated_Value: one of the following three
+   -- Updated_Class_Value  --  Has a mapping of selector => VN/CVal
+   -- Updated_Container_Value -- Has an indexing operation, plus
+                    -- a stack of mappings of indexing params => VN/CVal
+   -- Updated_Composite_Value -- Has partial call VN (omitting param that
+                              -- is ref to enclosing object) => VN/CVal
+
+   - Component_Id
+   --  Selected_Component_Id
+         --  Has the index (and name?) of the class component
+   --  Indexed_Component_Id
+         --  Has the indexing op and params
+   --  Sub_Component_Id
+         --  Has the referencing op and params
+
+   We will also need an "Object_Id" value number, and a table indexed
+   by Object_Id of "Updated_Value+"
+
+   What does an Object_Id look like?
+   It is the result of calling an operation, or creating an empty object,
+   or copying an existing object.
+
+   Here are some types for Object_Id
+
+   type Object_Id is VN_Id  // Just a special kind of Value-Number Id
+   - Object_Identifier // abstract interface derived from Value_Number
+   -- Result_Object_Identifier  // Result of a call
+   -- New_Object_Identifer      // Input is prior object-id
+   -- Phi_Object_Identifier     // List of prior object-ids
+   -- Input_Object_Identifier   // No parameters needed
+   -- Component_Object_Identifier // Component_Id + Enclosing_Object_Id
+   -- Loop_Object_Identifier    // Object Sequence 
+
+Do we really want Object_Ids and VN_Ids to be the same type?
+Simpler might be to change the AV_Map into an AO_Map and an OV_Map.
+An address holds an object id, and an object id has a value.
+
+When do we assign a new object id?
+- On each call that returns something other than a "ref".
+- On each object creation.
+- On each object copy.
+
+A call that returns a "ref" is producing a new object-id as a function of
+the input object-id.  Object_Part_Id, Indexed_Component_Id, Named_Component_Id.
+
+How do we produce unique object-ids, which will come up the same on a
+second value-numbering iteration?  We have talked about them as being
+like the value of some global variable, that is bumped as a side-effect
+of an object-creating operation.  The initial value comes from an input
+to the operation.  Each call takes the old value and produces a new value.
+Each copy/create is similar.  These can be very simple, but we will
+need phis for join points to make them unique -- well, not really.  
+Also, two different calls on the same function in a "then" and "else"
+part produce different obj-ids (why?).  The most important thing is
+that the same call inside a loop body produces different obj-ids on
+each iteration.  We may want a loop index pseudo variable that can
+be used with other things as well.
+
+We do need object ids for components, since temporarily we compute such
+an object id, and then later assign through it.
+Note that addresses are subtly different than refs.  We have addresses
+of places on the stack.  But refs contain object ids that denote something
+in object space.
+
+-------- 2/21/2015 -- obj-id thoughts
+
+What is the significance of object ids?  Would it be OK if a phi obj-id
+was just assigned a new obj-id?  We use object-ids mainly for providing a
+level of indirection for updating components, in part because we don't know
+where the object is really anchored.  Do we care what are the original obj-ids
+for a phi VN?  We need to use addresses/locators as the basis for a phi-vn,
+and the obj-ids are somewhat incidental to that.  We propagate an obj-id to
+all of the locators where it resides, and we can update the value of the
+underlying composite object via any one of those locators.
+
+--------- 2/22/2015 -- more obj-id thoughts == instruction index?
+
+Suppose we use the PSVM instruction index as an obj-id?  We could use negative
+values to represent the obj-ids of the inputs/outputs.  The index of an
+instruction that possibly creates a new object is used as an obj-id.
+Instructions that simply move 64-bit values don't create new objects,
+and so their instruction index won't be used as an obj-id.  Given an
+instruction index, we can tell where the object originated, and in fact
+these might be called "origin ids" rather than "object ids."
+
+Now what about phis?  Can we just pick one of the origin ids as the origin
+id associated with a phi?  What really uniquely identifies a phi is the
+basic block and the address.  Do we even need the level of indirection?
+Yes, because phis can be copied and updated just like other objects.
+But we have a problem because the same origin-id(s) might be associated
+with two different phis, so we really need to include the address as
+something uniquifying.  So we really need an origin-id based on the
+phi itself, which means the basic block + address.  We could treat parameters
+somewhat that way as well, with basic block 0 (or 1) plus the parameter
+locator being the origin-id.
+
+Basic block + Code offset:
+BB0 -- instructions
+BB1 -- parameters
+BB>1 -- phis  (need a list associated with each basic block)
+
+---- 2/27/2015 more on origin/object IDs, including composites
+
+Using an "origin-id" seems to work for whole objects, but for components we
+still want a more general object-id, which identifies the enclosing object
+and then the (sub)component thereof.  We don't want to put the component
+obj-ids directly in an Objid-to-VN map, because changes to the enclosing object
+might indirectly change the value of the subcomponent, and it would be too
+much trouble to keep invalidating subcomponents in the Objid-to-VN map when
+a change is made to an enclosing object.
+
+We want an obj-id representing a component to be separable into a selector
+and an enclosing object, which itself might be a component.  Hence we
+have a pair [enclosing object, selector] and the selector can be used
+to index into the updatable value, or the frozen value, for the enclosing
+object.
+
+The routine "Value_Number_Locator" will probably want to be split up
+a bit, and at least one variant of this routine should return an object
+id composed of a base object id, and a selector VN.  It is not clear we want
+to "uniquify" object ids.  We don't ever to a lookup based on an arbitrary
+object-id as a whole.  We do use selector VNs as keys into a table of
+components, and we do use "origin" ids as keys into the whole-object
+obj-id => VN/updatable-value tables.
+
+Fetch_Value and Store_Value are clearly key routines.  Will these take
+obj-ids instead of addresses?  Or do we need both sorts of routines?
+Or will these return obj-ids in some cases (probably wouldn't be called
+"Fetch_Value" then!)?
+
+Currently Fetch_Value is used as part of Store_Value when storing into
+a component, and as part of Value_Number_Locator when dealing with
+a level of indirection, and as part of Fetch_Value itself when loading
+from a component.  These uses will almost certainly change.
+
+Fetch_Value is called for each actual parameter of a call, to create
+a VN for the call as a whole.  The parameters are stored in local
+stack locations, so the actual interesting "Fetch" might have happened
+earlier in Copy_Word_Op, Assign_Word_Op, and Make_Copy_In_Stg_Rgn_Op.
+Other operations like If_Op/Is_Null_Op/Not_Null_Op/Check_Not_Null_Op
+do similar fetches based on the obj-id of the source locator.
+
+Copy_Word_Op will now just carry the current obj-id of the source
+into the destination, with no change to the obj-id=>value table(s).
+Assign_Word_Op is like Copy_Word_Op, but it will also eliminate the
+value mapping for the old obj-id of the destination (effectively deleting
+that obj-id).  Make_Copy_In_Stg_Rgn_Op will generate a new obj-id,
+but with the same value as the source obj-id.
+
+Move_Obj_Op and Swap_Obj_Op probably create new obj-ids, because they might
+be moving from components, and we want new "origin" ids.  Note that
+Swap_Obj_Op is an annoying case because it creates two new objects.
+We could handle this somewhat like a call with multiple outputs, but
+that is going to cause more trouble downstream.  It sounds like we need
+the possibility of having an "output #" associated with the instruction index,
+for things like calls and swaps that generate multiple new obj-ids.
+
+---- 2/28/2015 changes to fetch_value, etc.
+
+Locator:
+  * local/offset -- becomes a local address
+  * base-reg/offset -- leave it as is for its address?  Or create an adddress
+    using the obj-id stored in the "base" register? It is simpler to leave
+    as is, creating a component address.
+  * Phys-base-reg/offset -- Almost always a zero offset.  A zero offset
+    means just add a level of indirection.  Should we fetch the address
+    from the given local location?  Might as well.  Note that an input VN
+    becomes an input VN when fetched.
+
+Opcode:
+  * Copy_Word_Op carries obj-id of source over to destination,
+    but doesn't create a new obj-id, nor does it add to the obj-to-value
+    mapping.
+  * Store_Address stores the "address" associated with a locator into
+    a particular location.  It does create a new obj-id and (address) value,
+    so it updates both the addr-to-obj and obj-to-value mapping.
+    It is used for initializing "ref" components, and for passing
+    "var" parameters.
+  * Call with value result -- creates a new obj-id and a new value
+  * Call with ref result -- creates an address that is based on selector
+  * Indexing call -- creates an address is based on the input address and
+                     index (indices)
+
+  * Assign_Word_Op  -- Destroys existing object and then works like
+                       Copy_Word_Op
+
+Helpers:
+  * Fetch_Obj_Id -- given an address, retrieves/builds the obj-id at
+      that address (called by Copy_Word_Op)  It returns the obj-id
+      "stored" in the given component if there, otherwise it generates
+      an obj-id (from the instruction index, or composed from obj-id
+      of enclosing composite object + selector).
+  * Store_Obj_Id -- given a destination address and a source obj-id,
+      associates the address with that obj-id. (called by Store_Address)
+      What if dest address is for a component?  What if compiler optimizes
+      away a copy_word_op, but just stores from a temp into a component
+      but then reuses the temp to update a sub-component?  We actually
+      want that obj-id in the temp to match the one used in the composite
+      object.
+  * Fetch_Value_From_Obj -- given an obj-id, fetches the associated value
+
+  * Fetch_Value -- given an address, fetches the current value,
+                   by finding the obj-id, and getting the value associated
+                   with the obj-id.  If fetching a component, this will
+                   initialize the origin/obj-id if not currently defined, so
+                   it needs the instruction index and output#
+
+  * Store_Value -- given a value and a dest address, gets the obj-id
+                   associated with the address, and replace the value.
+                   This might also generate a new origin-id, so needs to
+                   be provided with origin information.
+
+Big issue: When copying an obj-id and value, what if source is a component?  If obj-id has ever been stored, any particular reason not to use it?  Suppose same
+obj-id is used again?  Can this happen?  If you copy an obj-id into a
+composite object, can the obj-id can ever be used for anything else?  Suppose
+we hold onto the result of a call, and then based on an "if" condition, store
+it in one place or another.  Seems like a "phi" would always isolate these
+two uses from one another.
+
+OK, so suppose no obj-id/value has never been stored.  What do we produce?
+If we copy it and then use it to update a sub-sub-component, we want to be
+sure that the update takes effect on the component as well.  How does that
+work?  Do we need yet another level of indirection?  Or are the values of
+components stored outside the object, in the overall obj-id-to-value mapping?
+It is probably OK to store values outside the object, so long as conflicting
+updates are not lost.  So what happens if we store a new value in an obj-id
+which effectively invalidates some other subcomponent value?  How does that
+get noticed?  Invalidation happens two ways, one by updating using a different
+component "dimension," and the other by updating an enclosing object.
+
+We could make the various operations that fetch or store a component
+automatically create an "origin" id, and record it in the composite object
+whose component is being referenced, if it does not already have an
+origin/obj-id.  This means the obj-id says nothing about the location
+of the object, nor its value (except perhaps null left behind by
+a move? -- not worth it).  So this means all obj-ids are roughly of the
+same form, and there are no "composite" or "component" obj-ids.
+On the other hand, addresses generally reflect component-ness, and values
+will do so if the actual value of the component is not known otherwise.
+
+Note that if we have a physical-base-register + (zero) offset that refers
+to an input parameter, fetching the value of that input is just going to
+produce another input VN.
+
+OK, are we ready to go?
+
+We should revisit the representation for composite values, both updatable and
+otherwise.  Does fetching a component force a composite value into an
+updatable mode?  Yes, I suppose so.  More generally, how do we preserve
+component obj-ids when we "freeze" a composite value?  Do the obj-ids live
+outside the composite value?  Do we have a mapping from composite obj-id +
+selector to component obj-ids, as well as a separate mapping from
+composite-value + selector to component value?  The latter represents
+the primary *content* of a composite value.  No obj-ids in sight, so it
+can be shared freely.  An updatable value has obj-id information, and
+even when the value is frozen, the updatable value preserves the obj-id
+info, presumably.
+
+Updatable value representation:
+
+   Base value
+   a) named component updates
+       mapping, from named component => origin-id
+   b) indexed component updates
+       sequence of:
+         i) dynamic-indexed component => origin-id
+         ii) mapping, from static-indexed selector(s) => origin-id
+       only need to retain newest entry for a given
+       static or dynamic index 
+       
+   c) referenced part update
+       parameters to ref-returning function => origin-id
+
+Composite VN representation:
+
+   Base value
+   a) named component updates
+       mapping, from named component => VN
+   b) indexed component updates
+       sequence of:
+         i) dynamic-indexed component => VN
+         ii) mapping, from static-indexed selector(s) => VN
+       only need to retain newest entry for a given
+       static or dynamic index 
+       
+   c) referenced part update
+       parameters to ref-returning function => VN
+
+When we "freeze" a composite updatable value, we create a composite VN.
+What do we do with the origin ids?  We freeze the values they refer to,
+but preserve them (by updating the value in the O2V map) only if their
+associated VN is well-defined.  If not, we drop them (from the O2V map and the
+updatable value).
+
+When we update a component of an updatable value, we look for already
+well-defined (not possibly overridden by an alias) origin ids and
+update the associated VN.  If appropriate, we create or restructure
+an updatable value.
+
+When we fetch the component of an updatable value, we add an origin-id if
+necessary with an associated pre-existing VN, or freeze the value
+and create a new component VN.  If there is no updatable value,
+we create one.
+
+If a component's origin-id maps to a component VN, this means that its
+value wasn't updated, but rather merely fetched, and can be ignored when
+freezing an updatable value.
+
+---- 3/3/2015 next steps
+
+Define an Origin_Id (hierarchy?) to represent origin-ids.
+These are either Code_Origin: Instruction index + output#
+or Phi_Origin : basic block + address (each BB has: address => origin-id; use indexed set?)
+or Input_Origin, parameter address or InputVN address => origin-id; use indexed set?)
+
+Putting these all in a single indexed set, like a value number, seems
+attractive.
+
+We add an initial address => OID mapping to the Addr-to-OID mapping,
+when we add a Phi_Origin or Input_Origin to the OID_Table.
+Note that the OID associated with the address can change as a result
+of an assignment to the address.
+
+---- 3/10/2015 more details on using OIDs
+
+Let's take some specific examples:
+
+  Copy_Word from source_addr to dest_addr:
+
+     Get_OID(source_addr) -> source_oid:
+
+     Source_OID := Addr_To_OID_Table[source_addr]
+     if Source_OID /= null then
+        assert: source_addr is not a component-addr
+     els if source_addr is local addr then
+        error if no such OID
+        create and Source_OID based on Copy_Word instr-index
+     elsif source_addr is param addr, input VN, const VN, ...
+        create Source_OID as "Input" OID based on Addr
+     elsif source_addr is component addr then
+        compos_obj := get_updatable_value(source_addr.base_addr)
+        Source_OID := compos_obj.stack[top][source_addr.selector]
+        if Source_OID = null then
+           ??? TBD ???
+        end if
+     end if
+
+     Store_OID(dest_addr, Source_OID):
+
+     if dest_addr is component addr then
+        compos_obj := get_updatable_value(dest_addr.base_addr)
+        if compos_obj.stack not compatible with dest_addr.selector then
+           compos_obj.stack |= []
+           ??? TBD is this all we need to do ???
+        end if
+        compos_obj.stack[top] |= [dest_addr.selector => Source_OID]
+     else
+        Addr_To_OID_Table |= [dest_addr => Source_OID]
+     end if
+
+How do we ever get rid of entries in the Addr-to-OID table,
+selector-to-OID stack, or OID-to-value table?
+When we add a new entry to sel-to-OID for a given selector, we can presumably
+eliminate any deeper entries for the same selector (but
+we don't want to do that until we "freeze" the overall value, probably).
+
+What do we do at basic-block boundaries?  We need to store things into the
+mapping from basic-block to A2O/O2V maps.  Can we prune them at all at this
+point?  We could create a set of OIDs that appear in an A2O or an S2O.
+But where to updatable values live?  We probably should start from the A2O
+table, and then the O2V and O2UV, and then walk into the updatable values
+that appear in the O2UV table, freeze them, and compress out redundant OIDs,
+etc.  This is a whole set of things to do at end-of-basic-block!
+
+---- 3/11/2015 More on OIDs
+
+It is OK to create a new OID for a component, so long as there isn't an
+active one that has been copied into a temp and is updatable.  For example,
+if we create a long-lived "ref" to a component using a particular OID and
+then "bury" the OID in the stack, what might happen if we then update
+the updatable value associated with the OID?  A long-lived "ref" is
+actually represented by an address, so perhaps that helps, because we
+will go through the component address again.  When we store an address,
+is it always a full address from the "home" location of the object to
+its sub-sub-component?  That would be nice to know!  Unfortunately, it is
+probably not true.  We copy values several times and then take an address
+of a component.  We have the OID, but not the original address.
+Furthermore, the temp that was used in the creation of the component address
+might be overwritten (gack), perhaps immediately (that is the component address
+is stored back in the same slot as the composite object address).  
+Does that mean the address should incorporate
+an OID?  Thus far, VNs are independent of OIDs.
+
+Answer: Use an OID for the base object in a component address.
+So when we turn a base-register-relative address into an Addr VN, we
+find out what OID is associated with the corresponding local address,
+and then include that with the selector to create a component Addr_VN.
+For indexing, we should probably do the same thing.  There we pass the
+base object as a ref, meaning using store address.  We will want to
+fetch that address, (i.e. param-addr->OID->VN (should be Addr_VN)) and then
+get OID associated with that address, and use that as the base object.  
+The selector is defined by the rest of the parameters.
+
+Furthermore, we should pass OIDs around rather than getting an updatable value
+and passing that around.  This will minimize the lifetime of updatable "ref"s,
+which cause heartache to the race-condition prevention mechanism.
+
+---- 3/14/2015 (pi day!) more details on OIDs
+
+Defer creating value for OID representing a component, by assigning the OID 
+but not giving it a value. We need a way to go from the OID back to its 
+address so when a value is fetched or stored we can decide whether we need 
+to invalidate the existing component values. 
+
+Instruction:
+* Copy word:
+  Source loc -> source-addr
+    (if base-reg, local-addr -> sbase-OID, error if doesn't already have one)
+    (local sbase-OID -> base-value, assert non-null, or defer this?)
+  Dest loc -> dest-addr
+    (if base-reg, local-addr -> dbase-OID, error if doesn't already have one)
+    (local dbase-OID -> base-value, assert non-null, or defer this?)
+  source-addr -> source-OID, defer assigning OID a value/updatable value
+    (if is component addr: add [src-selector => src-OID] into enclosing src-UV
+      and add [src-OID => source-addr] to OID location mapping)
+  store src-OID into dest-addr
+    (if dest-addr is simple addr: add [dest-addr => src-OID] in AO map.
+     if dest-addr is component addr: add [dest-selector => src-OID] into
+      enclosing (possibly newly-created) dest-UV)
+
+* Make_Copy_In_Region:
+  Source loc -> source-addr
+  Existing loc -> existing-addr  (irrelevant, except perhaps non-null check)
+  Dest loc -> dest addr
+
+  source-addr -> source-OID
+  source-OID -> source-value
+  assign new dest-OID with pre-existing value
+    (add [dest-OID => source-value] to OV map
+  store dest-OID into dest-addr
+    (if dest-addr is simple addr: add [dest-addr => dest-OID] in AO map.
+     if dest-addr is component addr: add [dest-selector => dest-OID] into
+      enclosing (possibly newly-created) dest-UV)
+
+* Store_Address:
+  Source loc -> Source-addr
+  Dest loc -> Dest-addr
+  assign new dest-OID with source-addr as its value
+    (add [dest-OID => source-addr] to OV map
+  store dest-OID into dest-addr
+    (if dest-addr is simple addr: add [dest-addr => dest-OID] in AO map.
+     if dest-addr is component addr: add [dest-selector => dest-OID] into
+      enclosing (possibly newly-created) dest-UV)
+
+* Call:
+  if *not* ref result:
+    param-list loc -> param-list addr
+    create param addrs for each parameter
+    get values for each input param,
+      dereferencing if pass-by-ref (var) parameter
+    get addr for each output, including var parameters
+    create new OID and value for each output 
+    add [output-addr-n => call-OID-n] in AO table for each output
+      (or [output-sel-n => call-OID-n] in UV if component)
+    add [call-OID-n => call-value-n] in OV table for each output
+    
+  if *is* ref result:
+    param-list loc -> param-list addr
+    create param addrs for each parameter
+      dereferencing if pass-by-ref (var or ref-var) parameter
+    get existing OID of ref input (ref-addr -> ref-OID)
+    get values for each non-ref-[const] input param,
+    create new selector VN from non-ref input values
+    if there are [ref] var parameters:
+       get addr for each such [ref] var param
+       create new call VN from all input values
+       create new OID for each non-ref var param
+       create new call value for each [ref] var param
+       add [output-addr-n => call-OID-n] in AO table for each non-ref var param
+         (or [output-sel-n => call-OID-n] in UV if component)
+       add [OID-n => call-value-n] in OV table for each [ref] var param
+    end if
+    create new indexing addr value for ref output from ref-OID
+    store newly created indexing component address into ref output.
+      [output-param-0-addr => ref-OID] (can't be a component)
+      [ref-OID => indexing-addr]
+
+* Create object
+    dest-loc -> dest-addr
+    create new OID and get an empty value for the given type
+      (so empty objs of different types will compare unequal)
+    add [dest-addr => new-OID] in AO table or
+      [d-selector => new-OID] in UV if component
+    add [new-OID => empty-value] in OV table
+  
+* Store null
+    dest-loc -> dest-addr
+    create new OID and get null value (always the same)
+    add [dest-addr => new-OID] in AO table or
+      [d-selector => new-OID] if in UV if component
+    add [new-OID => null-value] in OV table
+
+* store literal
+    dest-loc -> dest-addr
+    create new OID and get literal value
+    add [dest-addr => new-OID] in AO table or
+      [d-selector => new-OID] if in UV if component
+    add [new-OID => literal-value] in OV table
+
+* is_null_op
+    src-loc -> src-addr
+    dest-loc -> dest-addr
+    src-addr -> src-OID -> src-value
+    create new OID and is-null(src-value)
+    add [dest-addr => new-OID] in AO table or
+      [d-selector => new-OID] if in UV if component
+    add [new-OID => is-null-value] in OV table
+
+* if_op
+    src-loc -> src-addr
+    src-addr -> src-OID -> src-value
+    src-value -> val-is-true, val-is-false as edge conditions
+
+=== Updatable Value (UV) operations
+  - UV has a base VN
+  - UV has a stack of maps from selector => OID
+  - NO: UV also has an extra map from selector => OID for 
+        OIDs that have no UV/VN
+    YES: this extra map is in the current basic block and is
+        component-addr => OID and is the inverse of the
+        OID => component-addr for OIDs without a UV/VN.
+  - The basic block has a map from OID => UV, OID => VN,
+     OID => component-addr, and component-addr => OID.
+     A given OID is in (at least) one of:
+       OID => UV, OID => VN, OID => component-addr
+     with precedence in the given order.  (We could enforce exactly one.)
+  - When you get an OID for a component-addr, a new OID is assigned unless
+    the selector is in the top of the base OID's UV stack's map, or is in the
+    component-addr => OID map.
+    If the base OID doesn't have a UV or VN, we assign a new OID
+    and just add the component to the component-addr => OID 2-way map
+    This can happen in Copy_Word.
+  - When you ask for a UV for a (base) OID:
+       if it has a UV, you return it (ref returned is used immediately).
+       if it has a VN, create a UV with the given base VN
+       if it has no VN nor UV, we need to find the address associated
+         with the OID, and get a UV for its base OID (recursively).
+  - When you store an OID (and value?) for a selector in a UV:
+      the component-addr is removed from the "valueless" map, if there
+      NOT[the selector is removed from anything but the top of the stack's map]
+      if the selector is not compatible with the top of stack
+        a new map is added to the stack
+      a mapping [selector => OID] is added to the top-of-stack map
+    QUESTION: When we add a new level to the stack, why not create a new
+      base value?  The underlying OIDs are no longer usable.
+      This simplifies the representation of UVs down to a single
+      map of selector => OID, plus a base value.
+      This also makes the "freezing" of a UV as simple as incorporating one
+      level of selector=>OID mappings into the base value.
+      A composite/aggregate value is a base value + map of selector=>VN,
+      So all this involves is getting a VN for each selector's OID.
+    ISSUE: After we freeze a UV, what about the OIDs that are still
+      relevant (have been copied)?  We presume they must be associated
+      with the top level mapping, so we could preserve the top-level
+      mapping even though it is redundant with the base value.
+      Or we could restructure it as a cache, clearly redundant with the
+      base value.  Or we could use the comp-address => OID mapping
+      to remember these existing mappings (seems simpler, and perhaps
+      they are already there if we don't delete them).
+  - PRINCIPLES:
+      * A newly computed/copied value always gets a new OID
+          (call/create/is-null/store-lit/make_copy/store-addr).
+      * An updated component preserves the base OID and merely updates its UV
+      * Getting a component value preserves the base OID
+           If component OID is in top of stack, same OID, same value
+             OID is added to top of stack.
+ PROBLEM: OIDs may have their value changed, even when enclosing composite
+      obj is not altered (how is that possible?)  We need the values
+      of every OID mapped from a selector in the UV, so can construct
+      a frozen value properly.
+      
+  - When you get a value for an OID that corresponds to an OID ...
+  - When you store a new OID into a selector
+
+---- 2/22/2015 loop refs
+
+What about refs that move their way through a data structure as part of a loop?
+The address would be represented by a "phi."  But we might want to separate off
+the selector part from the base address, so the base object is always known
+staticly.
+
+---------
+
+As last part of value numbering, we need to save the computed value numbers
+for all checks, calls & returns, and for path conditions.
+
+---------
+
+Computing path conditions may need some kind of dominator tree.
+
+We are now decorating each edge with its immediate condition.  That may be
+adequate during value-set propagation, as we go from block to block.  But
+if we want to create directly phi-as-kappa nodes, we need to have conditions
+on *incoming* edges of joins, rather than on outgoing edges of forks.
+It is possible to have more than two incoming edges at a particular join point,
+and some of the edges might be back edges.
+
+Let's ignore back edges for now.  If we go back to the dominator, which must
+be a fork point, then the conditions on each fork point found by walking
+backward from each edge, looking only at fork points which
+dominate multiple of the original join-point edges, instead of just one.
+Need to be able to ask whether a fork point dominates a given edge, though
+that is equivalent to the predecessor of the edge in these cases because
+we assume that the edges impinging on a join point are the only edges
+eminating from the predecessor.
+
+Computing the dominator tree:
+
+See paper:
+A Simple, Fast Dominance Algorithm
+Keith D. Cooper, Timothy J. Harvey, and Ken Kennedy
+Rice University
+Houston, Texas, USA
+
+------------- value set computation and propagation ------------
+
+Now we need to think about computing value sets for value numbers.
+This is made more difficult in ParaSail because we have user-defined
+enumeration types, among other things.  And essentially everything is
+a "call."  But as in the compiler, if the call is on a builtin, then
+we can use built-in knowledge of the properties of the operation to
+compute value sets information.  We will probably want to have type-specific
+operations for computing value sets.  In cases where we have a finite and
+relatively small set of values for the inputs, we can simply compute the
+values for the outputs.  This does imply we want to simplify the process
+for doing compile-time computation.  We also have to be careful if we start
+depending on particular operation bodies, that we recognize when those bodies
+change, and do the recomputation.  Essentially this is like inlining, and
+we need to know what needs to be recompiled.
+
+The other important issue is the propagation algorithm.  The one in CodePeer
+seems overly complex.  One issue is we don't want to have propagation have
+a side effect if the value number is not "live"/"active" in the current
+block.  So we should keep a set that represents the "live" value numbers
+in the current block, and never propagate outside that set.  But that implies
+that when we enter a new scope, we will need to re-compute value numbers
+from their constituents as they become active.  Top-down propagation should
+already have taken place since if a value number is active, so must be
+all of its constituents.  Phis are probably a special case here!  And phis-
+as-kappas are also interesting in this context.
+
+When propagating "across" from one operand to the next, that is only
+appropriate if the parent VN is "live."  When a new parent becomes live,
+it won't have any restriction in its value set, unless one is imposed at
+the point it is computed, which would presumably be due to overflow checks
+or range checks or divide-by-zero checks.  When a VN becomes live, we compute
+its from its constituents, and then we consider some top-down propagation
+only if there is a restriction on the output set.
+
+It is useful to keep track of whether the value set of a VN matches a
+bottom-up computation.  This needs to be rechecked each time we recompute.
+We need to recompute whenever a constituent shrinks.  It probably makes sense
+to keep the current restriction separately from the current computed value,
+so it is easy to re-check whether the restriction is redundant.  It might
+be useful to keep both values, and then compute the intersection whenever
+we want to retrieve the value.
+
+When doing a top-down propagation, we need to do it on both operands
+(presuming a binary operation) when a new tighter restriction is imposed.
+If we have a new smaller value set for one of the operands, then we
+should propagate down the other operand only.  We need to keep track of
+some kind of time-stamp to indicate when we have completed the top-down
+propagation so we won't unnecessarily repeat it.
+
+The built-in "=?" for enums, ints, and floats can all be turned into "-"
+presumably.  We might want a "rep" operation for types that are
+just wrappers or abstractions of ints or floats.  We also want an inverse
+operation to get up back to the abstract value/image.
+
+If we have a type (like string or set or map) which is not just a simple
+wrapper of a numeric type, we may want to have type-specific representations
+for value sets, along with type-specific operations on those sets.
+How might that work?  We need to create a polymorphic value-set hierarchy,
+and an ability to add to it.  We probably need a registration to create
+an empty set of the value-set type given some kind of identifier of the
+value type.  We can then use polymorphic calls to add compile-time values,
+though that presumes we have some polymorphic representation for values as
+well.  Where do compile-time values come from?  They would be from
+constructors.  We have the code for the constructors, so can we simply
+execute it at compile-time?  What do we end up with?  An "Assignable+"?
+But we can't actually do anything with that, though we could pass it to
+type-specific code which could complain if it were not the right type.
+
+There might also just be a default mechanism for hashable objects when the
+possibilities are limited (though that sounds like an enum type).
+Univ_enumeration might be one example of a countably infinite type, where
+some kind of default would work, so long as we had some way to represent
+the universal set, and perhaps all-but-XXX.
+
+In the static analyzer, it is creating value numbers.  These could be used
+to represent compile-time known values, and probably should be.
+But again this gets us back to being able to execute code conveniently in
+the static analyzer, and implies that when we compile code, we have access
+to the source code of everything, and not just stubs or module interfaces.
+Conceivably we could "cheat" and not recompile everything, but just do new
+checks for newly compiled code, and presume that the old code is still
+correct even if the things it depend on have changed in some way.  But this
+is the code for the *types* not for the other code, so it would seem unusual
+that the types would behave differently.  We are presuming that user-provided
+pre- and postconditions would allow checks to be performed without looking
+at the bodies of code in other files.
+
+Conceivably we could use (literal) value numbers as the bounds of ranges,
+as well as the components of sets.  Value numbers would need some
+representation of their type (or at least literal values would need that).
+
+Other than ranges (open and closed?) and individual values, what else
+might we need?  Universal, empty set, complement, all but ...
+
+Now let's go back to the current issue of null/non-null.  That seems somewhat
+orthogonal to any other value representation.  We also need to worry about
+true/false, i.e. boolean.
+
+Let's assume we have an abstract type Value_Set, with concrete descendants
+for different types.  We will need operations for Empty set, singleton,
+union, intersection, add null, remove null, contains null, contains non-null,
+overlaps, is-subset/is-superset ("=?"), ...
+The null stuff could be non-abstract.
+
+For boolean, what would these look like?  How would we know to use boolean?
+All "checks" start out as boolean.  The issue is more what happens during
+propagation.  User-written precondition checks or assertions can be
+arbitrary expressions involve arbitrary types (remember: preconditions
+need to be evaluated based on the actual parameters).  Almost everything
+will be a call on an operation.  We will have the routine Id in the PSVM
+instruction, and we can use that to retrieve more information, including
+the type descriptor (really? how do we substitute in for current-inst
+references or type-relative references).  Actually, we don't know the "true"
+type descriptor in general, we know some kind of interface, which might
+be parameterized.  So from the interface we need to figure out how to
+represent the possible values.  Suppose we have an indexable type and
+a range for the bounds.  Presumably there would be a precondition that
+the index is in the bounds.  Alternatively, we would just rely on the
+underlying precondition that the index into the underlying Basic_Array
+be in the range 1 .. Length.  In any case we would need to prove certain
+things that depend on the properties of "-" and membership in a
+countable_range.  Countable types have quite well defined properties,
+so that seems doable.
+
+The Canonical_Type_Name seems relevant.  We want to separate out the
+module name from the actual parameters.  So that would imply we should
+use the Actual_Sem_Infos for the actuals.  We are generally interested
+in the underlying type, so we would ignore "new", and perhaps look through
+wrappers in some cases.
+
+Probably the (full) module name is the right place to start, and then that
+can look at the module parameters if that is appropriate.  We will need more
+"reflection" operations probably, since right now we don't have much of
+anything for "decl"s which are types.
+
+The connection between "index_set" and a mapping seems important, and the
+presumption that "indexing" will never fail if the index is in "index_set".
+Also that the index set might grow as a side-effect of "var_indexing," |=,
+or <|=, but never shrink.  On the other hand, other operations (especially
+"-=") could shrink the index set.
+
+What are other sorts of checks that will be common?
+Unexpected cases in a polymorphic case statement, perhaps.  Or any sort
+of case statement where not all cases are covered.
+Explicit indices such as [1] of [|C|] which are off by 1.
+
+But not-null checks would be most common.
+Presumably our precondition checks on calls include checks against
+nullness of actuals.  We should have compile-time checks against
+nullness of module actuals.
+
+So let's talk about the value-propagation phase (passes?).
+Do we walk the instructions, or the basic blocks?  In PVP, we definitely
+walk the blocks, so we can iterate until things stabilize.
+We start by unioning the value sets of the incoming edges.
+
+------------
+
+Most of the information we get will be in the form of the truth or falsehood
+of boolean VNs.  We can divide VNs into various categories:
+ Literal VNs
+ Compile-Time-Known(CTK): Functions of Literal VNs (includes the above)
+ A non-CTK VN that has two or more non-CTK VNs as direct constituents.
+ A non-CTK VN that has one non-CTK VN as a direct constitutents, and zero
+   or more CTK VNs as direct constituents (see-through VN)
+ Boolean See-Through VNs.
+ Boolean VNs.
+
+For Boolean VNs, we should keep a mapping from VN to #true/#false.  If it
+doesn't appear in mapping, its value is not known.
+
+We should keep track of which VNs are active.
+We should keep track of immediate parent VNs.
+We should have a flag indicating whether a given VN is CTK, or See-Through.
+We should have a flag indicating whether a given VN is Boolean.
+We should keep track of nearest see-through (proper) ancestor(s)
+  that is (are) Boolean, even if VN is itself Boolean.
+
+Many see-through boolean VNs will be of the form to_bool(X =? CTK, NN)
+If they use the "built-in" =? then we can assume we have a countable type
+and can use ranges for X.  We may also know that a type is countable, in which
+case we can also use ranges.
+
+So what is a "Value_Set"?  We need an operation to add in an assertion
+of false or true, and or= to combine multiple incoming edges, and then
+we need operations useful for propagation.
+
+-------
+
+Should initialize a Not_Null_VN applied to non-optional inputs to have
+a value set of #true, as though there were implicit "Check_Not_Null"s at
+start of operation.  Similarly when fetching value of any object
+declared non-optional.  Need to add in front end Check_Not_Null, or
+implicit ones in the analyzer, when storing into a non-optional object.
+
+---------
+
+Parallelizing parascope.psl?  We need an iterator that generates the set of
+operations to analyze, so we can run it concurrently.  Alternatively we
+recurse in parallel with analyzing an operation.  But we probably don't
+want to analyze nested operations in parallel with their encloser, since
+the nested operations need to be analyzed for global data usage.
+
+[ASIDE: This is vaguely related to the issue of "indirect tasklets" that
+Brad Moore brought up in e-mail, I believe.  End of ASIDE]
+
+Need a query to decide whether an item should be counted, rather than
+having it return an updated count.  We would then pass down the index to
+use for uniqueness when analyzing an operation.
+
+------
+
+Nested blocks and operations: We need to create unique addresses for the
+locals and parameters for nested blocks/operations.  For nested blocks, we
+probably want a block number in addition to the "local"/"param".  Params
+of nested blocks are tricky.  When we have loops that don't use nested blocks,
+we evaluate into a temp, and then copy the temps into the loop variables.
+I think it is simplest to do this at the call site, where we copy the
+locals into the params for the nested block.  Similarly afterward we can
+copy the params back into the locals (this happens with check_nested_block
+and when a block is created to do an out-of-line call).  In cases where there
+is only one call site (which is true for non-loop cases), we can just
+create an equivalence between the caller's view and the nested-block's view.
+In fact, even with a loop, the original caller's local slots remain usable
+for this purpose.  Alternatively, we treat the parameters as indirections
+through a parameter-pointer which is set at each call site.  That is,
+we have a nested-block param-pointer which is effectively a shared global
+of the nested block, and we set that and then jump to the nested block.
+
+For nested operations, up-level references should generally be treated
+as "input"s.
+
+What would be a good identifier for a nested-block's locals?  The basic block
+id of the root of the nested block is unique.  Cur_Entry_Node and Cur_Exit_Node
+are initialized as a result of starting a basic block that is an entry node.
+References to enclosing locals/params will need to be resolved.  We need
+to know the level of nesting.  In fact, the code-block descriptor contains
+the nesting level, as does the enclosing Routine, so we can compare these
+to determine whether this is a reference from a nested block to an enclosing
+block, or a "true" up-level reference into an enclosing routine.
+An up-level reference to a nested block of an enclosing routine is tricky,
+as we don't know the basic-block ID.  However, we do know the nested
+level.  Hence, for "true" up-level references, we should probably use
+the "absolute" level number (same as used in code-block descriptor and in
+routine), and only use the BB_Id for references to the current routine.
+For simplicity, we will use a BB_Id of 0 for true up-level references.
+
+--------
+
+Nested operations: Should they be treated almost like nested blocks?  Do we
+want to effectively inline them?  What about recursion?  Or do we want to
+generate pre/postconditions, and iterate until things stabilize?  Is there
+some intermediate ground between these two?
+
+---------  Handling loops -- 14-Jan-2015
+
+We haven't done much of anything about loops yet.  Currently we create
+phis when we have a join point and there is no readily available value.
+We don't actually fill in the phis yet.
+
+It makes sense to fill in the phis on a separate pass.  Do we need the
+complexity of CodePeer where we have both a forward and a backward pass?
+In CodePeer some of that complexity comes from addresses which themselves
+change on each time through the loop.  Phis arise from getting the
+contents of an address or an object-id after a join point.
+If the address is A[I], where I is an index of the loop, what do we
+want the "phi" to look like?  Do we need it to be a phi at all if
+A is not changing in the loop?
+
+More generally, we may want to put in some level of indirection (object-id?)
+so we can eliminate a "phi" if the value is not changed.  This doesn't really
+work, since the same problem applies at the "object-id" level, if whole
+new objects are created on either side of an "if" statement.
+
+Could we wait until we need a "phi" to decide if the object is modified in the
+loop?  Or could we do an initial pass which would determine that?
+How would the initial pass work?  Would we essentially have to do a
+value numbering pass to know what addresses/object-ids are updated where?
+Alternatively, we do the whole value numbering repeatedly until things
+stabilize -- we would need to identify addresses/object-ids that are/are not
+updated in a loop, or just notice that all of the predecessors either
+are equal to the phi itself, or are the same other value.
+So that should work, though the predecessors need to be stored somewhere else.
+
+Now back to the question of a changing address.  That happens in CodePeer
+because the obj-ids might reference variables.  But the same thing can
+happen in an address value number in ParaScope, that is, an index value
+could itself be a phi of the same loop.  So A[X] could be updated in a loop
+in which X is also updated in the loop.  What is the significance of that?
+Suppose we add 1 to A[X] on each iteration.  What is the value number of A[X]?
+If X is definitely changed, then the value of A[X] before the update is
+equal to A[X] before the loop.  It would be better to look at the value of
+"A" as a whole before the loop.
+
+Suppose A is a reference which is being updated on each iteration?  We need
+to know what it might be referencing.  In general, we need to know what a
+loop might modify.  We already handle that in the front end, supposedly,
+though I am not convinced we handle loops completely correctly!  Mainly we
+need to be sure that the parts of the initial value/next values that are
+updated are non-overlapping.
+
+---  More on loops and indexing -- 16-Jan-2015
+
+Probably the right approach is to have phis only at the granularity of a
+top-level object.  It gets too confusing when we start having phis for
+parts of a top-level object.  Now it might be possible to have phis for
+statically indexed components, and for named selectors, but the fact that
+those are the only components that are updated could be
+discoverable when merging two different values of the entire composite,
+and is probably a better way to discover it.
+
+[Aside: May want to disallow initial/then/while ref iterators that cross
+object boundaries -- that is, the "then" part of a ref iterator must refer
+to some component of the prior object.]
+
+--- More loop stuff -- 18-Jan-2015
+
+The most important thing to have is an assertion or two about the value of
+a loop variable.  This should be relatively easy to come by if we recognize
+the operation that is producing the value, and the (initial) value of the
+object being passed into the "Remove_XXX" operation.
+
+--- Phis and all that -- 17-July-2015
+
+Ok, we now have an OID that is a Phi_Origin for a loop.  What is the next step?
+We call Fetch_OID_Value.  If a value was stored for this OID, then we are
+done.  If not, we look at the kind of the OID.  It is either for an input
+of some sort, or it might be a phi.  We don't do anything with phi OIDs yet.
+What should we do?  A Phi_Origin OID has a basic-block (node) and an
+address.  We could get an OID associated with the address
+for each predecessor of the basic block (we could do that immediately upon
+creating the Phi OID, or defer it until we do a Fetch on the Phi OID).
+Alternatively, we merely create a Phi VN, and associate it with the Phi OID.
+At some point we need to fill in the Phi VN, which we could do on a separate
+pass, though that may produce more Phis, presumably.  We have eliminated
+components from these, so these are only whole objects.  Does that help?
+I think that means that the address is simple, but for a loop, we might still
+need to iterate to get them all, especially if we have nested loops.
+Suppose we wait until we finish a block that has the back edge for a loop
+to "fill in" the phi's of the block.  That might trigger getting the
+final value of a nested loop phi.  We could create a phi for every object
+that is updated inside of a loop.  We really want to know whether it is
+live at the end of the loop.
+
+By the time we get to value propagation, we want value numbering to be
+complete.  As an aside, what is the best way to get a value set for
+a loop phi?  If we build it up from just its initial value, we can easily
+get into a "value creep" situation.  If we do a pattern match on the structure
+representing its value, i.e. the back-edge tree with removals on loop exit,
+we can avoid that, but we are limited to what patterns we can recognize.
+The path condition should help here, but not clear what a path condition
+looks like for a back edge.  Actually, a path condition is only relative
+to the immediate predecessor, so there is nothing special about back edges.
+We really need to know by how much a loop phi can change at most and at least
+on each iteration (in absolute value).  This should allow us to decide
+whether it is growing or shrinking, and whether it reaches every value
+or might skip some, and whether it changes on each iteration.  This should
+also allow us to relate it to the loop count.  Might need to create various
+VNs to represent this relationship (e.g. initial_val + N*count - loop_phi).
+
+Back to value numbering -- Since we can't update value numbers, we need
+a mapping to provide the inputs to a phi VN.  This could be a mapping
+from VN to vector.  Do we want value numbering to iterate?  If so, then
+we want to suppress multiple error messages about things like uninitialized
+data.  So let us assume we fill in the forward inputs to a phi when it is
+created, and the back edge inputs when we finish a block with an outgoing
+back edge.  Is it possible that a new phi is created that has a back
+edge as a side effect of this?  If so, can we fix it up right away?  It might
+be better to add a phi creation phase, but this could be a problem since
+we depend on address value-numbers for these.  We could do liveness of
+whole objects conceivably, ignoring components, but that is a lot of work.
+But it does mean we will create many more phis than necessary.
+
+OK, let's assume we need a phi creation phase.  Any update of any subcomponent
+of an object should create a phi.  If we are only creating phi VNs and
+address VNs, would that work?  We might also need to create Phi_Origin OIDs.
+When we store an address, what happens?  We store the address VN into
+a variable, and we later dereference it.  This implies we need to track
+the contents of such indirections so we know what is being updated.
+And if this is a component of a long-lived reference object, we are back to
+a pretty complex situation.
+
+Currently we are creating a Phi OID as soon as we encounter a join
+point when walking the predecessors.  But we should really see whether
+we get different OIDs for the predecessors (or different (updated) values
+for the OIDs?).  Conceivably we could create a Phi OID but not actually
+create a phi VN.  When we encounter a Phi OID associated with a given
+address, we could take the underlying address and search again for its
+OID/value to see if they are all the same.  One possibility is to create
+too many phis and then get rid of them iteratively when they are determined
+to have all inputs the same.  Or perhaps phis more generally are treated
+as a level of indirection; but that doesn't really work because we
+combine VNs via hashing.  Phi OIDs could be levels of indirection, but
+that doesn't really solve the problem, I suppose.
+
+We could identify Locators/Address-VNs that are stored-into inside a loop,
+as well as have their address taken.  That would deal pretty well with
+simple objects.  But for composite objects, they can be altered in more
+subtle ways by copying the "value" and then updating a component.  That is
+not easy to precompute.  But perhaps not that many composite objects
+are referenced inside a loop, so we can deal with them iteratively.
+
+This seems like an optimization which may be premature.  Probably simplest
+to just iterate for now.  Hopefully will stabilize quickly.  The question
+is which is better, to assume the best or assume the worst as far as
+whether an object is updated inside a loop?  Are both do-able?
+I would think it would be more efficient to assume that things are not
+updated inside a loop, since typically relatively few objects would
+be updated inside a loop.  Would need some kind of "shadow" phi to
+keep track of the value presumed on entry for a given address.  Could be as
+simple as looking at the value of the address in the other predecessors,
+which presumably would store it if it were fetched.  Or perhaps in a loop
+header we would always store the result of a fetch that crossed through
+the loop header, providing a cache as well.
+
+We will need to know which predecessors have been processed at least once,
+so we know whether to look at back-edge value.  In some weird cases, we
+may think we don't need a phi on one iteration and then later decide we
+do need one.  So we probably need to iterate at least one extra time to
+ensure stability.  So we should probably remember the value number for
+every "live" address/OID, and create a phi if the back-edge value doesn't
+match that.  Once we create a phi, there seems no reason it would ever
+go away.  So we have two mappings, one for live non-phis, and one for phis.
+The non-phis have the single value they get on all visited incoming live edges,
+while the phis have a mapping to a vector of values, one per incoming edge.
+It seems worth doing some compile-time computation of value numbers to identify
+"obviously" dead edges, though that can presumably wait.
+
+Is there any harm in always creating phi OIDs?  Or should we treat them the
+same way?  Seems undesirable to create excessive phi OIDs, so probably should
+treat them roughly the same as phi VNs.  Back edges will never be "visited"
+so they are ignored unless a phi has already been created, in which case
+we simply use the phi VN/OID.
+
+Should we revisit the blocks of a loop before proceeding further?  Or is it
+better to simply re-do all of value numbering?  Since there is probably
+a lot of code that is *not* part of a loop, it seems better to just
+iterate locally.  But with nested loops, would this be unnecessary?
+Perhaps only need to iterate if when doing the back edge we discover there
+needs to be a new phi.  In that case we could immediately repeat the loop.
+
+--- More on phis 18-July-2015
+
+When we create a phi, we add it to the current AO_Map/OV_Map for the join point
+node.  However, if later in the same node we assign a new value, then
+the phi will be overwritten.  Hence the outgoing edge AO_Map/OV_Map
+is not helpful for finding what Phi OIDs/VNs exist for a given node.
+So we now have for each join node, the set of Phi OIDs/VNs for that node.
+For loop headers, we also have the set of OIDs/VNs that were retrieved
+from a predecessor.  At the end of a block with an outgoing back edge
+to the loop header, we will check whether the same OID/VN would be
+produced.  If not, we create a phi and populate its input vector appropriately.
+When getting an OID for an Addr, or a VN for an OID, we recurse on the
+predecessors of the current block if there is nothing in the current block's
+map.  If there are multiple predecessors, if we get different answers
+(ignoring the back edges), then we create a phi, populated with these
+different answers.  If it is a loop header and we don't create a phi,
+we remember what single answer we get.
+
+What remains to be done:  
+ * Do for Phi_VNs what we did for Phi OIDs.
+   This will happen primarily in Fetch_OID_Value.
+   Note that even if OID is an Input_OID, it might have been updated
+   if it is a composite object and only components were updated.
+   If there is no value in the OV map, that might be because
+   we need to create a phi.
+
+ * When we create a phi, we should re-run value numbering on affected loop.
+
+We need that when (re) starting a node, to "pre-load" to AO/OV maps.  We
+might also need it for LLVM optimization.
+
+---------  19-July-2015
+
+What should Phi_VNs look like, given that we also have Phi_OIDs?
+In particular, should Phi_VNs have the OID that caused them to be
+created, or should they have the address VN, or what?  We have at least
+two cases:
+
+   1) OID is *not* a Phi_OID
+   2) OID is a Phi_OID for the same node as the Phi_VN
+
+In case (1), all edges used the same OID, and we can fill them in by doing
+the same sort of Fetch_OID_Value on each predecessor.
+In case (2), each edge has its own OID, including the back edge
+(which hopefully is filled in by the time we create a Phi_VN using
+the Phi_OID), and we should use that OID for the Fetch_OID_Value.
+
+Now suppose we have block with two incoming forward edges and one incoming back
+edge, and the two forward edges produce the same OID for the same address,
+but give different VNs.  But then imagine that the OID associated with
+the address changes inside the loop.
+We will create the Phi_VN using the common forward OID, but then when we
+get to the end of the loop, we will discover that we need to create a Phi OID.
+If we record the OID in the Phi_VN, then it will not notice this change.
+On the other hand, if we store the Addr, and re-look up the OID for the
+given Addr when we reach the end of the loop, we will avoid this problem.
+This implies we need the Addr given the OID.
+But we create the Origin_Info's before we have an address, generally.
+So this argues for having a single table from OID back to Address.  This
+can be used for component OIDs (eliminating the need for the 2-way map there)
+as well as in cases of Phi_VNs.
+
+-------
+
+Now we are worrying about value sets for Phi_VNs.
+Compute_Value_Set needs access to the Edge_Values mapping.
+Given that, it is pretty straightforward to "or" the value sets together.
+However, if we are computing the value set of a phi at a point where we
+know more, we may want to combine the current value map with the edge
+value maps before we do the union.  These are essentially the "Phi Input
+Contexts" from CodePeer.  If any phis of a given block are to be
+recomputed, then we might as well recompute all of them.  We probably
+want to do this systematically.  Might be useful to know which VNs
+of an Edge_Map actually contribute to Phis of the Target block.
+
+More interesting is the Propagate_To_Operands.  This is the Top_Down.Do_Phi
+of CodePeer.  Let's take an example:
+
+    Z := Max(X, Y)
+    {Z < 100}
+
+This should have the effect of asserting X < 100 and Y < 100, but that
+is because the path condition for the edge that sets Z := X to be X > Y
+and the path condition for the edge that sets Z := Y to be Y >= X.
+What we have is X < 100 if X > Y and Y < 100 if Y >= X.  That is, we
+can create conditional assertions, such as: X <= Y or else X < 100
+and Y < X or else Y < 100
+(!A or B) and (A or C) = (!A and A) or (A and B) or (!A and C) or (B and C)
+Clearly the (!A and A) drops out:
+(X > Y and X < 100) or (X <= Y and Y < 100) or (X < 100 and Y < 100)
+
+X > Y == X - Y > 0
+X <= Y == X - Y <= 0
+
+Net effect, is apply the constraint in the edge value sets, and then
+recombine the value sets to produce a new "current" value set.
+
+Actually, might as well substitute all of the phis into each of the
+edge value sets when you substitute any of them.  So propagate the
+value set shrinkage in the current block's value sets, and then if any
+phis of some node are shrunk, re-union the the "shrunk" edge value sets for
+that node and intersect them with the current block's value sets.
+
+------ Value-set propagation 20-July-2015
+
+We are running into problems because we are complaining about assertions
+possibly failing before we ever do a full bottom-up propagation.
+Currently Propagate_Top_Down propagates down from a set of VNs, but in the
+mean time it accumulates the immediate parents of any changed VNs.  This
+is passed to the Propagate_Bottom_Up routine.  Propagate_Bottom_Up takes a set
+of VNs needing to be recomputed.  Each time it recomputes the values of
+such a VN and its value changes, it adds the parent VNs to the set needing
+to be recomputed.
+
+So when do we do the initial computation of the value set for a VN?  And
+for which VNs do we do it?  We could do an initial pass over the assertions
+of the basic block, and the VNs needed for phis in successors, and compute
+the closure under the child relationship to produce an initial bottom-up
+set, and then do that right at the beginning.  Phis should be done first,
+but that will happen anyway given the ordering.  Should perhaps filter out
+certain address VNs (e.g. the Phi address or Input address).  But perhaps
+we can just eliminate all CTK-VNs, which are computed once at the beginning.
+Beware that if the Child_Vec is empty or null, then the VN is presumed
+to be a compile-time-known VN, and we don't want Phi VNs to be treated as CTK.
+
+[Aside: Do we properly know whether an input might be null?]
+
+Alternatively, we could do this cumulatively, as each assertion is encountered,
+keeping track of those that have already been computed at least once
+in the current block.  How would this work?  We would look at all of the
+children.  If they are in the Already_Computed set (initialized to
+include CTKs, and everything appearing in the initial VN_Values map, and
+each thing for which Compute_Value_Set or Compute_Phi_Value_Set is called.
+Then when we are about to compute an assertion or phi input, we would first
+call Propagate_Bottom_Up with the VNs of interest.  But propagate bottom up
+goes "all the way" up.  So perhaps all we need to do is include the Input_VNs
+in the initial computation?  But this would do too much.  Including
+computations involving phis, etc.  So better to do this on demand, perhaps.
+The problem is that when we start combining values at join points, if one
+"side" has computed something and one side hasn't, then perhaps we lose
+something?  Actually, if there was no restriction applied to a value,
+then there is no particular reason to keep track of its value, since it
+can be recomputed when needed.
+
+So perhaps we shouldn't pre-compute the CTKs or the Phis either.  If we
+are strictly "demand" driven, and ensure that anything in VN_Values has
+been computed at least once bottom-up, we should be OK.  The primary demands
+are assertions and phi inputs.  And perhaps propagate bottom up goes too
+far in general.  We only want to propagate to parents that have already
+been computed.  The point is that VN_Values should remain valid, so that
+if any input changes, we recompute.  But if no one is interested, we shouldn't
+waste our time computing.  VN_Values should never lie, but it can be
+incomplete.  Do we want to keep track of values that were computed and
+produced "null"?  We could have a separate set for that, or actually add
+elements to VN_Values for that.
+
+So when we have one or more assertion VNs we want to apply, we start
+by making sure they have been computed at least once.  That would be
+true if they are in VN_Values or in Already_Computed.  We could initialize
+Already_Computed to be the index set of VN_Values.
+
+The immediate-parent set produced by Propagate_Top_Down can be thought
+of as a "Needs_Recomputation" set.  But that is only relevant if they
+are in the Already_Computed set.  If they haven't been already computed,
+not a problem.
+
+Given a set that "needs computation" we find all the children that are
+not already computed, and add them to the set, until we have them all.
+
+
+--------- Debugging parascope on bigger tests -- 20-July-2015
+
+N_Queens::Place_Queens, used #Create_Tcb_Op with Num_Params => 1.  We need
+to allocate an object of size Tcb_Size + Num_Params, and store its address
+in the Parallel_Control slot.  We will later see a locator of the form
+Phys_Base_Registers'First + <control-offset>, 10 + <param-offset> to refer
+to the given parameter.
+
+More importantly, we are ending up with a weird reverse post-order walk.
+The normal assumption is that with a reverse post-order walk, a block
+is never walked until all of its predecessors have been walked, ignoring
+back edges.  But in this case we are walking the root node, and then
+a node that seems to be in the middle of a loop.  After walking BB1, the
+natural next node would be BB4, and then BB5, and then BB8.
+
+-------  More debugging of n_queens, 21-July-2015
+
+Reverse-postorder walk has been fixed.  Only remaining failure in
+n_queens has to do with an indexing that returns by ref, of an array
+of an array.
+
+152:38 instr#48 is a call on from-univ for J, result in loc-18 (AVN65)
+  value of J is VN54 (before and after from-univ), OID37
+152:31 instr#49 is a call on indexing of Result by J, result in loc-16 (AVN69)
+  J in loc-18 (AVN65, OID37, VN54)
+  &Result in loc-17 (AVN62, OID36, VN34 = loc-8)
+   [Result in loc-8 (AVN34, OID21, VN42 = comp-val VN10[VN39])
+  &Result[J] in loc-16 (AVN69, OID38, VN68 = comp-addr OID21[VN67])
+     VN67 = indexed by VN54
+152:31 instr#50 is copy from phys-base-reg-16[0] to loc-16
+     pbr-16[0] is equal to address AVN68.
+     Get_OID from AVN68, calls Get_Component_OID which creates a new
+       component-OID39(<->AVN68) for this not-previously-assigned component
+
+The problem has to do with the OID => Address mapping.  The information
+on components is being overwritten whenever we copy the object.
+
+We need to keep a separate Component OID => Component Address mapping.
+
+Now what about Phis?  Can we shift to using OIDs for Phi_VNs?
+Why wouldn't that work?  The problem is we might create a Phi_VN
+before the OID is split. We could keep the additional info elsewhere,
+and just make Phi_VNs unique by giving them a node-relative index.  Or
+just have a global phi-VN counter and phi-OID counter?
+How do we avoid creating a new phi-vn on the second pass?
+This seems like a bigger deal.  We want to get the same phi-vns
+when we re-do value numbering.  That would argue for using the OID,
+since that is the "object" whose value we want.  If we later discover
+that the address produces multiple OIDs, we will create a new phi-VN for
+the Phi-OID.  Is that so bad?  This should only happen in loops with
+multiple forward inputs where they both have the same OID but different values
+(due to component changes).  This seems like a pretty rare situation.
+
+-------- Value numbering debugging 22-July-2015
+
+We are perhaps stopping too soon when value numbering.  We should perhaps
+keep track of whether any new phis are created as well as whether on the
+second pass the final value AO/OV maps for each block have changed.
+The Phi for Solutions on line 119 seems suspicious, because it has
+four incoming edges.
+
+We are trying to check for nullness more systematically, but we don't keep
+track of the type of Aggregate_VNs nor Call_VNs, which means when we start
+selecting their components, we don't know whether they might be null.
+Other things which can be composite include Input_VNs, Unknown_VNs.
+Also Const_Area_VNs, and Component_Value_VNs.
+Perhaps (almost) every VN should have a type and a might-be-null field.
+We probably don't actually need this for address VNs.  We could have "typed"
+VNs as a class.
+
+-------- Propagating down from a phi -- 23-July-2015
+
+We have an interesting case in queens_main.psl, with:
+
+   if Num not null and then Num in 1 .. 12 then
+      Place_Queens(Num)
+   ...
+
+We are trying to prove that Num is not null.  But this is actually expanded 
+into:
+
+   var And_Then_Result : Boolean
+   if Num not null then
+      And_Then_Result := Num in 1 .. 12
+   else
+      And_Then_Result := #false
+   end if
+   if And_Then_Result then
+      Place_Queens(Num)
+   end if
+
+And_Then_Result is a phi, and we are constraining it to True.  By so
+doing we will hopefully eliminate the possibility that Num is null.
+If the new value of a phi conflicts with one of the inputs to the phi,
+Then we can "and" with the union of the ones that remain still possible.
+Or equivalently, we "and" with each of the inputs and then union the results.
+
+Not quite that simple.  When we do an outgoing edge, we constrain the 
+edge condition VN to be True.  We then do the propagation.  This has a ripple
+effect on some number of phis, potentially.  We keep track of the blocks
+whose phis are shrunk.  For each edge of such a block, we copy the incoming
+edge map, constrain the inputs to each phi to be in the range of the phi,
+and constrain all the other VNs to be in the range of the new edge map.
+If any VN goes empty, we ignore this incoming edge.  Otherwise, we
+re-union the incoming edges.  If there are intermediate join points, do we have
+to re-union everything back to the current point?  Yes, because some of the
+current values of some of the VNs might have come from those other edges.
+But phis can never grow beyond their original defining point.
+
+So if we shrink a phi from the current block, things are easy.
+If we shrink a phi from a block that dominates the current block, we are
+still in pretty good shape.  We could never shrink a phi from a block
+that does not dominate the current block, since we cannot refer to such things.
+So what do we do if we shrink a phi from a distant, but dominating block?
+We know that all of the values we have came from that dominating block.
+So we could re-union those input blocks after and'ing them with the
+value sets of the current block, with phi substitution.  Main goal is for
+one of them to disappear completely.
+
+When we "and" the current block into one of the inputs, we might cause one
+of the phis of a block that dominates that input to shrink.  We could
+continue this process multiple levels.  Ignoring that possibility, we
+could also have phis at various dominators being shrunk.  In that case,
+which do we do first?  The nearest dominator or the furthest dominator?
+Seems like we should start with the nearest, as shrinking that might
+affect more distant ones.
+
+Now suppose we used "cond" VNs (i.e. phi-as-kapps VNs) instead of phis vns.
+What would be the impact?  The predicates would be the and of the predicates
+along the path back to the dominator.  Would this simplify things?  How would
+we propagate top down from a Cond VN?  If the value set coming from one of
+the alternatives was no longer possible, we could assert that that
+predicate was false.  We could assert that if the predicate were true, the
+value would have to be in the results range.  That would look like an
+"or else" operation.  Would those require conditional vals again?
+
+---  More on shrinking phis 26-July-2015
+
+Start with nearest dominator's phis.  If any of them shrink, then see whether
+that will cause any of the predecessor blocks to become dead when merged
+with the current block, including phi substitutions.  If so, then re-union
+and re-compute phis, and intersect with current block.
+
+---  Yet more on shrinking phis 28-July-2015
+
+In Propagate_Top_Down, if we shrink a phi, merely add it to the list of
+phis that have been shrunk, as well as adding its associated block to the
+list of blocks with shrunken phis.  Once we reach the end of Propagate_Top_Down
+we should deal with such blocks.  But we don't particularly want to do this
+on recursive calls.  So does that mean we want another level of wrapper?
+But then how do the set of phis get to the outer level?  Or do we have an extra
+parameter so we can suppress handling phis in the recursive calls?
+We could have an extra "var" parameter of a VN set which is supplied by
+the caller and added to by the recursive calls.  Or use up-level references
+and create a nested recursive routine.  That is probably the simplest.
+
+OK, Presuming we have the set of Phis and the associated blocks, we want to
+pick the nearest dominator -- could sort by reverse post-order position,
+last-to-first.  Or just walk the dominator tree and check at each level
+whether we have a shrunken phi.  
+Then we "and" the current value map with each of
+the predecessor value maps, and'ing the phis into their inputs as well.
+We then can propagate and stop if something goes dead.  If nothing goes dead,
+then we re-union the input value maps to form the current value map.
+We shouldn't need to re-propagate if we already included all the VNs
+from the current value map.
+We want to notice if any phis have shrunk at the next dominator, or if
+we have a new dead edge, we want to look at dominators of the remaining
+edges.
+
+---  Propagation algorithm 17-Sep-2015
+
+The idea of doing strictly top-down propagation, and then strictly bottom-up, 
+doesn't seem to work in all cases.  For example, given A+B, A, and B, shrinking
+A can result in B shrinking, if there was a prior constraint applied to A+B.
+So only going down from B, and then up from B (to A+B) would never propagate
+the change to A.  But there are certain "rules" that should speed things up.
+In particular, in any given propagation there is never a need to do top-down
+or bottom-up propagation twice for the same VN.  Furthermore, if you encounter
+a unary VN during a top-down propagation, there is never a need to go back
+"up," and vice-versa.  For a binary VN, once you propagate top down you
+should never have to propagate it bottom-up.  On the other hand, if you
+propagate it bottom-up and it shrinks, then it does make sense to propagate
+top-down to the "other" operand.  We could distinguish Left and Right operand,
+since those are separate computations.  So perhaps we have Left, Right, and
+Up for a binary VN, and only Up and Down for a Unary VN.  If you come in
+on one path, you never need to go back along that path.
+
+Now what about "equivalences"?  Cases where we have other relationships
+between VNs, such as A-B + B-C = A-C?  This is yet another path, which we
+should keep track of.  We probably never want to re-perform the same path
+of propagation in a single wave of propagation, unless the VN shrinks
+further, I suppose.  Nor do we want to go back along a path that caused
+the shrinkage.  So when we shrink a VN, we should mark the complementary path
+as being followed already.
+
+Should we represent these as sets?  Or have a set that implies there might
+be something to do, and then have something local to the VN that says
+exactly what needs doing?  Probably better to represent it all as sets, since
+a single propagation might have quite minimal effects, and if we had something
+on each VN then we would need to reset them all for each new "wave."
+
+So how many sets do we need, and what do they represent?
+We need a set saying the value set of a VN shrank.
+When we process that VN, we need to propagate in all directions, except in
+the direction from which the (last) shrinkage came.  So we need something to
+keep track of which direction the shrinkage came.  That seems like
+a mapping, so it always preserves the last shrinkage direction.
+And after we propagate one direction, we need to record we have done
+that so we won't do it again.
+So perhaps we want a single mapping that keeps track of what needs to be
+done.
+
+TBD: We have never implemented the multi-top-down part!!!
+
+It may be that if we eliminate Phi-Input-Contexts, then we can afford to
+propagate up and down until things stabilize.  Conditional_Vals is another
+time sink, so it would be nice to eliminate that somehow.  C_V is used
+for evaluating "?:" and "and"/"or".
+
+------------ 25-Oct-2015 --------------
+
+Attempting to debug ParaScope applied to qsort6.psl.  While value numbering 
+a parallel call to indexing on line 20, it gets an error saying "fetch of
+undefined value at VN11:(Copied_VN, OID4, VN10).  VN45 is:
+(Component_Val, Base => VN11, Selector => VN43)
+VN43 is (Named_Selector, 1).  VN44 is (Component_Addr, Base => OID4, Sel=>VN43)
+VN10 is (Call VN8, VN4) = "slicing" i.e. A[..]
+VN11 is a copy of the result of VN10.  (It is not completely clear why
+we want to create a copy here, though presumably it is harmless.  
+Actually, we want each call that returns a composite object to return a
+distinct composite object, so they aren't aliased in any way.)
+This must be the first time through, because eventually there will be a "phi"
+involved, since Arr is a loop variable.
+When we have nested blocks, we fill in the parameters.  But what if they are
+called from multiple places?  Where do the phis come from?  Should we always
+create a phi?  We presumably know by the time we do value numbering that
+a given nested block is called from multiple places.
+
+VN45 must be Arr.First. The indexing we are doing is presumably Arr[Arr.First]. 
+Arr looks like a local variable, and we are fetching a component of a local
+variable without ever initializing it.  But is that really true?  Why don't
+we end up with just a Component_Val for the indexing.
+
+For instr#25, Copy_Word (Base19, 1) => (Local, 19)
+The AddrVN=>FetchedVN table is
+  VN44=>VN45, VN42=>VN11
+The AddrVN=>StoredVN table is
+  VN44=>VN45, VN42=>VN45
+
+VN42 is (Local, 19)
+VN45 is Arr.First
+VN44 is &Arr.First
+VN11 is Arr = A[..]
+
+Problem may be that parameter to indexing is by-copy ref, which is unusual,
+and for some reason we are trying to take the contents of the parameter.
+Yes, that was the problem.  We were presuming was passed by reference, and
+when builing the indexed-component-value node, we tried to get the "value"
+of the base object, when we already had it.
+
+-------------- 27-Oct-2015 -----------
+Getting an assertion failure in parascope.psl:3947
+Selector not in Base_UV.Component_OIDs.
+VN220 addr is (Comp_Addr, Base => OID4, Sel => VN219)
+VN219:(Indexed_Sel, [VN202])
+VN202:(Phi, BB36, AddrOID105, [VN107, VN143, VN204])
+VN107:(Copied_VN, (Call VN89, VN17 -- "-"))
+VN143:(Copied_VN, VN122:(Comp_Val, Base=>(Remove_Last), [Named_Sel, 0]))
+VN204:(Phi,BB26, AddrOID74, [VN107, VN143])
+
+This seems to be at the join point at the end of the "until Left > Right" loop.
+
+What is this assertion about?  We have a component OID in Fetch_OID_Value
+(Source_OID), and we use the map to get the corresponding addr-VN (VN220).
+We have already checked that Source_OID is *not* in the OID-to-VN map.
+We therefore believe it should not be one of the selectors for an updated
+value.  The Source_OID is probably OID114, and we have added to UV map
+for OID4 the mapping from VN219 to OID114.  VN220 is a component addr
+with OID4 as base and VN219 as selector.
+
+This might be the result of a swap Arr[New_Left] <=> Arr[New_Right].
+
+New_Left has addrVN VN228, Local, 40; Phi_VN is VN202, Phi_OID is OID105
+New_Right has addrVN VN233, Local, 42; Phi_VN is VN205, Phi_OID is OID106
+
+Arr[New_Left] uses indexed selector VN219, addr VN220, Base OID4
+Arr[New_Right] uses indexed selector VN223, addr VN224, Base OID4
+Arr has addrVN VN30, Local, 18; OID4; VN10 is result of "slicing"(),
+  VN11 is copy of VN10, OID4 has Updated_Value with Base of VN11
+  and two indices, VN219 => OID114, and VN223 => OID115.
+  (Should not have two dynamic indices)
+
+OK, the problem seems to be that this assertion makes sense after
+a Store_OID_Value, but not after a simple Store_OID.  And swap turns
+into two Store_OIDs without any corresponding setting of the value
+of the OID.  So this assertion is bogus.  Well, maybe not.  If a simple
+Store_OID is going to mean anything, we need to be sure there is a value
+already associated with it.  Store_OID should perhaps ensure this by
+calling Fetch_OID_Value.  That doesn't seem to fix the problem, but perhaps
+it helps?
+
+The swap seems to work for Arr[Arr.First] <=> Arr[Arr.Last]
+What is different about the one that fails?
+In the one that fails, Source_Addr is VN224, with selector VN223.
+Source_OID is OID114
+Dest_Addr is VN220 with selector VN119.  Dest_OID is OID115.
+
+Then we store Source_OID (OID114) into Dest_Addr (VN220/VN119)
+This seems to work.
+
+Then we store Dest_OID (OID115) into Source_Addr (VN224/VN223).
+Suddenly we see a call on Fetch_OID_Value for the Dest_Addr.  Why??
+This is because we are explicitly calling Fetch_OID_Value when inside
+Store_OID.  Suppose we put this at the point where we call Store_OID,
+but *before* we have stored anything into the Dest_Addr.
+That seemed to solve the problem...
+
+------------ 4-Dec-2015
+
+New problem: We are associating address with loop variable that comes
+from the initial value, rather than the current value, which is a parameter.
+It seems like we are effectively ignoring the fact that each loop iteration
+gets its own value for the parameters.  Since we aren't treating these
+like calls but instead treating them like inline blocks, we need to ultimately
+create a "phi" that represents the possible values for the input.  But
+that is not easy to do for a parallel loop given the way the code is
+organized.  Perhaps we should treat these like calls instead, at least
+when we can determine that the nested block is for a loop body.
+
+
+------------ 7-Dec-2015
+
+We have a problem where we have a component of a variable referenced
+before a loop, and although the component is not directly updated, 
+the variable as a whole is updated inside the loop.  The Live_In VN for
+the component's address inside the loop does not match the last-kill VN
+for that address in the predecessor-to-the-loop block, even though
+the VN itself is not a phi.  But we decided not to have components
+as phis, so this implies we need some other scheme for matching VNs
+for value of components across basic blocks.  Why do we need to do this
+at all?  It is so we know where an addr-VN is live, and what value it
+has.  But components are special.  So we shouldn't complain if the
+address is for a component, and we should simply take things at face value.
+
+------------- 19-Dec-2015
+
+We have a problem where the address of a composite object (VN77) is
+an up-level reference, causing its initial value to be an Input_VN (VN78).
+Then later we are expecting it to still have that value, but instead the
+last_kill is VN126, which is a side-effect of a call on var_indexing.
+Is that right?  Or should we treat a var_indexing the same as an indexing?
+
+------------- 20-Dec-2015
+
+Problem seems to be the phi created in BB21, which shows VN78 as the
+input value coming from predecessor to the loop for VN77.  Perhaps it
+is skipping over blocks that alter it?  This comes from a Fetch_OID_Value
+for component with addr VN125, which has OID31 as the base, with selector
+VN124.  It records VN78 as the value associated with OID31.
+This is indicated by "Recording common VN78 for OID31 in LH BB16/21/23.
+This happens while value numbering instr#162, at 256:23, a
+start_parallel_call_op of Bottles_To_Borrow.
+
+The problem seems to be that the ref result of "var_indexing" refers to
+the pre-call value of the array, rather than the post-call value of the
+array.  Unfortunately, having fixed that, we get a new failure where
+a phi doesn't have an address.
+
+------------- 20-Dec-2015
+
+For some reason the Input_VN created for the loop variable Phil (VN68)
+is marked as optional, but the Copy_Word that fetches it says non-null.
+
+At 256:23, we use a "start_parallel_call_op" but immediately do
+a wait_for_parallel_op.  Why would that ever make sense?
+Because it is a queued call!
+
+-------- 4-Feb-2016
+
+We have a long-lived "ref" which is passed as a parameter to a call
+which takes it by ref.  We want to know it is non-null.  If we had called
+it where the ref was declared, it might have worked.  But we are inside the
+body of a concurrent loop.  Let's see what happens if we move the call
+to outside the loop (or just make the loop non-concurrent).  Answer: It works
+fine.  But when in the body of a concurrent loop, everything is treated
+as an "input" and we don't retain any information about non-nullness.
+If we wanted to indicate non-null ness of what is pointed-to, we might need
+a new operation, like "copy address" where the non-nullness indicates the
+non-nullness of the pointed-to object.
+
+However, more generally if we know something is non-null in the outer block
+how do we preserve that information into the nested out-of-line block?
+In CodePeer, we have a mapping of info which we initialize when we process
+the enclosing block.
+
+--------- 8-Feb-2016
+
+We don't immediately process an out-of-line nested block at the point of a
+Start_Parallel instruction.  Perhaps we should.  Alternatively, we need to
+preserve some information.  Note that we also have nested routines.  With
+these there can be any number of calls, at any point where the routine is
+visible.  We could process them at the point where they occur.
+
+We have value numbering and also value propagation to worry about.
+These are two separate passes, and both value numbering and value
+propagation are iterative.
+
+We need to distinguish constants from variables.  For constants, we can
+know something about their value.  For variables, we can know something
+about their nullness and their worst-case range.  References are always
+"constants" in that they can't be changed after initialization.
+We don't indicate whether a local is a constant in the PSVM.
+Perhaps we should.  We also don't say much about any constraints.
+Alternatively, we could determine it is only assigned once.
+We could keep track of the one and only value number associated with a given
+Obj-ID.  But that doesn't do much for us if the obj-id of a small object
+changes on each computation.
+
+It would seem useful to have a compilation mode where we don't re-use
+local addresses, or we have an extra uniquifier which is ignored by the
+interpreter but which makes local addresses unique for the compiler.
+It wold also be nice to distinguish declared objects from temps.  If we
+could have some kind of unique id which is different from the address, and
+is preserved across copying, etc.  Sort of like "obj-id" but doesn't change
+when a new value is assigned to the same variable.
+
+The "Dest_Name" field in instructions could be augmented with a "Dest_Id"
+field which would be a unique-within-top-level-operation id.
+On a copy without a dest-id, the presumption is that we are getting the
+object into a local so it can be used as the base for a deref or a
+select, or to pass it as a parameter.
+
+We could say that everything is single-assignment *unless* it is assigned
+a dest-id.  So it would actually be a "var-id."  Would that be useful?
+Or should we also include a dest-id for anything that can be referenced
+up-level?
+
+Alternatively, we could keep track of the most recent assignment to
+every address.
+
+------
+
+Let's start from how we would use the information.  We have a local-area
+address at a level outside of the current out-of-line block.  This is treated
+as an Input_VN, with no particular information inherited from the enclosing
+context.  If we had some kind of mapping, we could ask for information
+about such outer levels.  We had done something for nested-block parameters
+before -- Nested_Block_Param_Area.  We used that in Value_Number_Locator to
+change a Param_Addr_VN to a Local_Addr_VN.  That won't help us in this case.
+We have a Local_Addr_VN, and we want to get an OID if we have one, and we
+want to know various things about it.   A VN has Type_Info and Might_Be_Null.
+The Type_Info is pretty useless at this point.  There is nothing like this
+for an OID.  But an OID has a "base" value.  We can also keep track of
+the "or" of the "might_be_null" values.  If we do this at each
+start_parallel_op we can keep track of which locals have the same value
+at each point.
+
+So we would use this in Get_OID (for an Input_VN that has an address
+in the mapping) and/or Fetch_OID_Value_From_Block.
+
+--------  14-Mar-2016 -- up-level references
+
+In ParaScope, we need to know whether the value of an object is changed as 
+a side-effect of a call on a nested routine that makes an up-level reference.
+
+If we ignore the ParaScope issue, and just focus on generating efficient code,
+we need to know which constants and variables need to be in the frame
+record.  When is the best time to do that?  We could do it in the PSVM
+generator, or we could do it in the LLVM generator.  The LLVM gen could make a
+pass over the PSVM strictly for the purpose of recording up-level references.
+That has the advantage of being safe.  Also, by that time we have all of
+the PSVM.  Finally, we are writing in ParaSail rather than Ada.
+
+So let us presume we do it in the LLVM gen.  What is the process?  Read each
+instruction.  We build up a set of objects in each block that are up-level
+referenced.  We can also keep track of whether it is a read or a write
+(beware of calls with var parameters -- we don't really know what those
+do).  We have two kinds of nesting.  Nesting within a single PSVM "routine"
+in the form of out-of-line nested blocks, and nesting of routines within
+each other.
+
+How do we use this information?  When we are declaring an object, we
+copy its content/address LLVM-reg into the frame record.  The frame record
+is updated as objects are declared, but then never changed.  The total size
+is used when the function starts to allocate sufficient space.  The zeroth
+slot is used for a further up-level reference, or to gain access to the
+type descriptor for a top-level routine; 
+We need to know whether the type descriptor is referenced by any nested
+routine or block.  Similarly, in a nested block/routine, we need to know
+whether the frame of its parent is referenced in a further
+nested block/routine.
+
+When we are referring to an up-level object, we need to know what offset
+to use.
+
+What about parameters? Probably simplest to always refer to parameters
+where they live, in the parameter vector.  But if there is an output,
+the parameter list would have to be writable.  Eventually could copy
+r/o parameters into frame record, as well as address of output(s).
+Could first copy parameters/address-of-output into local registers,
+and then from there into frame record.  That is probably more efficient
+in the long run, rather than having an extra level of indirection for
+parameters.  Note that currently we aren't assigning unique ids to 
+parameters.  Should we do so?  And what about the "declare" PSVM
+instruction?
+
+We can initially presume that everything is up-level referenced if there
+are nested blocks/operations.
+
+Info associated with each psvm_id:
+  0) psvm_id
+  1) dest_name
+  2) operation, nested block, level, offset
+  3) is-uplevel-refed
+  4) offset in frame record (null if not is-uplevel-refed)
+  5) var vs. const
+  6) llvm reg
+  7) might-be-null
+  8) llvm type
+
+Interface -- Local_Obj_Info.
+
+----------- 10-April-2016
+
+We should add a "declare" PSVM instruction, which is a no-op for the
+interpreter.  It has the PSVM id number, and indicates whether the object
+is a variable.  It could also provide more information, like the name and
+the type, mostly for debugging.  So the interpreter could use it in
+some kind of debug "mode."  Probably want to distinguish known to be small
+from might be large.
+
+Don't really need declare, if "var" information is included in each PSVM-id.
+
+What does the llvm code generator do with this information?  It creates
+a table indexed by PSVM id-num, that gives LLVM reg#, whether it is a "var,"
+and offset in frame record.  Parameters could be given the first N id-nums.
+We need to know level/operation.
+
+When generating LLVM code, we no longer have an array to represent the
+frame, instead we have a struct.  Ditto for parameter lists.
+In LLVM, struct types are declared using %mytype = { t1, t2, ... }
+Probably could put all vars together, and all others together.
+This is analogous to what we do for parameters, putting the OUT parameters
+first, and then the IN parameters.
+
+Parameters can be analyzed by the llvm generator to determine whether they
+are referenced up-level.  We don't really need PSVM ids for them, though it could be handy.
+
+We need to create a new pass in the compiler, which just analyzes the use of
+local/parameter objects.  We need to pass in the information, or store it in
+the LLVM printer data structure.
+
+It would be wise to have a separate data structure for each operation, or
+at least each top-level operation.
+
+We can just "hijack" most of what is in LLVM_Printer for a part of a file,
+presuming we can relatively easily paste them all back together.
+The main goal would be to avoid walking the individual instructions until
+we are in per-operation code.
+
+We should build up a list of top-level operations.

@@ -1,0 +1,55 @@
+Append three times
+Found Elem_Id = 1
+Found Elem_Id = 2
+Found Elem_Id = 3
+Prepend twice
+Count = 5
+Found Elem_Id = 5
+Found Elem_Id = 4
+Found Elem_Id = 1
+Found Elem_Id = 2
+Found Elem_Id = 3
+Insert before original second append
+Count = 6
+Found Elem_Id = 5
+Found Elem_Id = 4
+Found Elem_Id = 1
+Found Elem_Id = 6
+Found Elem_Id = 2
+Found Elem_Id = 3
+Remove 1 and 4
+Count = 4
+Found Elem_Id = 5
+Found Elem_Id = 6
+Found Elem_Id = 2
+Found Elem_Id = 3
+Reverse loop
+Found Elem_Id = 3
+Found Elem_Id = 2
+Found Elem_Id = 6
+Found Elem_Id = 5
+Append one and prepend two
+Count = 7
+Found Elem_Id = 7
+Found Elem_Id = 1
+Found Elem_Id = 5
+Found Elem_Id = 6
+Found Elem_Id = 2
+Found Elem_Id = 3
+Found Elem_Id = 4
+Reverse loop
+Found Elem_Id = 4
+Found Elem_Id = 3
+Found Elem_Id = 2
+Found Elem_Id = 6
+Found Elem_Id = 5
+Found Elem_Id = 1
+Found Elem_Id = 7
+Unordered loop
+Found Elem_Id = 7
+Found Elem_Id = 4
+Found Elem_Id = 1
+Found Elem_Id = 3
+Found Elem_Id = 5
+Found Elem_Id = 2
+Found Elem_Id = 6

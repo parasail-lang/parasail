@@ -1,0 +1,3 @@
+func main(Args : Basic_Array<Univ_String>) is
+   PSL::Test::Test_Packed_Word();
+end func main;

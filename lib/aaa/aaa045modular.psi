@@ -1,0 +1,309 @@
+interface PSL::Core::Modular<Modulus : Univ_Integer> is
+  // This is an unsigned type whose arithmetic is "modulo" the modulus
+
+    interface Modular_Range<> is
+       //  Similar to Countable_Range, except avoids wrap-around issues
+       const First : Modular
+       const Last : Modular
+       op ".."(Left, Right : Modular) -> Modular_Range
+       op "<.."(Left, Right : Modular) -> Modular_Range
+       op "..<"(Left, Right : Modular) -> Modular_Range
+       op "<..<"(Left, Right : Modular) -> Modular_Range
+       op "in"(Val : Modular; Interval : Modular_Range) -> Boolean
+       func Length(R : Modular_Range) -> Univ_Integer
+       op "magnitude"(Modular_Range) -> Univ_Integer is Length
+       op "[..]"() -> Modular_Range
+       op "[]"() -> Modular_Range
+
+       func Remove_First(var S : Modular_Range) -> optional Modular
+       func Remove_Last(var S : Modular_Range) -> optional Modular
+       func Remove_Any(var S : Modular_Range) -> optional Modular
+    end interface Modular_Range;
+
+    op "from_univ"(Lit : Univ_Integer) -> Modular 
+      is import(#integer_from_univ)
+
+    op "to_univ"(Val : Modular) -> Univ_Integer 
+      is import(#integer_to_univ)
+
+    op "+"(Right : Modular) -> Modular
+      is import(#identity)
+
+    op "-"(Right : Modular) -> Modular
+
+    op "abs"(Right : Modular) -> Modular
+      is import(#identity)
+
+    op "magnitude"(Modular) -> Modular is "abs"
+
+    op "+"(Left, Right : Modular) -> Result : Modular
+
+    op "-"(Left, Right : Modular) -> Result : Modular
+
+    op "*"(Left, Right : Modular) -> Result : Modular
+
+    op "/"(Left, Right : Modular) -> Result : Modular
+      is import("/")
+
+    op "mod"(Left, Right : Modular) -> Modular
+      is import("mod")
+
+    op "rem"(Left, Right : Modular) -> Modular
+      is import("rem")
+
+    op "**"(Left : Modular; Right : Univ_Integer) -> Result : Modular
+
+    op "+="(var Left : Modular; Right : Modular)
+
+    op "-="(var Left : Modular; Right : Modular)
+
+    op "*="(var Left : Modular; Right : Modular)
+
+    op "/="(var Left : Modular; Right : Modular) 
+      is import("/=")
+
+    op "**="(var Left : Modular; Right : Univ_Integer)
+
+    op "=?"(Left, Right : Modular) -> Ordering
+      is import("=?")
+
+    op ">>"(Modular; Modular) -> Modular is import(">>")
+
+    op "<<"(Modular; Modular) -> Modular is import("<<")
+
+    op "and"(Left, Right : Modular) -> Modular is import(#bit_and)
+    op "or"(Left, Right : Modular) -> Modular
+    op "xor"(Left, Right : Modular) -> Modular
+    op "not"(M : Modular) -> Modular
+
+    func Min(Left, Right : optional Modular) -> optional Modular
+      is import(#min)
+    func Max(Left, Right : optional Modular) -> optional Modular
+      is import(#max)
+
+    func Hash(Val : Modular) -> Univ_Integer
+      is import(#identity)
+
+    func To_String(Val : optional Modular) -> Univ_String
+      is import(#to_string_int)
+
+    func From_String(Str : Univ_String) -> optional Modular
+
+    func Print(X : Modular) is import(#print_int)
+    func Println(X : Modular) is (Println(To_String(X)))
+
+    func First() -> Modular
+
+    func Last() -> Modular
+
+    op "[..]"()->Modular_Range is in Modular_Range<>
+
+    op ".."(Left, Right : Modular) -> Countable_Set<Modular>
+      is in Countable_Set<Modular>
+    op "<.."(Left, Right : Modular) -> Countable_Set<Modular>
+      is in Countable_Set<Modular>
+    op "..<"(Left, Right : Modular) -> Countable_Set<Modular>
+      is in Countable_Set<Modular>
+    op "<..<"(Left, Right : Modular) -> Countable_Set<Modular>
+      is in Countable_Set<Modular>
+    op "|"(Left, Right : Modular) -> Countable_Set<Modular>
+      is in Countable_Set<Modular>
+  implements for Countable
+    // These operations are needed so Modular satifies
+    // requirements of "Countable" interface, but these
+    // operations are not directly callable (if they were callable,
+    // we would have ambiguity when adding a Modular to an int-literal).
+
+    op "+"(Left : Modular; Right : Univ_Integer) -> Result : Modular
+
+    op "+"(Left : Univ_Integer; Right : Modular) -> Result : Modular
+
+    op "-"(Left : Modular; Right : Univ_Integer) -> Result : Modular
+
+    op "-"(Left, Right : Modular) -> Result : Univ_Integer
+
+end interface PSL::Core::Modular
+
+class PSL::Core::Modular is
+    const Content : Univ_Integer;  // So this ends up as a wrapper
+
+    func Bit_Or(Left, Right : Univ_Integer) -> Univ_Integer 
+      is import(#bit_or)
+
+    func Bit_Xor(Left, Right : Univ_Integer) -> Univ_Integer 
+      is import(#bit_xor)
+  exports
+    op "-"(Right : Modular) -> Modular is
+        return (Content => Modulus - Right.Content)
+    end op "-"
+
+    op "+"(Left, Right : Modular) -> Result : Modular is
+        return (Content => (Left.Content + Right.Content) mod Modulus)
+    end op "+"
+
+    op "-"(Left, Right : Modular) -> Result : Modular is
+        return (Content => (Left.Content - Right.Content) mod Modulus)
+    end op "-"
+
+    op "*"(Left, Right : Modular) -> Result : Modular is
+        return (Content => (Left.Content * Right.Content) mod Modulus)
+    end op "*"
+
+    op "**"(Left : Modular; Right : Univ_Integer) -> Result : Modular is
+        return (Content => (Left.Content ** Right) mod Modulus)
+    end op "**"
+
+    op "+="(var Left : Modular; Right : Modular) is
+        Left := (Content => (Left.Content + Right.Content) mod Modulus)
+    end op "+="
+
+    op "-="(var Left : Modular; Right : Modular) is
+        Left := (Content => (Left.Content - Right.Content) mod Modulus)
+    end op "-="
+
+    op "*="(var Left : Modular; Right : Modular) is
+        Left := (Content => (Left.Content * Right.Content) mod Modulus)
+    end op "*="
+
+    op "**="(var Left : Modular; Right : Univ_Integer) is
+        Left := (Content => (Left.Content ** Right) mod Modulus)
+    end op "**="
+
+    func From_String(Str : Univ_String) -> optional Modular is
+        const Val : Univ_Integer := From_String(Str)
+        if Val is null or else Val in 0..<Modulus then
+            return (Content => Val)
+        else
+            return null
+        end if
+    end func From_String
+
+    op "or"(Left, Right : Modular) -> Modular is
+        return (Content => Bit_Or(Left.Content, Right.Content) mod Modulus)
+    end op "or"
+
+    op "xor"(Left, Right : Modular) -> Modular is
+        return (Content => Bit_Xor(Left.Content, Right.Content) mod Modulus)
+    end op "xor"
+
+    op "not"(M : Modular) -> Modular is
+        return (Content => Modulus - 1 - M.Content)
+    end op "not"
+
+    func First() -> Modular is
+        return (Content => 0)
+    end func First
+
+    func Last() -> Modular is
+        return (Content => Modulus-1)
+    end func Last
+
+    class Modular_Range is
+     exports
+       op ".."(Left, Right : Modular) -> Modular_Range is
+           return (First => Left, Last => Right)
+       end op ".."
+
+       op "<.."(Left, Right : Modular) -> Modular_Range is
+           return Left == Modulus-1? [] : (First => Left+1, Last => Right)
+       end op "<.."
+
+       op "..<"(Left, Right : Modular) -> Modular_Range is
+           return Right == 0? [] : (First => Left, Last => Right-1)
+       end op "..<"
+
+       op "<..<"(Left, Right : Modular) -> Modular_Range is
+           return Left == Modulus-1 or else Right == 0? [] :
+                              (First => Left+1, Last => Right-1)
+       end op "<..<"
+
+       op "in"(Val : Modular; Interval : Modular_Range) -> Boolean is
+           return Val >= Interval.First and then Val <= Interval.Last
+       end op "in"
+
+       func Length(R : Modular_Range) -> Univ_Integer is
+           return R.Last - R.First + 1
+       end func Length
+
+       op "[]"() -> Modular_Range is
+           return 1 .. 0
+       end op "[]"
+
+       op "[..]"() -> Modular_Range is
+           return Modular::First() .. Modular::Last()
+       end op "[..]"
+
+       func Remove_First(var S : Modular_Range) 
+         -> Result : optional Modular is
+           if S.First <= S.Last then
+               Result := S.First
+               S := Result <.. S.Last
+           else
+               Result := null
+           end if
+       end func Remove_First
+           
+       func Remove_Last(var S : Modular_Range) 
+         -> Result : optional Modular is
+           if S.First <= S.Last then
+               Result := S.Last
+               S := S.First ..< Result
+           else
+               Result := null
+           end if
+       end func Remove_Last
+
+       func Remove_Any(var S : Modular_Range) 
+         -> Result : optional Modular is
+           if S.First <= S.Last then
+               if (S.Last - S.First) mod 2 == 0 then
+                   Result := S.First
+                   S := Result <.. S.Last
+               else
+                   Result := S.Last
+                   S := (First => S.First, Last => Result-1)
+               end if
+           else
+               return null
+           end if
+       end func Remove_Any
+    end class Modular_Range
+
+  // implements
+  // for Countable
+    // These operations are needed so Modular satifies
+    // requirements of "Countable" interface, but these
+    // operations are not directly callable (if they were callable,
+    // we would have ambiguity when adding an Modular to an int-literal).
+
+    op "+"(Left : Modular; Right : Univ_Integer) -> Result : Modular is
+        return (Content => (Left.Content + Right) mod Modulus)
+    end op "+"
+
+    op "+"(Left : Univ_Integer; Right : Modular) -> Result : Modular is
+        return (Content => (Left + Right.Content) mod Modulus)
+    end op "+"
+
+    op "-"(Left : Modular; Right : Univ_Integer) -> Result : Modular is
+        return (Content => (Left.Content - Right) mod Modulus)
+    end op "-"
+
+    op "-"(Left, Right : Modular) -> Result : Univ_Integer is
+        return Left.Content - Right.Content  //  No "mod" here intentionally
+    end op "-"
+end class PSL::Core::Modular
+    
+func PSL::Test::Test_Modular() is
+    type Mod16 is Modular<16>
+
+    Println("Testing mod 16")
+    Println("0xA + 0xA = " | Mod16::0xA + Mod16::0xA)
+    Println("0xA or 0x1 = " | (Mod16::0xA or Mod16::0x1))
+    Println("0xA xor 0x2 = " | (Mod16::0xA xor Mod16::0x2))
+    Println("not 0xA = " | (not Mod16::0xA))
+    Print("for I in Mod16 is ");
+    for I in Mod16 loop
+       Print(" " | I);
+    end loop
+    Println("");
+end func PSL::Test::Test_Modular

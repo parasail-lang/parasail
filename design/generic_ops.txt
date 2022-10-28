@@ -1,0 +1,296 @@
+-- $Revision: 1.1 $ $Date: 2012/03/05 19:24:50 $
+
+"Generic" operations
+--------------------
+If an operation has a parameter of a type that is itself
+a parameter of the operation, then we need to implicitly
+instantiate the operation on each use.  We will effectively
+wrap each such operation in a parameterized module, which
+will be instantiated upon call.  When compiling code for
+such an operation, we will have an "enclosing module."
+This implicit module will itself be nested in the "real"
+module.
+
+When looking for an operation, we may find one of these
+generic operations.  Initially we just add interpretations
+that correspond to all of the operation declarations from
+the given region.  This happens in "Add_Operation_Interps."
+After this, we try to resolve the particular operation.
+This is done either by looking for an exact type match
+as part of a definition by equivalence (in 
+Resolve_Operation_Name), or it is done by seeing 
+whether there is an interpretation for each
+of the operands that "works" with the given operation
+(in Create_Call_Interps).  This in turn calls
+"Matching_Interp" for each formal parameter and each
+actual operand, which calls Find_Interp_Of_Type.
+
+One of these "generic" formal parameters
+is recognizable because its type is a type-decl rather
+than simply a module-instantiation, or a simple
+identifier.  [Update: 2015-12-29 -- type is recognizable
+because it has an associated_generic_op.]
+When we encounter one of these, it
+might be an input or an output.   (Outputs need to
+be parenthesized if they are going to have a 
+"generic" type.)  Find_Interp_Of_Type will need to
+handle the case when one or both of the types involved
+in the match is "generic."  ("Both generic" should probably be
+an error, since there are an infinite number of
+possible instantiations.) If we want to allow overloading,
+then we need to be able to check whether a given
+type matches a given "generic" type.  We already do
+this when instantiating, but we really don't check right
+away, since overloading is not permitted in an explicit
+instantiation.  If the formal type is for a module with
+parameters, then the actual must explicitly implement
+the module.  If the formal type has no parameters, then
+it need not explicitly implement the module -- it merely
+has to have the right operations.
+
+It seems error prone to match a parameter's generic type
+without an explicit "implements" claim.  On the other
+hand, if there is no ambiguity without actually *checking*,
+then this is not error prone.  So for a parameter whose
+generic type corresponds to a parameterless
+module, we could treat it as a wildcard.  Does there
+need to be a preference for a non-generic match?
+That seems important.   
+
+We probably need some examples:
+
+  For units checking:
+   interface Units<Dimensions : Vector<Unit>> is
+     op "*"(Left : Left_Type is Units<>; Right : Units) 
+       return (Result : Result_Type is Units<
+         Dimensions => Left::Dimensions + Dimensions>);
+     ...
+
+  For streaming:
+
+    abstract concurrent interface Input_Stream
+      <Element_Type is Assignable<>> is
+	function Get(queued var Stream : Input_Stream) -> optional Element_Type;
+    end interface Input_Stream;
+
+    abstract concurrent interface Output_Stream
+      <Element_Type is Assignable<>> is
+	procedure Put
+	  (queued var Stream : Output_Stream; Element : Element_Type);
+	procedure Close(queued var Stream : Output_Stream);
+    end interface Output_Stream;
+
+    abstract interface Stream_Component
+      <Input_Stream<>; Output_Stream<>> is
+	procedure Transform
+	  (Args : Stream_Component;
+	   var Inp : Input_Stream; 
+	   var Outp : Output_Stream);
+    end interface Stream_Component;
+
+    interface Pipeline
+      <Pipe_Input is Input_Stream<>;
+       Pipe_Output is Output_Stream<>> 
+      implements Stream_Component<Pipe_Input, Pipe_Output> is
+	operator "|"
+	 (Left is Stream_Component
+	    <Pipe_Input,
+	     Output_Stream<Internal_Type is Assignable<>>;
+	  Right is Stream_Component
+	    <Input_Stream<Internal_Type>,
+	     Pipe_Output>)
+	 -> Pipeline;
+      ...
+  
+In the streaming example, we see that the "generic" part of
+the type is actually buried.  This means we may need to
+propagate out of a module instantiation that some part of
+it is specified by a type-decl rather than a type identifier
+or instantiation.
+
+  And how about a more general Println or string "|":
+
+  interface Univ_String<> is
+
+     op "|"(Left, Right : Univ_String) -> Univ_String;
+
+     op "|"(Left : Univ_String; Right : Right_Type is Imageable<>) 
+       -> Univ_String;
+
+     op "|"(Left : Left_Type is Imageable<>; Right : Univ_String) 
+       -> Univ_String;
+
+     ...
+  end interface Univ_String;
+
+
+  interface Imageable<> is
+    op "to_string"(Value : Imageable) -> Univ_String;
+    op "from_string(Image : Univ_String) -> Imageable;
+  end interface Imageable;
+
+In this case, how do we avoid ambiguity?  Why wouldn't "a" | "b"
+be ambiguous?  How do we know that Univ_String itself does *not*
+match "Imageable"?  Do we keep separate flags for ambiguous without
+any "generic-type" matches, and ambiguous using them?  If they
+have the same result type, and one uses generic-type matching
+and one doesn't?
+
+Every type needs to keep track of whether it contains generic
+type declarations within it.  We need to be able to match an
+actual type against such a type.  Conceivably we could allow
+two such types to be matched against one another, so long
+as their "genericness" appears in different parts of the
+tree of type parameters.  Ultimately we can't actually call
+an operation unless we have a non-generic type to substitute for 
+each generic type declaration.  
+
+Each generic type declaration within the declaration of an 
+input or output of an operation effectively becomes a type parameter
+of an "invisible" enclosing module.  This might argue for
+pre-creating an additional region to hold such declarations,
+and effectively throwing it away if it isn't used.  Perhaps it
+could be created on the fly the first time it is needed.
+Presumably it would be created on the first semantic pass.
+This implies we need to "visit" the type-definition of a type-decl,
+and visit the param-type of a parameter-decl, during the first pass.
+
+Note that within the type-definition of a type-decl, everything
+is interpreted as "generic" rather than "actual."  Hence with
+"X : Vector<Element_Type is Indexable<Comparable<>, Countable<>>>",
+the "Vector" part is not "generic" in the sense that some other
+module Vector-implementing could be used.  But "Indexable", 
+"Comparable", and "Countable" are all generic to some degree.
+Only Element_Type needs to be an actual type parameter of the
+invisible enclosing module.  Vector<Element_Type> becomes a "nested"
+type, while "Comparable<>" and "Countable<>" become actuals-of-formals.
+
+Every (module-level?) operation should have the possibility of an "invisible"
+enclosing module.  When a type-decl is encountered and the
+immediately enclosing region is that of an operation spec 
+(i.e. Operation_Param_Region_Kind rather than Operation_Body_Region_Kind),
+we find/create the associated invisible module, as 
+well as creating a region for it, and the type is 
+declared within that region.  The enclosing region
+for the operation is changed to be that of the invisible enclosing
+module.  The same "invisible" module is used for both the spec and body
+of an operation.
+
+When we get around to creating a call on one of these "generic"
+operations, we create a module instantiation for the invisible
+module, and then call the operation within that type.  This module
+instantiation creates a nested type at the point of the call, which
+depending on the actual parameters, might be unique or might be
+identical to some other existing type.
+
+In Create_Call_Interps, Canonicalize_Actuals calls Matching_Interp.
+If the parameter has an Associated_Generic_Op, then we need to
+see whether the given parameter is for that operation,
+and if so, we need to do a special kind of matching, and we
+need to have a side-effect of populating the actuals of an
+instantiation.  This implies we need to pass in/out an instantiation
+which will define the type to be used for the call.
+Note: We need to be sure to fill in the "Enclosing_Type" field
+for such a type, which is an instance of an "implicit" module.  
+That might already happen automatically, if the module's
+enclosing region info is set properly.
+
+We have to make the information of this instantiation available
+to subsequent parameters.  So this list needs to be consulted
+in Matching_Interp as part of its call on Substitute_Actuals.
+Perhaps we can generalize the Extra_Subst_From/Extra_Subst_To
+parameters in Substitute_Actuals to be a list of such pairs.
+Note that these are required to be base types.
+
+We need to assign a nested type index for the type of a parameter
+that depends on an earlier parameter's generic type.  This might
+happen automatically; we want to be sure the enclosing module is 
+set properly.
+
+-----------
+
+Problem: the actual parameter for the Units interface is a vector
+of dimensions.  Unfortunately, when comparing, we do an "equiv-tree"
+rather than any sort of value comparison.  Should we be doing value
+comparison?  This might not be trivial.  
+
+-----------
+
+We need a way to walk through type descriptors.
+If type descriptors lived in their own special "chunk" this might
+be easier.  Then we could load a type descriptor into a 
+local register, and then index off of it, and know that we
+are doing a special type-descriptor indexing rather than the
+normal kind of addressing.  Alternatively we move type descriptors
+into "normal" address space, but that seems like a bigger change
+at this point.  Current idea: use negative virtual addresses
+for the "type-descriptor" space, where the negative of the 
+"chunk" number represents the type id.
+
+----------------------
+
+Even newer idea (11/24/2011): make nested constants out of
+references to module parameters of non-enclosing modules.
+Similarly, evaluate expressions that are a function of
+values known at module instantiation time, including those
+in assertions.  If the whole assertion reduces to an
+instantiation-time-known boolean value, then that simplifies
+compile-time checking pretty dramatically.  We will somehow
+want to flag such constants, presumably, so we know that
+a #false one is trouble.
+
+----------------------- 12/01/2011 --------
+
+We need to figure out several issues with generic operations:
+
+  1) Module parameters do not have same form, but have same value, so
+     types should be considered the same.
+  2) Match is between two generic-type parameters.
+  3) Generic parameter type depends on value of another parameter (which is
+     probably not visible given the way the regions are connected).
+  4) Generic parameter type has actuals specified -- who checks them, and 
+     can they be used to create an "actual" type?
+
+Would it make sense to create a "type" where the value is treated
+as a generic parameter?  Alternatively, should there be a way for
+a "regular" parameter to be recognized as a generic parameter to an
+operation?  Perhaps put it in angle brackets somehow?
+
+   op "**"(Left : Units; <Right : Univ_Integer>) 
+     -> Result_Type is Units<Dimension * Right>;
+
+---------------------- 1/5/2011 -------------------
+
+We only want to add interpretations based on the types of
+operands that both match the operation name and have a parameter
+of the "module" type in the corresponding place.  What about
+named parameters?  The parameter name must match.  The problem
+is that we are adding interpretations in the presence of generic
+type parameters which then match "backwards" because, e.g.,
+the left operand is itself generic and the right operand is a specific
+type, and the operation with a generic right parameter and
+a specific left parameter will match.
+"controlling"
+
+---------------------- 12/29/2015 -------------------
+
+We are having problems when the parameter is of the form:
+
+  Right : optional Right_Type is Imageable<>
+
+and then we try to pass it to an operation of the type:
+
+    return Left | Right_Type::To_String(Right)
+
+For some reason "Right" doesn't match the formal type of To_String after
+substituting Right_Type.  The problem seems to be that when "optional" is
+present, We have the Right from the spec and the Right_Type from the body,
+or vice-versa (should figure out which we have!).  In the case that works,
+they are both from the same thing (is it spec or body?).
+Note that Right_Type is actually a parameter of the implicit enclosing module.
+Note that normally a module has a single region shared between spec and body.
+Is that true for implicit modules?  Are there two regions or are there
+two declarations of Right_Type in the sharead region?  The key routine is
+Switch_Implicit_Enclosing_Module.  This one seems to still rely on
+the Param_Type being a type_decl, rather than noticing that it has an
+associated_generic_op.

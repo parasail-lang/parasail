@@ -1,0 +1,138 @@
+interface PSL::Core::Float<Digits : Univ_Integer := 15> is
+  // A floating point type that provides at least the
+  // given number of digits of precision.
+
+    op "from_univ"(Univ : Univ_Real) -> Float
+      is import(#identity)
+
+    op "to_univ"(Val : Float) -> Univ_Real
+      is import(#identity)
+
+    op "+"(Right : Float) -> Float
+      is import(#identity)
+
+    op "-"(Right : Float) -> Float
+      is import(#real_negate)
+
+    op "abs"(Right : Float) -> Float
+      is import(#real_abs)
+
+    op "magnitude"(Float) -> Float is "abs"
+
+    op "+"(Left, Right : Float) -> Result : Float 
+      is import(#real_add)
+
+    op "-"(Left, Right : Float) -> Result : Float
+      is import(#real_subtract)
+
+    op "*"(Left, Right : Float) -> Result : Float 
+      is import(#real_multiply)
+
+    op "*"(Left : Float; Right : Univ_Integer) -> Result : Float 
+      is import(#real_int_multiply)
+
+    op "*"(Left : Univ_Integer; Right : Float) -> Result : Float
+
+    op "/"(Left, Right : Float) -> Result : Float
+      is import(#real_divide)
+
+    op "/"(Left : Float; Right : Univ_Integer) -> Result : Float
+      is import(#real_int_divide)
+
+    op "**"(Left : Float; Right : Univ_Integer) -> Float
+      is import(#real_exp)
+
+    op "+="(var Left : Float; Right : Float) 
+      is import(#real_assign_add)
+
+    op "-="(var Left : Float; Right : Float) 
+      is import(#real_assign_subtract)
+
+    op "*="(var Left : Float; Right : Float) 
+      is import(#real_assign_multiply)
+
+    op "/="(var Left : Float; Right : Float) 
+      is import(#real_assign_divide)
+
+    op "**="(var Left : Float; Right : Univ_Integer) 
+      is import(#real_assign_exp)
+
+
+    op "=?"(Left, Right : Float) -> Ordering
+      is import(#real_compare)
+
+    func Min(Left, Right : optional Float) -> optional Float
+      is import(#real_min)
+    func Max(Left, Right : optional Float) -> optional Float
+      is import(#real_max)
+
+    func Sqrt(Val : Float {Val >= 0.0}) -> Float
+      is import(#real_sqrt)
+      // is (Univ_Real::Sqrt([[Val]]))     
+
+    func Hash(Val : Float) -> Univ_Integer
+      is import(#identity)
+
+    func Round_To_Int(Val : Float) -> Univ_Integer
+      is import(#round_to_int)
+
+    func Int_To_Float(Int : Univ_Integer) -> Float
+      is import(#int_to_real)
+
+    func To_String(Val : optional Float) -> Univ_String
+      is import(#to_string_real)
+
+    func From_String(Str : Univ_String) -> optional Float
+      is import(#from_string_real)
+
+    func Print(X : Float) is import(#print_real)
+    func Println(X : Float) is (Println(To_String(X)))
+
+    op "in"(Left : Float; Right : Range_Set<Float>) -> Boolean
+      is in Range_Set<Float>
+        // "in" defined in Range_Set
+
+    
+end interface PSL::Core::Float
+
+class PSL::Core::Float is
+    const Value : Univ_Real
+  exports
+    op "*"(Left : Univ_Integer; Right : Float) -> Result : Float is
+        // Hand off to built-in real*int op
+        return Right * Left
+    end op "*"
+end class PSL::Core::Float
+    
+func PSL::Test::Test_Float() is
+    type My_Float is Float<Digits => 8>
+
+    var X : My_Float := 3.5
+    var Y : My_Float := 5.22
+    var Z : My_Float := X + Y
+
+    Println("X = " | X | ", Y = " | Y | ", X + Y = " | Z)
+    var Teeny := 0.000023
+    Println("Teeny = " | Teeny)
+    var Small := 0.005
+    Println("Small = " | Small)
+    var Medium := 235.123
+    Println("Medium = " | Medium)
+    var Big := 11.0**5
+    Println("Big = " | Big)
+    var Huge := 13.0**15
+    Println("Huge = " | Huge)
+
+    var X2 : My_Float := 3.5 * 2
+
+    Println("X * 2 = " | X * 2 | ", 2 * X = " | 2 * X | ", X2 = " | X2)
+    Println("X / 2 = " | X / 2 )
+
+    if X in 1.5 ..< 3.6 then
+        Println("X *is* in 1.5 ..< 3.6")
+    else
+        Println("X *not* in 1.5 ..< 3.6??")
+    end if
+
+    Println("X in 1.5 ..< 3.5 = " | (X in 1.5 ..< 3.5) )
+end func PSL::Test::Test_Float

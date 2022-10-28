@@ -1,0 +1,36 @@
+func Test_Continue() is
+    var X := 0;
+   *Outer*
+    for I := 1 loop
+	Println("I = " | I);
+        if I == 1 then
+	    continue loop with 9;
+	end if;
+	Println("We skipped 1, but I still = " | I);
+	if I == 9 then
+	    continue loop with 7;
+	end if;
+	if I == 8 then
+	    exit loop;
+	end if;
+       
+        Println("X now " | X);
+        X := X + 1;
+
+	Println("We should have just exited if I == 8");
+        for J in 1..10 forward loop
+           Println("J = " | J);
+           if J < 3 then
+              continue loop
+           end if;
+           continue loop Outer with I+1;
+        end loop;
+	if I <= 10 then
+	    continue loop with I+1;
+	end if;
+    end loop Outer;
+end func Test_Continue;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Continue ();
+end func main;

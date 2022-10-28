@@ -1,0 +1,33 @@
+interface PSL::Core::Closed_Interval<Bound_Type is Comparable<>> is
+    // This provides a simple "closed" interval X..Y
+    // If a type is countable, then half-open or fully open intervals
+    // can be converted into the equivalent closed interval.
+    var Low : Bound_Type
+    var High : Bound_Type
+    op "in"(Left : Bound_Type; Right : Closed_Interval) -> Boolean
+    op "=?"(Left, Right : Closed_Interval) -> Ordering
+end interface PSL::Core::Closed_Interval
+
+class PSL::Core::Closed_Interval is
+  exports
+    op "in"(Left : Bound_Type; Right : Closed_Interval) -> Boolean is
+        return Left >= Right.Low and then Left <= Right.High
+    end op "in"
+
+    op "=?"(Left, Right : Closed_Interval) -> Ordering is
+        // Compare two intervals, and consider them #unordered
+        // if they overlap at all, unless they are identical.
+        // If they don't overlap, then return #less or #greater as appropriate.
+
+        if Left.High < Right.Low then
+            return #less
+        elsif Left.Low > Right.High then
+            return #greater
+        elsif Left.Low == Right.Low and then
+          Left.High == Right.High then
+            return #equal
+        else
+            return #unordered
+        end if
+    end op "=?"
+end class PSL::Core::Closed_Interval

@@ -1,0 +1,6 @@
+void main() {
+   java.test.testBoolean(#true, #false);
+   java.test.testBoolean(#false, #true);
+   java.test.testBoolean(#true, #true);
+   java.test.testBoolean(#false, #false);
+}

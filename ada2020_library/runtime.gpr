@@ -1,0 +1,8 @@
+project Runtime is
+   for Object_Dir use "obj";
+   for Source_Dirs use (".", "work_stealing", "work_in_progress");
+
+   package Compiler is
+      for Switches ("Ada") use ("-gnatg", "-gnata", "-gnat2020", "-O2", "-g");
+   end Compiler;
+end Runtime;

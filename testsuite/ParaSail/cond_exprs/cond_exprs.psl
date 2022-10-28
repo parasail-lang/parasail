@@ -1,0 +1,67 @@
+interface Vec_Utils<> is
+    func Print_Vec(V : Vec_Type is Vector<Imageable>)
+end interface Vec_Utils
+
+class Vec_Utils is
+  exports
+    func Print_Vec(V : Vec_Type is Vector<Imageable>) is
+        Print("[");
+        for I in 1..Length(V) forward loop
+            if I == 1 then
+                Print("" | V[I]);
+            else
+                Print(", " | V[I]);
+            end if;
+        end loop;
+        Println("]");
+    end func Print_Vec;
+end class Vec_Utils
+
+func Cond_Exprs(X, Y : Univ_Integer) is
+
+    func Sign(N : Univ_Integer) -> Univ_Integer
+      is ((if N >= 0 then 1 else -1)
+    ); 
+
+    Println("X = " | X | ", Y = " | Y);
+
+    Println("Sign(" | X | ") = " | Sign(X))
+
+    const Cond := X > Y;
+
+    Println("X > Y = " | Cond);
+
+    const Bigger : Univ_Integer := (if Cond then X else Y);
+
+    Println("Bigger is " | Bigger);
+
+    const Smaller : Univ_Integer := (case Cond of [#true] => Y; [#false] => X);
+
+    Println("Smaller is " | Smaller);
+
+    Println("not X < Y is " | (X < Y? #false: X == X));
+
+    Println("(if X > Y then X) = " | (if X > Y then X));
+
+    const Vec : Vector<Univ_Integer> := [for I in 1..10 => X + I * Y];
+
+    Print("Vec: "); Vec_Utils::Print_Vec(Vec);
+
+    const All_Small : Boolean := (for all E of Vec => E < 10);
+
+    Println("All_Small = " | All_Small);
+
+    const Some_Even : Boolean := (for some E of Vec => E mod 2 == 0);
+
+    Println("Some_Even = " | Some_Even);
+
+    const Double : Vector<Univ_Integer> :=
+       [for each E of Vec => E * 2];
+
+    Print("Double of Vec: "); Vec_Utils::Print_Vec(Double);
+
+end func Cond_Exprs;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Cond_Exprs (10, 20);
+end func main;

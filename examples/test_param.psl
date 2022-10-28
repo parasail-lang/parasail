@@ -1,0 +1,47 @@
+interface Int_User<Content is Integer<>; Val : Content> is
+    func Content_First() -> Univ_Integer;
+    interface Inner<Left_Type is Int_User<>; Right_Type is Int_User<>> is
+	func Sum_First() -> Univ_Integer;
+	func Sum_Vals() -> Univ_Integer;
+	func Right_Val() -> Right_Type::Content;
+    end interface Inner;
+end interface Int_User;
+
+class Int_User is
+  exports
+    func Content_First() -> Univ_Integer is
+	return Content::Range.First;
+    end func Content_First;
+
+    class Inner is
+      exports
+	func Sum_First() -> Univ_Integer is
+	    return Left_Type::Content::Range.First + 
+	      Right_Type::Content::Range.First;
+	end func Sum_First;
+	func Sum_Vals() -> Univ_Integer is
+	    return [[Left_Type::Val]] + [[Right_Type::Val]];
+	end func Sum_Vals;
+	func Right_Val() -> Right_Type::Content is
+	    return Right_Type::Val;
+	end func Right_Val;
+    end class Inner;
+end class Int_User;
+
+func Test_Param() is
+    type My_Int is Integer<3..33>;
+    type IU is Int_User<My_Int, 42>;
+    Println("IU::Content_First = " | IU::Content_First());
+
+    type My_Int2 is Integer<23..53>;
+    type My_Int3 is Integer<33..43>;
+    type IU2 is Int_User<My_Int2, 242>;
+    type IU3 is Int_User<My_Int3, 342>;
+    type Inner_Inst is IU::Inner<IU2, IU3>;
+    Println("Inner_Inst::Sum_First = " | Inner_Inst::Sum_First() | 
+      " (should be 23 + 33 = 56)");
+    Println("Inner_Inst::Sum_Vals = " | Inner_Inst::Sum_Vals() | 
+      " (should be 242 + 342 = 584)");
+    Println("Inner_Inst::Right_Val = " | Inner_Inst::Right_Val() | 
+      " (should be 342)");
+end func Test_Param;

@@ -1,0 +1,52 @@
+interface Nullness<> is
+    type Int_Arr is Basic_Array<Univ_Integer>;
+    func Make(Len : Univ_Integer) -> Nullness;
+    func Count(N : Nullness) -> Univ_Integer;
+    func Add(var N : Nullness; I : Univ_Integer);
+    func Fiddle(var N : Nullness);
+end interface Nullness;
+
+class Nullness is
+    var Count : Univ_Integer;
+    var Data : optional Int_Arr;
+  exports
+    func Make(Len : Univ_Integer) -> Nullness is
+        return (Count => 0, Data => Create(Len, 33));
+    end func Make;
+
+    func Count(N : Nullness) -> Univ_Integer is
+        return N.Count;
+    end func Count;
+
+    func Add(var N : Nullness; I : Univ_Integer) is
+	N.Count += 1;
+        N.Data[N.Count] := I;
+    end func Add;
+
+    func Fiddle(var N : Nullness) is
+	if N.Data is null then
+	    Println("N.Data is null");
+	    N.Data := Create(N.Count*2+1, 77);
+	elsif N.Data not null then
+	    Println("N.Data not null, Length(N.Data) = " | Length(N.Data));
+	    N.Data := null;
+	else
+	    Println("N.Data is neither null nor non-null");
+	end if;
+    end func Fiddle;
+    
+end class Nullness;
+
+func Test_Nullness() is
+    var X : Nullness := Make(9);
+ 
+    Add(X, 2);
+    Add(X, 3);
+    Println("Count(X) = " | Count(X));
+    Fiddle(X);
+    Fiddle(X);
+end func Test_Nullness;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Nullness ();
+end func main;

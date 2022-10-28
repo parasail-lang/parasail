@@ -1,0 +1,13 @@
+//  Super slow but the point is to use a local function
+func Less_Than(A : Univ_Integer; B : Univ_Integer) -> Univ_Integer is
+   func Check(N : Univ_Integer) -> Univ_Integer is
+      if N == B then
+         return 0;
+      elsif N == A then
+         return 1;
+      else
+         return Check(N + 1);
+      end if;
+   end func Check;
+   return Check(0);
+end func Less_Than;

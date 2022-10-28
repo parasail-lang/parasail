@@ -1,0 +1,439 @@
+// Example ParaSail modules for expression tree using inheritance
+// (module extension) and polymorphism (Expr+).
+
+// Copyright (C) 2011-2014, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+interface Expr<> is
+    // Define a root type of a hierarchy used to represent an expression tree
+
+    type Type_Enum is Enum<[#bool, #int, #real, #array, #record]>;
+      // Hypothetical set of types for expression tree nodes
+
+    func Combine(Left, Right : Type_Enum) -> Type_Enum;
+      // Combine operand types as appropriate to a binary operator
+      // (e.g. int+int=>int, int+real=>real)
+
+    abstract func Eval(E : Expr) -> Univ_Real;
+      // Operation to evaluate expression tree to a univ-real result
+    abstract func Display(E : Expr; Indent : Univ_Integer := 0);
+      // Operation to display an expression tree in an indented format
+
+    func Type(E : Expr) -> Type_Enum;
+      // Return current type of expression node
+    func Set_Type(var E : Expr; T : Type_Enum);
+      // Set type of expression node
+
+    func Init_Type(T : Type_Enum; Count : Univ_Integer) -> Expr;
+      // Create an initialized Expr object as needed for
+      // creating a class-aggregate in any descendant of Expr.
+      // Such a constructor is needed because Expr has hidden
+      // components (the "Type" component is hidden).
+
+    // Factory operations for building up expression trees
+    op "+"(Operand : Expr+) -> Expr+;
+    op "-"(Operand : Expr+) -> Expr+;
+    op "abs"(Operand : Expr+) -> Expr+;
+    op "+"(Left, Right : Expr+) -> Expr+;
+    op "-"(Left, Right : Expr+) -> Expr+;
+    op "*"(Left, Right : Expr+) -> Expr+;
+    op "/"(Left, Right : Expr+) -> Expr+;
+    op "**"(Left, Right : Expr+) -> Expr+;
+
+    op "from_univ"(Univ : Univ_Real) -> Expr+;
+    op "from_univ"(Univ : Univ_Integer) -> Expr+;
+
+    op "to_univ"(Val : Expr+) -> Univ_Real;
+      // Just passes the buck to Eval(Val)
+
+    func Expr_Kind (E : Expr+) -> Univ_Enumeration;
+      // Use a "case" statement to determine the kind of the expression
+      // (#unary, #binary, or #leaf)
+
+    const Count : Univ_Integer;
+      // A visible component that will be inherited
+      // (visibly) by all descendants of Expr
+
+end interface Expr;
+
+interface Binary<> extends Parent : Expr<> is
+    type Binop is Enum<[#plus, #minus, #times, #divide, #pow]>;
+    func Image(Op : Binop) -> Univ_String;
+	// Example of nested type and an associated operation
+
+    // Override abstract "Expr" operations
+    func Eval(B : Binary) -> Univ_Real;
+    func Display(B : Binary; Indent : Univ_Integer := 0);
+
+    // Define constructor for Binary nodes
+    func Create(Op : Binop; Left, Right : Expr+) -> Binary;
+
+    // Override inherited constructor, which "becomes" abstract 
+    // because Binary has its own constructor, and hence might have
+    // its own private components.
+    func Init_Type(T : Expr::Type_Enum; Count : Univ_Integer) -> Binary;
+end interface Binary;
+
+interface Unary<> extends Expr<> is
+    type Unop is Enum<[#plus, #minus, #abs]>;
+    func Image(Op : Unop) -> Univ_String;
+
+    func Eval(U : Unary) -> Univ_Real;
+    func Display(U : Unary; Indent : Univ_Integer := 0);
+
+    func Create(Op : Unop; Operand : Expr+) -> Unary;
+
+    // Override inherited constructor
+    func Init_Type(T : Expr::Type_Enum; Count : Univ_Integer) -> Unary;
+end interface Unary;
+
+interface Leaf<> extends Expr<> is
+    func Eval(L : Leaf) -> Univ_Real;
+    func Display(L : Leaf; Indent : Univ_Integer := 0);
+
+    // Define two constructors for Leaf nodes, one
+    // that takes a real, and one that takes an int.
+    func Create(Val : Univ_Real) -> Leaf;
+    func Create(Val : Univ_Integer) -> Leaf;
+
+    // Override inherited constructor
+    func Init_Type(T : Expr::Type_Enum; Count : Univ_Integer) -> Leaf;
+end interface Leaf;
+    
+class Binary is
+    const Op : Binop;
+    const Left : Expr+;
+    const Right : Expr+;
+  exports
+    func Image(Op : Binop) -> Univ_String is
+	case Op of
+	  [#plus] => return "+";
+	  [#minus] => return "-";
+	  [#times] => return "*";
+	  [#divide] => return "/";
+	  [#pow] => return "**";
+	end case;
+    end func Image;
+
+    // Override abstract "Expr" operations
+
+    func Eval(B : Binary) -> Univ_Real is
+	case B.Op of
+	  [#plus] => return Eval(B.Left) + Eval(B.Right);
+	  [#minus] => return Eval(B.Left) - Eval(B.Right);
+	  [#times] => return Eval(B.Left) * Eval(B.Right);
+	  [#divide] => return Eval(B.Left) / Eval(B.Right);
+	  [#pow] => return Eval(B.Left) ** Round_To_Int(Eval(B.Right));
+	end case;
+    end func Eval;
+
+    func Display(B : Binary; Indent : Univ_Integer := 0) is
+	if Indent == 0 then
+	    Println("Tree with " | B.Count | " nodes:");
+	end if;
+	Println(Indent * ' ' | Image(B.Op));
+	Display(B.Left, Indent => Indent + 2);
+	Display(B.Right, Indent => Indent + 2);
+	if Indent == 0 then
+	    Println("Value = " | Eval(B) | " of type " | Type(B));
+	end if;
+    end func Display;
+        
+    // Define constructor for Binary nodes
+    func Create(Op : Binop; Left, Right : Expr+) -> Binary is
+	return 
+	  (Parent => Init_Type(Expr::Combine(Type(Left), Type(Right)), 
+	     Count => Left.Count + Right.Count + 1),
+	   Op => Op, Left => Left, Right => Right);
+    end func Create;
+
+    // Override inherited constructor, which "becomes" abstract 
+    // because Binary has its own constructor, and hence might have
+    // its own private components.
+    func Init_Type(T : Expr::Type_Enum; Count : Univ_Integer) -> Binary is
+	return (Parent => Init_Type(T, Count),
+	  Op => #plus, Left => 0, Right => 0);
+    end func Init_Type;
+end class Binary;
+
+class Unary is
+    const Op : Unop;
+    const Operand : Expr+;
+  exports
+    func Image(Op : Unop) -> Univ_String is
+	case Op of
+	  [#plus] => return "+";
+	  [#minus] => return "-";
+	  [#abs] => return "abs";
+	end case;
+    end func Image;
+
+    func Eval(U : Unary) -> Univ_Real is
+	case U.Op of
+	  [#plus] => return Eval(U.Operand);
+	  [#minus] => return -Eval(U.Operand);
+	  [#abs] => return abs Eval(U.Operand);
+	end case;
+    end func Eval;
+
+    func Display(U : Unary; Indent : Univ_Integer := 0) is
+	if Indent == 0 then
+	    Println("Tree with " | U.Count | " nodes:");
+	end if;
+	Println(Indent * ' ' | Image(U.Op));
+	Display(U.Operand, Indent => Indent + 2);
+	if Indent == 0 then
+	    Println("Value = " | Eval(U) | " of type " | Type(U));
+	end if;
+    end func Display;
+
+    // Define constructor for Unary nodes
+    func Create(Op : Unop; Operand : Expr+) -> Unary is
+	return (Init_Type(Type(Operand), Count => Operand.Count + 1), 
+	  Op => Op, Operand => Operand);
+    end func Create;
+
+    // Override inherited constructor, which "becomes" abstract 
+    // because Unary has its own constructor, and hence might have
+    // its own private components.
+    func Init_Type(T : Expr::Type_Enum; Count : Univ_Integer) -> Unary is
+	return (Init_Type(T, Count),
+	  Op => #plus, Operand => 0);
+    end func Init_Type;
+end class Unary;
+
+class Leaf is
+    var Val : Univ_Real;
+  exports
+    func Eval(L : Leaf) -> Univ_Real is
+	return L.Val;
+    end func Eval;
+
+    func Display(L : Leaf; Indent : Univ_Integer := 0) is
+	Println(Indent * ' ' | L.Val);
+    end func Display;
+
+    func Create(Val : Univ_Real) -> Leaf is
+	return (Init_Type(#real, Count => 1), Val => Val);
+    end func Create;
+
+    // Define constructor for Leaf nodes
+    func Create(Val : Univ_Integer) -> Leaf is
+	return (Expr => Init_Type(#int, Count => 1), Val => Int_To_Real(Val));
+    end func Create;
+
+    // Override inherited constructor, which "becomes" abstract 
+    // because Leaf has its own constructor, and hence might have
+    // its own private components.
+    func Init_Type(T : Expr::Type_Enum; Count : Univ_Integer) -> Leaf is
+	return (Init_Type(T, Count), Val => 0.0);
+    end func Init_Type;
+end class Leaf;
+    
+class Expr is
+    var Type : Type_Enum;
+  exports
+
+    func Combine(Left, Right : Type_Enum) -> Type_Enum is
+      // Combine operand types as appropriate to a binary operator
+      // (e.g. int+int=>int, int+real=>real)
+        if Left > Right then 
+	    return Left;
+	else
+	    return Right;
+	end if;
+    end func Combine;
+
+    // Factory operations for building up expression trees
+    // (these call the "appropriate" descendants constructor operation).
+
+    op "+"(Operand : Expr+) -> Expr+ is
+	return Unary::Create(#plus, Operand);
+    end op "+";
+
+    op "-"(Operand : Expr+) -> Expr+ is
+	return Unary::Create(#minus, Operand);
+    end op "-";
+
+    op "abs"(Operand : Expr+) -> Expr+ is
+	return Unary::Create(#abs, Operand);
+    end op "abs";
+
+    op "+"(Left, Right : Expr+) -> Expr+ is
+	return Binary::Create(#plus, Left, Right);
+    end op "+";
+
+    op "-"(Left, Right : Expr+) -> Expr+ is
+	return Binary::Create(#minus, Left, Right);
+    end op "-";
+
+    op "*"(Left, Right : Expr+) -> Expr+ is
+	return Binary::Create(#times, Left, Right);
+    end op "*";
+
+    op "/"(Left, Right : Expr+) -> Expr+ is
+	return Binary::Create(#divide, Left, Right);
+    end op "/";
+
+    op "**"(Left, Right : Expr+) -> Expr+ is
+	return Binary::Create(#pow, Left, Right);
+    end op "**";
+
+    op "from_univ"(Univ : Univ_Real) -> Expr+ is
+	return Leaf::Create(Univ);
+    end op "from_univ";
+
+    op "from_univ"(Univ : Univ_Integer) -> Expr+ is
+	return Leaf::Create(Univ);
+    end op "from_univ";
+
+    op "to_univ"(Val : Expr+) -> Univ_Real is
+      // Just passes the buck to Eval(Val)
+	return Eval(Val);
+    end op "to_univ";
+
+    func Type(E : Expr) -> Type_Enum is
+      // Return current type of expression node
+	return E.Type;
+    end func Type;
+
+    func Set_Type(var E : Expr; T : Type_Enum) is
+      // Set type of expression node
+	E.Type := T;
+    end func Set_Type;
+
+    func Init_Type(T : Type_Enum; Count : Univ_Integer) -> Expr is
+      // Create an initialized Expr object as needed for
+      // creating a class-aggregate in any descendant of Expr.
+      // Such a constructor is needed because Expr has hidden
+      // components (the "Type" component is hidden).
+	return (Count => Count, Type => T);
+    end func Init_Type;
+
+    func Expr_Kind (E : Expr+) -> Univ_Enumeration is
+      // Use a "case" statement to determine the kind of the expression
+      // (#unary, #binary, or #leaf)
+       case E of
+         [L : Leaf] => Display(L); return #leaf;
+         [U : Unary] => Display(U); return #unary;
+         [B : Binary] => Display(B); return #binary;
+         [..] => return #other;
+       end case;
+       return #other;
+    end func Expr_Kind;
+end class Expr;
+
+interface Use_Expr <Expr_Type is Expr<>> is
+    func Show(E : Expr_Type);
+end interface Use_Expr;
+
+class Use_Expr is
+  exports
+    func Show(E : Expr_Type) is
+        Display(E);
+    end func Show;
+end class Use_Expr;
+    
+interface Use_Countable <Data_Type is Countable<>> is
+    func Succ(D : Data_Type) -> Data_Type;
+    func Pred(D : Data_Type) -> Data_Type;
+end interface Use_Countable;
+
+class Use_Countable is
+  exports
+    func Succ(D : Data_Type) -> Data_Type is
+        return D + 1;
+    end func Succ;
+    func Pred(D : Data_Type) -> Data_Type is
+        return D - 1;
+    end func Pred;
+end class Use_Countable;
+    
+abstract interface Im_Count <> extends Countable implements Imageable<> is
+    func To_String(Val : Im_Count) -> Univ_String<>;
+
+    func From_String(Str : Univ_String<>) -> optional Im_Count;
+end interface Im_Count;
+
+func Test_Extend() is
+  // Test the Expr tree modules
+
+    func Test_Assignment(E : Expr+) is
+	const G : Expr+ := E;  // polymorphic assignment
+	Display(E);   // run-time dispatching based on type-id of E
+	Expr::Display(G);  // (redundantly) specify module for Display
+    end func Test_Assignment;
+
+    func Test_Conversion(B : Binary) is
+	Test_Assignment(B);  // Implicit conversion from Binary to Expr+
+    end func Test_Conversion;
+
+    Println("Building up polymorphic expression from -5.3 + 4 * 5.2 ** 2");
+    const E : Expr+ := -5.3 + 4 * 5.2 ** 2; // Test call on factory operations
+    Display(E);  // Use type-id of E to determine which "Display" to call.
+                 // This is an example of "run-time dispatching."
+
+    Println("Building up Binary expr (#plus, 4.5, 7.1/3.0)");
+    Println("Displaying it before and after conversion to polymorphic type");
+    Test_Conversion(Create(#plus, 4.5, 7.1/3.0));
+      // Call Binary constructor explicitly, while calling
+      // "factory" operation "from_univ" to convert the real literals to Expr+
+      // and the operation "/" to build a nested binary node.
+
+    var Int_E : Expr+ := -4 + 7;  // Result should be of type #int
+    Display(Int_E);  // Another run-time dispatching call
+
+    var B1 := Binary::Create(#plus, 1, 2);
+    Println ("About to set type of B1 to #int");
+    Set_Type (B1, #int);
+    Println ("Managed to set type of B1 to #int");
+
+    Println ("About to (re)set type of Int_E to #int in case stmt");
+    case Int_E of
+      [B : Binary] => Set_Type (B, #int);
+      [..] => null;
+    end case;
+
+    const Real_E : Expr+ := Int_E * 2.5;  // Result should be of type #real
+    Display(Real_E);  // One more dispatching call
+
+    Println("Testing a polymorphic vector of [E, -3.1 + 4.0**2, 7.1, -33]");
+    var VP : Vector<Expr+> := [E, -3.1 + 4.0**2, 7.1, -33];
+
+    Println("Printing each element of vector");
+    for I in 1..Length(VP) loop
+        Println ("Kind = " | Expr_Kind(VP[I]));
+        Display(VP[I]);
+    end loop;
+
+    Println("Instantiating Use_Expr with Binary");
+    type Binary_Use is Use_Expr<Binary>;
+    Binary_Use::Show(Create(#plus, 2.5, 6.1/2.0));
+
+    Println("Instantiating Use_Expr with Expr+");
+    type Poly_Use is Use_Expr<Expr+>;
+    Poly_Use::Show(VP[2]);
+
+    type Color is Enum<[#red, #green, #blue]>;
+
+    var Blue : Color := #blue;
+
+    Println ("Converting " | Blue | " to Im_Count+:");
+
+    var IC : Im_Count+ := Blue;
+
+    Println (" Result of conversion = " | IC);
+
+    Println("Instantiating Use_Countable with Im_Count+");
+    type Enum_Ops is Use_Countable<Im_Count+>;
+
+    for C in Color forward loop
+        if C != First() then
+            Println("Pred(" | C | ") = " | Enum_Ops::Pred(C));
+        end if;
+        if C != Last() then
+            Println("Succ(" | C | ") = " | Enum_Ops::Succ(C));
+        end if;
+    end loop;
+end func Test_Extend;

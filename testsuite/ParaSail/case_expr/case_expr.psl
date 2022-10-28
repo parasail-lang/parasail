@@ -1,0 +1,25 @@
+func Case_Expr(X, Y, Z : Univ_Integer) is
+
+   type Color is Enum<[#red, #green, #blue]>;
+   var C : Color := #green;
+
+   if X in 0..2 then
+      C := #red + X;
+   end if;
+
+   Println("C = " | C);
+
+   const Result := (case C of [#red] => X; [#green] => Y; [#blue] => Z);
+
+   const Result2 := (case C: [#red] => X; [#green] => Y; [#blue] => Z);
+
+   {Result == Result2}
+
+   Println("(case C of [#red] => " | X | "; [#green] => " | Y |
+      "; [#blue] => " | Z | ") = " | Result);
+
+end func Case_Expr;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Case_Expr (1, 2, 3);
+end func main;

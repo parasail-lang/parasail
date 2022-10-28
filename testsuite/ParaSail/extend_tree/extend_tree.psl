@@ -1,0 +1,214 @@
+interface Expr<> is
+    abstract func Eval(E : Expr) -> Univ_Real;
+    abstract func Display(E : Expr; Indent : Univ_Integer := 0);
+
+    op "+"(Operand : Expr+) -> Expr+;
+    op "-"(Operand : Expr+) -> Expr+;
+    op "abs"(Operand : Expr+) -> Expr+;
+    op "+"(Left, Right : Expr+) -> Expr+;
+    op "-"(Left, Right : Expr+) -> Expr+;
+    op "*"(Left, Right : Expr+) -> Expr+;
+    op "/"(Left, Right : Expr+) -> Expr+;
+    op "**"(Left, Right : Expr+) -> Expr+;
+
+    op "from_univ"(Univ : Univ_Real) -> Expr+;
+    op "from_univ"(Univ : Univ_Integer) -> Expr+;
+
+    op "to_univ"(Val : Expr+) -> Univ_Real;
+
+    const Count : Univ_Integer;
+
+end interface Expr;
+
+interface Binary<> extends Parent : Expr<> is
+    type Binop is Enum<[#plus, #minus, #times, #divide, #pow]>;
+    func Image(Op : Binop) -> Univ_String;
+    func Eval(B : Binary) -> Univ_Real;
+    func Display(B : Binary; Indent : Univ_Integer := 0);
+    func Create(Op : Binop; Left, Right : Expr+) -> Binary;
+end interface Binary;
+
+interface Unary<> extends Expr<> is
+    type Unop is Enum<[#plus, #minus, #abs]>;
+    func Image(Op : Unop) -> Univ_String;
+    func Eval(U : Unary) -> Univ_Real;
+    func Display(U : Unary; Indent : Univ_Integer := 0);
+    func Create(Op : Unop; Operand : Expr+) -> Unary;
+end interface Unary;
+
+interface Leaf<> extends Expr<> is
+    func Eval(L : Leaf) -> Univ_Real;
+    func Display(L : Leaf; Indent : Univ_Integer := 0);
+    func Create(Val : Univ_Real) -> Leaf;
+    func Create(Val : Univ_Integer) -> Leaf;
+end interface Leaf;
+    
+class Binary is
+    const Op : Binop;
+    const Left : Expr+;
+    const Right : Expr+;
+  exports
+    func Image(Op : Binop) -> Univ_String is
+	case Op of
+	  [#plus] => return "+";
+	  [#minus] => return "-";
+	  [#times] => return "*";
+	  [#divide] => return "/";
+	  [#pow] => return "**";
+	end case;
+    end func Image;
+
+    func Eval(B : Binary) -> Univ_Real is
+	case B.Op of
+	  [#plus] => return Eval(B.Left) + Eval(B.Right);
+	  [#minus] => return Eval(B.Left) - Eval(B.Right);
+	  [#times] => return Eval(B.Left) * Eval(B.Right);
+	  [#divide] => return Eval(B.Left) / Eval(B.Right);
+	  [#pow] => return Eval(B.Left) ** Round_To_Int(Eval(B.Right));
+	end case;
+    end func Eval;
+
+    func Display(B : Binary; Indent : Univ_Integer := 0) is
+	if Indent == 0 then
+	    Println("Tree with " | B.Count | " nodes:");
+	end if;
+	Println(Indent * ' ' | Image(B.Op));
+	Display(B.Left, Indent => Indent + 2);
+	Display(B.Right, Indent => Indent + 2);
+	if Indent == 0 then
+	    Println("Value = " | Eval(B));
+	end if;
+    end func Display;
+        
+    func Create(Op : Binop; Left, Right : Expr+) -> Binary is
+	return (Count => Left.Count + Right.Count + 1,
+	  Op => Op, Left => Left, Right => Right);
+    end func Create;
+end class Binary;
+
+class Unary is
+    const Op : Unop;
+    const Operand : Expr+;
+  exports
+    func Image(Op : Unop) -> Univ_String is
+	case Op of
+	  [#plus] => return "+";
+	  [#minus] => return "-";
+	  [#abs] => return "abs";
+	end case;
+    end func Image;
+
+    func Eval(U : Unary) -> Univ_Real is
+	case U.Op of
+	  [#plus] => return Eval(U.Operand);
+	  [#minus] => return -Eval(U.Operand);
+	  [#abs] => return abs Eval(U.Operand);
+	end case;
+    end func Eval;
+
+    func Display(U : Unary; Indent : Univ_Integer := 0) is
+	if Indent == 0 then
+	    Println("Tree with " | U.Count | " nodes:");
+	end if;
+	Println(Indent * ' ' | Image(U.Op));
+	Display(U.Operand, Indent => Indent + 2);
+	if Indent == 0 then
+	    Println("Value = " | Eval(U));
+	end if;
+    end func Display;
+
+    func Create(Op : Unop; Operand : Expr+) -> Unary is
+	return (Count => Operand.Count + 1, Op => Op, Operand => Operand);
+    end func Create;
+
+end class Unary;
+
+class Leaf is
+    var Val : Univ_Real;
+  exports
+    func Eval(L : Leaf) -> Univ_Real is
+	return L.Val;
+    end func Eval;
+
+    func Display(L : Leaf; Indent : Univ_Integer := 0) is
+	Println(Indent * ' ' | L.Val);
+    end func Display;
+
+    func Create(Val : Univ_Real) -> Leaf is
+	return (Count => 1, Val => Val);
+    end func Create;
+
+    func Create(Val : Univ_Integer) -> Leaf is
+	return (Count => 1, Val => Int_To_Real(Val));
+    end func Create;
+end class Leaf;
+    
+class Expr is
+  exports
+
+    op "+"(Operand : Expr+) -> Expr+ is
+	return Unary::Create(#plus, Operand);
+    end op "+";
+
+    op "-"(Operand : Expr+) -> Expr+ is
+	return Unary::Create(#minus, Operand);
+    end op "-";
+
+    op "abs"(Operand : Expr+) -> Expr+ is
+	return Unary::Create(#abs, Operand);
+    end op "abs";
+
+    op "+"(Left, Right : Expr+) -> Expr+ is
+	return Binary::Create(#plus, Left, Right);
+    end op "+";
+
+    op "-"(Left, Right : Expr+) -> Expr+ is
+	return Binary::Create(#minus, Left, Right);
+    end op "-";
+
+    op "*"(Left, Right : Expr+) -> Expr+ is
+	return Binary::Create(#times, Left, Right);
+    end op "*";
+
+    op "/"(Left, Right : Expr+) -> Expr+ is
+	return Binary::Create(#divide, Left, Right);
+    end op "/";
+
+    op "**"(Left, Right : Expr+) -> Expr+ is
+	return Binary::Create(#pow, Left, Right);
+    end op "**";
+
+    op "from_univ"(Univ : Univ_Real) -> Expr+ is
+	return Leaf::Create(Univ);
+    end op "from_univ";
+
+    op "from_univ"(Univ : Univ_Integer) -> Expr+ is
+	return Leaf::Create(Univ);
+    end op "from_univ";
+
+    op "to_univ"(Val : Expr+) -> Univ_Real is
+	return Eval(Val);
+    end op "to_univ";
+
+end class Expr;
+
+func Test_Extend() is
+    func Test_Assignment(E : Expr+) is
+	const G : Expr+ := E;
+	Display(E);
+	Expr::Display(G);
+    end func Test_Assignment;
+
+    func Test_Conversion(B : Binary) is
+	Test_Assignment(B);
+    end func Test_Conversion;
+
+    const E : Expr+ := -5.3 + 4 * 5.2 ** 2;
+    Display(E);
+
+    Test_Conversion(Create(#plus, 4.5, 7.1/3.0));
+end func Test_Extend;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Extend ();
+end func main;

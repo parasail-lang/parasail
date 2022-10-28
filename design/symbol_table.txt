@@ -1,0 +1,147 @@
+How should the symbol table be structured?
+Presume we are writing in ParaSail?
+Should we allow references to be stored into
+a data structure to its own components?
+You would hope so.  Otherwise, having multiple
+indices is painful.  But the structure needs to
+be "monotonic," in the sense that once a
+component exists it remains until the enclosing
+structure as a whole is eliminated.  Another
+name for this might be "stable."
+
+Could we abbreviate "monotonic" as "mono"?
+Might be interpreted as monoprocessing, meaning
+that only one thread at a time could manipulate it.
+Or as opposed to stereo (i.e. monophonic).
+
+Let's assume we are going to allow some sort
+of references, but only to closely related
+objects or clearly longer-lasting objects.
+
+If we want a reference "lock" or "handoff" to
+apply to only one level as opposed to all
+subcomponents, we might use the term "shallow"
+(as opposed to "deep").
+
+Perhaps "optionality" breaks the connection,
+requiring another lock/handoff.  (Not sure that
+really makes sense.) Perhaps at 
+optionality points is also the only point where
+a reference may be made (can't imagine why).
+
+So back to our symbol table.  We could fully
+separate each module into tree and region.
+we probably want to do that, as that is the unit
+of replacement.  We really don't want direct 
+references from one module to another, do we?
+
+The syntax tree can be reused even if all of
+the other modules change.  The semantics cannot.
+That argues for keeping the semantics separate.
+If no pointers, then what sort of connections
+exist between modules?
+
+Are we being drawn back into the region-based
+storage management stuff, with reference counts
+between modules?  Or are inter-module references
+run through a level of indirection?  Who maintains
+the reference counts?  And what about weak references
+and all of that?
+
+Let's step back -- Inter-module references only make sense
+to "level 0" entities, and those can pretty easily be
+assigned unique indices.
+
+We need a word to capture the fact that X[I] === Y[J]
+if and only if I == J and X === Y.  "Identify", "enumerate", "classify",
+"partition," "distinguish," "select," "separate," "determine,"
+"determinate," "unique" (in database sense), "distinct".
+
+I think distinct is the winner.
+
+What is the opposite of "==="?  "=!=".  "identical"
+
+operator "indexing"(X : ref Array; I : Index_Type) -> ref distinct Element_Type;
+
+--------------
+
+Back to the symbol table.
+
+Module id and symbol id.
+
+How about types?
+
+They involve a module and some actual module parameters.
+Plus the polymorphism indicator.  And possibly some
+additional constraints.  And perhaps an add-on label.
+
+As far as polymorphism, what types are "convertible" to
+a polymorphic type?  It seems that it would depend on
+whether it is a ref-const or a ref-var or an output.
+
+Is it a "type" thing, or does it depend on the particular value?
+Ref-const would seem to depend on the current value.
+Ref-var would seem to require a perfect match, though
+we could use the "membership" operator to determine whether
+a given assignment is legal.
+
+How polymorphic is polymorphic?  Why identify a type at
+all, why not just identify the interface?  We are allowing
+pretty complete polymorphism at instantiation time.
+
+Can we allow underspecified actual parameters when defining
+a type, if it is only going to be used as a polymorphic type?
+Does this imply we want to use the term "abstract" with
+a type as well as with an interface and an operation?
+
+So objects of a type T2 can be converted to a polymorphic T1+
+if for the parameters specified for T1, T2 has the "same" types,
+values, and objects, but need not be from the same interface,
+so long as it provides corresponding operations.  Perhaps we
+should require explicit conversion to T1+ if the interface
+defining T2 does not extend/implement the interface defining T1.
+
+----------
+
+Back to representing types at compile-time:
+
+Module Id (do we mean top-level Module Id, or do
+sub-modules get assigned module ids?).
+Add-on label(s)
+Actual parameters.
+Constraints.
+Is-New? --> Symbol associated with "new" type.
+Is-Concurrent?
+Is-Optional?
+Is-Mutable?  (or is that something to do with the object?)
+Const, Stable/Monotonic (or simply non-mutable?), Var
+
+----------------------
+
+Let's think top-down.  Our goal in the static semantic analysis
+phase is to annotate every tree node with its type, and annotate
+every identifier node with its definition.  For modules, objects,
+and types, this is largely a conventional lookup problem.  For
+names of operations (including operators), this is an overloading
+problem.  Note that the "definition" associated with an identifier
+is more complex than pointing at a defining node.  We need to
+worry about which instance of the module, which is back to identifying
+a type, including possibly a "formal" type rather than an "actual" type.
+
+We also want to detect and report problems.  Overloading has its own
+set of problems, so we want to report ambiguity as well as unresolvable
+cases and a list of the "near misses".
+
+Only some of the problems relate to name resolution.   Other problems
+relate to value checks.  Others have to do with hand-off/aliasing.
+
+Value checks are based on assigning value numbers to each tree node,
+and then tracking value sets associated with value numbers.
+Loops will require some amount of iteration, presumably.
+
+Hand-off/aliasing is based on object identifiers of some sort, and
+the notion of inclusion/overlap.  Some references may be associated with 
+a set of possible enclosers, rather than a unique encloser.
+
+Checking for var vs. const vs. mutable is yet a fourth kind of problem.
+This is somewhat simpler than the others.

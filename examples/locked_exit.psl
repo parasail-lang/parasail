@@ -1,0 +1,70 @@
+// Example ParaSail program -- Simple concurrent locked box
+
+// Copyright (C) 2011-2014, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+// This illustrates exit when one of the threads is deeply nested
+// in a series of locked calls on concurrent objects.
+
+concurrent interface Lock<> is
+    func Create() -> Lock;
+    func Waste_Time (locked L : Lock; Count : Univ_Integer := 10;
+      First : Univ_Integer := 1);
+end interface Lock;
+
+concurrent class Lock is
+    const Mult := 10;
+  exports
+    func Create() -> Lock is
+        return ();
+    end func Create;
+    func Waste_Time (locked L : Lock; Count : Univ_Integer := 10;
+      First : Univ_Integer := 1) is
+        // We keep recursing until we have iterated from 1 .. Count * Mult.
+        Println("Looping " | First | " .. " | Count*Mult);
+
+        for I in First .. Count*Mult forward loop
+           if I mod Mult == 0 then
+              Println (" Iteration " | I);
+              var Inner : Lock := Create();
+
+              // Recurse to finish the loop.
+              Waste_Time (Inner, Count, First => I+1);
+
+              // Recursive call finished the job, so we can exit now.
+              exit loop;
+           end if;
+        end loop;
+    end func Waste_Time;
+end class Lock;
+
+func Locked_Exit() is
+  // Set up two parallel picothreads, both of which
+  // make locked calls on a time-wasting operation of a concurrent object.
+  // They both try to exit, and it is a race to see which one wins.
+  // It should be the one who wastes less time.
+    var Winner : Univ_Integer := 0;
+
+    block
+        var My_Clock := Clock::Create();
+        var L1 : Lock := Create();
+        var L2 : Lock := Create();
+        
+      then
+        Println("About to Waste_Time(5)");
+        Waste_Time(L1, 5);
+        Println("Done with Waste_Time(5)");
+        exit block with Winner => 5;
+      ||
+        Println("About to Waste_Time(2)");
+        Waste_Time(L2, 2);
+        Println("Done with Waste_Time(2)");
+        exit block with Winner => 2;
+      then
+        Println("Should not get here because of exits");
+    end block;
+
+    Println("And the Winner is " | Winner);
+
+end func Locked_Exit;

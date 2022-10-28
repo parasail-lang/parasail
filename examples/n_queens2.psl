@@ -1,0 +1,266 @@
+interface Range<Bound_Type is Countable<>> is
+    // Simple contiguous range of integers (i.e. an interval)
+    const First : Bound_Type;
+    const Last : Bound_Type;
+    op ".."(Left, Right : Bound_Type) -> Range;
+    op "<.."(Left, Right : Bound_Type) -> Range;
+    op "..<"(Left, Right : Bound_Type) -> Range;
+    op "<..<"(Left, Right : Bound_Type) -> Range;
+    op "in"(Val : Bound_Type; Int : Range) -> Boolean;
+    func Length(R : Range) -> Univ_Integer;
+
+    func Remove_First(var S : Range) -> optional Bound_Type;
+    func Remove_Last(var S : Range) -> optional Bound_Type;
+    func Remove_Any(var S : Range) -> optional Bound_Type;
+end interface Range;
+
+class Range is
+  exports
+    op ".."(Left, Right : Bound_Type) -> Range is
+	return (First => Left, Last => Right);
+    end op "..";
+
+    op "<.."(Left, Right : Bound_Type) -> Range is
+	return (First => Left+1, Last => Right);
+    end op "<..";
+
+    op "..<"(Left, Right : Bound_Type) -> Range is
+	return (First => Left, Last => Right-1);
+    end op "..<";
+
+    op "<..<"(Left, Right : Bound_Type) -> Range is
+	return (First => Left+1, Last => Right-1);
+    end op "<..<";
+
+    op "in"(Val : Bound_Type; Int : Range) -> Boolean is
+	return Val >= Int.First and then Val <= Int.Last;
+    end op "in";
+
+    func Length(R : Range) -> Univ_Integer is
+	return R.Last - R.First + 1;
+    end func Length;
+
+    func Remove_First(var S : Range) -> Result : optional Bound_Type is
+	if S.First <= S.Last then
+	    Result := S.First;
+	    S := (First => S.First+1, Last => S.Last);
+	else
+	    Result := null;
+	end if;
+    end func Remove_First;
+	
+    func Remove_Last(var S : Range) -> Result : optional Bound_Type is
+	if S.First <= S.Last then
+	    Result := S.Last;
+	    S := (First => S.First, Last => S.Last-1);
+	else
+	    Result := null;
+	end if;
+    end func Remove_Last;
+
+    func Remove_Any(var S : Range) -> Result : optional Bound_Type is
+	if S.First <= S.Last then
+	    if (S.Last - S.First) mod 2 == 0 then
+		return Remove_First(S);
+	    else
+		return Remove_Last(S);
+	    end if;
+	else
+	    return null;
+	end if;
+    end func Remove_Any;
+
+end class Range;
+
+interface Integer_Range<R : Range<Univ_Integer>> is
+    op "from_univ"(Univ : Univ_Integer<>) -> Integer_Range
+      is import(#integer_from_univ);
+    op "to_univ"(Val : Integer_Range) -> Univ_Integer
+      is import(#integer_to_univ);
+    op "+"(Left, Right : Integer_Range) -> Integer_Range
+      is import("+");
+    op "-"(Left, Right : Integer_Range) -> Integer_Range
+      is import("-");
+    op "=?"(Left, Right : Integer_Range) -> Ordering
+      is import("=?");
+    op "[..]"() -> Range<Integer_Range>;
+  implements
+  for Countable
+    // These operations are needed so Integer_Range satifies
+    // requirements of "Countable" interface, but these
+    // operations are not directly callable (if they were callable,
+    // we would have ambiguity when adding an integer-range to an int-literal).
+
+    op "+"(Left : Integer_Range; Right : Univ_Integer) -> Integer_Range 
+      is import("+");
+
+    op "+"(Left : Univ_Integer; Right : Integer_Range) -> Integer_Range 
+      is import("+");
+
+    op "-"(Left : Integer_Range; Right : Univ_Integer) -> Integer_Range 
+      is import("-");
+
+    op "-"(Left, Right : Integer_Range) -> Result : Univ_Integer
+      is import("-");
+
+end interface Integer_Range;
+
+class Integer_Range is
+  exports
+    op "[..]"() -> Range<Integer_Range> is
+	return R.First .. R.Last;
+    end op "[..]";
+end class Integer_Range;
+
+interface Key_Value<Key_Type is Assignable<>; Value_Type is Assignable<>> is
+    const Key : optional Key_Type;
+    const Value : optional Value_Type;
+    op "[]"() -> Key_Value;
+    op "var_indexing"(var KV : Key_Value; Index : Key_Type) -> ref Value_Type;
+end interface Key_Value;
+
+interface Array<Elem_Type is Assignable<>; Indexed_By is Integer_Range<>> is
+    op "indexing"(ref Arr : Array; Index : Indexed_By) -> ref Elem_Type;
+    op "var_indexing"(ref var Arr : Array; Index : Indexed_By) 
+      -> ref var Elem_Type;
+    op "|"(Left, Right : Array) -> Array;
+    op "|"(Left : Array; Right : Key_Value<Indexed_By, Elem_Type>) -> Array;
+    op "[]"() -> Array;
+end interface Array;
+
+class Array is
+    var Data : Basic_Array<Elem_Type>;
+  exports
+    op "indexing"(ref Arr : Array; Index : Indexed_By) -> ref Elem_Type is
+	return Arr.Data[ [[Index - Indexed_By::R.First + 1]] ];
+    end op "indexing";
+
+    op "var_indexing"(ref var Arr : Array; Index : Indexed_By) 
+      -> ref var Elem_Type is
+	return Arr.Data[ [[Index - Indexed_By::R.First + 1]] ];
+    end op "var_indexing";
+
+    op "|"(Left, Right : Array) -> Result : Array is
+	Result := Left;
+	for I in Indexed_By::R loop
+	    if Right[I] not null then
+		Result[I] := Right[I];
+	    end if;
+	end loop;
+    end op "|";
+
+    op "|"(Left : Array; Right : Key_Value<Indexed_By, Elem_Type>) 
+      -> Result : Array is
+	Result := Left;
+	Result[Right.Key] := Right.Value;
+    end op "|";
+
+    op "[]"() -> Result : Array is
+	return (Data => Create(Length(Indexed_By::R), null));
+    end op "[]";
+end class Array;
+
+interface N_Queens <N : Univ_Integer := 8> is
+    // Place N queens on an NxN checkerboard so that none of them can
+    // "take" each other.
+    type Chess_Unit is new Integer_Range<-N*2 .. N*2>;
+    type Row is Chess_Unit {Row in 1..N};
+    type Column is Chess_Unit {Column in 1..N};
+    type Solution is Array<optional Column, Row>; -- Indexed_By => Row>;
+     
+    func Place_Queens() -> Vector<Solution> 
+      {for all Sol of Place_Queens => for all Col of Sol => Col not null};
+end interface N_Queens;
+
+class N_Queens is
+    type Sum_Range is Chess_Unit {Sum_Range in 2..2*N};
+    type Diff_Range is Chess_Unit {Diff_Range in (1-N) .. (N-1)};
+    type Sum is Set<Sum_Range>;
+    type Diff is Set<Diff_Range>;
+
+    interface Solution_State<> is
+	func Initial_State() -> Solution_State;
+	func Is_Acceptable(S : Solution_State; R : Row) -> Boolean;
+	func Current_Column(S : Solution_State) -> Column;
+	func Next_State(S : Solution_State; R : Row) -> Solution_State;
+	func Final_Solution(S : Solution_State; R : Row) -> Solution;
+    end interface Solution_State;
+
+    class Solution_State is
+	const C : Column;
+	const Trial : Solution;
+	const Diag_Sum : Sum;
+	const Diag_Diff : Diff;
+      exports
+	func Initial_State() -> Solution_State is
+	    return (C => 1, Trial => [], Diag_Sum => [], Diag_Diff => []);
+	end func Initial_State;
+
+	func Is_Acceptable(S : Solution_State; R : Row) -> Boolean is
+              return S.Trial[R] is null and then
+                (R+S.C) not in S.Diag_Sum and then 
+                (R-S.C) not in S.Diag_Diff;
+	end func Is_Acceptable;
+	
+	func Current_Column(S : Solution_State) -> Column is
+	    return S.C;
+	end func Current_Column;
+
+	func Next_State(S : Solution_State; R : Row) -> Solution_State is
+	    return (C => S.C+1, 
+	      Trial     => S.Trial | [R => S.C],
+	      Diag_Sum  => S.Diag_Sum | (R+S.C),
+	      Diag_Diff => S.Diag_Diff | (R-S.C));
+	end func Next_State;
+
+	func Final_Solution(S : Solution_State; R : Row) -> Solution is
+	    return S.Trial | [R => S.C];
+	end func Final_Solution;
+
+    end class Solution_State;
+
+  exports
+    func Place_Queens() -> Vector<Solution> 
+      {for all Sol of Place_Queens => for all Col of Sol => Col not null}
+    is
+      var Solutions : concurrent Vector<Solution> := [];
+      
+     *Outer_Loop*
+      for State : Solution_State := Initial_State() loop
+      -- for (C : Column := 1; Trial : Solution := [.. => null];
+        -- Diag_Sum : Sum := []; Diag_Diff : Diff := []) loop
+          // Iterate over the columns
+        
+          for R in Row::[..] concurrent loop
+              // Iterate over the rows
+	      if Is_Acceptable(State, R) then
+              -- if Trial[R] is null and then
+                -- (R+C) not in Diag_Sum and then 
+                -- (R-C) not in Diag_Diff then
+                  // Found a Row/Column combination that is not on any diagonal
+                  // already occupied.
+                  if Current_Column(State) < N then
+                      // Keep going since haven't reached Nth column.
+                      continue loop Outer_Loop with Next_State(State, R);
+			-- (C => C+1, 
+                        -- Trial     => Trial | [R => C],
+                        -- Diag_Sum  => Diag_Sum | (R+C),
+                        -- Diag_Diff => Diag_Diff | (R-C));
+                  else
+                      // All done, remember trial result with last queen placed
+                      Solutions |= Final_Solution(State, R); 
+			-- (Trial | [R => C]);
+                  end if;
+              end if;
+          end loop;
+      end loop Outer_Loop;
+      return Solutions;
+      
+    end func Place_Queens;
+end class N_Queens;
+
+func Test_N_Queens() is
+    type Eight_Queens is N_Queens<8>;
+    var Results := Eight_Queens::Place_Queens();
+    Println("Number of results = " | Length(Results));
+end func Test_N_Queens;

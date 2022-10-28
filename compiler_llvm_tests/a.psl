@@ -1,0 +1,3 @@
+func A() -> Univ_Character is
+   return 'a';
+end func A;

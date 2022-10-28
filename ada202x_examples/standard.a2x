@@ -1,0 +1,104 @@
+-- Ada202X package Standard
+
+-- Copyright (C) 2011-2020, AdaCore, New York, NY
+-- To be used only for Personal, Academic, or Evaluation Purposes
+-- Not for Commercial Production Use.
+
+package Ada is
+end package Ada;
+
+package A2X.Core.Character is
+   type Character is private;
+
+   function "from_univ" (Lit : Univ_Character)
+     return Character
+     with Pre => Lit - Univ_Character'First < 2**8;
+
+   function "to_univ" (Val : Character)
+     return Univ_Character
+     with Post => "to_univ"'Result - Univ_Character'First < 2**8;
+
+   function "?=" (Left, Right : Character) return Ordering
+     with Import, External_Name => "=?";
+end package A2X.Core.Character;
+
+package body A2X.Core.Character is
+   type Character is record
+      Pos : Integer<0..2**8-1>;
+   end record Character;
+
+   function "from_univ" (Lit : Univ_Character) return Character is
+      ((Pos => Lit - Univ_Character'First));
+   
+   function "to_univ" (Val : Character) return Univ_Character is
+     (Univ_Character'First + Val.Pos);
+
+end A2X.Core.Character
+
+package A2X.Core.Wide_Character is
+   type Wide_Character is private;
+
+   function "from_univ" (Lit : Univ_Character)
+     return Wide_Character
+     with Pre => Lit - Univ_Character'First < 2**16;
+
+   function "to_univ" (Val : Wide_Character)
+     return Univ_Character
+     with Post => "to_univ"'Result - Univ_Character'First < 2**16;
+
+   function "?=" (Left, Right : Wide_Character) return Ordering
+      with Import, External_Name => "=?";
+end package A2X.Core.Wide_Character;
+
+package body A2X.Core.Wide_Character is
+   type Wide_Character is record
+      Pos : Integer<0..2**16-1>;
+   end record Wide_Character;
+
+   function "from_univ" (Lit : Univ_Character) return Wide_Character is
+      ((Pos => Lit - Univ_Character'First));
+   
+   function "to_univ" (Val : Wide_Character) return Univ_Character is
+     (Univ_Character'First + Val.Pos);
+
+end package A2X.Core.Wide_Character;
+
+package A2X.Core.String is
+   subtype Positive is Integer;
+   type String is new Array<Character, Indexed_By => Positive>;
+
+   function "from_univ" (Lit : Univ_String)
+     return String
+     with Pre => (for all C of Lit => C - Univ_Character'First < 2**8);
+
+   function "to_univ" (Val : String)
+     return Univ_String
+     with Post => (for all C of "to_univ"'Result =>
+        Univ_Character'(C) - Univ_Character'First < 2**8);
+
+   function "?=" (Left, Right : String) return Ordering
+      with Import, External_Name => #string_compare;
+end A2X.Core.String;
+
+package body A2X.Core.String is
+   function "from_univ" (Lit : Univ_String)
+     return String is
+      ([for C of Lit => "from_univ"(C)]);
+
+   function "to_univ" (Val : String)
+     return Univ_String is
+     (From_Array ([for C of Val => "to_univ"(C) ]));
+
+end A2X.Core.String;
+
+package Standard is
+   -- subtype Character is A2X.Core.Character;
+   -- subtype Wide_Character is A2X.Core.Wide_Character;
+
+   -- type Integer is new A2X.Core.Integer<>;
+   subtype Positive is Integer;
+   subtype Natural is Integer;
+
+   type Long_Integer is new A2X.Core.Integer<>;
+   type Long_Float is new A2X.Core.Float<>;
+end package Standard;

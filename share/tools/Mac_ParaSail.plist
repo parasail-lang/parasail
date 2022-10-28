@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--ParaSail language module for TextWrangler and BBEdit 8.x-->
+<!--version 0.1x-->
+<!--Place ’ParaSail.plist’ file in the-->
+<!--'~/Library/Application Support/TextWrangler/Language Modules’ directory.-->
+<!--Jacek Piwowarczyk; jpi@agh.edu.pl-->
+<!--Copyright 2015; distribution per GPL; no warranty-->
+<dict>
+	<key>BBEditDocumentType</key>
+	<string>CodelessLanguageModule</string>
+	<key>BBLMLanguageDisplayName</key>
+	<string>ParaSail</string>
+	<key>BBLMLanguageCode</key>
+	<string>PaSL</string>
+	<key>BBLMSuffixMap</key>
+	<array>
+		<dict>
+			<key>BBLMLanguageSuffix</key>
+			<string>.psl</string>
+		</dict>
+		<dict>
+			<key>BBLMLanguageSuffix</key>
+			<string>.psi</string>
+		</dict>
+	</array>
+	<key>BBLMSupportsTextCompletion</key>
+	<true/>
+	<key>BBLMIsCaseSensitive</key>
+	<true/>
+	<key>BBLMScansFunctions</key>
+	<true/>
+	<key>BBLMColorsSyntax</key>
+	<true/>
+	<key>BBLMKeywordList</key>
+	<array>
+		<string>abs</string>
+		<string>abstract</string>
+		<string>all</string>
+		<string>and</string>
+		<string>block</string>
+		<string>case</string>
+		<string>class</string>
+		<string>concurrent</string>
+		<string>const</string>
+		<string>continue</string>
+		<string>each</string>
+		<string>else</string>
+		<string>elsif</string>
+		<string>end</string>
+		<string>exit</string>
+		<string>extends</string>
+		<string>exports</string>
+		<string>for</string>
+		<string>forward</string>
+		<string>func</string>
+		<string>global</string>
+		<string>if</string>
+		<string>implements</string>
+		<string>import</string>
+		<string>in</string>
+		<string>interface</string>
+		<string>is</string>
+		<string>lambda</string>
+		<string>locked</string>
+		<string>loop</string>
+		<string>mod</string>
+		<string>new</string>
+		<string>not</string>
+		<string>null</string>
+		<string>of</string>
+		<string>op</string>
+		<string>optional</string>
+		<string>or</string>
+		<string>private</string>
+		<string>queued</string>
+		<string>ref</string>
+		<string>rem</string>
+		<string>return</string>
+		<string>reverse</string>
+		<string>separate</string>
+		<string>some</string>
+		<string>then</string>
+		<string>type</string>
+		<string>until</string>
+		<string>var</string>
+		<string>while</string>
+		<string>with</string>
+		<string>xor</string>
+	</array>
+	<key>BBLMPredefinedNameList</key>
+	<array>
+		<string>Boolean</string>
+		<string>Univ_Integer</string>
+		<string>Univ_Float</string>
+		<string>Univ_Character</string>
+		<string>Univ_String</string>
+		<string>Univ_Real</string>
+		<string>#true</string>
+		<string>#false</string>
+		<string>#less</string>
+		<string>#greater</string>
+		<string>#equal</string>
+		<string>#unordered</string>
+	</array>
+	<key>BBLMCommentLineDefault</key>
+	<string>// </string>
+	<key>Language Features</key>
+	<dict>
+		<key>Identifier and Keyword Character Class</key>
+		<string>#A-Za-z0-9_</string>
+		<key>Open Line Comments</key>
+		<string>//</string>
+		<key>Open Strings 1</key>
+		<string>&quot;</string>
+		<key>Close Strings 1</key>
+		<string>&quot;</string>
+		<key>Open Strings 2</key>
+		<string>'</string>
+		<key>Close Strings 2</key>
+		<string>'</string>
+		<key>Escape Char in Strings 1</key>
+		<string>\</string>
+		<key>End-of-line Ends Strings 1</key>
+		<true/>
+		<key>End-of-line Ends Strings 2</key>
+		<false/>
+		<key>Prefix for Functions</key>
+		<string>func</string>
+		<key>Prefix for Procedures</key>
+		<string>func</string>
+		<key>Open Parameter Lists</key>
+		<string>(</string>
+		<key>Close Parameter Lists</key>
+		<string>)</string>
+		<key>Terminator for Prototypes 1</key>
+		<string>;</string>
+		<key>Open Statement Blocks</key>
+		<string>block</string>
+		<key>Close Statement Blocks</key>
+		<string>end</string>
+	</dict>
+</dict>
+</plist>

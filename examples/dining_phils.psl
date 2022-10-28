@@ -1,0 +1,108 @@
+// Dining philosophers
+// There is a group of philosophers, numbered 1 to Num_Phils
+// There are the same number of forks.
+// A philosopher thinks for a while, and then gets hungry
+// and sits down, then picks up two forks, one on either
+// side of where she sits down.
+// She eats for a while, and then puts back the forks.
+// There is an obvious potential for deadlock (as well
+// as passing along communicable diseases, of course!).
+// What follows makes no effort to avoid the deadlock situation.
+
+import Clock;
+
+interface Dining_Philosophers<Num_Phils : Univ_Integer := 5; Context<>> is
+    func Dinner_Party
+      (Length_Of_Party : Clock::Interval_Type; Context);
+    
+    type Philosopher_Index is new Integer<1..Num_Phils>;
+    
+    type Left_Or_Right is Enum<[#is_left_fork, #is_right_fork]>;
+
+    concurrent interface Fork<> is  
+        func Pick_Up_Fork(queued var F : Fork; Which_Fork : Left_Or_Right);
+          // Pick up a fork; indicate whether is left or right fork for diner
+        func Put_Down_Fork(locked var F : Fork);
+          // Put back the fork.
+        func Create(Index : Philosopher_Index) -> Fork;
+    end interface Fork;
+
+    type Fork_Array is Array<Fork, Indexed_By => Philosopher_Index>;
+        
+end interface Dining_Philosophers;
+
+
+class Dining_Philosophers<Num_Phils : Univ_Integer := 5; Context<>> is
+
+  exports
+
+    func Dinner_Party
+      (Length_Of_Party : Clock::Interval_Type; Context) is
+        Delay(Context.Clock.Wall_Clock, Length_Of_Party);  // Overall timer
+        // Time to go home!
+        Display(Context.IO.Standard_Output, "Dinner Party is over\n");
+        return; 
+        
+      ||
+        
+        var Forks : Fork_Array := [for I in 1..Num_Phils => Create(I)];
+        
+        for Phil in Philosopher_Index concurrent loop
+            const Left_Fork := Phil;
+            const Right_Fork := Phil mod Num_Phils + 1;
+           
+            while True loop // Until overall timer terminates func
+                Display(Context.IO.Standard_Output, 
+                  "Philosopher " | Phil | " is thinking\n");
+                Delay(Clock, Next(Context.Random));  // Think
+              then
+                Pick_Up_Fork(Forks[Left_Fork], #is_left_fork);
+              ||
+                Pick_Up_Fork(Forks[Right_Fork], #is_right_fork);
+              then
+                Display(Context.IO.Standard_Output,
+                  "Philosopher " | Phil | " is eating\n");
+                Delay(Clock, Next(Context.Random));  // Eat
+              then
+                Put_Down_Fork(Forks[Left_Fork]);
+              ||
+                Put_Down_Fork(Forks[Right_Fork]);
+            end loop;
+        end loop;
+    end func Dinner_Party;
+    
+    concurrent class Fork<> is
+        // The simplest possible algorithm, with no deadlock avoidance.
+        // NOTE: By using the Create's "Index" parameter and Pick_Up_Fork's
+        //       "Which_Fork" parameter, a deadlock avoidance algorithm
+        //       could be implemented.
+        var Is_Available : Boolean;
+        
+      exports
+
+        func Create(Index : Philosopher_Index) -> Fork is
+          // Create a fork
+          // NOTE: Index is currently ignored.  It could be used
+          //       as part of implementing a deadlock-avoidance algorithm.
+            return (Is_Available => True);
+        end func Create;
+        
+        func Pick_Up_Fork
+          (queued var F : Fork; Which_Fork : Left_Or_Right) is 
+          // Pick up a fork; indicate whether is left or right fork for diner
+          // NOTE: Which_Fork is ignored at the moment.  It could be
+          //       used to implement a deadlock-avoidance algorithm.
+          queued until F.Is_Available then
+            // Queued until fork is available.
+            F.Is_Available := False;
+        end func Pick_Up_Fork;       
+            
+        func Put_Down_Fork(locked var F : Fork) is
+          // Put back the fork.
+            F.Is_Available := True;  // Indicate fork is available
+        end func Put_Down_Fork;
+        
+    end class Fork;
+
+end class Dining_Philosophers;
+

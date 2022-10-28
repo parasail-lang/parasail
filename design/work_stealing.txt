@@ -1,0 +1,252 @@
+--- 03-Jan-2014
+We have split the queues for each server into a shared set of queues and an
+unshared set of queues.  Now what?
+  When spawning a new thread, we should see whether we should put some
+threads on the shared queue (possibly including the new thread), or just
+add the new thread to the unshared queue.  If we decide to put
+some threads on the shared queue, clearly we need to do this under a lock.
+For now we will continue to have a single lock for all shared queues.
+
+We need to mark a master if one of its subthreads is placed on a shared queue.
+Once a master is marked as shared, it is probably not worth it to mark it as
+unshared when the last shared task is removed -- too much complex
+synchronization.  
+
+When waiting on a master, we should check whether it is
+shared, and if so, do the waiting using an entry call.  If it is not shared,
+then we can just recheck the subthread count after we serve a local thread.  If
+we end up stealing, then we can go back to using the entry call.
+
+Finish_Thread on a subthread of an unshared master can be done without a lock.
+If the master is shared, then we need to use the protected operation.
+
+Prepare_To_Exit is tricky, since it involves a master and the entire
+subtree within it.  For now, prepare-to-exit should always use a protected
+operation (but see below -- this might not be necessary).  
+Might this create a race condition with other operations on
+an unshared master?  What operation would that be?  Adding another thread?
+Removing a thread?  Yes, these could create trouble when trying to walk the
+thread tree.  This is only safe for a shared master.  For an unshared master
+that is not "owned" by the current server, we may need to mark the master
+itself and then let the owner take care of killing off the other threads.
+As we walk up the master chain, only a shared master can have threads
+executing on different servers.  Perhaps when we mark a master as shared,
+we should mark all enclosing masters as shared as well.  What would that
+accomplish?  We would know that such a master might have somewhere within
+itself threads executing on different servers.  So what?  We could safely
+navigate these enclosing masters without having asynchronous add/removes
+happening.  More to the point, if two threads are "racing" to exit a construct,
+we want to be able to synchronize all such threads, at least when they get
+to a shared master.  If the master they are exiting is not marked shared,
+then we know the whole tree is local, and can be shut down without any
+synchronization.  That seems like a good thing!
+
+A thread might change its master temporarily.  Should we allow
+that asynchronously if the master is shared?  We could say that any subthread
+of a shared master must update its master pointer using a protected op.
+
+So how do we spread the exit request?  We can safely mark each subthread of
+a shared master, but can we go down further than that?  If we require a
+subthread of a shared master to synchronize when it changes its master,
+we could at least check whether it has any other shared masters.  If the
+subthread is waiting on a master, it may be quite a while before that is
+noticed.  Perhaps we can notify the server that is executing a thread somehow
+so it will terminate its part of the thread tree.  Perhaps we have a global
+that indicates a thread-tree kill is in progress.
+
+Because of the FIFO nature of thread stealing, the first thread to be
+shared will be from the topmost master that is not already executing its
+last subthread.  Presuming it is safe to walk into subthreads of shared
+masters, we could mark the subthread as exit requested.  Must subthreads
+of a shared master be manipulated only in a protected op?  The next question
+is whether a server could easily notice that some ancestor of a thread
+it is about to start has been killed off?  We could keep track of the
+innermost enlosing shared master, and check the exit-requested flag on that.
+It is OK if we notice it after a bit of a delay.  Shared masters, at least,
+probably ought to have their own tree connections, independent of the
+threads involved, to simplify this process.  If each master kept track of the
+innermost enclosing shared master at all times, we could use that to
+check/propagate exit-requested.  We need to also know what thread is
+excepted from this, because it is the exiting thread.  It's subthreads
+are also presumably excepted from this, since evaluating the exit value(s)
+might be arbitrarily complicated.  Exiting_Tcb should be stored, presumably,
+and any submaster of that should indicate it is *not* requesting an exit.
+
+Note that when a master goes from unshared to shared, we would need to
+propagate this new "innermost enclosing shared master" down the tree further.
+When this happens, we should be able to do this, because the entire subtree
+below is unshared.  What happens when the innermost shared master goes
+away?  Well, that can only happen if it has no submasters!
+
+A shared master would refer to itself as the innermost enclosing shared master.
+
+Overall plan for Prepare_To_Exit:
+See whether target master is shared.  If not, do a simple unprotected kill
+thread tree.  
+
+If target master is shared, use a protected operation to mark entire subtree
+of shared masters as exit-requested, with exiting TCB as exception.  Exiting
+TCB should not have any submasters during prepare to exit.  If it does create
+a master, it would mark it as being protected from enclosing exit-requested,
+perhaps by simply not recording innermost enclosing shared master, or
+recording it along with indicating it is protected by exiting TCB.
+Note that we need to handle case where another outer exit begins while
+still doing the inner one, so by marking the inner masters as being
+based on the given exiting TCB, we can avoid the problem.  If a different
+exiting TCB is established for an outer exit, then that will cancel the
+protection.  Note that we can also have an exit that occurs inside the
+protected code.  Hopefully that would be fully local.  If not, we need
+to be sure that it works as desired.
+
+So the check for whether to exit immediately is:
+   Tcb_Exit_Requested(Tcb) or else
+     (Master_Exit_Requested (Innermost_Enclosing_Shared_Master(Master(Tcb)))
+        and then
+          Exiting_Tcb (Innermost_Enclosing_Shared_Master(Master(Tcb))) /=
+            Enclosing_Exiting_Tcb (Master(Tcb)))
+
+Now what about the delay queue?
+And a related question, what about concurrent objects?
+Does it make sense for an operation on a concurrent object to be done
+by a thread that is unshared?  What is the harm?  The locks are separate
+objects, with their own protected object.  The delay queue is similar.
+We execute the locked call on the "convenient" thread, but that seems
+OK as well.
+
+Hmmm...  But the problem is the call on "Finish_Thread."  If the master
+is unshared, then there is no lock on it.  And that is a problem.
+But we don't particularly want to force every caller of a queued concurrent
+operation to be on a shared master, and then force sharing all the way
+up the chain.  One possibility would be to have a separate lock for a master
+with a subthread that is doing a queued call.  It only needs to be
+activated if the call is in fact queued.  Alternatively, the concurrent
+object itself would be used somehow.  Perhaps it would have a queue
+of finished calls, and the waiters would queue on that.
+Or the individual master would become shared, but the sharing
+would not be propagated up, since we aren't really opening it up for
+sharing, we are just opening it up for an asynchronous finish-thread.
+
+The simplest seems to be to make the individual master shared, but with no
+propagation to enclosing masters.  This is only needed for queued calls.  This
+does mean when propagating an "exit_requested" flag around an unshared tree
+of tasks, we need to be aware that we may encounter such an individually-shared
+master, and need to treat it appropriately by marking it using a protected
+operation.
+
+For locked, as opposed to queued, calls, we don't need to do anything too
+special.  We are already noticing that a lock is held, and deferring
+the "kill," so that is enough.
+
+ISSUE: Inside Kill_Thread_Tree, we seem to kill submasters even if the
+thread is holding a lock.  That doesn't sound right.  I guess it is OK because
+we check each individual thread to see if it is holding a lock.  And a thread
+might be holding a lock while some of its subthreads were spawned before
+it acquired the lock.
+
+IDEA: Unshared thread queue can be simple -- no need for the three separate
+queues.  Just go pure LIFO.  That would seem to ensure that locks are always
+preserved and queued calls are safe.  It is only when stealing that we need
+to be careful about what we steal.  Or when we make a queued call?  What might
+happen then? We have a subthread waiting on a queue of a concurrent object,
+and we pick a different one of our own subthreads to execute, while we wait
+for our subthread to complete.  I think it still works.  Note that the rule
+about queuing threads is that a request for a thread to run while waiting
+for subthreads to finish must not pick a thread that might be queued unless
+it is a subthread of the master being awaited, since that could indefinitely
+delay the original waiter.  You can only choose a potentially queuing thread
+when the stack is empty, which typically means that the deque is also
+empty.  Hmmm... Suppose we spawn a thread that does a queued call.  Can we
+choose another queuing thread?  That would violate our rule.  But then we are
+stuck.  In that case we would need to spawn another server process to handle
+the other queuing thread.
+
+[ASIDE:
+It might be nice to have a way to schedule a picothread to run periodically
+without having to tie up a server process stack.  This could be associated
+with setting up callbacks or event handlers.  For GTK, we used a case statement
+to create event handlers.
+End of ASIDE]
+
+After calling Spawn_Unshared_Thread we should check whether we need to move
+threads from the unshared queue to the shared queue.  In fact, we should
+probably do this even if we are spawning a shared thread, but that can
+be done under a lock.  Or perhaps we check before we call
+Spawn_Unshared_Thread, and if the shared queue is too short, then we
+just call the protected Spawn_Thread, which should turn around and
+call Spawn_Unshared_Thread.  Nah, that increases the time where we
+are holding the lock, and that seems silly.  So let's check after we
+spawn the unshared thread, and then call an operation "Increase_Shared_Threads"
+or equivalent, which will move threads from the unshared queue to the shared
+queue.  This will be called from the locking Spawn_Thread as well before
+returning if appropriate.
+
+
+
+--- 27-Dec-2013
+
+We would like to re-implement the work-stealing to minimize the frequency of
+synchronization.  The basic idea is to keep track of the number of picothreads
+on a given server's queue, or perhaps the total number of instructions in those
+picothreads.  Of course a given picothread might represent a small number
+of instructions, but because it might spawn many other picothreads, the
+number is less relevant.  Hence it seems simpler to stick with a simple
+picothread count for now.  Nevertheless, it might be useful to at least
+compute the number of instructions in the picothread, perhaps including
+the subthreads which are not themselves loops.
+
+So once we hit a certain number of picothreads on a given server's queue,
+and we have less than some number available for stealing, we would want
+to get a lock on the stealable queue, and transfer some proportion or
+some number of threads to the stealable queue.  When we run out of threads on
+our private queue, we would go to the stealable queue, first stealing our "own"
+picothreads, and then eventually stealing from others.  When stealing our
+own, we would continue with the LIFO, but when we starting stealing from
+others, we would switch to FIFO.
+
+We need to keep track of servers that are holding a lock, and only steal
+threads that are holding similar locks.
+
+When we steal, we could take just one thread, or we could steal several.
+We might want to steal *all* of our own threads first, when we run out.
+We might steal less when stealing other server's threads.
+
+Another possibility is to have high overhead when queue is short, and then
+switch to low overhead as the queue gets longer.  The disadvantage of this is
+that we steal when there is no advantage to doing so.
+
+Other needs for synchronization:
+
+  - Allocating a lock object
+  - Dealing with masters
+     * Prepare to exit
+     * Need a flag to indicate whether master is visible to
+       multiple servers.
+  - Dealing with TCBs
+     * Killing thread tree
+     * Get_Thread
+     * Finish_Thread
+
+Fred Mueller's idea:  Share 1 picothread, if it is gone next time you come
+back, then share 2 picothreads, then share 4 picothreads, etc.  
+It does make sense to see how many threads are available for stealing,
+and if none, try to get at least one in there as soon as possible,
+especially if there is a server waiting.
+
+Perhaps it is best to go through a few scenarios, of thread creation and
+completion, etc.
+
+Let's suppose we start from scratch.  Each server has its own set of queues.
+Threads are added to the server's own queue, until there are some number,
+at which point a portion of them is moved into the shared queue.
+The master is local to the server initially.  Only when a subthread of the
+master is assigned to another server will the master become multi-threaded.
+We could give it its own lock, but it is not clear that is worth it.  We can
+try it initially without a separate lock, though perhaps we should start
+presuming we will need a lock for each multi-server master.
+
+Clearly we should have server-specific free lists of master indices.
+
+Should we also have indices for TCBs?  Not clear that is necessary, if we
+presume that the lock on the master of a TCB is adequate, presuming most
+TCB-specific things are done by the server that is executing the TCB.
+

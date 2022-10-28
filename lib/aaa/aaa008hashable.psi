@@ -1,0 +1,7 @@
+abstract interface PSL::Core::Hashable<> implements Comparable<> is
+    // Types which aren't ordered nevertheless are often
+    // hashable, which makes it possible to create an efficient
+    // set or map using them as the index type.
+    op "=?"(Left, Right : Hashable) -> Ordering
+    func Hash(Val : Hashable) -> Univ_Integer
+end interface PSL::Core::Hashable

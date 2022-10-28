@@ -1,0 +1,23 @@
+interface PSL::Core::Univ_Enumeration<> is
+    op "=?"(Left, Right : Univ_Enumeration) -> Ordering 
+      is import(#unordered_compare)
+
+    func To_String(Val : optional Univ_Enumeration) -> Univ_String
+      is import(#to_string_enum)
+
+    func From_String(Str : Univ_String) -> optional Univ_Enumeration
+      is import(#from_string_enum)
+
+    func Print(Val : Univ_Enumeration) 
+      is import(#print_univ_enum)
+    func Println(Val : Univ_Enumeration) 
+      is (Println(To_String(Val)))
+
+    func Hash(Val : Univ_Enumeration) -> Univ_Integer
+      is import(#hash_enum)
+
+    op "in"(Left : Univ_Enumeration; Right : Set<Univ_Enumeration>) 
+      -> Boolean<>
+      is in Set<Univ_Enumeration>
+
+end interface PSL::Core::Univ_Enumeration

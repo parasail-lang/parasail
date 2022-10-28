@@ -1,0 +1,122 @@
+We want to be able to use an archive of ".o" files and have the correct
+files brought in.  This means that if an object of a given type is
+created, we need to bring in all of the operations needed for that type's
+module.  This implies we need some kind of "module" symbol which is
+referenced when any instance of the module is used, and this module symbol
+will cause the interface and/or the class to be pulled in, as determined by
+which ones define operations.  
+-------
+We don't need to include type descriptors for parameterless modules,
+nor for the type descriptors they reference.  We can presume that
+the type descriptor for a parameterless module will be in the file where
+the module exists, and we can just look up the canonical name at run time.
+However, we do need to pull in the module, which means it needs to define
+a symbol that we reference (e.g. in the initialization function), and we
+need to be sure that each module's "defined" type descriptor(s) are
+loaded before undefined ones.
+
+When a module defines a "new" type (inside a parameterless module), that
+type descriptor can also be presumed to exist in that module.
+
+If a module refers to a type with a "known" location, then it can
+use other types that that type depends on without definition (recursively).
+
+There is some danger that two types depend on each other, and neither one
+feels the "obligation" to pull in a third type, on which they both depend
+indirectly.  Perhaps there needs to be a pecking order, to decide which
+one must actually define it.  Some sort of alphabetical rule might be
+adequate for this.
+
+If a file uses a global constant, it can presume the type of the
+global constant will already be defined.
+
+-----
+We need to make it easier to use ParaSail for development.
+Right now the interpreter is pretty easy to use, though it
+is still odd that you need to know about "aaa.psi."  We should
+have a script that hides that, and knows where to find it.
+We could presume that the executable lives in .../install/bin/...
+and look for aaa.psi and other things in .../install/lib.
+It would also be nice if you could "register" sources much like
+AdaMagic does, and then you could make an edit and then do a
+ParaSail "build" and end up with an executable.
+We would need to maintain some kind of dependency.  ParaSail dependency
+currently depends on bodies as well as specs, so you might have to recompile
+a bunch of things.  We may want the equivalent of "info" or "ali" files
+to record the dependency.  An "XML" format would make sense, or something
+that is easy to read/write.  Ideally all of this stuff would be writen in
+ParaSail itself.
+
+Before we do all of this, we need to decide where we will put the
+compiled library, even if the user has to pretty much recompile the
+world.
+
+----------
+
+Possible projects:
+
+There are (at least!) three projects related to the compiler that need
+doing, and it would be great if you wanted to tackle one of them.  The
+first is the one I mentioned a while ago, namely trying to reduce the
+number of type descriptors a given file ends up having to define.  I
+have some more detailed thoughts on that, but mostly it is changing the
+semantics of "Get_Local_Index" so it doesn't automatically pull in all
+of the "Dependents," and special-cases type descriptors whose names are
+un-parameterized (i.e. no "<...>") by knowing they will be brought in by
+some other file, and hence don't need a stream representation in the
+current file, and don't need any of their dependents defined at all.
+
+The second is related, and that is trying to get to the point that we
+can archive all of the ".o"s of the ParaSail standard library into a
+single "libpsl.a" file, and then let the linker pull in just the ones
+that are needed.  Unfortunately, right now that doesn't work, because
+many of the calls are indirect.  We could solve this by including an
+external reference to a "module" symbol in any file that uses a type
+descriptor associated with a given module, and the file that defined the
+module symbol would in turn have external (or internal) references to
+each of the operations of the module.
+
+The third is somewhat different.  Currently the user pretty much has to
+compile all of the files of a given program at the same time (at least
+using pslc.csh as currently implemented), since all the files referenced
+by the file being compiled need to be read in by the interpreter.  It
+would be much friendlier if the user could specify the directory search
+path for ParaSail source files (using -I perhaps, with default being
+"."), and the interpreter would go and find the files needed to handle
+an "import Blah" statement.  This would mean parsing (but not
+necessarily doing any further processing) all of the files in a
+directory to find out which ones define the "import"ed module(s). 
+Parsing is pretty fast, and we could wait until we find an "import" that
+can't be resolved by the files already read into the interpreter.  The
+interpreter would actually complete the processing, generating PSVM
+instructions, once it finds out which source files in a directory are
+needed by the file being compiled.  The interpreter would also know to
+automatically load "lib/aaa.psi" (unless all of the needed PSL modules
+are already provided by explicitly specified source files).
+
+The first and second are mainly just work on the compiler itself.  The
+third will either involve work on the interpreter (i.e. in Ada), or
+conceivably it could be controlled by the compiler if the "reflection"
+interface provided operations to direct the interpreter to read and
+parse files, and also to process them further.  The downside of doing
+this all in the compiler via the reflection interface is that the
+interpreter remains somewhat unfriendly, because it requires the user to
+specify lib/aaa.psi, etc.  But with the interpreter, it somehow seems OK
+to expect the user to give all of the files of interest every time.  In
+the compiler, clearly we will want to compile just the files that
+changed, and the files that depend on those.  (I suppose we could create
+a separate program in ParaSail, using this enhanced "reflection"
+interface, which given a list of source files of interest, would spit
+out the list of all other files that they depend on.  This new program
+could be run by some script, which would then pass back to the
+interpreter or compiler the full list of sources needing to be read in.)
+
+The above discussion seems to lead to a fourth item, namely some kind of
+automated "build"/"make" capability, which would compile everything that
+has an "out of date" object file, and then link the program.  One thing
+would be to have a flag which would cause the interpreter to spit out
+".d" files, like "gcc" can do, to indicate dependences.  An alternative
+approach would be to have a "build" flag to the compiler script which
+would figure out what needed to be recompiled and pass all of those
+files to the compiler executable.
+

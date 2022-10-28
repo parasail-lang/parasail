@@ -1,0 +1,95 @@
+Thoughts on distributed processing, i.e. remote operation invocation, in ParaSail
+S. T. Taft, April 2014
+
+Go has an "RPC" library which seems to make it a "good" language for
+building distributed systems.  But it doesn't really use channels
+or other go-specific features.  It is somewhat simplified by an ability
+to pass "any" object using "interface {}" as the type, and then switch
+on the type.  ParaSail's "Any+" would support something similar.
+[Selecting a polymorphic object in a case/switch statement is complex
+to implement, vs. a non-polymorphic object.]
+
+What is the best way to describe an RPC interface?  Simplest for the user would
+be a module "interface," perhaps most similar to a concurrent interface, in
+that presumably multiple requests are possible in parallel, and queuing
+may occur.  Also, with a concurrent interface, the call "travels" to the
+concurrent object, since that is where the lock resides.  A concurrent object
+is represented presumably by a handle of some sort that identifies the
+address space where it lives, since it cannot be easily moved around.
+[Whether every distributed call is modeled as a queued call is an interesting
+question.]
+
+How do we implement an RPC interface, without relying on the compiler to
+do all of the work?  Define a type with some special operators, seems
+to be the usual ParaSail way.  So what are the special operators associated
+with distribution?  We now have "ref" and "end" for ref objects.  Do we
+need something analogous for remote objects?  If an object has a complex
+location built into it, then there also needs to be a "real" object on the
+"other" side.  This is analogous to the wrapper we envisage for concurrent
+objects (even though right now we aren't using a "pure" wrapper).  The
+same wrapper is used for an object and its ancestors.  For non-concurrent
+objects we have a "hand-off" semantics, which allows by-copy and by-reference
+to be treated equivalently.  For refs and ref-objects, that doesn't work
+too well.  Similarly it doesn't work very well for remote objects.
+
+Is a "ref" to a remote object similar to a regular ref?  We don't
+allow assignment for regular refs, because of lifetime issues.  How do we
+solve this problem for remote objects?  Remote objects need some kind
+of representative locally, which handles communication, and can deal with
+the remote object being deleted.  In some way remote objects are best
+modeled as a remote repository plus some kind of key.  We want to associate
+a type with the key, so we know what operations are available on it.
+It is a polymorphic type since we don't know/care how the operations
+are actually implemented.  Furthermore, by making it polymorphic, we can
+have a local representative.  We would like to automate the intermediary
+notion, so the packaging of the parameters can be handled automatically.
+An intermediary is a way to implement an abstract interface without
+providing implementations of each of the operations.
+
+We also want to cache large non-concurrent objects in each address space where
+they might be of interest, and just exchange "deltas" rather than whole
+objects when they are moved, implying some kind of versioning.
+We might want to send only a slice of a large
+object.  Conceivably this could all be behind the scenes, or built into
+the passing of a slice.  We might have a "Slice2D" or a "Tile" abstraction
+as well.
+
+Some sort of global ID scheme is probably needed to identify the particular
+interface that is being implemented remotely, with an associated IP
+address, or equivalent to identify where the remote object resides.
+
+----
+
+Remote objects generally have "proxies" on each client.  The goal is to be
+able to apply operations to the proxies with the same net effect as applying
+them to the underlying remote object.  Both the proxies and the remote objects
+are probably best thought of as (sub)components of some sort of IO object,
+which represents the local operating system, similar to files.
+Files have a limited set of operations, while remote objects can support
+more general operations.  Remote objects and persistent objects clearly
+have a lot in common.  Widgets in the GTK interface are also similar.
+The big difference here is that we are trying to automate the marshalling
+process of turning a call into a message and then back into a call.
+This could dramatically simplify the process of implementing a complex
+interface in a separate address space, or in a different language, etc.
+
+A proxy object can be copied around to some extent, and be turned back into
+a "functioning" object.  When turned back into a functioning object,
+the goal is to have all operations on the functioning object marshalled
+into a message which is provided as a single object, including room
+for results, which can be passed across address spaces, etc.  Note that
+proxies can be passed as parameters as well, as well as being used to produce
+functioning objects.  The simplest process is probably to represent the
+whole parameter list as a single record, or perhaps separate input
+(some components of which are "var" components) and output objects.
+Then we need an ability to "stream"/"flatten" any object (provided it
+has no "ref" components).  If we want to include the identification of
+the operation, then this becomes a kind of variant record.
+
+—-  11-Jan-2016
+
+This might be somehow related to stream processing, which tends to support a shared-nothing world.  It also seems related to Simulink type programming models.  The main procedure of a ParaSail program tends to create and interconnect objects.  In Simulink there are two operations, one which computes the outputs as a function of the inputs, and one which updates the internal state.  There is also something which initializes the internal state, though that might also be the operation that creates the object in the first place.  Servers tend to have a request and a response, though there is rarely any real-time requirement.  For signals, the state is quite important for signal generators (e.g. a sin curve), though they could be just a pure function of time since initialization, conceivably.  State is also essential for signal delay, integrators, filters, etc.
+
+Hierarchical decomposition is also important.
+
+There is no problem defining an object which has the relevant compute and update operations, but how to make it simple and natural?  If it was easy enough, could you get away from depending on a GUI and just write the code?  Is that was Lustre does?  Does VHDL have something to contribute here?  Do we want something called a Signal?  It is significantly different from an array, or a stream?  It has a time dimension.  A stream has a sequence, an array can be treated as a sequence, but it retains too much probably.  Declare some signals and then pass them to multiple objects when created?  We need to create the whole network before we start any of them running.  So there is a static construction phase, and then a “start” action.  Presumably there is also a heartbeat of some sort.  And with hybrid models, we have both continuous and discrete models working in tandem.  We can also have hardware in the loop, so some portion of the model is replaced by hardware with sensors/actuators.

@@ -1,0 +1,37 @@
+{ if (FILENAME != savedfn) {
+    base = NR-1
+    savedfn = FILENAME
+  }
+}
+/^[ 	]*(abstract  *)?(queued *)?(concurrent *)?(func|op|interface|class|type|var|const|ref( *var)?)[^a-zA-Z_]/ {
+  id = $2
+  if ($1 ~ /^(abstract|queued|concurrent)$/) {
+    if ($2 ~ /^(abstract|queued|concurrent)$/) {
+       id = $4
+    } else {
+       id = $3
+    }
+  }
+
+  # remove trailing '(' and ';'
+  split(id, idar, "(");
+  id = idar[1];
+  split(id, idar, ";");
+  id = idar[1];
+  # if a child unit (e.g. "a.b.c") get just the last id (e.g. "c")
+  numids = split(id, idar, "::");
+  id = idar[numids];
+
+  # ignore if not a legal identifier
+  if (id ~ /["A-Za-z_].*/) {
+    x = $1" "$2
+    front = sprintf("%-15s %4d %-16s", id, NR-base, FILENAME);
+    max = 78 - length(front);
+    for (i = 3; i <= NF; i++) {
+      y = x" "$i
+      if (length(y) > max) break;
+      x = y
+    }
+    print front, x;
+  }
+}

@@ -1,0 +1,15 @@
+func Func_Result(X : Integer) -> Integer is
+    if X < 0 then
+	Func_Result := Func_Result(-X)*3;
+    else
+	Func_Result := X*2;
+    end if;
+end func Func_Result;
+
+
+func main(Args : Basic_Array<Univ_String>) is
+   const Result_1 : Integer := Func_Result (-2);
+   const Result_2 : Integer := Func_Result (3);
+   Println ("Result :  " | Result_1);
+   Println ("Result :  " | Result_2);
+end func main;

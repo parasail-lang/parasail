@@ -1,0 +1,439 @@
+interface Key_Value<Key_Type is Assignable<>; Value_Type is Assignable<>> is
+    var Key : optional Key_Type;
+    var Value : optional Value_Type;
+    op "[]"() -> Key_Value;
+    op "var_indexing"(ref var KV : Key_Value; Index : Key_Type) 
+      -> ref var Value_Type;
+end interface Key_Value;
+
+class Key_Value is
+  exports
+    op "[]"() -> Key_Value is
+	return (Key => null, Value => null);
+    end op "[]";
+
+    op "var_indexing"(ref var KV : Key_Value; Index : Key_Type) 
+      -> ref var Value_Type is
+	KV.Key := Index;
+	return KV.Value;
+    end op "var_indexing";
+end class Key_Value;
+
+interface Map<Key_Type is Hashable<>; Value_Type is Assignable<>> is
+  // A hashed-map module
+    type Pair is Key_Value<Key_Type, Value_Type>;
+
+    op "[]"() -> Map;
+
+    op "|="(var Left : Map; Right : Pair);
+	// Add Key=>Value to Map, replacing pre-existing mapping
+	// for Key, if any.
+
+    op "in"(Left : Key_Type; Right : Map) -> Boolean;
+	// Return True if given key has a mapping in the map
+
+    op "-="(var Left : Map; Right : Key_Type);  // aka Exclude
+	// Remove mapping for Right, if present
+
+    op "index_set"(M : Map) -> Set<Key_Type>;
+	// Return set of keys with mappings
+
+    op "indexing"(ref M : Map; Key : Key_Type) {Key in M} -> ref Value_Type;
+	// Used for references to M[Key]; requires the Key to be in M.
+
+    op "var_indexing"(ref var M : Map; Key : Key_Type) 
+      -> ref var optional Value_Type;
+	// Used for assignments to M[Key]; Key is added to M if not present
+
+    func Remove_Any(var M : Map) -> optional Pair;
+	// Remove one mapping from the Map.  Return null if Map is empty
+
+    func Count(M : Map) -> Univ_Integer;
+	// Number of mappings in the table
+
+    func Dump_Statistics(M : Map);
+      // A debugging routine to show bucket sizes of Map
+
+end interface Map;
+
+class Map is
+  // A hashed-Map module
+
+  // A Map is represented as a hash table, where each bucket is a linked list
+  // of key/value pairs.
+  // When key/value pairs are deleted from the Map they end up as "null"s in the
+  // list.  We expand the table when the Count gets to be twice
+  // that of the length of the table.
+
+    interface Hash_Bucket<> is
+      // a simple linked-list is used as a hash bucket
+	var Elem : optional Pair;
+	var Tail : optional Hash_Bucket;
+    end interface Hash_Bucket;
+
+    var Count : Univ_Integer;
+    var Table : optional Basic_Array<optional Hash_Bucket<>>;
+    const Initial_Table_Size := 4;
+    const Debugging : Boolean := #false;
+    
+    func Empty(Table_Size : Univ_Integer) -> Map is
+	// Create an empty Map with the given table size
+        return (Count => 0, Table => Create(Table_Size, null));
+    end func Empty;
+
+    func Add_One(var To : Map; Elem : Pair) is
+	// Add Element to table, without expanding it
+	const Index := Hash(Elem.Key) mod Length(To.Table) + 1;
+	ref Bucket => To.Table[Index];
+
+	if Bucket is null then
+	    // Bucket is now empty, so create bucket
+	    // with Elem as its only element.
+	    Bucket := (Elem => Elem, Tail => null);
+	else
+	    // See whether Elem already in bucket
+	    var Used_Empty_Slot : Boolean := #false;
+	    for B => Bucket then B.Tail while B not null loop
+		if B.Elem is null then
+		    // Remember we used an empty slot
+		    B.Elem := Elem;
+		    Used_Empty_Slot := #true;
+		elsif Elem.Key == B.Elem.Key then
+		    // Already there.  Null it out if we
+		    // used earlier empty slot, else replace the value.
+		    if Used_Empty_Slot then
+			B.Elem := null;
+		    else
+			// Replace the value
+			B.Elem.Value := Elem.Value;
+		    end if;
+		    return;
+		end if;
+	    end loop;
+
+	    if not Used_Empty_Slot then
+		// Make old bucket the new tail of the new bucket.
+		Bucket := (Elem => Elem, Tail <== Bucket);
+	    end if;
+	end if;
+
+	To.Count += 1;
+    end func Add_One;
+
+    func Move_One(var To : Map; var Elem : Pair) is
+	// Move Element into table, without expanding table.
+	// Elem is set to null as a result.
+	const Index := Hash(Elem.Key) mod Length(To.Table) + 1;
+	ref Bucket => To.Table[Index];
+
+	if Bucket is null then
+	    // Bucket is now empty, so create bucket
+	    // with Elem as its only element.
+	    Bucket := (Elem <== Elem, Tail => null);
+	else
+	    // See whether Elem already in bucket
+	    var Has_Empty_Slot : Boolean := #false;
+	    for B => Bucket then B.Tail while B not null loop
+		if B.Elem is null then
+		    // Remember there is an empty slot
+		    Has_Empty_Slot := #true;
+		elsif Elem.Key == B.Elem.Key then
+		    // Already there; replace it in case Value is different.
+		    B.Elem <== Elem;
+		    return;
+		end if;
+	    end loop;
+
+	    if Has_Empty_Slot then
+		// Fill in the empty slot
+		for B => Bucket then B.Tail while B not null loop
+		    if B.Elem is null then
+			// Use the empty slot
+			B.Elem <== Elem;
+			exit loop;
+		    end if;
+		end loop;
+	    else
+		// Make old bucket the new tail of the new bucket.
+		Bucket := (Elem <== Elem, Tail <== Bucket);
+	    end if;
+	end if;
+
+	To.Count += 1;
+    end func Move_One;
+
+    func Expand_Table(var Expanding : Map) is
+	// Expand table of given Map.
+	if Debugging then
+	    Println(" Expanding hash table, Count = " | Expanding.Count | 
+	      ", Length = " | Length(Expanding.Table));
+	end if;
+	var Old_Map <== Expanding;
+	Expanding := Empty(2*Length(Old_Map.Table));
+	// Move elements into new table
+	loop
+	    var Elem for Expanding := Remove_Any(Old_Map);
+		// "for Expanding" means to allocate Elem in
+		// region associated with Expanding.
+	    if Elem is null then
+		exit loop;
+	    end if;
+	    Move_One(Expanding, Elem);
+	end loop;
+	if Debugging then
+	    Println(" After expansion, Count = " | Expanding.Count |
+	      ", Length = " | Length(Expanding.Table));
+	end if;
+    end func Expand_Table;
+
+  exports
+    op "[]"() -> Map is
+        return (Count => 0, Table => null);
+    end op "[]";
+
+    op "|="(var Left : Map; Right : Pair) is
+	if Right.Value is null then
+	    // Putting in Key => null is equivalent to deleted Key
+	    Left -= Right.Key;
+	    return;
+	end if;
+
+	if Left.Table is null then
+	    Left := Empty(Initial_Table_Size);
+	elsif Left.Count >= 2*Length(Left.Table) then
+	    // Expand table if averaging 2 or more per hash bucket
+	    Expand_Table(Left);
+	end if;
+        Add_One(Left, Right);
+    end op "|=";
+
+    op "in"(Left : Key_Type; Right : Map) -> Boolean is
+	if Right.Count == 0 then
+	    // Empty Map
+	    return #false;
+	end if;
+	const Index := Hash(Left) mod Length(Right.Table) + 1;
+	ref Bucket => Right.Table[Index];
+	if Bucket is null then
+	    // Hash bucket is empty
+	    return #false;
+	end if;
+	// Scan for Elem in hash bucket
+	for B => Bucket then B.Tail while B not null loop 
+	    if B.Elem not null and then
+	      B.Elem.Key == Left and then
+	      B.Elem.Value not null then
+		// Found it
+		return #true;
+	    end if;
+	end loop;
+	// Not in Map
+	return #false;
+    end op "in";
+
+    op "-="(var Left : Map; Right : Key_Type) is
+      // Remove the given key from the Map, if present
+	if Left.Count == 0 then
+	    // Empty Map
+	    return;
+	end if;
+
+	const Index := Hash(Right) mod Length(Left.Table) + 1;
+	ref Bucket => Left.Table[Index];
+	if Bucket is null then
+	    // Hash bucket is empty
+	    return;
+	end if;
+
+	// Scan for Key in bucket
+	for B => Bucket then B.Tail while B not null loop
+	    if B.Elem not null and then
+	      B.Elem.Key == Right then
+		// Found it.  Map it to null, and decrement Map count.
+		B.Elem := null;
+		Left.Count -= 1;
+		return;
+	    end if;
+	end loop;
+	// Not found
+    end op "-=";
+   
+    op "index_set"(M : Map) -> Result : Set<Key_Type> is
+	// Return set of keys with non-null mappings
+	Result := [];
+	for each Bucket of M.Table loop
+	    for B => Bucket then B.Tail while B not null loop
+		if B.Elem not null and then
+		  B.Elem.Value not null then
+		    Result |= B.Elem.Key;
+		end if;
+	    end loop;
+	end loop;
+    end op "index_set";
+
+    op "indexing"(ref M : Map; Key : Key_Type) {Key in M} -> ref Value_Type is
+	// Used for references to M[Key]; requires the Key to be in M.
+	{M not null; M.Count > 0}
+	const Index := Hash(Key) mod Length(M.Table) + 1;
+	// Scan for Key in bucket
+	for B => M.Table[Index] then B.Tail while B not null loop
+	    if B.Elem not null and then
+	      B.Elem.Key == Key then
+		// Found it.  Return reference to Value of pair
+		{B.Elem.Value not null}
+		return B.Elem.Value;
+	    end if;
+	end loop;
+	{#false}
+    end op "indexing";
+
+    op "var_indexing"(ref var M : Map; Key : Key_Type) 
+      -> ref var optional Value_Type is
+	// Used for assignments to M[Key]; Key is added to M if not present
+	if M.Table not null then
+	    const Index := Hash(Key) mod Length(M.Table) + 1;
+	    // Scan for Key in bucket
+	    for B => M.Table[Index] then B.Tail while B not null loop
+		if B.Elem not null and then
+		  B.Elem.Key == Key then
+		    // Found it.  Return reference to Value of pair
+		    return B.Elem.Value;
+		end if;
+	    end loop;
+	end if;
+
+	// Not in table.  Add it, and then return reference
+	if M.Table is null then
+	    M := Empty(Initial_Table_Size);
+	elsif M.Count >= 2*Length(M.Table) then
+	    // Expand table if averaging 2 or more per hash bucket
+	    Expand_Table(M);
+	end if;
+
+	// Add [Key => null] to front of appropriate bucket.
+	const Index := Hash(Key) mod Length(M.Table) + 1;
+	ref Bucket => M.Table[Index];
+	const New_Mapping : Pair := [Key => null];
+
+	Bucket := (Elem => New_Mapping, Tail <== Bucket);
+	M.Count += 1;
+
+	// Return ref to new element's Value
+	return Bucket.Elem.Value;
+    end op "var_indexing";
+
+    func Count(M : Map) -> Univ_Integer is
+	return M.Count;
+    end func Count;
+
+    func Remove_Any(var M : Map) -> Result : optional Pair is
+	if M.Count == 0 then
+	    // Map is empty
+	    return null;
+	else
+	    // Find a non-empty bucket and pull out an item.
+	    for I in 1..Length(M.Table) loop
+		ref Bucket => M.Table[I];
+		if Bucket not null then
+		    for B => Bucket then B.Tail while B not null loop 
+			if B.Elem not null then
+			    // Found an item, remove from Bucket and return
+			    Result <== B.Elem;
+			    M.Count -= 1;
+			    return;
+			end if;
+		    end loop;
+		    // This bucket is completely empty, so might
+		    // as well empty it out.
+		    Bucket := null;
+		end if;
+		// Go on to the next bucket, this one'M empty
+	    end loop;
+	    // Should never get here
+	    return null;
+	end if;
+    end func Remove_Any;
+
+    func Dump_Statistics(M : Map) is
+      // A debugging routine to show bucket sizes of Map
+	Println("Map statistics: Count = " | M.Count);
+	if M.Table is null then
+	    Println(" Table is null");
+	else
+	    Println(" Table of length " | Length(M.Table));
+	    for I in 1..Length(M.Table) forward loop
+		Print("  Bucket #" | I);
+		if M.Table[I] is null then
+		    Println(" is null");
+		else
+		    var Len := 0;
+		    var Holes := 0;
+		    for B => M.Table[I] then B.Tail while B not null loop
+			Len += 1;
+			if B.Elem is null then
+			    // This list has a hole
+			    Holes += 1;
+			end if;
+		    end loop;
+		    if Holes > 0 then
+			Println(" of length " | Len | " with " | 
+			  Holes | " holes");
+		    else
+			Println(" of length " | Len);
+		    end if;
+		end if;
+	    end loop;
+	end if;
+    end func Dump_Statistics;
+
+end class Map;
+
+func Test_Map(X : Univ_Enumeration; Y : Univ_String; 
+  A : Univ_Enumeration; B : Univ_String) is
+    type Enum_String_Map is Map<Univ_Enumeration, Univ_String>;
+
+    var M : Enum_String_Map := [X => Y, A => B];
+
+    Println("Count = " | Count(M));
+
+    for each [K => V] of M loop
+	Println("Mapping " | K | " => " | V);
+    end loop;
+
+    M |= [X => null];
+
+    Println("Count after deletion = " | Count(M));
+
+    for each [K => V] of M loop
+	Println("Mapping " | K | " => " | V);
+    end loop;
+
+    M |= [X => "a new value"];
+
+    Println("Count after addition = " | Count(M));
+
+    for each [K => V] of M loop
+	Println("Mapping " | K | " => " | V);
+    end loop;
+
+    M |= [X => "a third value"];
+
+    Println("Count after replacement = " | Count(M));
+
+    for each [K => V] of M loop
+	Println("Mapping " | K | " => " | V);
+    end loop;
+
+    M -= A;
+
+    Println("Count after deletion = " | Count(M));
+
+    for each [K => V] of M loop
+	Println("Mapping " | K | " => " | V);
+    end loop;
+
+end func Test_Map;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Map (#false, "ParaSail", #true, "example");
+end func main;

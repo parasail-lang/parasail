@@ -1,0 +1,101 @@
+proc Make_Patch_File(In_File_Name : Univ_String) is
+    --  Procedure to take the output of a CodePeer regression-test run,
+    --  and convert it into a "patch" file.
+    --  It converts the "====... Bug" entries that precede the "----" line
+    --  into patch entries, presuming the file to be patched is called
+    --  <bug_dir>/test.out
+    --  Result goes into <in_file_name>.patch
+
+    var IO := A2X.Core.IO.Get_IO()
+    var In_File := File_Input_Stream.Open(IO, In_File_Name);
+    if In_File is null then
+        Put_Line(In_File_Name & " not found")
+        return
+    end if
+    var Out_File := File_Output_Stream.Create(IO, In_File_Name & ".patch")
+    var Line : Univ_String
+
+    Put_Line ("Converting '" & In_File_Name & "' to produce '" &
+      In_File_Name & ".patch'");
+
+    --  Read up to first bug
+    loop
+        Line := In_File.Get_Line()
+        if Line is null then
+            Put_Line("No bug entries found in " & In_File_Name)
+            return
+        end if
+
+        exit loop when |Line| > 4 and then Line[1..4] = "===="
+    end loop
+
+    --  Convert each entry
+    loop
+        var TN : Univ_String := ""
+
+        --  Extract key from first line of bug entry
+        for I in 1 .. |Line|-4 forward loop
+            if Line[I .. I+2] = "Bug" then
+                TN := Line[I+4 .. |Line|]
+                --  Ignore anything after first word
+                for each [J=>C] of TN forward loop
+                    if C = ' ' then
+                        TN := TN[1..J-1]
+                        exit loop
+                    end if
+                end loop
+                exit loop
+            end if
+        end loop
+
+        --  Remove trailing spaces
+        while |TN| > 0 and then TN[|TN|] = ' ' loop
+            TN := TN[1 .. |TN| - 1]
+        end loop
+
+        if TN = "" then
+            Put_Line ("Ticket number not found in:")
+            Put_Line ("  " & Line)
+            --  Just echo the line
+            Out_File.Put_Line (Line)
+        else
+            Out_File.Put_Line ("Index " & TN & "/test.out")
+            Out_File.Put_Line (Line)
+
+            Line := In_File.Get_Line ()
+            if |Line| < 3 or else Line[1..3] /= "---" then
+                Put_Line ("Expected line starting with '---' and found: '" &
+                  Line & "'")
+                Out_File.Put_Line (Line)
+            else
+                Out_File.Put_Line ("--- " & TN & "/test.out")
+            end if
+
+            Line := In_File.Get_Line ()
+            if |Line| < 3 or else Line[1..3] /= "+++" then
+                Put_Line ("Expected line starting with '+++' and found: '" &
+                  Line & "'")
+                Out_File.Put_Line (Line)
+            else
+                Out_File.Put_Line ("+++ " & TN & "/test.out")
+            end if
+        end if
+
+        --  Write out rest of lines of bug entry
+        loop
+            Line := In_File.Get_Line()
+            exit loop
+              when Line is null or else
+                (|Line| > 4
+                  and then (Line[1..4] = "====" or else Line[1..4] = "----"))
+            Out_File.Put_Line (Line)
+        end loop
+
+        exit loop
+          when Line is null or else (|Line| > 4 and then Line[1..4] = "----")
+            -- Reached the end of the bug entries to be converted
+    end loop
+
+    Out_File.Close()
+    Put_Line ("All done.")
+end proc Make_Patch_File

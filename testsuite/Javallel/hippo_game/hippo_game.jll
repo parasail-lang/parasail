@@ -1,0 +1,163 @@
+class interface Games<> {
+
+    type Length is Integer<2..5>  // post lengths and hole depths
+
+    class interface Hole<> {     // info on one hole
+        final Length Depth
+        final UnivString Id
+    }
+
+    type HippoGraph is DGraph<Hole>  // Graph of holes
+
+    class interface HippoPiece<> {  // info on one hippo
+        final Length Long
+        final Length Short
+    }
+
+    class interface HippoLocation<> {  // Location of a placed hippo in graph
+        final HippoGraph.NodeId LongLoc
+        final HippoGraph.NodeId ShortLoc
+    }
+
+    type PieceIndex is Integer<0..5>  // index into vector of pieces
+
+    type HippoSolution is Map      // Solution, giving location for each hippo
+      <KeyType => PieceIndex, ValueType => HippoLocation>
+
+    HippoSolution hippoGame(HippoGraph Graph, Vector<HippoPiece> Pieces)
+      // Find a solution with given graph and set of pieces
+
+}
+
+class Games {
+  public
+    HippoSolution hippoGame(HippoGraph Graph, Vector<HippoPiece> Pieces) {
+        // Solve by "multiply" and conquer:
+        // Progress through the hippo pieces, and with each hippo piece,
+        // create a separate thread for each open hole that is 
+        // deep enough for the long post of the hippo.  For each such hole,
+        // create a separate thread for each adjacent open hole
+        // that is deep enough for the short post of the hippo, with
+        // each thread "carrying" its own partially-completed game board.
+        // If a thread finds space for the piece, it places the hippo and 
+        // progresses onto the next piece.
+
+        Outer:
+        for (Index = 0;  // Index into Pieces vector
+           HippoGraph.NodeSet OpenHoles = allNodes(Graph);
+           HippoSolution PartialSolution = []) {
+
+            if Index >= |Pieces| {
+                // Found a complete solution,
+                // terminate other threads and return
+                return PartialSolution
+            }
+
+            final Piece = Pieces[Index]
+
+            // Try every sufficiently deep, open hole
+            for LongLoc in OpenHoles 
+              {> Graph[LongLoc].Depth >= Piece.Long <} parallel {
+
+                // Try every sufficiently deep, open, adjacent hole
+                for ShortLoc in successors(Graph, LongLoc)
+                  {> ShortLoc in OpenHoles 
+                    and then Graph[ShortLoc].Depth >= Piece.Short <} parallel {
+
+                    //  Found a pair of adjacent open holes that work
+                    //  Add them into the solution we are building.
+                    final HippoSolution NextSolution =
+                      PartialSolution | [Index => (LongLoc, ShortLoc)]
+
+                    // Continue the outer iteration with the next piece
+                    continue Outer with
+                      (Index => Index + 1,
+                       OpenHoles => OpenHoles - [LongLoc, ShortLoc],
+                       PartialSolution => NextSolution)
+                }
+            }
+        }
+
+    }
+
+}
+                
+void placeHippos() {
+    Games.HippoGraph buildGraph() as Graph {
+      // Build up a graph representing the Hippo game
+        type HoleId is Games.HippoGraph.NodeId
+        type GameRow is Vector<HoleId>
+
+        GameRow buildRow(Vector<Games.Length> V, UnivString Name)
+          as Row {
+          // Build row given vector of depths and name for row
+            Row = [for I in 0..<|V| forward =>
+              Graph.addNode((Depth => V[I], Id => Name + (I+1)))]
+        }
+
+        void connect(HoleId H1, HoleId H2) {
+          // Create an edge with deeper hole as "from" and shallower as "to"
+            if Graph[H1].Depth >= Graph[H2].Depth {
+                Graph.addEdge(From => H1, To => H2)
+            } else {
+                Graph.addEdge(From => H2, To => H1)
+            }
+        }
+
+        void connectRow(GameRow R) {
+          // Create edges between each pair of adjacent holes in row
+            for I in 0..<|R|-1 {
+                connect(R[I], R[I+1])
+            }
+        }
+
+        void createDiagonals(GameRow LRow, GameRow RRow) {
+          // Create diagonal edges, presuming LRow is to left of RRow
+            for I in 0..<|LRow| {
+                connect(LRow[I], RRow[I])
+                if I > 0 {
+                    connect(LRow[I], RRow[I-1])
+                }
+            }
+        }
+
+        Graph = []
+
+        // Create the holes, in three rows
+        final GameRow R1 = buildRow([4,5,2,5], "1")
+    
+        final GameRow R2 = buildRow([3,2,5,4], "2")
+    
+        final GameRow R3 = buildRow([2,3,4,3], "3")
+    
+        // Connect adjacent holes in each row
+        connectRow(R1); connectRow(R2); connectRow(R3)
+
+        // Connect along the diagonals between rows
+        createDiagonals(LRow => R1, RRow => R2)
+        createDiagonals(LRow => R3, RRow => R2)
+
+    }
+
+    // Build the graph of holes
+    var Games.HippoGraph Graph = buildGraph()
+
+    // Create the hippo pieces
+    final Vector<Games.HippoPiece> Pieces =
+      [(5,4), (5,3), (5,2), (4,3), (4,2), (3,2)];
+
+    // Find a solution
+    final Solution = Games.hippoGame(Graph, Pieces)
+
+    if |Solution| == 0 {
+        println("No solution to game")
+    }
+
+    for each [Index => Location] of Solution {
+        final Piece = Pieces[Index]
+
+        println("Piece " + Piece.Long + "," + Piece.Short + " is at " +
+          Graph[Location.LongLoc].Id + "," + Graph[Location.ShortLoc].Id)
+    }
+
+}

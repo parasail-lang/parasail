@@ -1,0 +1,33 @@
+procedure Chunk_Like (Num : Univ_Integer) is
+   subtype Positive is Integer<1 .. Univ_Integer'Last>;
+   Sums : Array<Integer, Indexed_By => Positive> :=
+     Create (1 .. Num, 0);
+   Sum : Integer := 0;
+
+   Chunk_Range : constant := 1 .. Num;
+   Split_Range : constant := Split(1 .. 1_000_000, Chunk_Range'Length);
+begin
+   parallel
+   for Chunk in Chunk_Range loop  --  1 .. Num loop
+      for I in Split_Range[Chunk] when I mod 2 = 1 loop
+         Sums [Chunk] := Sums [Chunk] + I;
+      end loop;
+   end loop;
+
+   for I in 1 .. Num loop
+      Put_Line (" Sums[" & I'Image & "] = " & Sums[I]'Image);
+      Sum := Sum + Sums[I];
+   end loop;
+
+   Put_Line ("Total Sum = " & Sum'Image);
+
+   Count : Atomic<Integer> := Create(0);
+
+   parallel
+   for chunk_2 in Chunk_Range loop  --  1 .. Num loop
+      for I in Split_Range[chunk_2] when I mod 2 = 1 loop
+         Ignore : constant Integer := Count.Fetch_And_Add (I);
+      end loop;
+   end loop;
+   Put_Line ("Sum using atomic counter = " & Count.Value()'Image);
+end Chunk_Like;

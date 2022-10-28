@@ -1,0 +1,68 @@
+// CROSS + ROADS = DANGER
+// John Barnes puzzle, Ada-Europe 2019
+
+func cross_roads() is
+   const D := 1;
+
+   for C in 2..9 loop
+      for R in 2..9 loop
+         if R == C then
+            continue loop;
+         end if;
+         if C + R < 10 then
+            continue loop;
+         end if;
+         for S in 2 .. 9 loop
+            if S in R | C then
+               continue loop;
+            end if;
+            if (S + S - R) mod 10 != 0 then 
+                continue loop;
+            end if;   
+            for E in 2 .. 9 loop
+               if E in S | R | C then
+                  continue loop;
+               end if;
+               if ((S + D + (S + S) / 10) - E) mod 10 != 0 then
+                  continue loop;
+               end if;
+               for O in 2..9 loop
+                 if O in S | R | C | E then
+                    continue loop;
+                 end if;
+                 for A in 2 .. 9 loop
+                    if A in O | S | R | C | E then
+                       continue loop;
+                    end if;
+                    for G in 2 .. 9 loop
+                       if G in A | O | S | R | C | E then
+                          continue loop;
+                       end if;
+                       if ((O + A + (2*S/10 + S + D)/10) - G) mod 10 != 0 then
+                          continue loop;
+                       end if;
+                       for N in 2 .. 9 loop
+                          if N in G | A | O | S | R | C | E then
+                             continue loop;
+                          end if;
+                          if (((O + A + (2*S/10 + S + D)/10)/10) +
+                                        R + O - N) mod 10 != 0 then
+                             continue loop;
+                          end if;
+                          if ((((O + A + (2*S/10 + S + D)/10)/10) +
+                                        R + O)/10 + C + R - A) mod 10 != 0 then
+                             continue loop;
+                          end if;
+                          Println ("  `(C) `(R) `(O) `(S) `(S)")
+                          Println ("  `(R) `(O) `(A) `(D) `(S)")
+                          Println ("`(D) `(A) `(N) `(G) `(E) `(R)")
+                       end loop;
+                    end loop;
+                 end loop;
+               end loop;
+            end loop;
+         end loop;
+      end loop;
+   end loop;
+end func cross_roads;
+                             

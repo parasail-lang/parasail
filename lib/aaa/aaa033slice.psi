@@ -1,0 +1,78 @@
+interface PSL::Containers::Slice<Array_Type is Indexable<>> is
+  // A sliceable array.
+    const First : Array_Type::Index_Type
+    const Last : Array_Type::Index_Type
+
+    func Length(S : Slice) -> Univ_Integer
+        // Return length of slice (i.e. Last - First + 1)
+
+    op "magnitude"(Slice) -> Univ_Integer is Length
+        // Allows use of |...| operator
+
+    op "slicing"(ref A : Array_Type) -> ref Slice
+        // Convert an array into a slice covering 1..Length(A)
+
+    op "slicing"(ref A : Array_Type;
+      Bounds : Countable_Range<Array_Type::Index_Type>)
+      -> ref Slice
+        // Slice of an array
+
+    op "slicing"(ref S : Slice;
+      Bounds : Countable_Range<Array_Type::Index_Type>)
+      -> ref Slice
+        // Slice of a slice
+
+    op "indexing"(ref S : Slice; Index : Array_Type::Index_Type) 
+      -> ref Array_Type::Elem_Type
+        // Index into a slice
+
+    op "index_set"(S : Slice) -> Countable_Range<Array_Type::Index_Type>
+end interface PSL::Containers::Slice
+
+class PSL::Containers::Slice is
+    ref Arr : Array_Type
+  exports
+    func Length(S : Slice) -> Univ_Integer is
+        // Return length of slice (i.e. Last - First + 1)
+        return S.Last - S.First + 1
+    end func Length
+
+    op "slicing"(ref A : Array_Type) -> ref Slice is
+        // Convert an array into a slice covering whole array
+        const A_Bounds := "index_set"(A)
+        return (First => A_Bounds.First, Last => A_Bounds.Last, Arr => A)
+    end op "slicing"
+
+    op "slicing"(ref A : Array_Type;
+      Bounds : Countable_Range<Array_Type::Index_Type>)
+      -> ref Slice is
+        // Slice of an array
+        const A_Bounds := "index_set"(A)
+        {Bounds.First > Bounds.Last or else 
+          (Bounds.First >= A_Bounds.First and then 
+            Bounds.Last <= A_Bounds.Last)} //slice out of bounds
+        return (First => Bounds.First, Last => Bounds.Last, Arr => A)
+    end op "slicing"
+
+    op "slicing"(ref S : Slice;
+      Bounds : Countable_Range<Array_Type::Index_Type>)
+      -> ref Slice is
+        // Slice of a slice
+        {Bounds.First > Bounds.Last or else 
+          (Bounds.First >= S.First and then Bounds.Last <= S.Last)}
+          // slice out of bounds
+        return (First => Bounds.First, Last => Bounds.Last, Arr => S.Arr)
+    end op "slicing"
+
+    op "indexing"(ref S : Slice; Index : Array_Type::Index_Type) 
+      -> ref Array_Type::Elem_Type is
+        // Index into a slice
+        {Index >= S.First and then Index <= S.Last}
+          // array index out of bounds
+        return S.Arr[Index]
+    end op "indexing"
+    
+    op "index_set"(S : Slice) -> Countable_Range<Array_Type::Index_Type> is
+        return S.First .. S.Last
+    end op "index_set"
+end class PSL::Containers::Slice

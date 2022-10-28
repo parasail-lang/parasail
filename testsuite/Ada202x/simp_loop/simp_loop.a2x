@@ -1,0 +1,26 @@
+proc Test_Simp_Loop(X : Integer) is
+    Println("--------- forward");
+    for J in 1..X forward loop
+	var I : Integer := J;
+	Println("I = " | I);
+    end loop;
+
+    Println("--------- reverse");
+    for J in 1..X reverse loop
+	var I : Integer := J;
+	Println("I = " | I);
+    end loop;
+
+    Println("--------- parallel (1)");
+    for J in 1..X parallel loop
+	var I : Integer := J;
+	Println("I = " | I);
+    end loop;
+
+    Println("--------- parallel (2)");
+    for J in 1..X parallel loop
+	var I : Integer := J;
+	Println("I = " | I);
+    end loop
+end proc Test_Simp_Loop;
+

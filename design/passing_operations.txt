@@ -1,0 +1,40 @@
+Here are some thoughts on passing operations as parameters.
+
+Starting 9/4/2012:
+
+We are not proposing to have variables of type "operation,"
+only parameters.  The actual must be an operation, or a "formal"
+operation parameter.
+
+One of the general principles of ParaSail is that all module
+instantiations could be expanded inline (if desired), and similarly
+any calls that take operation parameters could be expanded
+inline.  The only place where you have "fundamental" dynamic binding
+is with polymorphic objects, and for them, it is possible to
+use "behavioral subtyping," otherwise known as the the Liskov
+Substitution Principle (LSP) to do something in the way of
+program proofs.
+
+So how should operations be represented when passed as a parameter?
+They can be passed as parameters in a call on another operation, as well 
+as in a module instantation.  If module instantiations are going to be
+"compile-time" things, then the actual must be a library-level
+operation in that case.  On the other hand, there seems no need to
+make any restrictions in passing operations in a call.
+
+This implies that operations passed in a module instantiation can
+be represented as operation plus type (i.e. static-link), whereas
+in a call, the operation might need more context (though static link
+seems like enough in that case as well).  Lambda expressions can also
+be passed in a call.  Lambda expressions with no up-level references
+would seem to be OK in a module instantiation, or up-level references
+to constants or other module parameters.
+
+What about partially bound operations?  Simplest to just require use 
+of a lambda expression for that.
+
+When passing an operation in a call, updatable objects visible to the 
+operation should be considered "handed off" as part of the call.
+When calling a formal operation, it should be considered "handed off"
+as well, since it might be updating a global.
+

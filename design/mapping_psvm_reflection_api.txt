@@ -1,0 +1,98 @@
+To start translating PSVM to Ada, we need something akin to a "reflection"
+API for a ParaSail program itself to perform queries about its modules,
+operations, etc.  
+
+We will have a module PSC::Reflection to provide this information,
+and another PSC::Translate to actually call the APIs in Reflection.
+These modules are currently in examples/compiler.psl, with builtin 
+support operations in psc-trees-semantics-translator.ad?
+
+Here is a skeleton interface for PSC::Reflection:
+
+interface PSC::Reflection<> is
+    type Decl_Index is new Integer<0..2**6>;
+
+    interface Environment<> is
+        func Get_Current_Env() -> Environment;
+        func Outermost_Region(Env : Environment) -> Region;
+        func Num_Library_Items(Env : Environment) -> Decl_Index;
+        func Nth_Library_Item(Env : Environment; Decl_Index) -> Decl;
+
+        func Num_Library_Bodies(Env : Environment) -> Decl_Index;
+        func Nth_Library_Body(Env : Environment; Decl_Index) -> Decl;
+    end interface Environment;
+
+    interface Region<> is
+    end interface Region;
+
+    interface Decl<> is
+        func Create(Id : Univ_String) -> Decl;
+        func Id(Decl) -> Univ_String;
+    end interface Decl;
+end interface PSC::Reflection;
+
+Decls can declare modules, types, operations, or objects.
+Top-level decls can only declare modules and operations.
+
+A module has ancestry, parameters (types, objects, or 
+operations) and a sequence of declarations, separated into 
+locals, exports, and new exports.
+
+An operation has parameters (objects or operations), and a 
+sequence of statements/declarations (actually, it is a
+tree, with stmts/decls connected by operators ";", "then", and "||").
+
+A type can be a reference to a named type, or can be the 
+instantiation of a module, either with an implicit or 
+explicit set of parameters.
+
+A statement that is not a decl can be an assignment statement, a 
+call on an operation, a return/exit/continue, a composite statement
+(block, if, case, loop). Statements are connected with other
+statements using ";", "then", or "||".
+
+An expression can be a literal, a reference to an object,
+a call on an operation, a short-circuit operation, a
+conditional or quantified expression, a conversion, an aggregate.
+
+Declarative Regions:
+
+Each module has a region, broken up into various "contexts" (interface
+or class; inherited, visible, "implements for," or private).
+
+Each operation has a region for its parameters, and one for its
+statements.  Subgroups of statements have their own regions, including
+each "side" of an "if" statement, each alternative of a
+"case" statement, each loop body, each side of a "||", etc.
+
+-------
+
+Translation will use the Reflection API.  It will use it roughly
+as follows:
+
+- Walk the set of top-level decls
+  - Generate an Ada package spec for each interface,
+    with various type declarations as described in other
+    mapping_psvm_*.txt documents.
+  - Generate an Ada package body for each class.
+  - Generate an Ada subprogram for each stand-alone operation.
+- Walk the decls of each interface or class
+  - Generate an Ada subprogram spec for each operation decl.
+  - Generate an Ada subprogram body for each operation definition.
+  - Generate an Ada object for each initialized const.
+  - Add an Ada record field for each var and uninitialized const.
+  - Create a child package which will provide all of the type-descriptors
+    for each unique instantiation of the module (we will need a unique
+    naming scheme).
+  - Add a parameterless function for each named type declaration
+    in an interface which returns the appropriate type descriptor.
+    For named type declarations in a class, we can just provide
+    a rename of one of the type descriptors from the child 
+    "type-descriptor" package.
+- Walk the routine's PSVM instruction list for each operation definition.
+  - The outermost PSVM instructions become the code for the subprogram,
+    the nested PSVM blocks become nested subprograms (with some appropriate
+    unique naming scheme).
+
+
+- 

@@ -1,0 +1,216 @@
+-- $Revision: 1.1 $ $Date: 2012/03/05 19:24:50 $
+
+Implementing the "extends" feature of ParaSail.
+
+We are now working out the details of implementing
+the "extends" feature of ParaSail.  Taking it phase-by-phase:
+
+1) Parser -- already done
+2) Semantic analysis --
+   - Identify interface being extended.
+
+   - See whether new interface has its own
+     set of parameters, or inherits them from the parent interface.
+     If not inheriting the parameters, make sure the parameters
+     are specified for the parent interface.
+     If inheriting the parameters, make sure they are *not* specified.
+     Declare the inherited parameters in the new interface's region.
+
+   - Initialize the num_interface_operations count from that of
+     the parent interface.  Walk the new interface operation
+     declarations.  Check each one to see if it matches one
+     of the parent.  If so, reuse the interface number.
+   Alternatively: Walk the existing operations and create "tentative"
+     declarations which then can be overridden.
+
+     Ancestor operations are marked with a particular context.
+     They should be marked overridden if a new declaration matches
+     them, and at that point the existing operation number would be used.
+     An operation is visible if it is inherited from an ancestor and
+     not overridden.
+
+   - *All* operations are inherited, or only those with a current-instance
+     operand?  What does that accomplish?  Is there any dispatching?
+     Example of Substitute_Operands.  If we have multiple polymorphic
+     parameters, this can't really work.  But if we have exactly
+     one polymorphic parameter, we could treat it as a displatching
+     operation.  Alternatively, we make the first polymorphic
+     operand a dispatching operand if there are no current-instance
+     operands.  It may only be overridden in extensions,
+     and only by changing the parameter to be <extension>+.
+     Types implementing do *not* inherit this operation
+     and cannot override it (though it will appear in their
+     op map).
+   - Inherited components are ignored, since they all end up
+     as components of the implicit "underlying" object,
+     even if the parent is abstract.
+   - Implicit underlying object has same name as parent interface,
+     unless name is specified with a label.
+   - Presumably inherited components may be selected directly from
+     an object of the extension type.  Alternatively, the parent part
+     may be selected, and then they may be selected from that.
+     Similarly, in a class aggregate, either the parent part may be
+     specified, or the individual components of the parent, but not both.
+
+     *BUT* this should only be true for visible components.  What
+     if the parent type has some number of hidden components?
+     How does that work?  How do we know whether or not the
+     parent type has hidden components?  Must we assume it does?
+     That means using visible components in the aggregate
+     is not helpful, unless the module needs no class to implement it,
+     for lack of any non-abstract, non-optional operations.
+
+     Should we have something like an extension aggregate?
+     C++ and Java have implicit calls on constructor of parent type.
+     Is that a good idea?  What implicit constructor would there be?
+     Suppose parent type doesn't export any sort of constructor
+     function, perhaps because it is abstract?  Do we want a special
+     operator for this purpose?  Something like "()"?  Is there a default
+     implementation of "()"?  Should we use "extends" in syntax
+     for aggregate?  "return (...) extends B();", where default
+     If it has no operation that returns an object of the type,
+     we may presume it has no hidden components.
+     is "extends ()"?  If we have a name for the parent part,
+     why not use it inside?  "return (Parent => B(), Blah => F());"
+     That seems at least as good.
+
+     Issue: What about <polymorphic_obj>.component?  It would necessarily
+     be a visible component.  Do we want to insert the requisite
+     number of indirections based on the component extension level?
+     Or do we want to treat visible components specially, and
+     have them directly in each object?  But that is a problem as
+     far as calling inherited operations, since it is not clear
+     where the components would reside.  Conceivably instead we 
+     could have "ref"s pointing to visible components in ancestors,
+     but those are a pain when copying an object.  If an ancestor
+     is abstract and has only visible components, and no non-abstract
+     operations, then we could simply duplicate the components
+     in each extension.  This also means there is no "constructor"
+     associated with the module, and hence no hidden components
+     (we need to enforce that somehow).
+
+     In any case, we *will* need to insert the appropriate number
+     of indirections when selecting a visible component of a
+     polymorphic object, since we don't know whether there have
+     been any component extensions.  Probably an operation
+     that gets the appropriate ancestor part, which would be a no-op
+     if the type-desc's have the same component extension levels.
+     DONE 1/24/2012: We have added an instruction for Select_Ancestor_Part_Op
+     which converts a polymorphic object into a non-polymorphic object
+     while selecting the appropriate ancestor part.
+
+     As an initial position, we have decided we won't allow
+     implementing interfaces that have visible components, though
+     they can be extended.  We could support implementing them
+     if we did all component selection on polymorphic objects by
+     calling an operation, but that seems more trouble than it is
+     worth at the moment.
+
+   - A module may only have "hidden" components if it has
+     one or more "constructor" operations, namely operations
+     that return an object of the type.  An abstract type
+     may have such operations, but they can only be used
+     to initialize the parent part of an extension in an
+     aggregate.  An object/value of an abstract type
+     cannot be converted to a polymorphic object if the
+     polymorphic root type has operations that are abstract
+     in the abstract type, nor can an abstract type be used 
+     to be the actual for a formal type that needs any of 
+     the operations that are abstract.  Might better be
+     thought of as a "partial" type.
+
+   - As part of inheritance, should we create copies of the original
+     trees, or simply create new symbols in the new module region, or
+     allow lookups to follow into region of parent module?
+     The inherited operations end up with a different signature, so
+     those presumably need new operations with new parameter decls.
+     But what about module parameters and components?
+
+     Could we even handle inherited operations by just pointing to
+     the parent module operations, and make substitutions on the fly?
+     We have a good "Substitute" mechanism.  Should we use it right
+     at the beginning, or defer using it until something is referenced?
+     
+   
+3) Code generation
+   - The inherited and not overridden operations of the parent type
+     expect to receive an object of the parent type, which is the
+     first component of the derived type.  If there are no other
+     components added, then nothing special needs to be done, since
+     the usual "wrapper" rules make these two types identical
+     structurally.  However, if any components are added, then the
+     parent component must be extracted for each "current-instance"
+     parameter.  This is most efficiently done with a wrapper,
+     but if we want to do it in a data-driven fashion, we need
+     to indicate which input(s) need this, and how many levels
+     of encloser to strip off (since the operation might already
+     be inherited).  This could be recorded in the operation table.
+     But what about "ref" parameters?  We could rely on the parameter
+     information recorded in the routine, and some kind of
+     wrapper "level" recorded in the type-descriptor associated with
+     the operation.  In general, if the type-descriptor of the operation
+     is different, we might have some additional work to do,
+     perhaps indicated by an additional flag in the operation table.
+
+     This is analogous to what needs to be done when a polymorphic
+     type is used as the actual type parameter in a module instantiation.
+     In that case, we decided we needed to create a bunch of wrappers,
+     which would have pseudo-operations which would turn any normal
+     call into a dispatching call.
+
+   - ISSUE: We are struggling with a case where the parent type is a wrapper,
+     and we are trying to select the only component of the parent.
+     We are having similar problems when we are selecting a component
+     of a polymorphic object and its root type is a wrapper.
+     We can use Select*_Ancestor_Part to get the right parent part, but
+     if we are going to assign to the component, we have gone "too far."
+     Normally when we select the component of a wrapper, we just pass
+     everything in the way of lvalue-context, etc. through to the
+     prefix, and we are done with it.  I guess this should be the same.
+     That is the "component" that represents the parent part as a whole
+     should be used, instead of the component of the parent part.
+
+     There is no problem in create-class-agg, because we aren't ever 
+     going after a component that cannot be used in an array aggregate.  
+     [Actually, there is still a problem which we already fixed, where
+     the originating module is a wrapper, but it has no constructor,
+     so the (visible) component is inherited without creating a separate
+     parent part.]
+
+     So our main problem is component selection.  So how do we recognize
+     this case?  If the originating module for the component is a wrapper,
+     but the prefix type is not a wrapper, then we seem to have the
+     problem.  Actually, the prefix type could be a wrapper of some
+     intermediate ancestor, which is *not* a wrapper of the originating
+     ancestor.  Or I suppose we could be in situation where the originating 
+     module doesn't have any constructors and the intermediate ancestor
+     with a constructor adds more components and thereby is no longer 
+     a wrapper.  So we may need to do this by walking up the parent
+     chain, looking at component-extension levels.
+
+     Let's start with the polymorphic case.  If the associated module
+     of the component is a wrapper, we have a possible issue.
+     If the component is at a different component-extension level
+     than the root type, then what matters is whether the nearest ancestor
+     with that component-extension level is a wrapper.  If not, no problem --
+     we have a "regular" component.  However, if that ancestor is
+     a wrapper, then we really just want that ancestor part, and this
+     now becomes a recursive problem, since that might be wrapped
+     by an ancestor at the next component-extension level.
+     We could have two different component-extension levels, one "logical" 
+     and one physical.  We effectively "collapse" component-extension
+     levels when the descendant with a constructor is a wrapper.
+     So in the Select*_Ancestor_Part, we should identify a type that
+     is *not* a wrapper.  That works for the non-polymorphic case,
+     but what about the polymorphic case.  Can we do this at run-time?
+     Perhaps this means storing the "physical" component-extension
+     levels in the type-desc, and computing the difference between them.
+     But we are still stuck with a situation where we should treat the
+     thing as a wrapper from the get-go.  That could still work, 
+     since we could avoid unwrapping the polymorphic object layer,
+     and then selecting "component 1" would do the right thing.
+     Interesting... this really makes it more important that
+     a polymorphic object looks like a non-wrapper one-component object.
+     I guess the point is that after Select_Polymorphic_Ancestor_Part,
+     we are never going to use wrapper semantics, so it should be a no-op
+     if in fact it is wrappers "all the way down" to the target type.

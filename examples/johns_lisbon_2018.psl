@@ -1,0 +1,102 @@
+func Johns_Lisbon_2018() is
+   type Digit is Integer<0..9>
+   type Counts is Array<Univ_Integer, Indexed_By => Digit>
+   var Solutions : concurrent Vector<Vector<Univ_Integer>> := []
+
+   func Extract (Num : Univ_Integer)
+     -> Result : Vector<Digit> is
+      var N := Num
+      Result := []
+      while N > 0 loop
+         Result |= N mod 10
+         N /= 10
+      end loop
+   end func Extract
+
+   func Count_Digits (var Total : Counts; Digs : Vector<Digit>)
+     -> Result : Boolean is
+         //  return #true if we would go over 2 for any digit;
+         //  otherwise update Total with count of digits.
+
+      Result := #false
+      for each D of Digs loop
+         Total[D] += 1
+         if Total[D] > 2 then
+            if #false and then Total[D] == 3 then
+               Println("Digit " | D | " hit count of 3")
+            end if
+            Result := #true
+         end if
+      end loop
+
+      if Result then
+         --  Back out updates
+         for each D of Digs loop
+            Total[D] -= 1
+         end loop
+      end if
+   end func Count_Digits
+
+   *Outer*
+   for I in 112 .. 998 concurrent loop
+      var Total_Counts : Counts := [for X in Digit::Range => 0]
+      const Digs := Extract(I)
+
+      if Count_Digits(Total_Counts, Digs) then
+         continue loop Outer
+      end if
+
+      if I mod 100 == 0 then
+         Println("Trying " | I);
+      end if
+
+      *Inner*
+      for J in 100 .. 998 forward loop
+         var Local_Counts := Total_Counts
+         const Total_Val := I * J
+
+         if Total_Val > 99_999 then
+            exit loop Inner
+         end if
+
+         if Count_Digits(Local_Counts, Extract(J)) then
+            // Println("Already failed with: " | I | ", " | J)
+            continue loop Inner
+         end if
+
+         if Count_Digits(Local_Counts, Extract(Total_Val)) then
+            // Println("Total " | Total_Val | " failed with: " | I | ", " | J)
+            continue loop Inner
+         end if
+
+         for each D of Digs forward loop
+            const Partial := D * J;
+        
+            if Partial not in 100 .. 999 then
+               continue loop Outer
+            end if
+
+            const Partial_Digs := Extract(Partial)
+
+            if Count_Digits(Local_Counts, Partial_Digs) then
+               //  Println("Partial sum " | Partial |
+               //    " failed with: " | I | ", " | J)
+               continue loop Inner
+            end if
+         end loop
+         Println("Found one: " | I | ", " | J)
+         Solutions |= [I, J]
+         for each D of Digs forward loop
+            const Partial := D * J;
+        
+            Println(" Partial: " | Partial)
+         end loop
+         Println("  Total: " | Total_Val)
+      end loop Inner
+
+   end loop Outer
+   for each S of Solutions loop
+      Println("Solution: " | S[1] | ", " | S[2])
+   end loop
+
+end func Johns_Lisbon_2018

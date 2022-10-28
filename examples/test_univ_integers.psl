@@ -1,0 +1,15 @@
+func Test_Univ_Integers() is
+   for I in 1 .. 100 forward loop
+      Println ("2 ** `(I) = `(2**I) = 0x" | Hex_Image (2**I));
+   end loop
+
+   var Ran : Random := Start (33);
+
+   for J in 1 .. 100 loop
+      const N := Ran.Next() mod 20 + 20;
+      const M := Ran.Next();
+
+      Println ("10 ** `(N) + `(M) * 3 ** 40 = 0x" |
+        Hex_Image (10**N + M*3**40))
+   end loop;
+end func Test_Univ_Integers

@@ -1,0 +1,7 @@
+func Cmp() -> Univ_Integer is
+   if 0 < 1 and 1 > 0 and 1 == 1 and 2 != 1 and 1 != 2 and 1 <= 3 and 3 >= 2 then
+      return 1;
+   else
+      return 0;
+   end if;
+end func Cmp;

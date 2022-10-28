@@ -1,0 +1,59 @@
+func Apply_Op (Op : func (Input : Univ_Integer) -> Univ_Integer;
+  Inputs : Vector<Univ_Integer>) -> Vector<Univ_Integer>
+is
+   return [ for I in 1..Length(Inputs) => Op(Inputs[I]) ];
+end func Apply_Op;
+
+func Test_Apply (Length : Univ_Integer) is
+    func Print_Vec (Vec : Vector<Univ_Integer>) is
+        Print('[');
+        for I in 1..Length(Vec) forward loop
+            if I > 1 then 
+                Print(", ");
+            end if;
+            Print(Vec[I]);
+        end loop;
+        Println("]");
+    end func Print_Vec;
+    const Input : Vector<Univ_Integer> := [for I in 1..Length => I**2];
+
+    Print("Input = "); Print_Vec(Input);
+
+    func Double (In : Univ_Integer) -> Univ_Integer is (In * 2);
+
+    const Result : Vector<Univ_Integer> := Apply_Op (Double, Input);
+
+    Print("Doubled: "); Print_Vec(Result);
+
+    const Neg_Vec : Vector<Univ_Integer> := Apply_Op ("-", Input);
+
+    Print("Negated: "); Print_Vec(Neg_Vec);
+
+    var ZZZ := 0;
+//    func Triple_Plus_N(X : Univ_Integer) -> Univ_Integer is 
+//       ZZZ += 1;
+//       return X*3 + ZZZ;
+//    end func Triple_Plus_N;
+
+    const Tripled : Vector<Univ_Integer> := 
+      Apply_Op
+        //(Triple_Plus_N, Input);
+        (lambda (X) -> (ZZZ += 1; return X*3 + ZZZ), Input);
+
+    Print("Tripled+N: "); Print_Vec(Tripled);
+
+end func Test_Apply;
+
+func main(Args : Basic_Array<Univ_String>) is
+   if |Args| == 0 then
+      Test_Apply(7)
+   else
+      const Count : optional Univ_Integer := From_String (Args[1])
+      if Count not null then
+         Test_Apply (Count)
+      else
+         Println("First arg should be a numeric length: " |
+           Args[1])
+      end if
+   end if
+end func main

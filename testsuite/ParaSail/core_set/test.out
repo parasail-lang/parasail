@@ -1,0 +1,86 @@
+1 is *not* in 5|7|33
+[Z, Y, X] =? (X | Y | Z) --> #equal
+Adding 100 random digits to Set.
+Set is now of count = 66
+Contents of Set:
+63 65 1 66 60 67 3 68 4 58 
+69 5 57 7 72 8 73 9 53 10 
+52 51 12 77 13 49 78 14 79 15 
+16 81 17 45 82 44 42 21 85 22 
+40 87 23 24 88 38 25 37 26 90 
+36 27 91 35 99 92 28 98 29 93 
+97 33 30 94 96 95 
+S Before adding random elements =? now --> #less
+S =? S --> #equal
+S =? (-1 | 2) --> #unordered
+[2 , -1] =? (-1 | 2) --> #equal
+S =? [] --> #greater
+Count(S) = 66
+After Exclude(S, 5), Count(S) = 65
+Before_Exclude =? After Exclude --> #greater
+Basic_Map statistics: Count = 65
+ Table of length 64
+  Bucket #1 is null
+  Bucket #2 of length 2
+  Bucket #3 of length 1
+  Bucket #4 of length 2
+  Bucket #5 of length 2
+  Bucket #6 of length 2 with 1 holes
+  Bucket #7 is null
+  Bucket #8 of length 1
+  Bucket #9 of length 2
+  Bucket #10 of length 2
+  Bucket #11 of length 1
+  Bucket #12 is null
+  Bucket #13 of length 1
+  Bucket #14 of length 2
+  Bucket #15 of length 2
+  Bucket #16 of length 2
+  Bucket #17 of length 1
+  Bucket #18 of length 2
+  Bucket #19 of length 1
+  Bucket #20 is null
+  Bucket #21 is null
+  Bucket #22 of length 2
+  Bucket #23 of length 1
+  Bucket #24 of length 2
+  Bucket #25 of length 2
+  Bucket #26 of length 1
+  Bucket #27 of length 2
+  Bucket #28 of length 2
+  Bucket #29 of length 2
+  Bucket #30 of length 2
+  Bucket #31 of length 2
+  Bucket #32 of length 1
+  Bucket #33 of length 1
+  Bucket #34 of length 2
+  Bucket #35 of length 1
+  Bucket #36 of length 2
+  Bucket #37 of length 1
+  Bucket #38 of length 1
+  Bucket #39 of length 1
+  Bucket #40 is null
+  Bucket #41 of length 1
+  Bucket #42 is null
+  Bucket #43 of length 1
+  Bucket #44 is null
+  Bucket #45 of length 1
+  Bucket #46 of length 1
+  Bucket #47 is null
+  Bucket #48 is null
+  Bucket #49 is null
+  Bucket #50 of length 1
+  Bucket #51 is null
+  Bucket #52 of length 1
+  Bucket #53 of length 1
+  Bucket #54 of length 1
+  Bucket #55 is null
+  Bucket #56 is null
+  Bucket #57 is null
+  Bucket #58 of length 1
+  Bucket #59 of length 1
+  Bucket #60 is null
+  Bucket #61 of length 1
+  Bucket #62 is null
+  Bucket #63 is null
+  Bucket #64 of length 1

@@ -1,0 +1,444 @@
+interface PSL::Core::XVector<Element_Type is Assignable<>> 
+  implements Indexable<Element_Type, Univ_Integer> is
+  // Extendable XVector, indexed by Univ_Integer, 1..Length
+    op "[]"() -> XVector
+    func Create(Length : Univ_Integer; Value : Element_Type) -> XVector
+    op "indexing"(ref V : XVector; Index : Univ_Integer) -> 
+      ref Element_Type
+    op "slicing"(V : XVector; Index_Set : Countable_Range<Univ_Integer>)
+      -> XVector  // a "read-only" slice
+    op "index_set"(V : XVector) -> Countable_Range<Univ_Integer>
+    func Bounds(V : XVector) -> Countable_Range<Univ_Integer> is "index_set"
+    op "|="(var V : XVector; Elem : Element_Type)
+    op "|="(var V : XVector; Right : XVector)
+    op "<|="(var V : XVector; var Elem : optional Element_Type)
+    op "|"(Left, Right : XVector) -> XVector
+    op "|"(Left : XVector; Right : Element_Type) -> XVector
+    func Length(V : XVector) -> Univ_Integer
+    op "magnitude"(XVector) -> Univ_Integer is Length
+end interface PSL::Core::XVector
+    
+class PSL::Core::XVector is
+  // Extendable XVector, indexed by Univ_Integer, 1..Length
+    const Debug := #false;
+    const Initial_Size := 4
+    const Leaf_Vec_Capacity := 256
+    const Vec_Of_Vec_Length := 256
+    const Subvec_Capacity : Basic_Array<Univ_Integer> :=
+      // Capacity of each subvec at given level
+      [Leaf_Vec_Capacity,
+       Vec_Of_Vec_Length * Leaf_Vec_Capacity,
+       Vec_Of_Vec_Length ** 2 * Leaf_Vec_Capacity]
+    const Ordinal : Basic_Array<Univ_String> :=
+      ["th","st","nd","rd","th","th","th","th","th","th"]
+
+    const Level : Univ_Integer        //  Level = 0 means only Data array
+    var Count   : Univ_Integer := 0   //  Overall count
+    var Width   : Univ_Integer := 0   //  Num Subvecs in use; is 0 if level = 0
+    var Data    : optional Basic_Array<optional Element_Type> := null
+    var Subvecs : optional Basic_Array<optional XVector> := null
+
+    func Rep_Ok(V : XVector; ID : Univ_Integer) is
+        //if Debug then
+        //    Println("ID: " | ID);
+        //end if;
+        {V.Count >= 0};
+        if V.Level == 0 then
+            {V.Width == 0};
+            {V.Subvecs is null};
+            if V.Data not null then
+                {V.Data.Length() >= V.Count};
+            end if;
+        else
+            {V.Width > 0};
+            {V.Subvecs not null};
+            {V.Data is null};
+        end if;
+    end func Rep_Ok;
+
+    func Expand_Count(var V : XVector; Amount : Univ_Integer := 1) is
+        // Expand count by "Amount"
+        {> Amount > 0 <}
+        Rep_Ok(V, 1)
+        const New_Count := V.Count + Amount;
+
+        loop
+            var Next_Count := New_Count
+
+            if V.Level == 0 then
+                //  A single Basic_Array of elements
+                Next_Count := Min (New_Count, Leaf_Vec_Capacity)
+                if V.Data is null then
+                    //  Very first element
+                    if Debug then
+                        Println("Very first element");
+                    end if;
+                    V.Data := Create(Max(Initial_Size, Next_Count), null)
+                    Rep_Ok(V, 5555);
+                elsif V.Count == Length(V.Data) or New_Count > Length(V.Data)
+                then
+                    //  Double the size if below capacity, else add a level
+                    if V.Count < Leaf_Vec_Capacity then
+                        // Double the size (up to the max)
+                        if Debug then
+                            Println("Doubling Data, V.Count was " | V.Count)
+                        end if
+                        var Old_Data <== V.Data
+                        V.Data := Create(Min (Max (2*V.Count, Next_Count),
+                                              Leaf_Vec_Capacity), null)
+                        for I in 1..V.Count loop
+                            V.Data[I] <== Old_Data[I]
+                        end loop
+                        Old_Data := null
+                        Rep_Ok(V, 6666);
+                    else
+                        // Reached maximum, add one level
+                        {> Next_Count == V.Count <}
+                        Rep_Ok(V, 3333);
+                        if Debug then
+                            Println("Adding second level, V.Count was " |
+                              V.Count)
+                        end if;
+                        var Old_V <== V
+                        V := (Level => 1,
+                              Count => Next_Count,
+                              Width => 2,
+                              Subvecs => Create (Vec_Of_Vec_Length, null))
+                        V.Subvecs[1] <== Old_V
+                        V.Subvecs[2] :=
+                          (Level => 0, Data => Create(Leaf_Vec_Capacity, null))
+                        //  Will loop around to extend this two-level structure
+                        Rep_Ok(V, 4444);
+                    end if;
+                else
+                    if Debug then
+                        Println(Next_Count | ", " | New_Count);
+                    end if;
+                end if
+            else
+                //  Multi-level structure, expand last subvec or add another
+                if V.Width > 0 and then
+                    V.Subvecs[V.Width].Count < Subvec_Capacity[V.Level]
+                then
+                    //  Can expand this subvec up to its capacity
+                    if Debug then
+                        Println("Expand Subvec " | V.Width |
+                          ", V.Count was " | V.Count)
+                    end if;
+                    ref Last_Subvec => V.Subvecs[V.Width]
+                    const Subvec_Increase := Min (New_Count - V.Count,
+                      Subvec_Capacity[V.Level] - Last_Subvec.Count)
+                    Expand_Count (Last_Subvec, Subvec_Increase);
+                    //  Compute next value for V.Count
+                    Next_Count := V.Count + Subvec_Increase;
+                    Rep_Ok(V, 7777);
+                elsif V.Width < Vec_Of_Vec_Length then
+                    //  Add another subvec
+                    V.Width += 1
+                    if V.Level == 1 then
+                        //  Add another leaf vec
+                        //  Compute amount in this new leaf vec
+                        const Amount_In_New_Leaf := Min (Leaf_Vec_Capacity,
+                          New_Count - V.Count)
+
+                        if Debug then
+                            Println("Add " | V.Width |
+                                Ordinal[V.Width mod 10+1] |
+                                " leaf vec, V.Count was " | V.Count |
+                                ", adding " | Amount_In_New_Leaf |
+                                " in new leaf")
+                        end if;
+
+                        V.Subvecs[V.Width] :=
+                          (Level => 0, Count => Amount_In_New_Leaf,
+                           Data => Create(Leaf_Vec_Capacity, null))
+
+                        //  Compute total count of vector
+                        Next_Count := V.Count + Amount_In_New_Leaf
+                        Rep_Ok(V, 8888);
+                    else
+                        //  Add another multi-level subvec
+                        if Debug then
+                            Println("Add " | V.Width |
+                                Ordinal[V.Width mod 10+1] |
+                                " level " | V.Level-1 |
+                                " sub vec, V.Count was " | V.Count)
+                        end if;
+                        V.Subvecs[V.Width] :=
+                          (Level => V.Level-1,
+                           Width => 0,
+                           Subvecs => Create(Vec_Of_Vec_Length, null))
+                        Rep_Ok(V, 9999);
+
+                        //  Count not increased yet
+                        Next_Count := V.Count
+                    end if
+                else
+                    //  Must add another level
+                    if Debug then
+                        Println("Adding another level, V.Level was " |
+                          V.Level | ", V.Count was " | V.Count |
+                          ", Next_Count = " | Next_Count)
+                    end if;
+                    var Old_V <== V
+                    V := (Level => Old_V.Level+1,
+                          Count => Old_V.Count,
+                          Width => 1,
+                          Subvecs => Create (Vec_Of_Vec_Length, null))
+                    V.Subvecs[1] <== Old_V
+
+                    //  Count not increased yet
+                    Next_Count := V.Count
+                    //  Will loop around to extend this multi-level structure
+                end if
+            end if
+            Rep_Ok(V, 1212);
+            V.Count := Next_Count
+            Rep_Ok(V, 2323);
+            if Next_Count == New_Count then
+                exit loop
+            end if
+            if Debug then
+                Println("Trying again, Next_Count = " | Next_Count |
+                  ", New_Count = " | New_Count)
+                Println("V.Level = " | V.Level | ", V.Width = " | V.Width);
+            end if;
+            Rep_Ok(V, 2);
+        end loop
+        Rep_Ok(V, 2222);
+    end func Expand_Count
+
+  exports
+    op "[]"() -> XVector is
+        return (Level => 0, Count => 0, Data => null)
+    end op "[]"
+
+    func Create(Length : Univ_Integer; Value : Element_Type) {Length >= 0} 
+        -> XVector is
+
+        if Length <= Leaf_Vec_Capacity then
+            return (Level => 0,
+                    Count => Length, Data => Create (Length, Value))
+        else
+            const More_Needed := Length - Leaf_Vec_Capacity;
+
+            var Result : XVector :=
+                (Level => 0, Count => Leaf_Vec_Capacity,
+                 Data => Create (Leaf_Vec_Capacity, Value))
+            Result.Expand_Count(More_Needed);
+            if Value not null then
+                for I in 1 .. More_Needed loop
+                    Result[Leaf_Vec_Capacity + I] := Value
+                end loop
+            end if;
+            Rep_Ok(Result, 3);
+            return Result;
+        end if;
+
+    end func Create
+
+    func Length(V : XVector) -> Univ_Integer is
+        Rep_Ok(V, 4);
+        return V.Count
+    end func Length
+
+    op "indexing"(ref V : XVector; Index : Univ_Integer) -> 
+      ref Element_Type is
+        Rep_Ok(V, 5);
+        if Index not in 1 .. V.Count then
+           var IO := IO::Get_IO();
+           IO.Stderr.Println("XVector index " | Index | " out of bounds 1 .. " |
+             V.Count)
+           {*vector_index_out_of_bounds* Index in 1..V.Count}
+        end if
+        if V.Level == 0 then
+            //  Simple case
+            return V.Data[Index]
+        else
+           const Subvec_Size := Subvec_Capacity[V.Level]
+           const Which_Subvec := (Index-1) / Subvec_Size + 1
+           const Subvec_Index := (Index-1) mod Subvec_Size + 1
+           //  Recurse with appropriate subvec
+           return V.Subvecs[Which_Subvec][Subvec_Index]
+        end if;
+    end op "indexing"
+
+    op "slicing"(V : XVector; Index_Set : Countable_Range<Univ_Integer>)
+      -> XVector is
+      // a "read-only" slice
+        Rep_Ok(V, 6);
+        return [for I in Index_Set => V[I]]
+    end op "slicing"
+
+    op "index_set"(V : XVector) -> Countable_Range<Univ_Integer> is
+        Rep_Ok(V, 7);
+        return 1..Length(V)
+    end op "index_set"
+
+    op "<|="(var V : XVector; var Elem : optional Element_Type) is
+        Rep_Ok(V, 8);
+        Expand_Count(V, Amount => 1)
+        Rep_Ok(V, 9);
+        V[V.Count] <== Elem
+        Rep_Ok(V, 10);
+    end op "<|="
+
+    op "|="(var V : XVector; Elem : Element_Type) is
+        Rep_Ok(V, 11);
+        Expand_Count(V, Amount => 1)
+        Rep_Ok(V, 12);
+        V[V.Count] := Elem
+        Rep_Ok(V, 13);
+    end op "|="
+    
+    op "|="(var V : XVector; Right : XVector) is
+        Rep_Ok(V, 14);
+        const Orig_Count := V.Count
+        if Orig_Count == 0 then
+            // Just copy right
+            V := Right;
+        elsif Right.Count > 0 then
+            // Grow V, and then copy in Right
+            Expand_Count(V, Right.Count)
+            for I in 1..Right.Count loop
+                Rep_Ok(V, 15);
+                if Debug then
+                    Println(V.Level | ", " | V.Count | ", " | V.Width);
+                end if;
+                V[I+Orig_Count] := Right[I]
+                Rep_Ok(V, 16);
+            end loop
+        end if
+        Rep_Ok(V, 17);
+    end op "|="
+
+    op "|"(Left, Right : XVector) -> Result : XVector is
+        Rep_Ok(Left, 18);
+        Rep_Ok(Right, 19);
+        // Copy left into result, and then add in the Right elements
+        if Left.Count == 0 then
+            // Left is null XVector; result is determined by Right
+            Result := Right
+        else
+            // Start with Left
+            Result := Left
+            Rep_Ok(Result, 20);
+            Result |= Right
+        end if
+        Rep_Ok(Result, 21);
+    end op "|"
+
+    op "|"(Left : XVector; Right : Element_Type) -> Result : XVector is
+        Rep_Ok(Left, 22);
+        Result := Left
+        Rep_Ok(Result, 23);
+        Result |= Right
+        Rep_Ok(Result, 24);
+    end op "|"
+
+end class PSL::Core::XVector
+
+func PSL::Test::Test_XVector() is
+    var V : XVector<Univ_Integer> := []
+    var U : XVector<Univ_Integer> := []
+    V |= 23
+    U |= 24
+    V := V | U
+    Println("V = " | V[1] | ", " | V[2])
+    for I in 1..10 loop
+        V |= I
+    end loop
+    for I in 1..Length(V) forward loop
+        Println("V[" | I | "] = " | V[I])
+    end loop
+    Println("\"indexing\"(V, 12) := 33;")
+    "indexing"(V, 12) := 33
+    for I in 1..Length(V) forward loop
+        Println("V[" | I | "] = " | V[I])
+    end loop
+    const Slice := V[3..7]
+    Println("Slice := V[3..7]")
+    for I in 1..Length(Slice) forward loop
+        Println("Slice[" | I | "] = " | Slice[I])
+    end loop
+
+    func Equal(Left, Right : XVector<Univ_Integer>) -> Boolean is
+        if |Left| == |Right| then
+            //  TODO
+            //  TBD: wait for implementation of Prepare_To_Exit_Parallel_Op
+            //for each [I => L] of Left concurrent loop
+            for each [I => L] of Left forward loop
+                if L != Right[I] then
+                    return #false;
+                end if;
+            end loop;
+        else
+            return #false;
+        end if;
+        return #true;
+    end func Equal;
+
+    var W : XVector<Univ_Integer> := Create(253, 1)
+    const Correct : XVector<Univ_Integer> := [1, 1, 2, 2, 2, 2];
+    W |= 2; W |= 2; W |= 2; W |= 2
+    {Length(W) == 257}
+    {Equal(W[252 .. 257], Correct)}
+
+    var Y : XVector<Univ_Integer> := Create(256, 1)
+    //Y |= 2; Y |= 2; Y |= 2; Y |= 2
+    Y |= [2, 2, 2, 2];
+    {Length(Y) == 260}
+    {Equal(Y[255 .. 260], Correct)}
+    W |= Y;
+
+    var Z : XVector<Univ_Integer> := Create(300, 1)
+    Z |= 2; Z |= 2; Z |= 2; Z |= 2
+    {Length(Z) == 304}
+    {Equal(Z[299 .. 304], Correct)}
+    Z |= Correct;
+    Z |= W;
+    Z[257] := 4;
+    const J := Z[1];
+    var H := Z[12];
+
+    var X : XVector<Univ_Integer> := [1];
+    const XX : XVector<Univ_Integer> := Create(257, 1);
+    X |= XX;
+
+    var Strings : XVector<Univ_String> := [];
+    Strings |= "hi";
+    Strings |= "ho";
+    Strings := Strings | "hi";
+    Strings |= "";
+    Strings[|Strings|] := "ho";
+    Strings |= ["it's", "off", "to"];
+    const To_Add : XVector<Univ_String> := [] | "work" | "we" | "go";
+    Strings |= To_Add;
+    for (each S of Strings; Sep := "" then " ") forward loop
+        Print(Sep | S);
+    end loop;
+    Print('\n');
+
+    var LL : XVector<XVector<Univ_String>> := [];
+    LL |= ["one", "two", "three"];
+    LL |= ["ten", "twenty", "thirty"];
+    for each Vec of LL forward loop
+        for each S of Vec forward loop
+            Print(S);
+        end loop
+    end loop
+    Print('\n');
+//    var Big_V : XVector<Univ_Integer> := []
+//    var Ran := Random::Start()
+//    for I in 1..1_000_000 forward loop
+//        Big_V |= Ran.Next() mod 1_000_000
+//        if |Big_V| mod 50_000 == 0 then
+//            Println("Big_V[" | |Big_V| | "] = " | Big_V[|Big_V|])
+//        end if
+//    end loop
+//    Println("|Big_V| = " | |Big_V|)
+end func PSL::Test::Test_XVector
+
+func main(Args : Basic_Array<Univ_String>) is
+   PSL::Test::Test_XVector ();
+end func main;

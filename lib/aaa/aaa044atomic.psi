@@ -1,0 +1,81 @@
+concurrent interface PSL::Core::Atomic<Content_Type is Comparable<>> is
+    func Create(Initial_Val : Content_Type) -> Atomic
+      // Create an atomic object with given initial value
+
+    func Set_Value(locked var A : Atomic; Val : Content_Type)
+      // Atomically set the new value
+      // TBD: Use atomic hardware instructions eventually
+
+    func Value(locked A : Atomic) -> Content_Type
+      // Return the current value
+      // TBD: Use atomic hardware instructions eventually
+
+    func Test_And_Set(locked var A : Atomic; New_Val : Content_Type) ->
+      Content_Type
+      // Set Value(A) to New_Val; Return the prior value.
+
+    func Compare_And_Swap(locked var A : Atomic;
+      Expected_Val, New_Val : Content_Type) -> Content_Type
+      // If Value(A) == Expected_Val, then set Value(A) to New_Val.
+      // In any case, return the prior value.
+end interface PSL::Core::Atomic
+
+concurrent class PSL::Core::Atomic is
+    var Value : Content_Type
+  exports
+    func Create(Initial_Val : Content_Type) -> Atomic is
+      // Create an atomic object with given initial value
+        return (Value => Initial_Val)
+    end func Create
+
+    func Set_Value(locked var A : Atomic; Val : Content_Type) is
+      // Atomically set the new value
+      // TBD: Use atomic hardware instructions eventually
+        A.Value := Val
+    end func Set_Value
+
+    func Value(locked A : Atomic) -> Content_Type is
+      // Return the current value
+      // TBD: Use atomic hardware instructions eventually
+        return A.Value
+    end func Value
+
+    func Test_And_Set(locked var A : Atomic; New_Val : Content_Type) ->
+      Result : Content_Type is
+      // Set Value(A) to New_Val; Return the prior value.
+        Result := A.Value
+        A.Value := New_Val
+    end func Test_And_Set
+
+    func Compare_And_Swap(locked var A : Atomic;
+      Expected_Val, New_Val : Content_Type) -> Result : Content_Type is
+      // If Value(A) == Expected_Val, then set Value(A) to New_Val.
+      // In any case, return the prior value.
+        Result := A.Value
+        if Result == Expected_Val then
+            A.Value := New_Val
+        end if
+    end func Compare_And_Swap
+end class PSL::Core::Atomic
+
+func PSL::Test::Test_Atomic(X, Y : Univ_Integer) is
+    type Atomic_Univ is Atomic<Univ_Integer>
+    var AX := Atomic_Univ::Create(X)
+
+    Println("Value(X) = " | Value(AX))
+
+    Set_Value(AX, X+1)
+    Println("After Set_Value(" | X+1 | "), Value(X) = " | Value(AX))
+
+    const Z := Test_And_Set(AX, Y)
+    Println("Test_And_Set(X, " | Y | ") = " | Z)
+
+    const CAS := Compare_And_Swap(AX, Expected_Val => X-1, New_Val => Y-1)
+    Println("Compare_And_Swap(X, " | X-1 | ", " | Y-1 | 
+      ") = " | CAS | ", Value(X) = " | Value(AX))
+
+    const CAS2 := Compare_And_Swap(AX, Y, Y-2)
+    Println("Compare_And_Swap(X, " | Y | ", " | Y-2 | 
+      ") = " | CAS2 | ", Value(X) = " | Value(AX))
+
+end func PSL::Test::Test_Atomic

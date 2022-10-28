@@ -1,0 +1,5 @@
+calling Fun(10)
+Fun(10) is returning 10 + 1 = 11
+calling Fun2(10)
+Fun(10) is returning 10 + 1 = 11
+Fun2(10) is returning Fun(10) * 2 = 22

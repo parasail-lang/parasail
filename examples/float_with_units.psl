@@ -1,0 +1,89 @@
+// Interface which provides physical units checking
+// at compile-time.  
+//
+// The Unit_Dimensions parameter specifies the
+// Exponent for each dimension in Dimension_Enum
+// where Dimension_Enum is something like 
+//   type Dimension_Enum is Enum<[#meter, #kilo, #second]>;
+//
+// You could declare some types that represent various
+// combinations of dimensions as:
+//   type Base_Float is Float<Digits => 15>;
+//   type Centimeter is Float_With_Units<Base_Float, 
+//      Name => "Centimeter", Short_Hand => "cm",
+//      Unit_Dimensions => [#meter => 1.0, #kilo => 0.0, #second => 0.0],
+//      Scale => 0.01>;
+//   type Gram is Float_With_Units<Base_Float,
+//      Name => "Gram", Short_Hand => "g",
+//      Unit_Dimensions => [#meter => 0.0, #kilo => 1.0, #second => 0.0],
+//      Scale => 0.001>;
+//   type Grams_Per_CC is Float_With_Units<Base_Float,
+//      Name => "Grams_Per_CC", Short_Hand => "g/cc",
+//      Unit_Dimensions => [#meter => -3.0, #kilo => 1.0, #second => 0.0],
+//      Scale => 0.001/(0.001**3)>;
+//
+//   const L : Centimeter := ...;
+//   const W : Gram := ...;
+//   const Density : Grams_Per_CC := W / L**3;  
+//                // Units checked at compile-time
+//
+// Note that in the "*", "/", and "**" operators the "Right"
+// operand is of any type that implements the Float_With_Units interface,
+// but which might have different Unit_Dimensions.
+// The precondition on the operator establishes compile-time requirements
+// linking the Unit_Dimensions vector of Left, Right, and Result.
+
+interface Float_With_Units
+ <Base is Float<>;
+  Name : Univ_String;
+  Short_Hand : Univ_String;
+  Unit_Dimensions : Array
+   <Univ_Real, Indexed_By => Dimension_Enum> := [.. => 0.0];
+  Scale : Univ_Real := 1.0> 
+is
+  op "from_univ"(Value : Univ_Real)
+    {Value in Base::First*Scale .. Base::Last*Scale}
+    -> Float_With_Units;  
+         // Allow real literals
+
+  op "to_univ"(Value : Float_With_Units) -> Result : Univ_Real
+    {Result in Base::First*Scale .. Base::Last*Scale};
+         // Define "meaning" operator "[[...]]"  -- incorporates Scale
+
+  op "+"(Left, Right : Float_With_Units) -> Result : Float_With_Units
+    {[[Result]] == [[Left]] + [[Right]]};
+	// Addition requires matching units
+
+  op "-"(Left, Right : Float_With_Units) -> Result : Float_With_Units
+    {[[Result]] == [[Left]] - [[Right]]};
+	// Subtraction requires matching units
+
+  op "=?"(Left, Right : Float_With_Units) -> Ordering;
+	// Comparison requires matching units
+
+  op "*"(Left : Float_With_Units;
+    Right : Right_Type is Float_With_Units<>) 
+    -> (Result : Result_Type is Float_With_Units
+          <Unit_Dimensions => Unit_Dimensions + Right_Type.Unit_Dimensions>)
+      {[[Result]] == [[Left]] * [[Right]]};
+	// Multiplication produces result with sum of dimensions
+	// and scales multiplied (implied by definition of "[[...]]" operator)
+
+  op "/"(Left : Float_With_Units;
+    Right : Right_Type is Float_With_Units<>) 
+    -> (Result : Result_Type is Float_With_Units
+          <Unit_Dimensions => Unit_Dimensions - Right_Type.Unit_Dimensions>)
+      {[[Result]] == [[Left]] / [[Right]]};
+	// Division produces result with difference of dimensions
+	// and scales divided (implied by definition of "[[...]]" operator)
+
+  op "**"(Left : Float_With_Units;
+    Right : Univ_Integer) 
+    -> (Result : Result_Type is Float_With_Units
+          <Unit_Dimensions => Unit_Dimensions * Right>)
+      {[[Result]] == [[Left]] ** Right};
+	// Exponentiation gives result with product of dimension and exponent
+	// and scales exponentiated (implied by definition of "[[...]]" op)
+
+end interface Float_With_Units;
+

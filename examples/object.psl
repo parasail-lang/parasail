@@ -1,0 +1,43 @@
+interface Point<E is Assignable<>> is
+   func Create(V : E) -> Point
+   func Get(P : Point) -> E
+   func Set(var P : Point; X : E)
+end interface Point
+
+class Point<E is Assignable<>> is
+   var X : E;
+
+   exports
+
+   func Create(V : E) -> Point is
+      return (X => V)
+   end func Create
+
+   func Get(P : Point) -> E is
+      return P.X
+   end func Get
+
+   func Set(var P : Point; X : E) is
+      P.X := X
+   end func Set
+
+end class Point
+
+func main(Args : Basic_Array<Univ_String>) is
+   var P1 : Point<Univ_Integer>
+   var P2 : Point<Univ_Integer>
+   var I := 1;
+   while I <= Length(Args) loop
+      if I rem 2 == 1 then
+         P1 := Create(From_String(Args[I]))
+      else
+         P2 := Create(From_String(Args[I]))
+         var Sum := P1.Get();
+         Sum += P2.Get();
+         P2.Set(Sum)
+         Print(P2.Get())
+         Print('\n')
+      end if
+      I += 1;
+   end loop
+end func main

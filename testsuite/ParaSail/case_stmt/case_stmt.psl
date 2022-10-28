@@ -1,0 +1,21 @@
+func Test_Case(X : Univ_Integer) is
+   case X of
+     [1..2] =>
+	Println("X in 1..2");
+     [3 | 5..7] =>
+	Println("X in 3 | 5..7");
+     [..] =>
+	Println("X in ..");
+   end case;
+end func Test_Case;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Case (1);
+   Test_Case (2);
+   Test_Case (3);
+   Test_Case (4);
+   Test_Case (5);
+   Test_Case (6);
+   Test_Case (7);
+   Test_Case (8);
+end func main;

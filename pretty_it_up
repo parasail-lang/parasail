@@ -1,0 +1,1 @@
+gnatpp -rnb -A0 -nM -Ddict_pp -c3 --no-separate-is $* -Iinterpreter -Iparser -Iparser/gen -Isemantics

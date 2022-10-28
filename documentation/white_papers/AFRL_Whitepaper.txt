@@ -1,0 +1,183 @@
+
+        White Paper for BAA 09-08-RIKA
+              
+              To: Guna Seetharaman
+                  (315) 330-2414 
+                  Gunasekaran.Seetharaman@rl.af.mil
+              Cc: Stanley Lis 
+                  (315) 330-3275 
+                  Stanley.Lis@rl.af.mil
+              
+        Title:
+              ParaSail : A Simplified Approach to a Parallel Future
+              
+        Period of performance:
+              July 2012 to June 2013
+              
+              Estimated Cost: $480,000.00
+              
+        Company:
+              
+              Ada Core Technologies
+              104 Fifth Avenue, 15th Floor
+              New York, NY  10011
+              DUNS: 83-731-6348
+              CAGE: 1NNP8
+              
+        Technical point of contact:
+              
+              S. Tucker Taft
+              Director of Language Research
+              AdaCore, SofCheck Division
+              24 Muzzey Street, 3rd Floor
+              Lexington, MA  02421
+              
+              Phone: 781-750-8068 x220
+              FAX: 781-750-8064
+              Email: taft@adacore.com
+              
+All white papers/proposals shall be double spaced with a font no smaller
+than 12 pitch. In addition, respondents are requested to provide their
+Commercial and Government Entity (CAGE) number, their Dun & Bradstreet
+(D&B) Data Universal Numbering System (DUNS) number, a fax number, an
+e-mail address, and reference BAA 09-08-RIKA with their submission. All
+responses to this announcement must be addressed to the technical POC,
+as discussed in paragraph six of this section.
+  
+B. Task Objective:
+
+    Produce a production-quality implementation of ParaSail, a pervasively
+    parallel programming language that supports the secure development of
+    complex mission-critical real-time and command-and-control systems
+    while taking maximum advantage of multi-core and many-core hardware.
+    As stated in the BAA, the goal is to provide "computational tools
+    to catalyze increased usage of high performance computing software
+    and systems."
+
+    This white paper is in response to:
+	
+	Emerging Computing Technology and Applications
+	Solicitation Number: BAA-09-08-RIKA
+	Agency: Department of the Air Force
+	Office: Air Force Materiel Command
+	Location: AFRL - Rome Research Site
+	
+	(3) Computational Science and Engineering, Highly Effective and
+	Performance Assured Computing
+
+	The objective of the research is to fully understand and exploit
+	the interdependency between architecture, application context,
+	domain specific science driven models, choice of algorithms,
+	operational constraints and mission specific exploitable
+	features within the sensing, processing, managing, fusion and
+	exploitation facets of information processing chain. This
+	broader perspective is defined to include but not limited to:
+	... computational tools to catalyze increased usage of high
+	performance computing software and systems ...
+
+C: Technical Summary and Proposed Deliverables:
+
+With single-processor clock speeds essentially stalled at 3GHz since
+2005, and near-term hardware performance improvements almost entirely
+relegated to increasing numbers of cores per chip, it is clear that all
+software will need to migrate from a largely sequential approach to a
+pervasively parallel approach.  There are various strategies to support
+this migration to parallel software. Automatic parallelizing compilers
+or run-time systems is one approach. A second approach is to add new
+parallel features or libraries to existing already-complex languages. We
+are pursuing a third approach, namely shifting the fundamental
+programming language model to a parallel one, by removing impediments to
+parallelism as part of significantly simplifying the programming
+language, while adding back a core of explicitly parallel features and
+full compile-time detection of race conditions and other common run-time
+errors.  We are pursuing an approach where the default is parallel, and
+the programmer has to work harder to force sequential execution where it
+is felt to be essential.  We believe that only through such an approach
+will the software development community succeed in gaining maximum
+advantage of new multi-core and many-core hardware.
+
+ParaSail : A Simplified Approach to Parallelism
+
+Our approach to supporting the migration to parallelism is embodied in a
+new programming language called ParaSail, for "Parallel Specification
+and Implementation Language."  ParaSail is designed to appear familiar
+to the vast majority of existing programmers, while nevertheless
+shifting over to a pervasively parallel model.  The ParaSail module and
+type system is based on an interface/class model familiar to Java and C#
+programmers, while incorporating safety and real-time capabilities from
+languages such as Ada, and the natural ease of parallelization from
+functional languages through eliminating hidden aliasing.
+
+The resulting language is further simplified by eliminating special
+cases for scalar types such as integers and floating point types --
+these like all other types are defined using interface and class
+modules.   All modules are parameterized (like generic templates), and
+every type, including every built-in type, is an instance of a module.
+All operators, including all of the built-in operators, are defined in
+interfaces just like other operations. Furthermore, operators for
+indexing into arrays and other containers are defined similarly, as are
+operators for constructing arrays or containers out of a literal
+sequence of elements.
+
+Race conditions are detected at compile-time, as are other errors that
+are typically not detected until run-time, if at all, such as indexing
+beyond the bounds of an array, using uninitialized or null data, and
+numeric overflow.  Furthermore, annotations such as preconditions,
+postconditions, and class invariants, are woven directly into the syntax
+and checked at compile-time.  This robust compile-time checking allows
+us to eliminate run-time exceptions and the complexity of exception
+handling.
+
+Storage management is also simplified in ParaSail because there are no
+explicit pointers in the language.  The capabilities associated with
+pointers are provided through the support for user-defined indexing into
+containers, and the ability for an object to start null and expand in
+size at run-time.  Eliminating pointers eliminates the hidden aliasing
+associated with complex pointer-based structures.  Because there are no
+pointers, any given object is either a stand-alone object, or part of
+exactly one enclosing stand-alone object, meaning that generalized
+garbage collection is unnecessary.  When an object grows or shrinks,
+storage in an appropriate "region" is automatically allocated or
+released.  There is never any garbage to be collected later.
+
+Hidden aliasing is further reduced by eliminating global variables, and
+by disallowing passing two parameters to the same operation that refer
+to the same variable, if the variable is updatable via either parameter.
+ This together with the lack of explicit pointers means that ParaSail
+expressions can always be evaluated in parallel, with the same level of
+safety associated with functional languages, while still allowing direct
+updating of variables when appropriate.
+
+Overall, learning and using ParaSail is straightforward for existing
+programmers from languages such as Java, C#, C++, Ada, OCaml, etc.,
+while providing a pervasively parallel execution semantics.  Additional
+explicit parallelism is easily inserted using "||" between statements,
+and adding the word "concurrent" to loop statements.  But even without
+these "hints" from the programmer, the semantics of the language are
+such that statements can execute concurrently if there are no explicit
+data flows that might prevent it.  Because of the elimination of hidden
+aliasing, identifying data flows is trivial for the ParaSail
+implementation.
+
+Implementing ParaSail
+
+An interpreter-based prototype implementation of ParaSail now exists, so
+the language is available now for evaluation and experimentation.  But
+clearly a production-quality implementation is needed to make ParaSail a
+valuable part of the solution to migrating to parallel software. AdaCore
+is proposing to:
+
+a) Complete the interpreter-based implementation of ParaSail
+
+b) Integrate the full ParaSail front end with the GNU
+Compiler Collection (GCC -- http://gcc.gnu.org) set of backends
+
+c) Integrate with other open-source infrastructures such as the Global Address
+Space networking system GASNet (http://gasnet.cs.berkeley.edu), and the
+Intel Threaded-Building-Blocks work-stealing open-source library
+(http://threadingbuildingblocks.org/).
+
+Estimated effort: 2 people for 12 months, 24 person-months, $480,000.00
+
+
+

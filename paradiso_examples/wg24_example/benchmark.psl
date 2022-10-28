@@ -1,0 +1,65 @@
+// import Correlation, Point, Init_Points, Stats, Histogram
+
+func main (Args: Basic_Array <Univ_String>) is
+  type Init_Flt_Points is Init_Points<Float>
+  var Points: Vector<Point<Float>> := []
+  if |Args| == 0 then
+    //  Generate points randomly
+    var R := Random::Start(11)
+    var S := Random::Start(12)
+    for I in 1 .. 5000 loop
+      Points |= New(Next_Real(R), Next_Real(S))
+    end loop
+  else
+    //  Read in points from JSON file, and use first N points
+    const Num_Points : optional Univ_Integer := From_String(Args[1])
+    if Num_Points is null then
+       Println ("First parameter should be count of points: `(Args[1])")
+       return
+    end if
+    const All_Points := Init_Flt_Points::Points(Limit => Num_Points)
+    Points := All_Points[1..Num_Points]
+  end if
+
+  var Clk := Clock::Create()
+  const Start := Clk.Now()
+
+  type Flt_Correlation is Correlation<Float>
+  const Results := Flt_Correlation::Run(Points)
+
+  const Elapsed_Time := Clk.Now() - Start
+  Println(|Points| | " points took " | Elapsed_Time | " seconds")
+
+  Println("First point: " | Points[1])
+  Println("Last point: " | Points[|Points|])
+  Println("Correlation results:")
+  Println(To_String(Results))
+
+  const X_Vec : Vector<Float> := [for each Point of Points => Point.X]
+  const X_Stats : Stats<Float> := Compute_From_Vec(X_Vec)
+  const Y_Vec : Vector<Float> := [for each Point of Points => Point.Y]
+  const Y_Stats : Stats<Float> := Compute_From_Vec(Y_Vec)
+
+  type Flt_Histogram is Histogram<Float>
+  const X_Histo := Flt_Histogram::Build
+    (X_Vec,
+     Num_Buckets => 12,
+     Low => X_Stats.Average() - 2.0 * X_Stats.Std_Dev(),
+     High => X_Stats.Average() + 2.0 * X_Stats.Std_Dev())
+
+  const Y_Histo := Flt_Histogram::Build
+    (Y_Vec,
+     Num_Buckets => 12,
+     Low => Y_Stats.Average() - 2.0 * Y_Stats.Std_Dev(),
+     High => Y_Stats.Average() + 2.0 * Y_Stats.Std_Dev())
+
+  Println("X Histogram:")
+  Println("`(X_Histo.Low)..`(X_Histo.High):[" |
+    (for (each C of X_Histo.Buckets() forward; Sep := "" then ", ")
+       => <""> | Sep | C) | "]")
+
+  Println("Y Histogram:")
+  Println("`(Y_Histo.Low)..`(Y_Histo.High):[" |
+    (for (each C of Y_Histo.Buckets() forward; Sep := "" then ", ")
+       => <""> | Sep | C) | "]")
+end func main

@@ -1,0 +1,47 @@
+import PSL::Short_Names::*, *
+
+interface Const_Params<Base : Univ_Integer> is
+   const Twice : Univ_Integer := Base * 2;
+   const Square : Univ_Integer := Base * Base;
+end interface Const_Params;
+
+interface Constants<> is
+   const Hello : Univ_String := "Hello"
+   const Greeting := Hello | ',' | " World!"
+   const An_Enum := #This_Is_An_Enum
+   const Enum_Arr : Basic_Array<Univ_Enumeration> := [#This, #Is, #Fun]
+
+   const Enum_Arr2 := Enum_Arr
+   
+   const Enum_Arr3 : Basic_Array<Univ_Enumeration> := Enum_Arr2
+
+   type CP5 is Const_Params<5>;
+   const Twice5 : Univ_Integer := CP5::Twice
+   const Square5 : Univ_Integer := CP5::Square
+
+end interface Constants;
+
+func main(Args : Basic_Array<String>) is
+   Println(Constants::Greeting);
+   Print(Constants::An_Enum); Print('\n');
+
+   type CP3 is Const_Params<3>;
+
+   Print("Const_Params<3>::Twice = ");
+   Println(CP3::Twice);
+
+   Print("Const_Params<3>::Square = ");
+   Println(CP3::Square);
+
+   Print("Const_Params<5>::Twice = ");
+   Println(Constants::Twice5);
+
+   Print("Const_Params<5>::Square = ");
+   Println(Constants::Square5);
+
+   for I := 1 then I+1 while I <= |Constants::Enum_Arr3| loop
+      Print(Constants::Enum_Arr3[I]); Print(' ');
+   end loop
+   Print('\n')
+end func main;
+

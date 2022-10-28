@@ -1,0 +1,32 @@
+with "../runtime";
+
+project LWT_Example is
+
+   for Object_Dir use "obj";
+   for Exec_Dir use "bin";
+   for Source_Dirs use (".", "../work_stealing", "../work_in_progress",
+      "sort", "/homes/taft/_distrib/zyre-Ada/src",
+      "/homes/taft/_distrib/zyre-Ada/src/gen",
+      "/homes/taft/_distrib/include/zmq",
+      "/homes/taft/_distrib/zeromq-Ada/src/gen");
+   for Main use
+     ("simple_par_loop.adb",
+      --  "simple_par_taskloop.adb",
+      "map_par_loop.adb",
+      "excep_loop.adb", "excep_seq_loop.adb"
+      --  "vector_par_loop.adb",
+      --  "cxai017_con_par.adb", "cxai017_con_seq.adb",
+     );
+
+   package Builder is
+      for Switches ("Ada") use ("-s", "-g");
+   end Builder;
+
+   package Compiler is
+      for Switches ("Ada") use ("-g", "-gnata", "-gnatg", "-gnatyN",
+        "-gnat2020", "-I/homes/taft/_distrib/include/zmq",
+        "-I/homes/taft/_distrib/zeromq-Ada/src/gen");
+   end Compiler;
+
+end LWT_Example;
+

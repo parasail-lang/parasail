@@ -1,0 +1,12 @@
+interface Glob<> is
+   global var X : Integer := 42;
+   var Y : Integer := 33;
+end interface Glob;
+
+func Glob_Test(Arr : Basic_Array<Univ_String>; global var Glob::*) is
+   var A : Glob := (Y => 77);
+   var B : Glob := (Y => 88);
+
+   Glob::X := 8;
+   Println ("Glob::X = `(Glob::X)");
+end func Glob_Test;

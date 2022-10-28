@@ -1,0 +1,167 @@
+Count = 2
+Basic_Mapping #peanitbutter => jelly
+#peanitbutter in M = #True
+Basic_Mapping #mustard, => hot dog
+#mustard, in M = #True
+#xy in M = #False
+Count after deletion = 1
+Basic_Mapping #mustard, => hot dog
+Count after addition = 2
+Basic_Mapping #peanitbutter => a new value
+Basic_Mapping #mustard, => hot dog
+Count after replacement = 2
+Basic_Mapping #peanitbutter => a third value
+Basic_Mapping #mustard, => hot dog
+Count after deletion = 1
+Basic_Mapping #peanitbutter => a third value
+Adding 100 random KV_Typeings to Basic_Map.
+Basic_Map is now of count = 67
+Basic_Mapping 0 => 33
+MUI[0] = 33
+Basic_Mapping 64 => 74
+MUI[64] = 74
+Basic_Mapping 63 => 94
+MUI[63] = 94
+Basic_Mapping 1 => 33
+MUI[1] = 33
+Basic_Mapping 65 => 19
+MUI[65] = 19
+Basic_Mapping 66 => 40
+MUI[66] = 40
+Basic_Mapping 2 => 61
+MUI[2] = 61
+Basic_Mapping 61 => 98
+MUI[61] = 98
+Basic_Mapping 67 => 26
+MUI[67] = 26
+Basic_Mapping 60 => 23
+MUI[60] = 23
+Basic_Mapping 4 => 74
+MUI[4] = 74
+Basic_Mapping 68 => 23
+MUI[68] = 23
+Basic_Mapping 69 => 85
+MUI[69] = 85
+Basic_Mapping 6 => 53
+MUI[6] = 53
+Basic_Mapping 70 => 44
+MUI[70] = 44
+Basic_Mapping 57 => 51
+MUI[57] = 51
+Basic_Mapping 56 => 31
+MUI[56] = 31
+Basic_Mapping 72 => 23
+MUI[72] = 23
+Basic_Mapping 55 => 74
+MUI[55] = 74
+Basic_Mapping 73 => 48
+MUI[73] = 48
+Basic_Mapping 9 => 68
+MUI[9] = 68
+Basic_Mapping 10 => 36
+MUI[10] = 36
+Basic_Mapping 11 => 18
+MUI[11] = 18
+Basic_Mapping 75 => 19
+MUI[75] = 19
+Basic_Mapping 52 => 95
+MUI[52] = 95
+Basic_Mapping 51 => 55
+MUI[51] = 55
+Basic_Mapping 77 => 73
+MUI[77] = 73
+Basic_Mapping 50 => 27
+MUI[50] = 27
+Basic_Mapping 14 => 61
+MUI[14] = 61
+Basic_Mapping 78 => 53
+MUI[78] = 53
+Basic_Mapping 49 => 6
+MUI[49] = 6
+Basic_Mapping 79 => 41
+MUI[79] = 41
+Basic_Mapping 16 => 86
+MUI[16] = 86
+Basic_Mapping 81 => 80
+MUI[81] = 80
+Basic_Mapping 17 => 97
+MUI[17] = 97
+Basic_Mapping 46 => 64
+MUI[46] = 64
+Basic_Mapping 82 => 46
+MUI[82] = 46
+Basic_Mapping 18 => 46
+MUI[18] = 46
+Basic_Mapping 45 => 85
+MUI[45] = 85
+Basic_Mapping 44 => 4
+MUI[44] = 4
+Basic_Mapping 84 => 75
+MUI[84] = 75
+Basic_Mapping 43 => 99
+MUI[43] = 99
+Basic_Mapping 85 => 63
+MUI[85] = 63
+Basic_Mapping 21 => 89
+MUI[21] = 89
+Basic_Mapping 42 => 31
+MUI[42] = 31
+Basic_Mapping 22 => 67
+MUI[22] = 67
+Basic_Mapping 86 => 27
+MUI[86] = 27
+Basic_Mapping 41 => 26
+MUI[41] = 26
+Basic_Mapping 23 => 42
+MUI[23] = 42
+Basic_Mapping 88 => 17
+MUI[88] = 17
+Basic_Mapping 24 => 25
+MUI[24] = 25
+Basic_Mapping 25 => 9
+MUI[25] = 9
+Basic_Mapping 38 => 9
+MUI[38] = 9
+Basic_Mapping 26 => 11
+MUI[26] = 11
+Basic_Mapping 90 => 17
+MUI[90] = 17
+Basic_Mapping 37 => 55
+MUI[37] = 55
+Basic_Mapping 27 => 30
+MUI[27] = 30
+Basic_Mapping 28 => 39
+MUI[28] = 39
+Basic_Mapping 98 => 87
+MUI[98] = 87
+Basic_Mapping 34 => 62
+MUI[34] = 62
+Basic_Mapping 94 => 73
+MUI[94] = 73
+Basic_Mapping 97 => 77
+MUI[97] = 77
+Basic_Mapping 33 => 13
+MUI[33] = 13
+Basic_Mapping 31 => 28
+MUI[31] = 28
+Basic_Mapping 95 => 1
+MUI[95] = 1
+Basic_Mapping 32 => 41
+MUI[32] = 41
+Basic_Mapping 96 => 31
+MUI[96] = 31
+ [64 => 74] [0 => 33] [63 => 94] [65 => 19] [1 => 33]
+ [2 => 61] [66 => 40] [61 => 98] [67 => 26] [60 => 23]
+ [4 => 74] [68 => 23] [69 => 85] [6 => 53] [70 => 44]
+ [57 => 51] [56 => 31] [72 => 23] [55 => 74] [9 => 68]
+ [73 => 48] [10 => 36] [75 => 19] [11 => 18] [52 => 95]
+ [51 => 55] [77 => 73] [50 => 27] [78 => 53] [14 => 61]
+ [49 => 6] [79 => 41] [16 => 86] [81 => 80] [17 => 97]
+ [46 => 64] [82 => 46] [18 => 46] [45 => 85] [44 => 4]
+ [84 => 75] [43 => 99] [85 => 63] [21 => 89] [42 => 31]
+ [22 => 67] [86 => 27] [41 => 26] [23 => 42] [88 => 17]
+ [24 => 25] [25 => 9] [38 => 9] [26 => 11] [90 => 17]
+ [37 => 55] [27 => 30] [28 => 39] [98 => 87] [34 => 62]
+ [94 => 73] [97 => 77] [33 => 13] [95 => 1] [31 => 28]
+ [96 => 31] [32 => 41]
+

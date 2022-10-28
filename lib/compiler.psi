@@ -1,0 +1,16 @@
+import PSL::Short_Names::*
+import PSC::LLVM_Printer, PSC::Reflection
+
+interface PSC::Translate<> is
+   const Debug : Boolean := #false;
+   const Verbose_Debug : Boolean := #false;
+   const Msg_File_Name : optional String := "errors.err";
+
+
+   //  Compile one file
+   func Compile(File_Name : String;
+                LLVM_Debug, Doing_Run_Time_Checks, Sequential : Bool;
+                Verbose, More_Verbose : Bool; Max_Instrs_For_Inlining : Int;
+                Use_Stack_For_Objects : Bool)
+
+end interface PSC::Translate

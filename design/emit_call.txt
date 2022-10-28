@@ -1,0 +1,159 @@
+-- $Revision: 1.2 $ $Date: 2011/02/17 04:02:55 $
+
+We are working on emitting a parallel call.
+The problem is whether we need two passes or just one.
+If we do it in one pass, then when we find the second 
+slow call, we need to allocate extra space for the
+master and the TCB, and it is not obvious where those will
+go.  We generally allow the outgoing parameter area
+to grow without limit, as necessary to accommodate nested
+calls.  So we would do better to allocate the masters and
+TCBs earlier in the local area, like local variables.
+Doing two passes over parameters is probably going to be
+necessary eventually anyway, so might as well start now.
+
+So let's assume we do two passes.  What do we want the first
+pass to do?  (We may have similar considerations related to
+statement trees, where we want to know if there is an "exit"
+which might terminate other threads.)  When we are done with
+the first pass, we want to know whether we need to leave
+space for a task master and for how many TCBs.  For each
+TCB, we may want to know whether it is to be a parallel call
+or a parallel block.  
+
+Now what about the case where an operand is a "fast" call,
+but where some of its sub-operands are slow calls.  I think
+we have decided to do that operand as a parallel block.
+The only time we do a parallel call rather than a parallel
+block is if the operand is itself a slow call, and it has
+no slow-calls for any of its sub-operands.
+
+And what about the first operand?  If it has multiple slow
+calls inside it, should we create a separate task master,
+or dump the whole thing into a parallel block?  For now,
+let's presume we create an additional task master.  So the
+first operand which has any slow calls is special, in that
+we never use a parallel call or parallel block for the
+operand as a whole, but we might end up creating a task master
+with sub-tasks for its sub-operands.
+
+So the first pass serves multiple purposes, one to allocate space for
+task masters, one to allocate TCBs and tie them to particular masters,
+and one to decide whether to use a parallel call or a parallel block
+for a given operand.  Note that if we create a parallel block, then
+we need to generate code for that as well, so exactly where that
+code goes is an interesting question.  It probably needs to be relocatable,
+since it is going to go at the "end" of the routine.  For each
+such parallel block, we need to know where the call is (in terms of
+main block vs. parallel block N, and in terms of offset within
+parallel block N).  Each parallel block has its own instruction counter.
+
+Info on a parallel block:
+   - index (0 means main block)
+   - location of invocation of parallel block
+   - local area size
+   - start of callee locals
+   - instruction counter/total length
+   - starting location in enclosing routine
+
+Decision process for a call:
+   Scan operands.  
+     * If the operand involves only
+       fast calls, ignore it for now.
+     * If the operand is the first that involves at least 
+       one slow call, note that for later and then...
+         - Recurse on the operand, following this same decision
+	   process again, to decide whether a task master will be
+	   needed.
+         - We could end up with multiple masters.  We could argue
+           that we never want more than one task master for a given
+           thread of code, so we convert the computation into a 
+           parallel block if it gets too complicated
+           and there are other operands.  This will simplify termination
+           as well, presumably, since if we have a master, we know where
+           it will be.
+	 - With this approach, once we know we need a master because
+           somewhere there is a call with multiple operands containing
+           slow calls, we convert the first operand into a parallel block
+           if it would need a master "internally"
+     * If the operand is the second or later that involves
+       a slow call, then
+         - We will need a task master
+         - This operand will end up as a parallel call
+           if the operand is a slow call, and none of its
+           operands involve slow calls.
+         - Otherwise, this operand will end up as a parallel block.
+           or a parallel block.
+
+
+We can categorize a computation tree as follows:
+  - contains no slow calls
+  - contains exactly one slow call
+  - contains exactly one slow call, which is the top of the tree
+  - contains multiple slow calls, but they don't depend on each other
+  - contains one sequence of slow calls, each depending on the result of the
+    inner one.
+  - contains a slow call that depends on multiple slow calls that could
+    be run in parallel (hence needs its own task master).
+  - contains multiple slow calls, at least two can be run in parallel,
+    and at least one has nested slow calls
+  - ... others?
+
+We will use this information as follows:
+  - If contains no slow calls, then we will compute this when we need it
+  - If contains exactly one slow call,
+     + If we are the first "slow" operand, we will call this on the main thread
+     + If we are not the first slow operand, then we will use a Parallel_Call
+       and the "current" task master, and then when all parallel operands
+       are done, any fast-call computations will be performed using this
+       result.
+  - If contains exactly one slow call, which is the top of the tree
+     + Treat as above case
+  - If contains multiple slow calls that don't depend on each other
+     + If we are the first operand with slow calls, then
+       the leftmost slow call will be done on the main thread,
+       and the others will be done on new threads.
+     + ...
+
+Summarizing:
+  - Task master is either: 
+      + unallocated, 
+      + allocated but not in use for an enclosing computation,
+      + allocated and in use for an enclosing computation,.
+  - Leftmost slow call:
+     + If there are no other slow calls outside this one
+       (i.e. master is unallocated or not in use):
+        * Do this slow call on the main thread, use a task master
+          to evaluate the operands in parallel if necessary.
+     + If there are other slow calls outside this one
+       (i.e. master is in use for enclosing computation)
+        * If this call has multiple independent slow calls in its operands,
+          (i.e. it will need a master) convert it into a parallel block
+        * If this call does not need a master internally, then just
+          compute it on main thread.
+  - Slow call that is not the leftmost one
+     (There must be a master which is in use for an enclosing computation.):
+     + If this call has any slow operands, convert it into a parallel block
+     + If this call has no slow operands, convert it into a parallel call.
+
+So Visitor has:
+ - "Master_needed" flag which remains True once set
+ - "Master_in_use" flag/pointer which is set on entering a computation
+   tree that needs it, and then reset to False once done with that
+   tree.
+ - "Is_Leftmost_Tree_with_slow_call" which is set when walking
+   the leftmost operand of a parallel evaluation that has
+   a "contains...slow_call" set.
+
+Recorded on each expression, one of:
+   + "Contains_no_slow_calls"
+   + "Contains_one_slow_call"
+   + "contains_one_slow_call_sequence"
+   + "contains_one_slow_call_tree_needing_master"
+   + "Contains_multiple_independent_slow_call_trees"
+        
+  - If 
+
+
+Info on an operand of a slow call:
+   

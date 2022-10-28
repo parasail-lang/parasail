@@ -1,0 +1,7 @@
+This implementation of K-Means was initially created by Andrea Ferretti.
+Please visit: https://github.com/andreaferretti/kmeans for the original.
+We have made a small number of changes to that code.
+
+We have also implemented a version that is designed to execute faster with
+the current ParaSail compiler and run-time.
+See ../kmeans_fast for that version.

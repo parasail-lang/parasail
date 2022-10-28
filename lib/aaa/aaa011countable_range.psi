@@ -1,0 +1,192 @@
+interface PSL::Core::Countable_Range<Bound_Type is Countable<>> is
+    // Simple contiguous Countable_Range of integers (i.e. an interval)
+    const First : Bound_Type
+    const Last : Bound_Type
+    op ".."(Left, Right : Bound_Type) -> Countable_Range
+    op "<.."(Left, Right : Bound_Type) -> Countable_Range
+    op "..<"(Left, Right : Bound_Type) -> Countable_Range
+    op "<..<"(Left, Right : Bound_Type) -> Countable_Range
+    op "in"(Val : Bound_Type; Interval : Countable_Range) -> Boolean
+    func Length(R : Countable_Range) -> Univ_Integer
+    op "magnitude"(Countable_Range) -> Univ_Integer is Length
+    op "[..]"() -> Countable_Range
+    op "[]"() -> Countable_Range
+    func Singleton(Bound : Bound_Type) -> Countable_Range
+
+    op "/"(R : Countable_Range; Num_Pieces : Univ_Integer)
+      -> Vector<Countable_Range>
+        // Divide a range into a vector of subranges, each of similar size
+
+    func Remove_First(var S : Countable_Range) -> optional Bound_Type
+    func Remove_Last(var S : Countable_Range) -> optional Bound_Type
+    func Remove_Any(var S : Countable_Range) -> optional Bound_Type
+
+    op "=?"(Left, Right : Countable_Range) -> Ordering
+    //  Return #equal if Left.First == Right.First and Left.Last == Right.Last
+    //  Return #less if Left.Last < Right.First
+    //  Return #greater Left.First > Right.Last
+    //  Return #unordered otherwise (i.e. they overlap and are not identical)
+end interface PSL::Core::Countable_Range
+
+class PSL::Core::Countable_Range is
+exports  // check that indent of 0 works
+    op ".."(Left, Right : Bound_Type) -> Countable_Range is
+        return (First => Left, Last => Right)
+    end op ".."
+
+    op "<.."(Left, Right : Bound_Type) -> Countable_Range is
+        return (First => Left+1, Last => Right)
+    end op "<.."
+
+    op "..<"(Left, Right : Bound_Type) -> Countable_Range is
+        return (First => Left, Last => Right-1)
+    end op "..<"
+
+    op "<..<"(Left, Right : Bound_Type) -> Countable_Range is
+        return (First => Left+1, Last => Right-1)
+    end op "<..<"
+
+    op "in"(Val : Bound_Type; Interval : Countable_Range) -> Boolean is
+        return Val >= Interval.First and then Val <= Interval.Last
+    end op "in"
+
+    func Length(R : Countable_Range) -> Univ_Integer is
+        return R.Last - R.First + 1
+    end func Length
+
+    op "[]"() -> Countable_Range is
+        return Bound_Type::First()+1 .. Bound_Type::First()
+    end op "[]"
+
+    op "[..]"() -> Countable_Range is
+        return Bound_Type::First() .. Bound_Type::Last()
+    end op "[..]"
+
+    func Singleton(Bound : Bound_Type) -> Countable_Range is
+        return Bound .. Bound
+    end func Singleton
+
+    op "/"(R : Countable_Range; Num_Pieces : Univ_Integer)
+      -> Result : Vector<Countable_Range> is
+       // Divide a range into a vector of subranges, each of similar size
+        {> Num_Pieces > 0 <}
+
+        if Num_Pieces <= 1 then
+            //  Return a vector of length 1 if Num_Pieces is 1 (or less)
+            return Create(1, R)
+        end if
+
+        const Size := Length(R)
+        const Small_Piece_Size := Size / Num_Pieces
+        const Big_Piece_Size := Small_Piece_Size + 1
+        const Num_Big_Pieces := Size rem Num_Pieces
+
+        //  Create the result
+        Result := Create(Num_Pieces, [])
+
+        //  Fill in the elements of the result vector with slices of the set.
+        var Index := R.First
+
+        //  Big pieces first
+        for I in 1 .. Num_Big_Pieces forward loop
+            Result[I] := Index .. Index + Big_Piece_Size - 1
+            Index := Index + Big_Piece_Size
+        end loop
+
+        //  Small pieces next
+        if Small_Piece_Size > 0 then
+            for I in Num_Big_Pieces + 1 .. Num_Pieces forward loop
+                Result[I] := Index .. Index + Small_Piece_Size - 1
+                Index := Index + Small_Piece_Size
+            end loop
+        end if
+
+        {> Index == R.Last + 1 <}
+            
+    end op "/"
+
+    func Remove_First(var S : Countable_Range) 
+      -> Result : optional Bound_Type is
+        if S.First <= S.Last then
+            Result := S.First
+            S := (First => Result+1, Last => S.Last)
+        else
+            Result := null
+        end if
+    end func Remove_First
+        
+    func Remove_Last(var S : Countable_Range) 
+      -> Result : optional Bound_Type is
+        if S.First <= S.Last then
+            Result := S.Last
+            S := (First => S.First, Last => Result-1)
+        else
+            Result := null
+        end if
+    end func Remove_Last
+
+    func Remove_Any(var S : Countable_Range) 
+      -> Result : optional Bound_Type is
+        //  NOTE: Optimized to minimize calls on Bound_Type operations
+        const Diff := S.Last - S.First
+        if Diff >= 0 then
+            if Diff mod 2 == 0 then
+                Result := S.First
+                S := (First => Result+1, Last => S.Last)
+            else
+                Result := S.Last
+                S := (First => S.First, Last => Result-1)
+            end if
+        else
+            return null
+        end if
+    end func Remove_Any
+
+    op "=?"(Left, Right : Countable_Range) -> Ordering is
+    //  Return #equal if Left.First == Right.First and Left.Last == Right.Last
+    //  Return #less if Left.Last < Right.First
+    //  Return #greater Left.First > Right.Last
+    //  Return #unordered otherwise (i.e. they overlap and are not identical)
+        if Left.Last < Right.First then
+           return #less
+        elsif Left.First > Right.Last then
+           return #greater
+        elsif Left.First == Left.First
+          and then Left.Last == Right.Last
+        then
+           return #equal
+        else
+           return #unordered
+        end if
+    end op "=?"
+end class PSL::Core::Countable_Range
+
+func PSL::Test::Test_Countable_Range(A, X, Y : Integer) is
+    var R : Countable_Range<Integer> := X .. Y
+    Println(A | " in " | X | ".." | Y | "=" | ( A in R ))
+
+    for J in R loop 
+        Println("Remove_Any(" | X | ".." | Y | ") = " | J)
+    end loop
+
+    R := 1 .. 10
+    Println("R := 1..10");
+
+    for K in R reverse loop 
+        Println("Remove_Last(R) = " | K)
+    end loop
+
+    Println("Length(R) = " | Length(R))
+
+    for Num in 1 .. 11 forward loop
+       Print("R / " | Num | " =")
+       for each Piece of R / Num forward loop
+          if Length(Piece) == 0 then
+             Print (" []")
+          else
+             Print (" " | Piece.First | ".." | Piece.Last)
+          end if
+       end loop
+       Print('\n')
+    end loop
+end func PSL::Test::Test_Countable_Range

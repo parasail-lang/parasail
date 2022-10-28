@@ -1,0 +1,377 @@
+//  Initial work to see how a non-hashed univ-string might work.
+//  One idea is to allow the actual characters of the array to be shared,
+//  but always make it a "big" object.
+//  The other is to have more than one "null"-like value usable for
+//  other shared strings.
+//  Another would be to have a special representation for short strings,
+//  as well as distinguishing 8-bit vs. 16-bit vs. 32-bits/element strings.
+//  This is implemented on top of a Basic_Packed_Array
+interface PSL::Core::Non_Univ_String<> is
+    op "to_univ"(Val : Non_Univ_String) -> Univ_String
+    op "from_univ"(Str : Univ_String) -> Non_Univ_String
+
+    op "*"(Left : Univ_Integer; Right : Non_Univ_String) -> Non_Univ_String
+	// Produce specified number of "Right" strings in a row
+    op "*"(Left : Non_Univ_String; Right : Univ_Integer) -> Non_Univ_String
+	// Produce specified number of "Left" strings in a row
+
+    op "|"(Left, Right : Non_Univ_String) -> Non_Univ_String 
+
+    op "=?"(Left, Right : Non_Univ_String) -> Ordering
+
+    op "|="(var Left : Non_Univ_String; Right : Non_Univ_String)
+
+    op "|="(var Left : Non_Univ_String; Right : Right_Type is Imageable<>)
+
+    op "indexing"(Str : Non_Univ_String; Index : Univ_Integer<>)
+      -> Univ_Character
+	// a "read-only" element, indexed 1 .. |Str|
+
+    op "index_set"(Str : Non_Univ_String) -> Countable_Set<Univ_Integer>
+        // Return set of indices for string
+
+    op "slicing"(Str : Non_Univ_String;
+      Index_Set : Countable_Range<Univ_Integer>) 
+      -> Non_Univ_String
+	// a "read-only" slice
+
+    func Length(Str : Non_Univ_String) -> Univ_Integer
+
+    op "magnitude"(Non_Univ_String) -> Univ_Integer is Length
+
+    func Hash(Val : Non_Univ_String) -> Univ_Integer
+
+    // Operations to convert to/from a Vector of Univ_Character's
+    func To_Vector(Str : Non_Univ_String) -> Vector<Univ_Character>
+    func From_Vector(Vec : Vector<Univ_Character>) -> Non_Univ_String
+
+    func Dump()
+
+  implements for Imageable
+    // These operations are needed so Non_Univ_String satifies
+    // requirements of "Imageable" interface
+
+    func To_String(Val : Non_Univ_String) -> Univ_String is "to_univ"
+    func From_String(Str : Univ_String) -> optional Non_Univ_String
+      is "from_univ"
+
+end interface PSL::Core::Non_Univ_String
+    
+class PSL::Core::Non_Univ_String is
+    type Substr_Array is Basic_Array<Non_Univ_String>
+
+    var Parts : optional Substr_Array
+
+    type Field is Enum<[#Hash, #Length, #Kind]>
+      //  Low 32 bits = hash
+      //  Next 24 bits = length (total number of characters)
+      //  Next 3 bits select 0 = array of 8-bit chars,
+      //                     1 = array of 16-bit chars,
+      //                     2 = array of 31-bit chars,
+      //                     3 = array of substrs (Max num sub-strs = 16)
+      //                     4 = array of substrs (all sub-strs 8*256 chrs)
+      //                     5 = array of substrs (all substrs 8*256^2 chrs)
+      //                     6 = array of substrs (all substrs 8*256^3 chrs)
+
+    //  Enumeration of kind of array
+    type Kind_Enum is Enum<[#Array_8, #Array_16, #Array_31, #Array_Substr,
+      #Array_2K_Substr, #Array_512K_Substr, #Array_128M_Substr]>
+    
+    //  Number of characters per substr
+    const Array_2K_Multiplier := 2**11
+    const Array_512K_Multiplier := 2**19
+    const Array_128M_Multiplier := 2**27
+
+    //  Packed representation
+    type Info_Type is
+      Packed_Word<Field, [#Hash => 32, #Length => 24, #Kind => 3]>
+
+    var Info : Info_Type
+
+    const Hash_Modulus := 2**32
+
+    //  (unchecked) conversion routines to array of 8/16/31-bit chars
+    func To_Int_Array(ref Substr_Array)
+      -> ref Basic_Array<Univ_Integer> is import(#identity)
+
+    type Int8 is Integer<0 .. 2**8-1>
+    type Int8_Array is Basic_Packed_Array<Int8>
+
+    func To_Int8_Array(ref Substr_Array) -> ref Int8_Array
+      is import(#identity)
+
+    func From_Int8_Array(ref Int8_Array) -> ref Substr_Array
+      is import(#identity)
+
+    type Int16 is Integer<0 .. 2**16-1>
+    type Int16_Array is Basic_Packed_Array<Int16>
+
+    func To_Int16_Array(ref Substr_Array) -> ref Int16_Array
+      is import(#identity)
+
+    func From_Int16_Array(ref Int16_Array) -> ref Substr_Array
+      is import(#identity)
+
+    type UChar_Array is
+      Basic_Packed_Array<Univ_Character>
+
+    func To_UChar_Array(ref Substr_Array) -> ref UChar_Array
+      is import(#identity)
+
+    func From_UChar_Array(ref UChar_Array) -> ref Substr_Array
+      is import(#identity)
+
+    const Char_First := Univ_Character::First()
+
+    func Hash_Vec(Vec : Vector<Univ_Character>) -> Univ_Integer is
+       return (for I in 1 .. |Vec| reverse =>
+         (<0> * 127 + (Vec[I] - Char_First)) mod Hash_Modulus)
+    end func Hash_Vec
+
+  exports
+    op "to_univ"(Val : Non_Univ_String) -> Univ_String is
+        return Univ_String::From_Vector(Non_Univ_String::To_Vector(Val))
+    end op "to_univ"
+        
+    op "from_univ"(Str : Univ_String) -> Non_Univ_String is
+        return Non_Univ_String::From_Vector(Univ_String::To_Vector(Str))
+    end op "from_univ"
+
+    op "|"(Left, Right : Non_Univ_String) -> Non_Univ_String is
+        return From_Vector(To_Vector(Left) | To_Vector(Right))
+    end op "|"
+
+    op "=?"(Left, Right : Non_Univ_String) -> Ordering is
+        const Right_Len := |Right|
+        const Left_Len  := |Left|
+        for I in 1 .. Left_Len forward loop
+            if I > Right_Len then
+                --  Right ended first
+                return #greater
+            elsif Left[I] != Right[I] then
+                return Left[I] =? Right[I]
+            end if
+        end loop
+        if Right_Len > Left_Len then
+            -- Left ended first
+            return #less
+        else
+            return #equal
+        end if
+    end op "=?"
+
+    op "indexing"(Str : Non_Univ_String; Index : Univ_Integer<>)
+      -> Univ_Character is
+	// a "read-only" element, indexed 1 .. |Str|
+        const Len := Str.Info[#Length]
+        const Kind := Str.Info[#Kind] + Kind_Enum::First()
+
+        {Index in 1 .. Len}
+
+        case Kind of
+          [#Array_8] =>
+           ref Arr => To_Int8_Array(Str.Parts)
+           return Char_First + Arr[Index]
+
+          [#Array_16] =>
+           ref Arr => To_Int16_Array(Str.Parts)
+           return Char_First + Arr[Index]
+
+          [#Array_31] =>
+           ref Arr => To_UChar_Array(Str.Parts)
+           return Arr[Index]
+
+          [#Array_Substr] =>
+           //  Heterogeneous substrings, need to iterate
+           var I := Index
+           for each Substr of Str.Parts forward loop
+              const Len_Substr := |Substr|
+              if I <= Len_Substr then
+                 //  Recurse with appropriate substring
+                 return Substr[I]
+              end if
+              //  Substract out length of this substring and move on to next
+              I -= Len_Substr
+           end loop
+
+          [#Array_2K_Substr] =>
+           //  All substrings are 2**11 chars
+           ref Substr => Str.Parts[(Index-1)/Array_2K_Multiplier + 1]
+           const Subindex := (Index-1) mod Array_2K_Multiplier + 1
+           //  Recurse with appropriate substring
+           return Substr[Subindex]
+
+          [#Array_512K_Substr] =>
+           //  All substrings are 2**19 chars
+           ref Substr => Str.Parts[(Index-1)/Array_512K_Multiplier + 1]
+           const Subindex := (Index-1) mod Array_512K_Multiplier + 1
+           //  Recurse with appropriate substring
+           return Substr[Subindex]
+
+          [#Array_128M_Substr] =>
+           //  All substrings are 2**27 chars
+           ref Substr => Str.Parts[(Index-1)/Array_128M_Multiplier + 1]
+           const Subindex := (Index-1) mod Array_128M_Multiplier + 1
+           //  Recurse with appropriate substring
+           return Substr[Subindex]
+
+          [..] => {#false}
+        end case
+    end op "indexing"
+
+    op "slicing"(Str : Non_Univ_String;
+      Index_Set : Countable_Range<Univ_Integer>) 
+      -> Non_Univ_String is
+	// a "read-only" slice
+        return From_Vector(To_Vector(Str)[Index_Set])
+    end op "slicing"
+
+    func Length(Str : Non_Univ_String) -> Univ_Integer is (Str.Info[#Length])
+
+    func Hash(Val : Non_Univ_String) -> Univ_Integer
+      is (Val.Info[#Hash])
+
+    op "|="(var Left : Non_Univ_String; Right : Right_Type is Imageable<>) is
+        var Right_Str : Non_Univ_String for Left := To_String(Right)
+        Left := Left | Right_Str
+    end op "|="
+
+    op "|="(var Left : Non_Univ_String; Right : Non_Univ_String) is
+        if Right is null then
+            Left |= "null"
+        else
+            Left := Left | Right
+        end if
+    end op "|="
+
+    // Operations to convert to/from a Vector of Univ_Character's
+    func To_Vector(Str : Non_Univ_String)
+      -> Result : Vector<Univ_Character> is
+        const Len := Str.Info[#Length]
+        const Kind := Str.Info[#Kind] + Kind_Enum::First()
+
+        case Kind of
+          [#Array_8] =>
+           ref Arr => To_Int8_Array(Str.Parts)
+           return [for I in 1 .. Len => Char_First + Arr[I]]
+          [#Array_16] =>
+           ref Arr => To_Int16_Array(Str.Parts)
+           return [for I in 1 .. Len => Char_First + Arr[I]]
+          [#Array_31] =>
+           ref Arr => To_UChar_Array(Str.Parts)
+           return [for I in 1 .. Len => Arr[I]]
+          [..] =>
+           Result := []
+           for each Substr of Str.Parts forward loop
+              if |Substr| == 0 then
+                 exit loop
+              else
+                 Result |= To_Vector(Substr)
+              end if
+           end loop
+        end case
+    end func To_Vector
+
+    func From_Vector(Vec : Vector<Univ_Character>)
+      -> Result : Non_Univ_String is
+       const Max_Char := (for each C of Vec => Max(<null>, C))
+       const Max_Val := Max_Char - Univ_Character::First()
+       const Len := |Vec|
+       if Max_Val < 2**8 then
+          var Arr : optional Int8_Array := Create(Len, 0)
+          for I in 1..Len forward loop
+             Set_Nth_Elem(Arr, I, Vec[I] - Univ_Character::First())
+          end loop
+          Result := (Parts <== From_Int8_Array(Arr),
+                     Info => Create([#Hash => Hash_Vec(Vec),
+                              #Length => Len,
+                              #Kind => #Array_8 - Kind_Enum::First()]))
+       elsif Max_Val < 2**16 then
+          var Arr : optional Int16_Array := Create(Len, 0)
+          for I in 1..Len forward loop
+             Set_Nth_Elem(Arr, I, Vec[I] - Univ_Character::First())
+          end loop
+          Result := (Parts <== From_Int16_Array(Arr),
+                     Info => Create([#Hash => Hash_Vec(Vec),
+                              #Length => Len,
+                              #Kind => #Array_16 - Kind_Enum::First()]))
+       else
+          var Arr : optional UChar_Array := Create(Len, '\0')
+          for I in 1..Len forward loop
+             Set_Nth_Elem(Arr, I, Vec[I])
+          end loop
+          Result := (Parts <== From_UChar_Array(Arr),
+                     Info => Create([#Hash => Hash_Vec(Vec),
+                              #Length => Len,
+                              #Kind => #Array_31 - Kind_Enum::First()]))
+       end if
+    end func From_Vector
+
+    op "index_set"(Str : Non_Univ_String) -> Countable_Set<Univ_Integer> is
+        // Return set of indices for string
+        return 1..|Str|
+    end op "index_set"
+
+    op "*"(Left : Univ_Integer; Right : Non_Univ_String) -> Non_Univ_String is
+	// Produce specified number of "Right" strings in a row
+	if Left <= 0 then
+	    return ""
+	elsif Left == 1 then
+	    return Right
+	else
+	    // Recurse to produce half-length, and then combine
+	    const Partial : Non_Univ_String := (Left/2) * Right
+	    if Left mod 2 == 1 then
+		return Partial | Partial | Right
+	    else
+		return Partial | Partial
+	    end if
+	end if
+    end op "*"
+
+    op "*"(Left : Non_Univ_String; Right : Univ_Integer) -> Non_Univ_String is
+	// Produce specified number of "Left" strings in a row
+	return Right * Left   // Just pass the buck to other "*"
+    end op "*"
+
+    func Dump() is
+        Println("Int8_Array::Dump():")
+        Int8_Array::Dump()
+        Println("Int16_Array::Dump():")
+        Int16_Array::Dump()
+        Println("UChar_Array::Dump():")
+        UChar_Array::Dump()
+        Println("Info_Type::Dump_Constant_Info():");
+        Info_Type::Dump_Constant_Info()
+    end func Dump
+
+end class PSL::Core::Non_Univ_String
+
+func PSL::Test::Test_NU_String() is
+    Non_Univ_String::Dump()
+    const U : Non_Univ_String := "tab\t"
+    const T := U[4]
+    Println("U = '" | U | "', |U| = " | |U| | ", U[4] = '" | T | "'")
+    const X : Non_Univ_String := "this is a string"
+    const Y := X[3]
+    {Y == 'i'} // string indexing problem
+    const Z := X[6..7]
+    {Z == "is"} // string slicing problem, expected 'is', found Z 
+    Println("X = '" | X | "', X[3] = '" | Y | "', X[6..7] = '" | Z | "'")
+
+    Println("About to indent 4 and then print 'hello'")
+    Println(4 * " " | "hello")
+
+    const Seven_Xs : Non_Univ_String := "x" * 7
+    {Seven_Xs == "xxxxxxx"} // Char multiplication check
+
+    Println("Here are seven x's: " | Seven_Xs)
+    
+    Print("Here are 6 y's: ")
+    Println('y' * 6)
+end func PSL::Test::Test_NU_String
+
+import PSL::Test::Test_NU_String;
+func main(Args : Basic_Array<Univ_String>) is
+   PSL::Test::Test_NU_String ();
+end func main;

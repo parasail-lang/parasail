@@ -1,0 +1,350 @@
+interface PSL::Containers::Ordered_Set<Element_Type is Comparable<>> is
+  // A set over individual but ordered elements
+    op "[]"() -> Ordered_Set
+
+    func Singleton(Elem : Element_Type) -> Ordered_Set
+
+    op "|"(Left, Right : Element_Type) -> Ordered_Set
+    op "|"(Left : Ordered_Set; Right : Element_Type) 
+      -> Ordered_Set
+    op "|"(Left : Element_Type; Right : Ordered_Set) 
+      -> Ordered_Set
+    op "|"(Left : Ordered_Set; Right : Ordered_Set) 
+      -> Ordered_Set
+
+    op "|="(var Left : Ordered_Set; Right : Element_Type)
+    op "|="(var Left : Ordered_Set; Right : Ordered_Set)
+
+    op "<|="(var Left : Ordered_Set; var Right : optional Element_Type)
+        // Move element into set, leaving Right null afterward.
+
+    op "<|="(var Left : Ordered_Set; var Right : Ordered_Set)
+        // Move all elements of Right into Left, leaving Right empty.
+
+    op "-"(Left, Right : Ordered_Set) -> Ordered_Set
+      // Set difference
+    op "-"(Left : Ordered_Set; Right : Element_Type) 
+      -> Ordered_Set
+      // Remove one element
+    op "-="(var S : Ordered_Set; Elem : Element_Type)
+      // Remove the given element from the set, if present
+    op "-="(var Left : Ordered_Set; Right : Ordered_Set)
+      // Remove all elements of Right from Left, if present
+
+    op "or"(Left : Ordered_Set; Right : Ordered_Set) 
+      -> Ordered_Set is "|"   // union
+    op "or="(var Left : Ordered_Set; Right : Ordered_Set)
+      is "|="
+
+    op "+"(Left : Ordered_Set; Right : Ordered_Set) 
+      -> Ordered_Set is "|"   // Union
+    op "+="(var Left : Ordered_Set; Right : Ordered_Set)
+      is "|="
+    op "+="(var Left : Ordered_Set; Right : Element_Type) is "|="
+   
+    op "and"(Left, Right : Ordered_Set) -> Ordered_Set
+        // Intersection
+    op "and="(var Left : Ordered_Set; Right : Ordered_Set)
+
+    op "xor"(Left, Right : Ordered_Set) -> Ordered_Set
+        // Symmetric difference
+    op "xor="(var Left : Ordered_Set; Right : Ordered_Set)
+
+    op "in"(Left : Element_Type; Right : Ordered_Set) -> Boolean
+
+    op "=?"(Left, Right : Ordered_Set) -> Ordering
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left is a proper subset of Right
+        // Return #greater if Left is a proper superset of Right
+        // Return #unordered otherwise
+
+    func Count(S : Ordered_Set) -> Univ_Integer
+
+    op "magnitude"(Ordered_Set) -> Univ_Integer is Count
+
+    func Is_Empty(S : Ordered_Set) -> Boolean
+
+    func First(S : Ordered_Set) -> optional Element_Type
+    func Last(S : Ordered_Set) -> optional Element_Type
+    func Any_Element(S : Ordered_Set) -> optional Element_Type
+
+    func Next(S : Ordered_Set; E : Element_Type) -> optional Element_Type
+      // Return minimum element in Set greater than E, or null if none
+    func Prev(S : Ordered_Set; E : Element_Type) -> optional Element_Type
+      // Return maximum element in Set less than E, or null if none
+
+    func Min_No_Less(S : Ordered_Set; E : Element_Type)
+      -> optional Element_Type
+      // Return minimum element in Set no less than E, or null if none
+    func Max_No_Greater(S : Ordered_Set; E : Element_Type)
+      -> optional Element_Type
+      // Return maximum element in Set no greater than E, or null if none
+
+    func Remove_First(var S : Ordered_Set) -> optional Element_Type
+        // Remove first element of set (lowest value)
+
+    func Remove_Last(var S : Ordered_Set) -> optional Element_Type
+        // Remove last element of set (highest value)
+
+    func Remove_Any(var S : Ordered_Set) -> optional Element_Type
+        // Remove an arbitrary element of set
+
+end interface PSL::Containers::Ordered_Set
+
+class PSL::Containers::Ordered_Set is
+
+    var Items : optional AA_Tree<Element_Type>
+    var Count := 0
+
+  exports
+    op "[]"() -> Ordered_Set is
+        return (Items => [], Count => 0)
+    end op "[]"
+
+    func Singleton(Elem : Element_Type) -> Result : Ordered_Set is
+        Result := []
+        Result.Items |= Elem
+        Result.Count := 1
+    end func Singleton
+
+    op "|"(Left, Right : Element_Type) -> Result : Ordered_Set is
+        Result := [];
+        Result.Items |= Left;
+        Result.Items |= Right;
+        Result.Count := Count(Result.Items)
+    end op "|"
+
+    op "|"(Left : Ordered_Set; Right : Element_Type) 
+      -> Result : Ordered_Set is
+        Result := Left
+        Result.Items |= Right
+        Result.Count := Count(Result.Items)
+    end op "|"
+
+    op "|"(Left : Element_Type; Right : Ordered_Set) 
+      -> Ordered_Set is
+        return Right | Left
+    end op "|"
+
+    op "|"(Left : Ordered_Set; Right : Ordered_Set) 
+      -> Result : Ordered_Set is
+        Result := Left
+        Result |= Right
+    end op "|"
+
+    op "|="(var Left : Ordered_Set; Right : Element_Type) is
+        Left.Items |= Right;
+        Left.Count := Count(Left.Items)
+    end op "|="
+
+    op "<|="(var Left : Ordered_Set; var Right : optional Element_Type)
+      is
+        // Move element into set, leaving Right null afterward.
+        Left.Items <|= Right
+        Left.Count := Count(Left.Items)
+    end op "<|="
+
+    op "<|="(var Left : Ordered_Set; var Right : Ordered_Set)
+      is
+        // Move all elements of Right into Left, leaving Right empty.
+        if Left.Count == 0 then
+            Left.Items <== Right.Items
+            Left.Count := Right.Count
+            Right.Count := 0
+        else
+            // Iterate through the tree
+            loop
+                // Extract element from right
+                var Elem for Left := Remove_Any(Right)
+
+                if Elem is null then
+                    Left.Count := Count(Left.Items)
+                    return   // All done
+                end if
+
+                Left.Items <|= Elem
+
+            end loop
+        end if
+    end op "<|="
+
+    op "|="(var Left : Ordered_Set; Right : Ordered_Set) is
+        // Pass the buck to the "<|=" operation
+        var Right_Copy for Left := Right
+        Left <|= Right_Copy
+    end op "|="
+
+    op "-"(Left, Right : Ordered_Set) 
+      -> Result : Ordered_Set is
+      // Set difference
+        Result := Left
+        Result -= Right
+    end op "-"
+
+    op "-"(Left : Ordered_Set; Right : Element_Type)
+      -> Result : Ordered_Set is
+      // Remove one element
+        Result := Left
+        Result -= Right
+    end op "-"
+        
+    op "-="(var S : Ordered_Set; Elem : Element_Type) is
+      // Remove the given element from the set, if present
+        Delete(S.Items, Elem);
+        S.Count := Count(S.Items)
+    end op "-="
+
+    op "-="(var Left : Ordered_Set; Right : Ordered_Set) is
+      // Remove all elements of Right from Left, if present
+        for Elem in Right loop
+            Left -= Elem
+        end loop
+    end op "-="
+
+    op "and"(Left, Right : Ordered_Set)
+      -> Result : Ordered_Set is
+        // Intersection
+        Result := []
+        for Elem in Right loop
+            if Elem in Left then
+                Result += Elem
+            end if
+        end loop
+    end op "and"
+
+    op "and="(var Left : Ordered_Set; Right : Ordered_Set) is
+        // Intersection
+        for Elem in Left loop
+            if Elem not in Right then
+                Left -= Elem
+            end if
+        end loop
+    end op "and="
+
+    op "xor"(Left, Right : Ordered_Set) 
+      -> Result : Ordered_Set is
+        // Symmetric difference
+        Result := Left
+        Result xor= Right
+    end op "xor"
+
+    op "xor="(var Left : Ordered_Set; Right : Ordered_Set) is
+        // Symmetric difference
+        // Want elements that are only in one of the two inputs
+        for Elem in Right loop
+            if Elem in Left then
+                Left -= Elem
+            else
+                Left += Elem
+            end if
+        end loop
+    end op "xor="
+
+    op "in"(Left : Element_Type; Right : Ordered_Set) -> Boolean is
+        return Overlapping(Right.Items, Left) not null
+    end op "in"
+
+    op "=?"(Left, Right : Ordered_Set) -> Ordering is
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left is a proper subset of Right
+        // Return #greater if Left is a proper superset of Right
+        // Return #unordered otherwise
+        var Overlaps := 0
+        var Missing := 0
+        for Elem in Left loop
+            if Elem not in Right then
+                Missing += 1
+            else
+                Overlaps += 1
+            end if
+        end loop
+
+        if Missing > 0 then
+            // Can't be equal, but Left might be a proper superset
+            if Overlaps < Count(Right) then
+                return #unordered
+            else
+                // Left is a superset
+                return #greater
+            end if
+        else
+            // Might be equal or Left might be a proper subset
+            if Overlaps < Count(Right) then
+                // Left is a proper subset of Right
+                return #less
+            else
+                return #equal
+            end if
+        end if
+    end op "=?"
+
+    func Count(S : Ordered_Set) -> Result : Univ_Integer is
+        // Return count of items in set
+        return S.Count;
+    end func Count
+
+    func Is_Empty(S : Ordered_Set) -> Boolean is
+        return S.Count == 0;
+    end func Is_Empty
+
+    func First(S : Ordered_Set) -> optional Element_Type is
+        return First(S.Items);
+    end func First
+
+    func Last(S : Ordered_Set) -> optional Element_Type is
+        return Last(S.Items);
+    end func Last
+
+    func Any_Element(S : Ordered_Set) -> optional Element_Type is
+        return Any_Element(S.Items);
+    end func Any_Element
+
+    func Next(S : Ordered_Set; E : Element_Type) -> optional Element_Type is
+      // Return minimum element in Set greater than E, or null if none
+        return Next(S.Items, E);
+    end func Next
+
+    func Prev(S : Ordered_Set; E : Element_Type) -> optional Element_Type is
+      // Return maximum element in Set less than E, or null if none
+        return Prev(S.Items, E);
+    end func Prev
+
+    func Min_No_Less(S : Ordered_Set; E : Element_Type)
+      -> optional Element_Type is
+      // Return minimum element in Set no less than E, or null if none
+        return Min_No_Less(S.Items, E);
+    end func Min_No_Less
+
+    func Max_No_Greater(S : Ordered_Set; E : Element_Type)
+      -> optional Element_Type is
+      // Return maximum element in Set no greater than E, or null if none
+        return Max_No_Greater(S.Items, E)
+    end func Max_No_Greater
+
+    func Remove_First(var S : Ordered_Set) 
+      -> Result : optional Element_Type is
+        // Return first element of set
+        Result := Remove_First(S.Items)
+        if Result not null then
+           S.Count -= 1
+        end if
+    end func Remove_First
+
+    func Remove_Last(var S : Ordered_Set) 
+      -> Result : optional Element_Type is
+        // Remove last element of set
+        Result := Remove_Last(S.Items);
+        if Result not null then
+           S.Count -= 1
+        end if
+    end func Remove_Last
+
+    func Remove_Any(var S : Ordered_Set) -> Result : optional Element_Type is
+        // Remove any element of set
+        Result := Remove_Any(S.Items);
+        if Result not null then
+           S.Count -= 1
+        end if
+    end func Remove_Any
+
+end class PSL::Containers::Ordered_Set

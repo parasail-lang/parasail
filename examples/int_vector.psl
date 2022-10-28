@@ -1,0 +1,98 @@
+interface Int_Vector<> is
+    type Element_Type is Univ_Integer<>;
+
+    op "[]"() -> Int_Vector;
+    op "indexing"(ref V : Int_Vector; Index : Univ_Integer) -> 
+      ref Element_Type;
+    op "|="(var V : Int_Vector; Elem : Element_Type);
+    op "|"(Left, Right : Int_Vector) -> Int_Vector;
+    func Length(V : Int_Vector) -> Univ_Integer;
+end interface Int_Vector;
+    
+class Int_Vector is
+
+    var Count : Univ_Integer := 0;
+    var Data : optional Basic_Array<Element_Type>;
+  exports
+    op "[]"() -> Int_Vector is
+	return (Count => 0, Data => null);
+    end op "[]";
+
+    func Length(V : Int_Vector) -> Univ_Integer is
+        return V.Count;
+    end func Length;
+
+    op "indexing"(ref V : Int_Vector; Index : Univ_Integer) -> 
+      ref Element_Type is
+	if V.Data is null then
+	    Println("V.Data is null when indexing!");
+	    V.Data := Create(42, 42);
+	end if;
+	return V.Data[Index];
+    end op "indexing";
+
+    op "|="(var V : Int_Vector; Elem : Element_Type) is
+	if V.Data is null then
+	    Println("V.Data is null, creating a non-null array");
+	    V.Data := Create(100, null);
+	    if V.Data not null then
+		Println("V.Data no longer null");
+	    else
+		Println("V.Data is still null?!");
+	    end if;
+	else
+	    Println("V.Data not null, Length(V.Data) = " | Length(V.Data));
+	end if;
+	V.Count += 1;
+	Println("V.Count bumped to " | V.Count);
+	Println("Length(V.Data) now " | Length(V.Data));
+	V.Data[V.Count] := Elem;
+    end op "|=";
+    
+    op "|"(Left, Right : Int_Vector) -> Result : Int_Vector is
+	// Copy left into result, and then add in the Right elements
+	if Left.Count == 0 then
+	    // Left is null Int_Vector; result is determined by Right
+	    Result := Right;
+	else
+	    // Start with Left
+	    Result := Left;
+	    Println("-> length starts at " | Length(Result));
+	    // TBD: Expand capacity to make sure there is room
+	    // Assign all elements of Right into tail of Result.
+	    var I : Univ_Integer := 1;
+	    while I <= Length(Right) loop
+		Result |= Right[I];
+		Println("-> length now " | Length(Result));
+		I += 1;
+	    end loop;
+	end if;
+	Println("Final combined length = " | Length(Result));
+    end op "|";
+
+end class Int_Vector;
+
+func Test_Int_Vector() is
+    var V1 : Int_Vector<> := [];
+    V1 |= 5;
+
+    Println("Length of V1 = " | Length(V1));
+    var V2 : Int_Vector<> := V1;
+
+    Println("Length of V2 = " | Length(V2));
+    V1 |= 7;
+    Println("Length of V1 = " | Length(V1));
+    V2 |= 37;
+    Println("Length of V2 = " | Length(V2));
+    V2 |= 42;
+    Println("Length of V2 = " | Length(V2));
+    var V3 := V1 | V2 ; // | V1;
+    Println("Length of V3 = " | Length(V3));
+    Println("Length of V3 = " | Length(V3) | ", V3[4] = " | V3[4]);
+    var V4 := V1 | V3;
+    Println("Length of V4 = " | Length(V4));
+    V1 := V4;
+    Println("Length of V1 = " | Length(V1));
+    Println("Length of V1 = " | Length(V1) | ", V1[1] = " | V1[1]);
+    Println("Length of V1 = " | Length(V1) | ", V1[4] = " | V1[4]);
+end func Test_Int_Vector;

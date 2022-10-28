@@ -1,0 +1,5 @@
+concurrent interface Point<> is
+   func Create(V : Univ_Integer) -> Point
+   func Get(P : Point) -> Univ_Integer
+   func Set(locked var P : Point; X : Univ_Integer)
+end interface Point

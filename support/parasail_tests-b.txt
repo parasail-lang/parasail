@@ -1,0 +1,5 @@
+# This file contains tests which must fail at compile time (B-Tests)
+# ------------------------------------------------------------------
+ error_test.psl
+ extend_errs.psl
+ race_cond.psl

@@ -1,0 +1,909 @@
+import Cairo::*
+import GTK::*
+
+concurrent interface GTK<> is
+
+    type Location is Float<Digits => 11>
+    type Widget_Id is new Univ_Integer
+
+    func Init
+       (var IO; 
+        Args : Vector<Univ_String> := []) -> GTK
+
+    func Main_Loop (var GTK; var Controller+)
+
+    func Main_Quit (var GTK)
+
+    // These operations are used to create a mapping between
+    // Widget_Id and Widget+
+
+    func Enter_Widget(locked var GTK; Widget+) 
+      // Add widget to table of widgets indexed by widget id
+      // NOTE: This must be called in *every* widget constructor (e.g. "New"),
+      //       including those for user-defined extensions of existing
+      //       widget types.
+
+    func Get_Widget(locked ref GTK; Widget_Id) -> ref optional Widget+
+      // Get widget given widget id
+
+end interface GTK
+
+interface GTK::Controller<> is
+    // Extend this to create your overall GTK application.
+    // Its components would be the underlying "model" as well as
+    // the "view" components, such as the Top-level Window, buttons,
+    // and other widgets.  The constructor function for your controller
+    // would take an init'ed GTK and create these widgets.
+    // When you are ready, you call the Main_Loop func of GTK
+    // passing in your controller.
+
+    // The operations below should be overridden to handle corresponding
+    // signals.  If not overridden, then the default action occurs.
+    // If overridden, for those with a Boolean return value, returning 
+    // #true suppresses the default action, returning #false allows the 
+    // default action to occur as well.
+    // The Widget parameter identifies which widget generated the signal.
+
+    // An instance of your controller is passed to GTK::Main_Loop
+    // along with an instance of an init'ed GTK which was used
+    // when creating the widgets.
+    // Once in the main loop, this instance of GTK will call back to 
+    // the controller to handle all signals.
+
+    // TBD: The handler operations that say "is (null)" should be declared
+    //      "optional" instead, once "optional" operations are supported.
+
+    var GTK : GTK;
+
+    func On_Clicked (var Controller; var Widget+) is (null)
+
+    func On_Button_Press_Event
+      (var Controller; var Widget+; Event_Button) -> Boolean is (#false)
+    func On_Button_Release_Event
+      (var Controller; var Widget+; Event_Button) -> Boolean is (#false)
+
+    func On_Draw (var Controller; var Widget+; var Cairo::Context) -> Boolean
+
+    func On_Key_Press_Event (var Controller; var Widget+; Event_Key) -> Boolean
+      is (#false)
+    func On_Key_Release_Event (var Controller; var Widget+; Event_Key)
+      -> Boolean
+      is (#false)
+
+    func On_Delete_Event (var Controller; var Window+; Event) -> Boolean
+
+    func On_Destroy (var Controller; var Window+)
+
+    func Main_Loop (var Controller+)
+
+    func Get_Widget(ref Controller; Widget_Id) -> ref optional Widget+
+end interface GTK::Controller
+
+class GTK::Controller is
+  exports
+
+    func Main_Loop (var Controller+) is
+        Controller.GTK.Main_Loop (Controller)
+    end func Main_Loop
+
+    func Get_Widget(ref Controller; Widget_Id) -> ref optional Widget+ is
+        return Controller.GTK.Get_Widget(Widget_Id)
+    end func Get_Widget
+
+    func On_Delete_Event (var Controller; var Window+; Event) -> Boolean is
+        // Default is to destroy the window
+        Window.Destroy()
+        return #false
+    end func On_Delete_Event
+
+    func On_Destroy (var Controller; var Window+) is
+        // Default is to call Main_Quit
+        Println ("On_Destroy for widget " | Get_Widget_Id(Window) |
+          " about to call Main_Quit");
+        Controller.GTK.Main_Quit()
+    end func On_Destroy
+
+    func On_Draw (var Controller; var Widget+; var Cairo::Context) -> Boolean is
+        // Indicate whether default is executed
+        Println ("Controller On_Draw default executed, " |
+          "calling Widget.On_Draw for widget " | Widget.Get_Widget_Id())
+        //   By default pass the buck to a widget-specific On_Draw routine
+        //   TBD: Might want to provide it with the Controller as a parameter
+        const Result := On_Draw(Widget, Context)
+        Println (" returning " | Result |
+          " from Widget.On_Draw for widget " | Widget.Get_Widget_Id())
+
+        if Result is null then
+           return #false
+        else
+           return Result
+        end if
+    end func On_Draw
+
+end class GTK::Controller
+
+interface GTK::Event<> is
+    type Event_Type is Enum
+      <[#delete, #destroy, #expose,
+        #motion_notify, 
+        #button_press, #button_press_double, #button_press_triple,
+        #button_release,
+        #key_press, #key_release,
+        #enter_notify, #leave_notify,
+        #focus_change,
+        #configure,
+        #map, #unmap,
+        #property_notify,
+        #selection_clear, #selection_request, #selection_notify,
+        #proximity_in, #proximity_out,
+        #drag_enter, #drag_leave, #drag_motion, #drag_status,
+        #drop_start, #drop_finished,
+        #client_event,
+        #visibility_notify,
+        #no_expose,
+        #scroll,
+        #window_state,
+        #setting,
+        #owner_change,
+        #grab_broken,
+        #damage]>
+
+    type Event_Mask is Enum_Mask < Modular<2**31>,
+       [#exposure => 1 << 1,
+        #pointer_motion => 1 << 2,
+        #pointer_motion_hint => 1 << 3,
+        #button_motion => 1 << 4,
+        #left_button_motion => 1 << 5,
+        #middle_button_motion => 1 << 6,
+        #right_button_motion => 1 << 7,
+        #button_press => 1 << 8,
+        #button_release => 1 << 9,
+        #key_press => 1 << 10,
+        #key_release => 1 << 11,
+        #enter_notify => 1 << 12,
+        #leave_notify => 1 << 13,
+        #focus_change => 1 << 14,
+        #structure => 1 << 15,
+        #property_change => 1 << 16,
+        #visibility_notify => 1 << 17,
+        #proximity_in => 1 << 18,
+        #proximity_out => 1 << 19,
+        #substructure => 1 << 20,
+        #scroll => 1 << 21]>
+
+    type Modifier_Type is Enum_Mask < Modular<2**31>,
+       [#shift => 1 << 0,
+        #lock => 1 << 1,
+        #control => 1 << 2,
+        #mod1 => 1 << 3,
+        #mod2 => 1 << 4,
+        #mod3 => 1 << 5,
+        #mod4 => 1 << 6,
+        #mod5 => 1 << 7,
+        #button_left => 1 << 8,
+        #button_middle => 1 << 9,
+        #button_right => 1 << 10,
+        #button4 => 1 << 11,
+        #button5 => 1 << 12,
+
+        #super => 1 << 26,
+        #hyper => 1 << 27,
+        #meta => 1 << 28,
+
+        #release => 1 << 30]>
+
+    func Get_Type(Event) -> Event_Type
+      is import(#gdk_get_event_type)
+
+    // func Get_Window(Event) -> GDK::Window  -- TBD
+
+end interface GTK::Event
+
+interface GTK::Keyval<>
+  // Representation of unique keys on keyboard
+  extends Enum_With_Rep < Modular<2**31>,
+    [#alt_left => 0xffe9,
+     #alt_right => 0xffea,
+     #break => 0xff6b,
+     #caps_lock => 0xffe5,
+     #control_left => 0xffe3,
+     #control_right => 0xffe4,
+     #menu => 0xff67,
+     #num_lock => 0xff7f,
+     #scroll_lock => 0xff14,
+     #shift_left => 0xffe1,
+     #shift_right => 0xffe2,
+     #left => 0xff51,
+     #right => 0xff53,
+     #super_left => 0xffeb,
+     #super_right => 0xffec]> is
+
+    op "from_univ" (Univ : Univ_Character) -> Keyval
+      is import(#gdk_unicode_to_keyval)
+    op "to_univ" (Keyval) -> optional Univ_Character  
+      // returns null if not a char
+      is import(#gdk_keyval_to_unicode)
+
+    func To_String(Keyval) -> Univ_String
+      is import("null") --(#gdk_keyval_name)
+    func From_String(Univ_String) -> Keyval
+      is import("null") --(#gdk_keyval_from_name)
+
+end interface GTK::Keyval
+
+interface GTK::Event_Key<> extends GTK::Event is
+
+    func Get_Keyval(Event_Key) -> Keyval
+      is import(#gdk_event_key_get_keyval)
+    func Get_State(Event_Key) -> Event::Modifier_Type
+      is import(#gdk_event_get_state)
+end interface GTK::Event_Key
+
+interface GTK::Event_Button<> extends GTK::Event is
+    type Mouse_Button is Enum<[#back, #forward, #left, #middle, #right]>
+
+    func Get_Button(Event_Button) -> Mouse_Button
+      is import(#gdk_event_button_get_button)
+    func Get_State(Event_Button) -> Event::Modifier_Type
+      is import(#gdk_event_get_state)
+    func Get_X(Event_Button) -> Location
+      is import(#gdk_event_button_get_x)
+    func Get_Y(Event_Button) -> Location
+      is import(#gdk_event_button_get_y)
+end interface GTK::Event_Button
+
+interface GTK::Widget<> is
+  // The root of the GTK Widget hierarchy
+    const Id : Widget_Id;
+
+    func Get_Widget_Id(Widget) -> Widget_Id
+
+    func Set_Size_Request (var Widget; Width, Height : Univ_Integer)
+      is import(#gtk_widget_set_size_request)
+
+    func Show (var Widget)
+      is import(#gtk_widget_show)
+    func Show_All (var Widget)
+      is import(#gtk_widget_show_all)
+    func Queue_Draw (var Widget)
+      is import(#gtk_widget_queue_draw)
+
+    func Add_Events (var Widget; Event::Event_Mask)
+      is import(#gtk_widget_add_events)
+    func Set_Events (var Widget; Event::Event_Mask)
+      is import(#gtk_widget_set_events)
+
+    func Destroy (var Widget)
+      is import(#gtk_widget_destroy)
+
+    func Get_Allocated_Width (Widget) -> Univ_Integer
+      is import(#gtk_widget_get_allocated_width)
+    func Get_Allocated_Height (Widget) -> Univ_Integer
+      is import(#gtk_widget_get_allocated_height)
+
+    //  Following are TBD
+    func Activate (var Widget)
+      is import("null") --(#gtk_widget_activate)
+    func Get_Parent (Widget) -> Container+
+      is import("null") --(#gtk_widget_get_parent)
+    func Get_Toplevel (Widget) -> Widget+
+      is import("null") --(#gtk_widget_get_toplevel)
+
+    op "=?" (Left, Right : Widget) -> Ordering
+    func Hash (Widget) -> Univ_Integer
+
+    func On_Draw (var Widget; var Cairo::Context) -> Boolean
+      //  This is called by default from On_Draw routine of controller
+end interface GTK::Widget
+
+class GTK::Widget is
+
+  exports
+
+    func Get_Widget_Id(Widget) -> Widget_Id is
+        return Widget.Id
+    end func Get_Widget_Id
+
+    op "=?" (Left, Right : Widget) -> Ordering is
+      // Just equal or unordered, no ordering
+        if Left.Id == Right.Id then
+            return #equal
+        else
+            return #unordered
+        end if
+    end op "=?"
+
+    func Hash (Widget) -> Univ_Integer is
+        return Widget.Id
+    end func Hash
+
+    func On_Draw (var Widget; var Cairo::Context) -> Boolean is
+      //  This is called by default from On_Draw routine of controller
+        Println ("In default On_Draw for Widget " | Widget.Id)
+        return #false
+    end func On_Draw
+
+end class GTK::Widget
+
+interface GTK::Container<> extends GTK::Widget is
+
+    func Add (var Container; Element : Widget+)
+      is import(#gtk_container_add)
+    func Remove (var Container; Element : Widget+)
+      is import("null") --(#gtk_container_remove)
+
+    func Set_Border_Width (var Container; Width : Univ_Integer)
+      is import(#gtk_container_set_border_width)
+
+    func Get_Children (Container) -> Vector<Widget+>
+      is import("null") --(#gtk_container_get_children)
+end interface GTK::Container
+
+interface GTK::Table<> extends GTK::Container is
+    type Attach_Options is Enum<[#expand, #fill, #shrink]>
+
+    func New (var GTK; Rows, Column : Univ_Integer;
+      Homogeneous : Boolean) -> Table
+
+    func Attach (var Table; Child : Widget+;
+      Left_Attach, Right_Attach, Top_Attach, Bottom_Attach : Univ_Integer;
+      X_Options, Y_Options : optional Attach_Options := null;
+      X_Padding, Y_Padding : Univ_Integer := 0)
+      is import(#gtk_table_attach)
+
+    func Resize (var Table; Rows, Columns : Univ_Integer)
+      is import("null") --(#gtk_table_resize)
+
+    func Set_Column_Spacing (var Table;
+      Column : optional Univ_Integer := null; Spacing : Univ_Integer)
+      is import("null") --(#gtk_table_set_column_spacing)
+      
+    func Set_Row_Spacing (var Table;
+      Row : optional Univ_Integer := null; Spacing : Univ_Integer)
+      is import("null") --(#gtk_table_set_row_spacing)
+      
+end interface GTK::Table
+
+class GTK::Table is
+    func New (var GTK; Rows, Column : Univ_Integer;
+      Homogeneous : Boolean) -> Widget_Id
+      is import(#gtk_table_new)
+
+  exports
+    func New (var GTK; Rows, Column : Univ_Integer;
+      Homogeneous : Boolean) -> Result : Table is
+        Result := (Id => GTK.New(Rows, Column, Homogeneous))
+        GTK::Enter_Widget (GTK, Result)
+    end func New
+end class GTK::Table
+
+interface GTK::Bin<> extends GTK::Container is
+  // A container that only holds a single child widget
+
+    func Get_Child (GTK) -> Widget+
+      is import("null") --(#gtk_bin_get_child)
+end interface GTK::Bin
+
+interface GTK::Window<> extends GTK::Bin is
+  // A GTK Window
+    type Window_Type is Enum<[#toplevel, #popup]>
+
+    type Window_Position is
+      Enum<[#none, #center, #mouse, #center_always, #center_on_parent]>
+
+    func New (var GTK; Type : Window_Type := #toplevel) -> Window
+
+    func Get_Width (Window) -> Univ_Integer
+      is import("null") --(#gtk_window_get_width)
+    func Get_Height (Window) -> Univ_Integer
+      is import("null") --(#gtk_window_get_height)
+
+    func Get_Maximized (Window) -> Boolean
+      is import("null") --(#gtk_get_maximized)
+
+    func Resize (var Window; Width, Height : Univ_Integer)
+      is import(#gtk_window_resize)
+
+    func Set_Default_Size (var Window; Width, Height : Univ_Integer)
+      is import(#gtk_window_set_default_size)
+
+    func Set_Title (var Window; Title : Univ_String)
+      is import(#gtk_window_set_title)
+
+    func Set_Modal (var Window; Modal : Boolean)
+      is import("null") --(#gtk_window_set_modal)
+
+    func Set_Position (var Window; Position : Window_Position)
+      is import(#gtk_window_set_position)
+
+    func Present (var Window)
+      is import("null") --(#gtk_window_present)
+
+end interface GTK::Window
+
+class GTK::Window is
+    func New (var GTK; Type : Window_Type := #toplevel) -> Widget_Id
+      is import(#gtk_window_new)
+  exports
+    func New (var GTK; Type : Window_Type := #toplevel) -> Result : Window is
+        Result := (Id => GTK.New(Type))
+        GTK::Enter_Widget (GTK, Result)
+    end func New
+end class GTK::Window
+
+interface GTK::Button<> extends GTK::Bin is
+    func New (var GTK) -> Button
+    func New (var GTK; Label : Univ_String) -> Button
+
+    func Set_Label (var Button; Label : Univ_String)
+      is import("null") --(#gtk_button_set_label)
+    func Get_Label (Button) -> Univ_String
+      is import("null") --(#gtk_button_get_label)
+
+    func Emit_Clicked (var Button)
+      is import("null") --(#gtk_button_emit_clicked)
+end interface GTK::Button
+
+class GTK::Button is
+    func New (var GTK) -> Widget_Id
+      is import("null") -- (#gtk_button_new)
+    func New (var GTK; Label : Univ_String) -> Widget_Id
+      is import(#gtk_button_new_with_label)
+  exports
+
+    func New (var GTK) -> Result : Button is
+        Result := (Id => GTK.New())
+        GTK::Enter_Widget(GTK, Result)
+    end func New
+      
+    func New (var GTK; Label : Univ_String) -> Result : Button is
+        Result := (Id => GTK.New(Label))
+        GTK::Enter_Widget(GTK, Result)
+    end func New
+end class GTK::Button
+
+interface GTK::Event_Box<> extends GTK::Bin is
+    func New (var GTK) -> Event_Box
+
+    func Set_Above_Child (var Event_Box; Setting : Boolean)
+      is import("null") --(#gtk_event_box_set_above_child)
+    func Set_Visible_Window (var Event_Box; Setting : Boolean)
+      is import("null") --(#gtk_event_box_set_visible_window)
+end interface GTK::Event_Box
+
+class GTK::Event_Box is
+    func New (var GTK) -> Widget_Id
+      is import("null") --(#gtk_event_box_new)
+  exports
+    func New (var GTK) -> Result : Event_Box is
+        Result := (Id => GTK.New())
+        GTK::Enter_Widget(GTK, Result)
+    end func New
+end class GTK::Event_Box
+
+interface GTK::Drawing_Area<> extends GTK::Widget is
+    func New (var GTK) -> Drawing_Area
+end interface GTK::Drawing_Area
+
+class GTK::Drawing_Area is
+    func New (var GTK) -> Widget_Id
+      is import(#gtk_drawing_area_new)
+  exports
+    func New (var GTK) -> Result : Drawing_Area is
+        Result := (Id => GTK.New())
+        GTK::Enter_Widget(GTK, Result)
+    end func New
+end class GTK::Drawing_Area
+
+concurrent class GTK is
+    var Widget_Table : Map <Key_Type => Widget_Id, Value_Type => Widget+>
+    // This is a mapping between Widget_Id and Widget+
+
+    var Null_Widget : optional Widget+ := null;
+
+    var Hooks_Id : Univ_Integer := 0;  // Set when hooks established
+
+    func Do_GTK_Init(var IO; Args : Vector<Univ_String>)
+      is import(#gtk_init)
+
+    func Do_Main_Loop (var GTK; var Controller+)
+      is import(#gtk_main_loop)
+
+    func Do_Main_Quit (var GTK)
+      is import(#gtk_main_quit)
+
+    type G_Signal_Emission_Hook is 
+      func(var Controller+;
+           Widget_Id;
+           Param_Values : G_Value_Array) -> Boolean;
+
+    func To_Poly_Window(Widget+) -> Window+
+      is import(#identity)
+
+    type Signal_Id is new Univ_String;
+
+    interface G_Value<> is
+
+        func To_Event(G_Value) -> GTK::Event
+          is import(#g_value_to_event)
+        func To_Event_Key(G_Value) -> GTK::Event_Key
+          is import(#g_value_to_event)
+        func To_Event_Button(G_Value) -> GTK::Event_Button
+          is import(#g_value_to_event)
+        func To_Cairo_Context(G_Value) -> Cairo::Context
+          is import(#g_value_to_cairo_context)
+    end interface G_Value
+
+    interface G_Value_Array<> is
+        op "indexing"(G_Value_Array; Index : Univ_Integer) -> G_Value
+          is import(#g_value_array_indexing);
+    end interface G_Value_Array;
+
+    func G_Signal_Add_Emission_Hook
+       (Handler : G_Signal_Emission_Hook;
+        Signal : Signal_Id;
+        Object_Type : Univ_String;
+        var Controller+;
+        var Hooks_Id : Univ_Integer)
+      is import(#g_signal_add_emission_hook)
+
+    func G_Signal_Remove_Emission_Hooks (Hooks_Id : Univ_Integer)
+      is import(#g_signal_remove_emission_hooks)
+      //  Remove all emission hooks associated with given Hooks_Id
+
+    func Add_Window_Destroy_Hook
+       (Handler : G_Signal_Emission_Hook;
+        var Controller+;
+        var Hooks_Id : Univ_Integer)
+      is import(#gtk_add_window_destroy_hook)
+
+    func Button_Clicked_Handler
+       (var Controller+;
+        Widget_Id;
+        Param_Values : G_Value_Array) -> Boolean is
+        ref Widget => Controller.Get_Widget(Widget_Id);
+        Controller.On_Clicked (Widget);
+        //  Indicate we want the handler reconnected
+        return #true;
+    end func Button_Clicked_Handler;
+
+    func Button_Press_Handler
+       (var Controller+;
+        Widget_Id;
+        Param_Values : G_Value_Array) -> Boolean is
+        ref Widget => Controller.Get_Widget(Widget_Id);
+        const Ignore := Controller.On_Button_Press_Event
+          (Widget, To_Event_Button(Param_Values[1]));
+        return #true  // stay connected
+    end func Button_Press_Handler;
+
+    func Button_Release_Handler
+       (var Controller+;
+        Widget_Id;
+        Param_Values : G_Value_Array) -> Boolean is
+        ref Widget => Controller.Get_Widget(Widget_Id);
+        const Ignore := Controller.On_Button_Release_Event
+          (Widget, To_Event_Button(Param_Values[1]));
+        return #true  // stay connected
+    end func Button_Release_Handler;
+
+    func Window_Draw_Handler
+       (var Controller+;
+        Widget_Id;
+        Param_Values : G_Value_Array) -> Boolean is
+        Println("In Window_Draw_Handler");
+        ref W : optional Widget+ => Controller.Get_Widget(Widget_Id);
+        if W not null then
+            var Context : Cairo::Context := Create(W);
+            const Ignore := Controller.On_Draw (W, Context);
+        else
+            Println ("Widget_Id " | Widget_Id | " not recognized")
+        end if
+        Println("Exiting Window_Draw_Handler");
+        return #true // stay connected
+    end func Window_Draw_Handler;
+
+    func Key_Press_Handler
+       (var Controller+;
+        Widget_Id;
+        Param_Values : G_Value_Array) -> Boolean is
+        ref Widget => Controller.Get_Widget(Widget_Id);
+        return Controller.On_Key_Press_Event
+          (Widget, To_Event_Key(Param_Values[1]));
+    end func Key_Press_Handler;
+
+    func Key_Release_Handler
+       (var Controller+;
+        Widget_Id;
+        Param_Values : G_Value_Array) -> Boolean is
+        ref Widget => Controller.Get_Widget(Widget_Id);
+        return Controller.On_Key_Release_Event
+          (Widget, To_Event_Key(Param_Values[1]));
+    end func Key_Release_Handler;
+
+    func Window_Delete_Event_Handler
+       (var Controller+;
+        Widget_Id;
+        Param_Values : G_Value_Array) -> Boolean is
+        var Window := To_Poly_Window (Controller.Get_Widget(Widget_Id));
+        return Controller.On_Delete_Event
+          (Window, To_Event(Param_Values[1]));
+    end func Window_Delete_Event_Handler;
+
+    func Window_Destroy_Handler
+       (var Controller+;
+        Widget_Id;
+        Param_Values : G_Value_Array) -> Boolean is
+        var Window := To_Poly_Window (Controller.Get_Widget(Widget_Id));
+        Controller.On_Destroy (Window);
+        return #false
+    end func Window_Destroy_Handler;
+
+  exports
+    func Init
+       (var IO; 
+        Args : Vector<Univ_String> := []) -> GTK is
+        Do_GTK_Init(IO, Args)  // Do the actual GTK initialization
+        return (Widget_Table => [], Hooks_Id => 0) // initialize Widget table
+    end func Init
+
+    func Main_Loop (var GTK; var Controller+) is
+        G_Signal_Add_Emission_Hook (Button_Clicked_Handler,
+          "clicked", "GtkButton", Controller, GTK.Hooks_Id);
+        G_Signal_Add_Emission_Hook (Button_Press_Handler,
+          "button-press-event", "GtkWidget", Controller, GTK.Hooks_Id);
+        G_Signal_Add_Emission_Hook (Button_Release_Handler,
+          "button-release-event", "GtkWidget", Controller, GTK.Hooks_Id);
+        G_Signal_Add_Emission_Hook (Key_Press_Handler,
+          "key-press-event", "GtkWidget", Controller, GTK.Hooks_Id);
+        G_Signal_Add_Emission_Hook (Key_Release_Handler,
+          "key-release-event", "GtkWidget", Controller, GTK.Hooks_Id);
+        G_Signal_Add_Emission_Hook (Window_Delete_Event_Handler,
+          "delete-event", "GtkWindow", Controller, GTK.Hooks_Id);
+        G_Signal_Add_Emission_Hook (Window_Draw_Handler,
+          "expose-event", "GtkWidget", Controller, GTK.Hooks_Id);
+
+        // NOTE: Cannot add emission hook for "destroy" signal
+        //       so we need to connect the destroy signal for
+        //       each window to something which will call
+        //       the Window_Destroy_Handler
+
+        Add_Window_Destroy_Hook (Window_Destroy_Handler, Controller,
+          GTK.Hooks_Id);
+
+        --  Now enter the main loop
+        Do_Main_Loop (GTK, Controller);
+    end func Main_Loop
+
+    func Main_Quit (var GTK) is
+        // remove all hooks, then call GTK's Main_Quit
+        G_Signal_Remove_Emission_Hooks (GTK.Hooks_Id)
+        Do_Main_Quit (GTK)
+    end func Main_Quit
+
+    // These operations are used to create a mapping between
+    func Enter_Widget(locked var GTK; Widget+) is
+      // Add widget to table of widgets indexed by widget id
+        GTK.Widget_Table[Get_Widget_Id(Widget)] := Widget
+        Println("Widget number " | |GTK.Widget_Table| | " has widget id " |
+          Get_Widget_Id(Widget));
+    end func Enter_Widget
+
+    func Get_Widget(locked ref GTK; Widget_Id) -> ref optional Widget+ is
+      // Get widget given widget id
+        if Widget_Id in GTK.Widget_Table then
+           return GTK.Widget_Table[Widget_Id]
+        else
+           return GTK.Null_Widget
+        end if;
+    end func Get_Widget
+
+end class GTK
+
+func GTK::Test() is
+    var IO := IO::Get_IO()
+    -- var Inited_GTK := GTK::Init(IO)
+    -- var Top := Window::New(Inited_GTK)
+    -- Add_Events(Top, #button_press | #button_release)
+    const Mask : Event::Event_Mask := #button_press | #button_release
+    Println("Mask = #button_press | #button_release = " | Mask)
+end func GTK::Test
+
+import Cairo::*
+import GTK::*
+import Pango::*
+import GDK::*
+
+//* = have used in the java Gtk
+//# = want to use in tic-tac-toe
+
+interface Cairo<> is
+end interface Cairo
+
+interface Cairo::Context<> is
+    func Create(var GTK::Widget+) -> Context
+       is import(#cairo_context_create)
+    func Arc(var Context; XC, YC, Radius, Angle1, Angle2 : Float)
+       is import(#cairo_arc)//*
+    func Arc_Negative(var Context; XC, YC, Radius, Angle1, Angle2 : Float)
+       is import(#cairo_arc_negative)//*
+    func Clip(var Context) is (null)
+    func Clip_Preserve(var Context) is (null)
+    func Close_Path(var Context)
+       is import(#cairo_close_path)//*
+    func Fill(var Context)
+       is import(#cairo_fill)//*
+    func Fill_Preserve(var Context)
+       is import(#cairo_fill_preserve)//*
+    func Get_Current_Point_X(Context) -> Float is (null)//*
+    func Get_Current_Point_Y(Context) -> Float is (null)//*
+    func Get_Line_Width(Context) -> Float is (null)
+    func Get_Source(Context) -> Cairo::Pattern is (null)
+    func Get_Target(Context) -> Cairo::Surface is (null)
+    func In_Fill(var Context; X, Y : Float) -> Float is (null)
+    func In_Stroke(var Context; X, Y : Float) -> Float is (null)
+    func Line_Relative(var Context; DX, DY : Float) is (null)
+    func Line_To(var Context; X, Y : Float)
+       is import(#cairo_line_to)//#
+    func Mask(var Context; Cairo::Pattern) is (null)
+    func Mask_Surface(var Context; Cairo::Surface; X, Y : Float) is (null)
+    func Move_Relative(var Context; DX, DY : Float) is (null)
+    func Move_To(var Context; X, Y : Float)
+       is import(#cairo_move_to)//#
+    func New_Sub_Path(var Context) is (null)
+    func Paint(var Context) is (null)
+    func Rectangle(var Context; X, Y, Width, Height : Float)
+       is import(#cairo_rectangle)//*
+    func Restore(var Context) is (null)
+    func Rotate(var Context; Float) is (null)
+    func Save(var Context) is (null)
+    func Scale(var Context; SX, SY : Float) is (null)
+    func Set_Antialias(var Context; Cairo::Antialias) is (null)
+    func Set_Dash(var Context; Dashes : Basic_Array<Float>;
+      Offset : Float := 0.0)
+       is import(#cairo_set_dash)
+    func Set_Fill_Rule(var Context; Cairo::Fill_Rule) is (null)
+    func Set_Line_Width(var Context; Float) is (null)
+    func Set_Operator(var Context; Cairo::Operator) is (null)
+
+    func Set_Source_RGB(var Context; Red, Green, Blue : Float)
+       is import(#cairo_set_source_rgb)//*
+
+    func Set_Source_RGB_Alpha(var Context; Red, Green, Blue, Alpha: Float)
+       is import(#cairo_set_source_rgb_alpha)//*
+
+    func Set_Source(var Context; Cairo::Pattern) is (null)
+
+    func Set_Source_Pixbuf(var Context; GDK::Pixbuf; X, Y : Float) is (null)
+
+    func Set_Source_RGBA(var Context; GDK::RGBA)
+
+    func Set_Source_Surface(var Context; Cairo::Surface; X, Y : Float)
+       is (null)
+    //func Show_Handle(var Context; RSVG::Handle) is (null)
+    func Show_Layout(var Context; Pango::Layout)
+       is import(#cairo_show_layout)//#
+    func Stroke(var Context)
+       is import(#cairo_stroke)//#
+    func Stroke_Preserve(var Context)
+       is import(#cairo_stroke_preserve)//*
+    func Transform(var Context; Cairo::Matrix) is (null)
+    func Translate(var Context; TX, TY : Float) is (null)
+    func Update_Layout(var Context; Pango::Layout) is (null)
+end interface Cairo::Context
+
+class Cairo::Context is
+    const Context_Ptr : Univ_Integer
+  exports
+    func Set_Source_RGBA(var Context; GDK::RGBA) is
+       Set_Source_RGB_Alpha
+         (Context, Get_Red(RGBA), Get_Green(RGBA), Get_Blue(RGBA),
+          Get_Alpha(RGBA))
+    end func Set_Source_RGBA
+end class Cairo::Context
+
+interface Cairo::Antialias <> is
+end interface Cairo::Antialias
+
+interface Cairo::Fill_Rule <> is
+end interface Cairo::Fill_Rule
+
+interface Cairo::Operator <> is
+end interface Cairo::Operator
+
+interface Cairo::Surface<> is
+    func Copy_Page(var Surface) is (null)
+    func Create_Similar
+      (Surface; Cairo::Content; Width, Height : Univ_Integer) 
+      -> Surface is (null)
+    func Finish(var Surface) is (null)
+    func Flush(var Surface) is (null)
+    func Set_Mime_Data_Bytes(var Surface; Cairo::Mime_Type) 
+      is (null) //needs an array of bytes as well
+    func Set_Mime_Data_Filename(var Surface; Cairo::Mime_Type; Univ_String) 
+      is (null)
+    func Show_Page(var Surface) is (null)
+    func Write_To_PNG(var Surface; Univ_String) is (null)
+end interface Cairo::Surface
+
+interface Cairo::Pattern <> is
+    func Create_RGB(Red, Green, Blue : Float) -> Pattern is (null)
+    func Create_RBGA(Red, Green, Blue, Alpha : Float) -> Pattern is (null)
+
+    func Add_Color_Stop_RGB(var Pattern; Red, Green, Blue : Float) is (null)
+    func Add_Color_Stop_RGBA(var Pattern; Red, Green, Blue, Alpha : Float)
+      is (null)
+    func Get_Surface(Pattern) -> Cairo::Surface is (null)
+    func Set_Extend(var Pattern; Cairo::Extend) is (null)
+    func Set_Filter(var Pattern; Cairo::Filter) is (null)
+end interface Cairo::Pattern
+
+interface Cairo::Matrix <> is
+end interface Cairo::Matrix
+
+interface Cairo::Extend <> is
+end interface Cairo::Extend
+
+interface Cairo::Filter <> is
+end interface Cairo::Filter
+
+interface Cairo::Content <> is
+end interface Cairo::Content
+
+interface Cairo::Mime_Type <> is
+end interface Cairo::Mime_Type
+
+interface GDK <> is
+end interface GDK
+
+interface GDK::RGBA <> is
+    func Create(Red, Green, Blue : Float; Alpha : Float := 1.0) -> RGBA
+    func Get_Red(RGBA) -> Float
+    func Get_Green(RGBA) -> Float
+    func Get_Blue(RGBA) -> Float
+    func Get_Alpha(RGBA) -> Float
+    func Hash(RGBA) -> Univ_Integer
+end interface GDK::RGBA
+
+class GDK::RGBA is
+    const Red : Float
+    const Green : Float
+    const Blue : Float
+    const Alpha : Float
+  exports
+    func Create(Red, Green, Blue : Float; Alpha : Float := 1.0) -> RGBA is
+        return (Red => Red, Green => Green, Blue => Blue, Alpha => Alpha)
+    end func Create
+
+    func Get_Red(RGBA) -> Float is (RGBA.Red)
+    func Get_Green(RGBA) -> Float is (RGBA.Green)
+    func Get_Blue(RGBA) -> Float is (RGBA.Blue)
+    func Get_Alpha(RGBA) -> Float is (RGBA.Alpha)
+
+    func Hash(RGBA) -> Univ_Integer is
+        return Hash(RGBA.Red) + Hash(RGBA.Green) + Hash(RGBA.Blue) +
+          Hash(RGBA.Alpha)
+    end func Hash
+
+end class GDK::RGBA
+
+interface GDK::Pixbuf <> is
+end interface GDK::Pixbuf
+
+interface Pango <> is
+end interface Pango
+
+interface Pango::Layout <> is
+    func New(var Context) -> Layout
+       is import(#pango_layout_new)
+
+    func Get_Pixel_Height(Layout) -> Univ_Integer
+           is import(#pango_layout_get_pixel_height) //*
+    func Get_Pixel_Width(Layout) -> Univ_Integer
+           is import(#pango_layout_get_pixel_width) //*
+    func Set_Text(var Layout; Univ_String) 
+       is import(#pango_layout_set_text)//#
+
+    //...
+end interface Pango::Layout
+

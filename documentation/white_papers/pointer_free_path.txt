@@ -1,0 +1,76 @@
+ParaSail: A Pointer-Free Path to a Parallel Future
+
+High-reliability software systems are growing in complexity, and the
+kinds of data structures being constructed and manipulated by these
+systems are also growing in complexity.  At the highest level of
+reliability, programmers have often been forced to live within the
+restrictions of using fixed-length arrays of fixed-length records as the
+primary data structuring mechanism.  At the other end of the spectrum of
+reliability, we have arbitrarily complex and dynamic pointer-based
+structures, with dynamic allocation and garbage collection for storage
+management.  This presentation will present a new data structuring
+approach using "expandable objects," which provide an intermediate point
+for storage management, by providing much of the flexibility of fully
+dynamic languages, without using either (reassignable) pointers or
+garbage collection.  Expandable objects are also particularly well
+suited to parallel programming, with numerous threads operating on large
+data structures employing a divide-and-conquer approach.
+
+Expandable objects arose as part of the design of ParaSail, a new
+pervasively-parallel programming language, as an attempt to eliminate
+the need for reassignable pointers and garbage collection, while still
+providing flexible data structuring capabilities.  ParaSail starts with
+a relatively conventional object-oriented programming model, but then
+adopts a value-oriented semantics rather than a pointer-oriented
+semantics.  What this means is that complex data structures are built up
+out of expandable sub-objects, rather than using pointers.  Any object
+or component may be declared "optional" which means that it starts out
+"null" or empty, and then may grow into a "real" object at some point.
+For example, a binary tree structure can be declared as follows:
+
+   interface Tree<Element_Type is Assignable<>> is
+       Left : optional Tree;
+       Right : optional Tree;
+       Data : Element_Type;
+   end interface Tree;
+   
+We build up a tree by creating an empty node, and then assigning
+subtrees into the Left or Right component.  Assignment from an existing
+object copies rather than shares.  Assignment from the result of a
+function call moves the temporary result returned by the function into
+the left-hand side of the assignment. In any case, there is no sharing
+of data between separate objects, since there are no pointers at the
+language level (of course pointers might be used below the language
+level to implement optional and expandable objects).
+
+To minimize unnecessary copying, ParaSail also provides direct support
+for swap operations and move operations, which do not involve copying,
+but exchange parts of objects, or move a part of an object to another
+place leaving behind a "null" where the original part resided.  These
+operations allow for restructuring complex objects, as might be needed
+when rebalancing a tree, as well as destructive query operations, such
+as Remove_First(Queue), without requiring any copying.
+
+In pointer-oriented languages, the programmer can freely assign pointers
+as needed to do restructuring or destructive queries, but then either
+the programmer or a garbage collector has to determine when there are
+multiple references to the same object, or when the last reference to an
+object goes away.  In a language like ParaSail with value-oriented
+semantics, a given piece of data belongs to exactly one data structure,
+and when it is overwritten, the space holding its prior contents may be
+reclaimed immediately.
+
+In our early experience in using ParaSail to implement data structures
+such as balanced trees, expandable vectors, hash tables, ordered sets,
+etc., the transition to using value-oriented primitives is very smooth,
+and the lack of worries about dangling references or garbage collection
+significantly increases confidence in the final result.  We believe that
+existing languages are amenable to similar approaches, and to some degree
+the various "collection" or "container" libraries already provide 
+capabilities analagous to expandable objects.  Unfortunately, a library-based
+approach does not provide all of the advantages of a language-based
+approach, in that code not using the libraries will still need to be
+supported, and fewer guarantees about safety will be possible because
+of that.  Nevertheless, we believe that a carefully-constructed library,
+perhaps augmented with a small number of language extensions, could
+bring some of the benefits of expandable objects to existing languages.

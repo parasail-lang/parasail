@@ -1,0 +1,21 @@
+package Simple_Fib is
+    proc Print(X : Integer) is import(#print_int);
+    func Fib  (N : Integer) return Integer;
+end Simple_Fib;
+ 
+package body Simple_Fib is
+  exports
+
+    func Fib(N : Integer) return Integer is
+	if N <= 1 then
+	    return N;
+	else
+	    return Fib(N-1) + Fib(N-2);
+	end if;
+    end func Fib;
+
+end Simple_Fib;
+
+proc Test(N : Integer<>) is
+   Simple_Fib.Print(Simple_Fib.Fib(N));
+end proc Test;

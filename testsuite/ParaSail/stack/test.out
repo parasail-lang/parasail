@@ -1,0 +1,12 @@
+stack.psl:63:38: Warning: Postconditions differ between body and spec; body postconditions override those on spec
+stack.psl:68:18: Warning: Postconditions differ between body and spec; body postconditions override those on spec
+stack.psl:73:33: Warning: Preconditions should appear on spec so are visible to caller
+stack.psl:78:18: Warning: Postconditions should appear on spec so are visible to caller
+Pushing 1..5
+Pop = 5
+Pop = 4
+Pushing 6
+Pop = 6
+Pop = 3
+Pop = 2
+Pop = 1

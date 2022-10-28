@@ -1,0 +1,4 @@
+abstract interface PSL::Core::Sequence<Element_Type is Assignable<>> is
+    func Remove_First(var S : Sequence) -> optional Element_Type
+      // Returns null when sequence is empty
+end interface PSL::Core::Sequence

@@ -1,0 +1,271 @@
+interface Doubly_Linked_Index<Max_Len : Univ_Integer := 100_000> is
+  // Doubly-linked list acting as index into a separate vector of data
+    type Elem_Id is new Integer<1..Max_Len>;
+    op "[]"() -> Doubly_Linked_Index;
+      // Create an empty linked list
+
+    func Append(var DLI : Doubly_Linked_Index) -> Elem_Id;
+      // Add a new node onto end of linked list
+
+    func Prepend(var DLI : Doubly_Linked_Index) -> Elem_Id;
+      // Add a new node at beginning of linked list
+
+    func Insert_Before(var DLI : Doubly_Linked_Index; Elem_Id) 
+      -> optional Elem_Id;
+      // Insert new node before given element Id
+
+    func Insert_After(var DLI : Doubly_Linked_Index; Elem_Id) 
+      -> optional Elem_Id;
+      // Insert new node after given element Id
+
+    func Remove(var DLI : Doubly_Linked_Index; Elem_Id);
+      // Remove specified element from linked list (if present)
+
+    op "in"(Elem_Id; DLI : Doubly_Linked_Index) -> Boolean;
+      // Return True if given element is in linked list
+
+    func Remove_First(var DLI : Doubly_Linked_Index) -> optional Elem_Id;
+      // Remove first element from linked list
+
+    func Remove_Last(var DLI : Doubly_Linked_Index) -> optional Elem_Id;
+      // Remove last element from linked list
+
+    func Remove_Any(var DLI : Doubly_Linked_Index) -> optional Elem_Id;
+      // Remove arbitrary element from linked list
+
+    func Count(DLI : Doubly_Linked_Index) -> Univ_Integer;
+      // Return count of elements in linked list
+
+    func Max_Id_In_Use(DLI : Doubly_Linked_Index) -> optional Elem_Id;
+      // Return max Elem_Id in use
+end interface Doubly_Linked_Index;
+
+class Doubly_Linked_Index is
+    interface Node<> is
+        // Each node on list has next and prev Id
+        var Next : Elem_Id;
+        var Prev : Elem_Id;
+    end interface Node;
+
+    var Links : ZVector<Node>;  // zero-th element is header
+
+    var First_Free : Elem_Id;
+    var Num_Free : Univ_Integer;
+
+    func Add_Node(var DLI : Doubly_Linked_Index; Next, Prev : Elem_Id) 
+      -> New_Id : Elem_Id is
+      // Add a node with given Next/Prev fields to Links vector
+        var New_Node for DLI := Node::(Next => Next, Prev => Prev);
+
+        if DLI.First_Free != 0 then
+            // Reuse a free node`
+            New_Id := DLI.First_Free;
+            DLI.First_Free := DLI.Links[New_Id].Next;
+            DLI.Num_Free -= 1;
+
+            DLI.Links[New_Id] <== New_Node;
+        else
+            // Add a new node at end of Links vector
+            New_Id := Length(DLI.Links);
+            DLI.Links <|= New_Node;
+        end if;
+
+        DLI.Links[Prev].Next := New_Id;
+        DLI.Links[Next].Prev := New_Id;
+        return New_Id;
+    end func Add_Node;
+
+    // {Num_Free < Length(Links); First_Free in 0..<Length(Links)}
+    // {(for all N of Links => N.Next in 0..<Length(Links) and then
+                            // N.Prev in 0..<Length(Links)}
+  exports
+    op "[]"() -> Doubly_Linked_Index is
+        return (Links => [(Next => 0, Prev => 0)],
+                First_Free => 0, Num_Free => 0);
+    end op "[]";
+
+    func Append(var DLI : Doubly_Linked_Index) -> New_Id : Elem_Id is
+      // Add a new node onto end of linked list
+        return Add_Node(DLI,
+          Next => 0, Prev => DLI.Links[0].Prev);
+    end func Append;
+            
+    func Prepend(var DLI : Doubly_Linked_Index) -> Elem_Id is
+      // Add a new node at beginning of linked list
+        return Add_Node(DLI,
+          Next => DLI.Links[0].Next, Prev => 0);
+    end func Prepend;
+
+    func Insert_Before(var DLI : Doubly_Linked_Index; Follower : Elem_Id) 
+      -> New_Id : optional Elem_Id is
+      // Insert new node before given element Id
+        if Follower in DLI then
+            return Add_Node(DLI,
+              Next => Follower, Prev => DLI.Links[Follower].Prev);
+        else
+           // Follower not in linked list
+           return null;
+        end if;
+    end func Insert_Before;
+
+    func Insert_After(var DLI : Doubly_Linked_Index; Elem_Id) 
+        -> optional Elem_Id is
+        // Insert new node after given element Id
+        if Elem_Id in DLI then
+            return Add_Node(DLI,
+              Next => DLI.Links[Elem_Id].Next, Prev => Elem_Id);
+        else
+            // Elem_Id not in linked list
+            return null;
+        end if;
+    end func Insert_After;
+
+    op "in"(Elem_Id; DLI : Doubly_Linked_Index) -> Boolean is
+      // Return #true if given element is in linked list
+      // NOTE: All elements on free list have Prev pointing to themselves
+        return Elem_Id in 1..<Length(DLI.Links) and then
+          DLI.Links[Elem_Id].Prev != Elem_Id;
+    end op "in";
+
+    func Remove(var DLI : Doubly_Linked_Index; Elem_Id) is
+      // Remove specified element from linked list (if present)
+        if Elem_Id in DLI then
+            // Not on the free list, so OK to remove
+            ref Elem => DLI.Links[Elem_Id];
+            DLI.Links[Elem.Prev].Next := Elem.Next;
+            DLI.Links[Elem.Next].Prev := Elem.Prev;
+
+            // Mark as being on the free list
+            Elem.Prev := Elem_Id;
+
+            // Add to the free list
+            Elem.Next := DLI.First_Free;
+            DLI.First_Free := Elem_Id;
+            DLI.Num_Free += 1;
+        end if;
+    end func Remove;
+
+    func Remove_First(var DLI : Doubly_Linked_Index) -> optional Elem_Id is
+      // Remove first element from linked list
+        const First := DLI.Links[0].Next;
+
+        if First == 0 then
+            // List is empty
+            return null;
+        else
+            Remove(DLI, First);
+            return First;
+        end if;
+    end func Remove_First;
+
+    func Remove_Last(var DLI : Doubly_Linked_Index) -> optional Elem_Id is
+      // Remove last element from linked list
+        const Last := DLI.Links[0].Prev;
+
+        if Last == 0 then
+            // List is empty
+            return null;
+        else
+            Remove(DLI, Last);
+            return Last;
+        end if;
+    end func Remove_Last;
+
+    func Remove_Any(var DLI : Doubly_Linked_Index) -> optional Elem_Id is
+      // Remove arbitrary element from linked list
+        if Count(DLI) mod 2 == 0 then
+            // Remove First if Count is odd, Remove Last if Count is even
+            return Remove_Last(DLI);
+        else
+            return Remove_First(DLI);
+        end if;
+    end func Remove_Any;
+
+    func Count(DLI : Doubly_Linked_Index) -> Univ_Integer is
+      // Return count of elements in linked list
+        return Length(DLI.Links) - DLI.Num_Free - 1;
+    end func Count;
+
+    func Max_Id_In_Use(DLI : Doubly_Linked_Index) -> optional Elem_Id is
+      // Return max Elem_Id in use
+        return Length(DLI.Links) - 1;
+    end func Max_Id_In_Use;
+
+end class Doubly_Linked_Index;
+
+func Test_DLI() is
+    var DLI : Doubly_Linked_Index := [];
+
+    Println("Append three times");
+    const Id1 := Append(DLI);
+    const Id2 := Append(DLI);
+    const Id3 := Append(DLI);
+
+    for Id in DLI forward loop
+        Println("Found Elem_Id = " | Id);
+    end loop;
+
+    Println("Prepend twice");
+    const Id4 := Prepend(DLI);
+    const Id5 := Prepend(DLI);
+
+    Println("Count = " | Count(DLI));
+
+    for Id in DLI forward loop
+        Println("Found Elem_Id = " | Id);
+    end loop;
+
+    Println("Insert before original second append");
+    const Id6 := Insert_Before(DLI, Id2);
+
+    Println("Count = " | Count(DLI));
+
+    for Id in DLI forward loop
+        Println("Found Elem_Id = " | Id);
+    end loop;
+
+    Println("Remove " | Id1 | " and " | Id4);
+
+    Remove(DLI, Id1);
+    Remove(DLI, Id4);
+
+    Println("Count = " | Count(DLI));
+
+    for Id in DLI forward loop
+        Println("Found Elem_Id = " | Id);
+    end loop;
+
+    Println("Reverse loop");
+
+    for Id in DLI reverse loop
+        Println("Found Elem_Id = " | Id);
+    end loop;
+
+    Println("Append one and prepend two");
+
+    const Id7 := Append(DLI);
+    const Id8 := Prepend(DLI);
+    const Id9 := Prepend(DLI);
+
+    Println("Count = " | Count(DLI));
+
+    for Id in DLI forward loop
+        Println("Found Elem_Id = " | Id);
+    end loop;
+
+    Println("Reverse loop");
+
+    for Id in DLI reverse loop
+        Println("Found Elem_Id = " | Id);
+    end loop;
+
+    Println("Unordered loop");
+    for Id in DLI loop
+        Println("Found Elem_Id = " | Id);
+    end loop;
+
+end func Test_DLI;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_DLI ();
+end func main;

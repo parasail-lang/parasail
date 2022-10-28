@@ -1,0 +1,12 @@
+X = 3.5, Y = 5.22, X + Y = 8.72
+Teeny = 2.3E-5
+Small = 0.005
+Medium = 235.123
+Big = 161051.0
+Huge = 5.11858930140908E+16
+Y in 1.0 .. 6.0 = #true
+Y in 1.0 ..< 5.22 = #false
+Sqrt(2.0) = 1.4142135623731
+Sqrt(-2.0) = 0.0
+Error: Assertion failed: Val >= 0.0 
+

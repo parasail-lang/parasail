@@ -1,0 +1,7 @@
+func Get() -> Univ_Integer is
+   return 1;
+end func Get;
+
+func One() -> Univ_Integer is
+   return Get();
+end func One;

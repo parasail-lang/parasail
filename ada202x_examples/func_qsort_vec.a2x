@@ -1,0 +1,83 @@
+procedure Test_Func_Sort_Vec(Input_Len : Univ_Integer) is
+    -- For Random
+    Len : constant := abs Input_Len;
+    Mult : constant := 7**5;
+    Mod : constant := 2**31 - 1;
+    Ran : Random := Random.Start(Len, Mult, Mod);
+
+    Debug : constant Boolean := Input_Len < 0;
+
+    subtype Positive is Integer<1 .. Univ_Integer'Last>;
+    subtype Vec_Of_Int is Vector<Integer>;
+
+    function QSort (V : Vec_Of_Int) return Vec_Of_Int is
+         if V'Length <= 1 then
+            return V;  -- The easy case
+         else
+            Mid : constant Integer :=
+              V[ V'First + V'Length/2 ]  -- Pick a pivot value
+            Left_Part, Mid_Part, Right_Part : Vec_Of_Int;
+
+            if Debug then
+               Put_Line ("Divide and conquer around pivot of " & Mid'Image);
+            end if;
+
+            parallel do 
+               Left_Part := QSort([for E of V when E < Mid => E])  -- Recurse
+            and
+               Mid_Part := [for E of V when E = Mid => E];-- No need to Recurse
+            and 
+               Right_Part := QSort([for E of V when E > Mid => E]);-- Recurse
+            end do; 
+
+            if Debug then
+               Put_Line ("Divide and conquer with pivot of " & Mid'Image &
+                 " produced sizes of" & Left_Part'Length'Image & "," &
+                 Mid_Part'Length'Image & "," & Right_Part'Length'Image);
+            end if;
+            return Left_Part & Mid_Part & Right_Part;
+         end if;
+    end QSort;
+
+    Vec : Vec_Of_Int := Create(Len, 0);
+    Is_Sorted : Boolean := False;
+begin
+
+    Put_Line("Seed = " & Len'Image &
+      ", Mult = " & Mult'Image & ", Mod = " & Mod'Image);
+
+    for I in 1..Len loop
+        Vec[I] := Next(Ran) mod 100;
+    end loop;
+
+    Put_Line("Before sort, Vec = ");
+    for I in 1 .. Vec'Length loop
+        Put(" " & Vec[I]'Image);
+        if I < Vec'Length then
+            Put(",");
+            if I mod 10 = 0 then
+                Put_Line("");
+            end if;
+        end if;
+    end loop;
+    Put_Line("");
+    Put_Line("");
+
+    Vec := QSort(Vec);
+
+    Is_Sorted := (for all I in 1 .. Vec'Length - 1 => Vec[I] <= Vec[I+1]);
+
+    Put_Line("After sort, Is_Sorted = " & Is_Sorted'Image & ", Vec = ");
+    for I in 1 .. Vec'Length loop
+        Put(" " & Vec[I]'Image);
+        if I < Vec'Length then
+            Put(",");
+            if I mod 10 = 0 then
+                Put_Line("");
+            end if;
+        end if;
+    end loop;
+    Put_Line("");
+
+end Test_Func_Sort_Vec;
+

@@ -1,0 +1,4 @@
+abstract interface PSL::Core::Optional<> is
+    op "null"() -> Optional
+    op "is null"(Optional) -> Boolean
+end interface PSL::Core::Optional

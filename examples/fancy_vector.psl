@@ -1,0 +1,61 @@
+interface Vector<Element_Type is Assignable<>> is
+    op "[]"() -> Vector;
+    op "indexing"(ref V : Vector; Index : Univ_Integer) -> 
+      ref Element_Type;
+    op "|="(var V : Vector; Elem : Element_Type);
+    op "|"(Left, Right : Vector) -> Vector;
+    func Length(V : Vector) -> Univ_Integer;
+end interface Vector;
+    
+class Vector is
+
+    interface Subvector<Element_Type is Assignable<>> is
+	var Small : optional Basic_Array<optional Element_Type> := null;
+	var Large : optional Basic_Array<optional Subvector> := null;
+	var Capacity : Univ_Integer := 0;
+    end interface Subvector;
+
+    var Count : Univ_Integer := 0;
+    var Top : optional Subvector<Element_Type>;
+  exports
+    op "[]"() -> Vector is
+	return (Count => 0, Top => null);
+    end op "[]";
+
+    op "indexing"(ref V : Vector; Index : Univ_Integer) -> 
+      ref Element_Type is
+	return V.Top.Small[Index];
+    end op "indexing";
+
+    op "|="(var V : Vector; Elem : Element_Type) is
+	if V.Top is null then
+	    V.Top := (Small => Create(100, null), 
+	      Large => null, Capacity => 100);
+	end if;
+	V.Count += 1;
+	V.Top.Small[V.Count] := Elem;
+    end op "|=";
+    
+    op "|"(Left, Right : Vector) -> Result : Vector is
+	// Copy left into result, and then add in the Right elements
+	if Left.Top is null then
+	    // Left is null vector; result is determined by Right
+	    Result := Right;
+	else
+	    // Start with Left
+	    Result := Left;
+	    // TBD: Expand capacity to make sure there is room
+	    // Assign all elements of Right into tail of Result.
+	    for I in 1..Right.Count concurrent loop
+		// TBD: Use slice assignment
+		Result.Top.Small[Left.Count + I] := Right.Top.Small[I];
+	    end loop;
+	    // Bump up the count
+	    Result.Count += Right.Count;
+	end if;
+    end op "|";
+
+    func Length(V : Vector) -> Univ_Integer is
+        return V.Count;
+    end func Length;
+end class Vector;

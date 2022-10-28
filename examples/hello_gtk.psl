@@ -1,0 +1,58 @@
+import *, GTK::*
+
+interface Hello_GTK<> extends GTK::Controller<> is
+    func Create(locked GTK; Str : Univ_String) -> Hello_GTK
+    func On_Delete_Event(var Hello_GTK; var Window+; Event+) -> Boolean
+    func On_Destroy(var Hello_GTK; var Widget+)
+    func On_Clicked(var Hello_GTK; var Widget+)
+    func On_Draw (var Hello_GTK; var Widget+; Cairo::Context) -> Boolean
+end interface Hello_GTK
+
+class Hello_GTK is
+    var Top : optional Window := null
+    var The_Button : optional Button := null
+  exports
+    func Create(locked GTK; Str : Univ_String) -> Result : Hello_GTK is
+        Result := (GTK => GTK);
+        Result.Top := Window::New(Result.GTK, #toplevel)
+        Result.The_Button := Button::New(Result.GTK, Str);
+        Set_Border_Width (Result.Top, 10)
+        Add (Result.Top, Result.The_Button)
+
+        Show (Result.The_Button)
+        Show (Result.Top)
+
+    end func Create
+    
+    func On_Delete_Event(var Hello_GTK; var Window+; Event+) -> Boolean is
+        Println("In Hello_GTK On_Destroy routine")
+        Println("delete event occurred")
+        // Println("Get_Type(Event) = " | Get_Type(Event))
+        return #false
+    end func On_Delete_Event
+
+    func On_Destroy(var Hello_GTK; var Widget+) is
+        Println("In Hello_GTK On_Destroy routine")
+        Hello_GTK.GTK.Main_Quit()
+    end func On_Destroy
+
+    func On_Clicked(var Hello_GTK; var Widget+) is
+        Println("In Hello_GTK On_Clicked routine")
+        Println("Hello World")
+        Hello_GTK.Top.Destroy()
+    end func On_Clicked
+
+    func On_Draw (var Hello_GTK; var Widget+; Cairo::Context) -> Boolean is
+        Println("In Hello_GTK On_Draw routine")
+        return #false
+    end func On_Draw
+end class Hello_GTK;
+
+func Test_Hello_GTK(Str : Univ_String) is
+    var IO := IO::Get_IO()
+    var Hello := Hello_GTK::Create(Init(IO, []), Str)
+
+    Println ("About to display button with " | Str);
+    Hello.Main_Loop()
+    Println ("All done!");
+end func Test_Hello_GTK;

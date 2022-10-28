@@ -1,0 +1,17 @@
+proc Test_Continue() is
+    for I := 1 loop
+	Println("I = " | I);
+        if I = 1 then
+	    continue loop with 9;
+	end if;
+	Println("We skipped 1, but I still = " | I);
+	if I = 9 then
+	    continue loop with 7;
+	end if;
+        exit loop when I = 8;
+	Println("We should have just exited if I == 8");
+	if I <= 10 then
+	    continue loop with I+1;
+	end if;
+    end loop;
+end proc Test_Continue;

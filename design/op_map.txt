@@ -1,0 +1,66 @@
+--$Revision: 1.2 $ $Date: 2012/03/05 19:26:24 $
+
+We are trying to figure out how best to use the "operation map"
+concept.  Given a formal type, the actual type need not be
+an instantiation of the formal type's module.  It must provide 
+all the same operations as the formal type, but not necessarily in
+the same order.  That is the point of the operation map (op-map).
+
+So what do we do at the point of an instantiation, both
+at compile time and at run time?
+
+At run time, we need an operation map so when we invoke
+operation # X with the formal type as the type area,
+we get the right operation.  We have created a variant
+record for type descriptors, where one comprise an
+operation map and a pointer to a "normal" type descriptor.
+When are these type descriptors created?  
+
+When we create an instantiation, if all of the parameters
+are known, we create a normal type descriptor with the
+formal types being op-map type descriptors.  When we create
+an instantiation where not all of the parameters are known,
+we set it up as a nested type.  Eventually we create
+the descriptor for the nested type, and at that point
+the formal types will be op-map type descriptors.
+
+If we have an op-map type descriptor when we make a call,
+we map the operation index through the op-map, and then
+pass the "actual" type descriptor as the static link.
+
+-------------- Problem discovered 11/06/2011 -------------
+
+If an abstract type has some operations that return types
+defined by instantiating another module, for example:
+
+  interface Countable<> is
+      func ".."(Left, Right : Countable) -> Countable_Set<Countable>;
+      ...
+  end interface Countable<>;
+
+and we have some other interface that expects a "Countable" type:
+
+  interface Countable_Map<Key_Type is Countable<>;
+    Value_Type is Assignable<>> is
+      ...
+  end interface Countable_Map;
+
+and then we have an instantiation of this interface, e.g.:
+
+  type Int_String_Map is Countable_Map<Integer, String>;
+
+we need to create an op-map for Integer that matches that
+of Countable.  How do we do that?  For each op of Countable,
+we scan Integer for a matching operation.  For ".." we
+would expect:
+
+      func ".."(Left, Right : Integer) -> Countable_Set<Integer>;
+
+Either we do a "deep" compare remembering that Integer = Countable,
+or we do a substitution for one or the other.  This should only
+come up for parameterless interfaces, because if a type implements
+an interface with parameters, unless it extends it, it needs
+to specify the parameters to the interface.  But Integer can
+"implement" Countable directly.  
+
+Idea: Add Extra_Subst_From and Extra_Subst_To to Substitute_Actuals.

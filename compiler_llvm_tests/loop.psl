@@ -1,0 +1,7 @@
+func Loop() -> Univ_Integer is
+   var Sum := 0;
+   for I := 1 then I + 1 while I < 4 loop
+      Sum += I;
+   end loop
+   return Sum;
+end func Loop;

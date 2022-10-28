@@ -1,0 +1,3 @@
+func Mod(A, B : Univ_Integer) -> Univ_Integer is
+   return A mod B;
+end func Mod;

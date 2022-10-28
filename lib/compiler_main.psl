@@ -1,0 +1,5 @@
+//  Invoke the top-level Compile routine
+import Compile
+func main(Args : PSL::Containers::Basic_Array<Univ_String>) is
+   Compile(Args)
+end func main

@@ -1,0 +1,196 @@
+interface PSL::Containers::Node_Tree<Key_Type is Hashable<>> is
+  //  Define a rooted tree of nodes, where each node may have zero or more
+  //  child nodes.  Each node in a tree is assigned a unique Node_Id.
+  //  Each child node has a key.  All children of a given node must
+  //  have unique keys, but the same key may be re-used for children
+  //  of different parent nodes.
+  //  Ancestors of a node may be retrieved, given the distance to the
+  //  ancestor.
+   type Node_Id is Integer<1 .. 100_000>;
+
+   func Create() -> Node_Tree;
+     //  Create a tree with a single (root) node.
+
+   op "[]"() -> Node_Tree is Create;
+     //  Create a (nearly) empty tree.
+
+   func Root(Node_Tree) -> Node_Id;
+     //  Return node id of root of tree.
+
+   func Num_Nodes(Node_Tree) -> Univ_Integer;
+   op "magnitude"(Node_Tree) -> Univ_Integer is Num_Nodes;
+     //  Return number of nodes in tree.
+     //  Root counts
+
+   func Add_Child(var Node_Tree; Parent : Node_Id; Key : Key_Type)
+     { Find_Child(Node_Tree, Parent, Key) is null }
+     -> Node_Id;
+     //  Add new child node to given Parent node, with given Key
+     //  Pre: child with given key must not exist
+
+   func Find_Child(Node_Tree; Parent : Node_Id; Key : Key_Type)
+     -> optional Node_Id;
+     //  Find child node of given Parent node, with given Key, if any.
+     //  Return null if no such child.
+
+   func Get_Child(var Node_Tree; Parent : Node_Id; Key : Key_Type)
+     -> Node_Id;
+     //  Add new child node to given Parent node, with given Key, if
+     //  it doesn't already exist.
+     //  If child already exists, return Node_Id of existing child.
+
+   func Children(Node_Tree; Parent : Node_Id) -> Ordered_Set<Node_Id>;
+     //  Return set of children of given node.
+
+   func Child_Keys(Node_Tree; Parent : Node_Id) -> Set<Key_Type>;
+     //  Return set of keys of children of given parent node.
+   
+   func Depth(Node_Tree; Node_Id) -> Univ_Integer {Depth >= 0};
+     //  Return depth of given node.  Depth(Root_Id) == 0
+
+   func Ancestor(Node_Tree; Node_Id;
+                      Distance : Univ_Integer {Distance >= 0})
+     -> optional Node_Id
+     //  Return ancestor node in tree, at given "distance."
+     //  Parent node at distance 1, Root node at distance Depth(Node_Id).
+     //  Return null if Distance > Depth(Node_Id)
+
+end interface PSL::Containers::Node_Tree;
+class PSL::Containers::Node_Tree is
+  //  Define a rooted tree of nodes, where each node may have zero or more
+  //  child nodes.  Each node in a tree is assigned a unique Node_Id.
+  //  Each child node has a key.  All children of a given node must
+  //  have unique keys, but the same key may be re-used for children
+  //  of different parent nodes.
+  //  Ancestors of a node may be retrieved, given the distance to the
+  //  ancestor.
+   var Children : Map<Node_Id, Map<Key_Type, Node_Id>> := [];
+   var Num_Nodes : Univ_Integer := 1;
+   const Root_Id : Node_Id := 1;
+   var Parent : Map<Node_Id, Node_Id> := []
+
+  exports
+
+   func Create() -> Node_Tree is
+     //  Create a tree with a single (root) node.
+      return ()
+   end func Create
+
+   func Root(Node_Tree) -> Node_Id is
+     //  Return node id of root of tree.
+      return Node_Tree::Root_Id
+   end func Root
+
+   func Num_Nodes(Node_Tree) -> Univ_Integer is
+     //  Return number of nodes in tree.
+     //  Root counts
+      return Node_Tree.Num_Nodes
+   end func Num_Nodes
+
+   func Add_Child(var Node_Tree; Parent : Node_Id; Key : Key_Type)
+     { Find_Child(Node_Tree, Parent, Key) is null }
+     -> Result : Node_Id is
+     //  Add new child node to given Parent node, with given Key
+     //  Pre: child with given key must not exist
+      if Parent not in Node_Tree.Children then
+         Node_Tree.Children[Parent] := []
+      else
+         { Key not in Node_Tree.Children[Parent] }
+      end if
+      Node_Tree.Num_Nodes += 1
+      Result := 0 + Node_Tree.Num_Nodes
+      Node_Tree.Children[Parent][Key] := Result
+      Node_Tree.Parent[Result] := Parent  //  Remember parent
+   end func Add_Child
+
+   func Find_Child(Node_Tree; Parent : Node_Id; Key : Key_Type)
+     -> optional Node_Id is
+     //  Find child node of given Parent node, with given Key, if any.
+     //  Return null if no such child.
+      if Parent in Node_Tree.Children then
+         ref Sibs => Node_Tree.Children[Parent]
+         if Key in Sibs then
+            return Sibs[Key]
+         end if
+      end if
+      return null
+   end func Find_Child;
+
+   func Get_Child(var Node_Tree; Parent : Node_Id; Key : Key_Type)
+     -> Node_Id is
+     //  Add new child node to given Parent node, with given Key, if
+     //  it doesn't already exist.
+     //  If child already exists, return Node_Id of existing child.
+      const Existing_Child := Find_Child(Node_Tree, Parent, Key)
+      if Existing_Child not null then
+         return Existing_Child
+      else
+         return Add_Child(Node_Tree, Parent, Key)
+      end if
+   end func Get_Child
+
+   func Children(Node_Tree; Parent : Node_Id) -> Ordered_Set<Node_Id> is
+     //  Return set of children of given node.
+      if Parent not in Node_Tree.Children then
+         return []
+      else
+         return [for each Id of Node_Tree.Children[Parent] => Id]
+      end if
+   end func Children
+   
+   func Child_Keys(Node_Tree; Parent : Node_Id) -> Set<Key_Type> is
+     //  Return set of keys of children of given parent node.
+      if Parent not in Node_Tree.Children then
+         return []
+      else
+         return [for each [Key => Id] of Node_Tree.Children[Parent] => Key]
+      end if
+   end func Child_Keys
+   
+   func Depth(Node_Tree; Node_Id) -> Univ_Integer {Depth >= 0} is
+     //  Return depth of given node.  Depth(Root_Id) == 0
+      return (for N := Node_Id then Node_Tree.Parent[N]
+                 while N in Node_Tree.Parent => <0> + 1)
+   end func Depth
+
+   func Ancestor(Node_Tree; Node_Id;
+                      Distance : Univ_Integer {Distance >= 0})
+     -> optional Node_Id is
+     //  Return ancestor node in tree, at given "distance."
+     //  Parent node at distance 1, Root node at distance Depth(Node_Id).
+     //  Return null if Distance > Depth(Node_Id)
+      for (Anc := Node_Id then Node_Tree.Parent[Anc];
+           D := Distance then D - 1) forward loop
+         if D == 0 then
+            return Anc
+         elsif Anc not in Node_Tree.Parent then
+            exit loop;
+         end if
+      end loop
+      return null
+   end func Ancestor
+
+end class PSL::Containers::Node_Tree;
+
+import PSL::Containers::Node_Tree
+func PSL::Test::Test_Node_Tree() is
+   type Int_Tree is Node_Tree<Univ_Integer>
+   var T : Int_Tree := Create()
+   const Sub1 := Add_Child(T, T.Root(), 41)
+   const Sub2 := Add_Child(T, Sub1, 42)
+   const Sub3 := Add_Child(T, T.Root(), 43)
+   Println("Depth(Sub2) = " | Depth(T, Sub2))
+   Println("Node_Id of Sub1 = " | Sub1)
+   Println("Node_Id of Sub3 = " | Sub3)
+   Println("Ancestor(Sub2, 2) = " | Ancestor(T, Sub2, 2));
+   const Root_Children := Children(T, T.Root())
+   const Root_Child_Keys := Child_Keys(T, T.Root())
+   Println("Child keys of Root:")
+   for each K of Root_Child_Keys loop
+      Println("  " | K | " => " | Find_Child(T, T.Root(), K))
+   end loop
+   Println("Child nodes of Root:")
+   for each C of Root_Children forward loop
+      Println("  " | C)
+   end loop
+end func PSL::Test::Test_Node_Tree

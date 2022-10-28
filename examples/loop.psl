@@ -1,0 +1,12 @@
+func Loop() -> Univ_Integer is
+   var Sum := 0;
+   for I := 1 then I + 1 while I < 4 loop
+      Sum := Sum + I;
+   end loop
+   return Sum;
+end func Loop;
+
+func main(Basic_Array<Univ_String>) is
+   Print(Loop());
+   Print('\n');
+end func main;

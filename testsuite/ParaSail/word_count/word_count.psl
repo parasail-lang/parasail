@@ -1,0 +1,46 @@
+interface String_Utils<> is
+    func Word_Count
+      (S : Univ_String; Separators : Countable_Set<Univ_Character> := [' ']) 
+      -> Univ_Integer;
+        // Return count of words separated by given set of separators
+end interface String_Utils;
+
+class String_Utils is
+  exports
+    func Word_Count
+      (S : Univ_String; Separators : Countable_Set<Univ_Character> := [' ']) 
+      -> Univ_Integer is
+        // Return count of words separated by given set of separators
+        case |S| of
+          [0] => return 0; // Empty string
+          [1] => 
+            if S[1] in Separators then
+                return 0;  // A single separator
+            else
+                return 1;  // A single non-separator
+            end if;
+          [..] =>          // Multi-character string; divide and conquer
+            const Half_Len := |S|/2;
+            const Sum := Word_Count(S[ 1 .. Half_Len ], Separators) +
+              Word_Count(S[ Half_Len <.. |S| ], Separators);
+
+            if S[Half_Len] in Separators 
+              or else S[Half_Len+1] in Separators then
+                return Sum;    // At least one separator at border
+            else
+                return Sum-1;  // Combine words at border
+            end if;
+        end case;
+    end func Word_Count;
+end class String_Utils;
+
+func Test_Word_Count(S : Univ_String) is
+    Println("Word count of '" | S | "' is " | String_Utils::Word_Count(S));
+
+    Println("With Separators => ['_', '.', ' '], Word count is " |
+      String_Utils::Word_Count(S, Separators => ['_', '.', ' ']));
+end func Test_Word_Count;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Word_Count ("This_is a,ParaSail test");
+end func main;

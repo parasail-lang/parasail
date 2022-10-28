@@ -1,0 +1,128 @@
+// Example ParaSail program -- Simple concurrent locked box
+
+// Copyright (C) 2011-2018, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+concurrent interface Locked_Box<Content_Type is Assignable<>> is
+    func Create(C : optional Content_Type) -> Locked_Box;
+        // Create a box with the given content
+    func Put(locked var B : Locked_Box; C : Content_Type);
+        // Put something into the box
+    func Content(locked B : Locked_Box) -> optional Content_Type;
+        // Get a copy of current content
+    func Remove(locked var B : Locked_Box) -> optional Content_Type;
+        // Remove current content, leaving it null
+    func Get(queued var B : Locked_Box) -> Content_Type;
+        // Wait until content is non-null, then return it, leaving it null.
+end interface Locked_Box;
+
+concurrent class Locked_Box is
+    var Content : optional Content_Type;
+  exports
+    func Create(C : optional Content_Type) -> Locked_Box is
+        // Create a box with the given content
+        return (Content => C);
+    end func Create;
+
+    func Put(locked var B : Locked_Box; C : Content_Type) is
+        // Put something into the box
+        B.Content := C;
+    end func Put;
+
+    func Content(locked B : Locked_Box) -> optional Content_Type is
+        // Get a copy of current content
+        return B.Content;
+    end func Content;
+
+    func Remove(locked var B : Locked_Box) -> Result : optional Content_Type is
+        // Remove current content, leaving it null
+        Result <== B.Content;
+    end func Remove;
+
+    func Get(queued var B : Locked_Box) -> Result : Content_Type is
+        // Wait until content is non-null, then return it, leaving it null.
+      queued until B.Content not null then
+        Result <== B.Content;
+    end func Get;
+        
+end class Locked_Box;
+
+concurrent interface Recorder<> is
+   func Start(locked var R : Recorder; Index : Univ_Integer);
+   func Finish(locked var R : Recorder; Index : Univ_Integer);
+   func Who_Is_Missing(locked R : Recorder);
+   func Create() -> Recorder;
+end interface Recorder;
+
+concurrent class Recorder is
+   var In_Process : Ordered_Set<Univ_Integer> := [];
+   const Debug : Boolean := #false; //  Suppress output since not stable
+ exports
+   func Create() -> Recorder is 
+      return (In_Process => []);
+   end func Create;
+
+   func Start(locked var R : Recorder; Index : Univ_Integer) is
+      R.In_Process |= Index;
+      // Println("Start " | Index);
+   end func Start;
+
+   func Finish(locked var R : Recorder; Index : Univ_Integer) is
+      R.In_Process -= Index;
+      // Println("Finish " | Index);
+   end func Finish;
+
+   func Who_Is_Missing(locked R : Recorder) is
+      if Debug then
+         Println("Num Missing: " | |R.In_Process|);
+         for I in R.In_Process forward loop
+            Print(" " | I);
+         end loop;
+         Print('\n');
+      end if;
+   end func Who_Is_Missing;
+end class Recorder;
+
+func Test_Box(Seed : Univ_Integer) is
+    var U_Box : Locked_Box<Univ_Integer> := Create(null);
+    var Ran := Random::Start(Seed);
+    var Rec : Recorder := Create();
+
+    Println("Starting 100 pico-threads trying to put something in the box");
+    Println(" or take something out.");
+    for I in 1..100 concurrent loop
+
+        // JM: Outputs disabled to avoid differences between executions
+
+        Rec.Start(I);
+        
+        if I < 30 then
+            // Println("About to call Get");
+            // Println("Getting out " | Get(U_Box));
+            const Ignore := Get(U_Box);
+        else
+            // Println("Putting in " | I);
+            Put(U_Box, I);
+            // Println("Done putting in " | I);
+        end if;
+
+        Rec.Finish(I);
+        if I mod 10 == 1 then
+           Rec.Who_Is_Missing();
+        end if;
+    end loop;
+
+    Println("And the winner is: " | Remove(U_Box));
+    // const Ignore := Remove (U_Box);  //  if output not stable
+
+    Println("And the box is now " | Content(U_Box));
+end func Test_Box;
+
+func main(Args : Basic_Array<Univ_String>) is
+   if Length(Args) > 0 then
+      Test_Box(Univ_Integer::From_String(Args[1]));
+   else
+      Test_Box(0);
+   end if;
+end func main;

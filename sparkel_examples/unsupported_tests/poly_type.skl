@@ -1,0 +1,10 @@
+proc Poly_Type() is
+    var X : Comparable+ := 3;
+    var Y : Comparable+ := 4;
+
+    if X < Y then
+	Println("Comparable+ 3 < 4");
+    else
+	Println("Comparable+ 3 >= 4???");
+    end if;
+end proc Poly_Type;

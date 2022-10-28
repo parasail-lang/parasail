@@ -1,0 +1,213 @@
+Thoughts on synchronizing region-based storage management
+
+Tofte and Talpin pioneered region-based storage management in the ML Kit.
+Regions were further developed in the Cyclone language.
+ParaSail uses regions for all storage management.
+
+Potentially "large" output parameters are initialized with a "null" 
+that indicates the region to be used for their value if it ever
+becomes non-null.  Similarly, initially null variables and 
+components which might be large are initialized with a null that 
+indicates the region.
+
+Variables may be placed in a longer-lived region (even in a global
+region), so long as the variable is set to null before it goes out
+of scope, so its storage is reclaimed.  A "hint" may be provided
+when declaring a variable that it should be allocated in the
+same region as some existing variable, using the "for T" notation.
+Similarly, a parameter may be annotated with "for T" where T is
+some other parameter to the call, which indicates that the actual
+is a "source" parameter and will be set to null upon completion, 
+and so must be a local constant which then becomes dead after the 
+call, a local variable which becomes null, or an outer "source" 
+parameter.
+
+An object can be placed all by itself in a region.  This might be 
+appropriate for a large object, or if you want to prevent false
+sharing (cache battles) between two objects in the same scope.
+
+------------------
+
+Now for issues relating to parallelism.
+
+Regions are made up of zero or more region chunks.
+Region chunks may be "borrowed" from outer regions,
+meaning that they may already have some amount of 
+storage in use.  When borrowed, they are no longer
+usable for expansion of objects in their original
+region.
+
+Each region and its associated region chunks are "owned"
+by the server which creates the associated scope.
+Each server has its own stack of regions and region chunks,
+however when it allocates from some region it doesn't
+own, it has to lock the corresponding region/region-chunk.
+Each region could have its own lock, but we probably should
+use a more global one when borrowing a chunk.  Alternatively,
+borrowing could be always done on the server's own chain of
+regions.  It has to be given back to the original region it
+came from, which means more locks upon scope exit potentially
+if there are multiple chunks.  Sounds simpler to bite the
+bullet on allocating the chunk, rather than having additional
+complexity on scope exit.
+
+Can we do a "cheap" synchronization using atomic variables and then 
+only do an expensive protected-object lock if we need to?
+We presume all allocations out of non-owned regions would
+get a lock, but first they have to wait until the owner
+is aware that a lock is being used.  Here is a possible protocol:
+
+Owner checks flag indicating there is already a lock.
+If so, it uses it (and tries to clear flag?).
+If no lock in use, it sets flag indicating it is manipulating
+the region.  Before clearing the flag, it checks to see
+whether a different flag has been set to indicate non-owners
+are waiting.  If so, it gets the lock, indicates that the 
+lock is in use and clears its owner-active flag.
+(why bother with the owner-active flag?)
+
+Non-owner sets flag indicating it is about to request
+exclusive access and then does an entry call waiting for
+the lock to be marked in use.  Once lock is in use, then
+it can proceed to manipulate the region under protection
+of the lock.  
+
+Can we ever turn off the lock?  Problem is that non-owner
+may set non-owner-waiting flag and then ask for lock, and we may 
+clear the non-owner-waiting flag before they actually get 
+queued on lock.  
+
+Possibilities:  
+
+1) non-owner notices that queue count is
+zero so it clears the non-owner-waiting flag.  Owner
+gets lock, finds non-owner-waiting flag off and queue empty,
+and turns off the lock.  Only problem: owner may beat non-owner to the
+lock.  
+
+2) owner notices queue is empty.  If non-owner-waiting
+flag is on, it clears it.  If non-owner waiting flag is
+already off, it turns off the lock (and does a yield?).
+
+Alternative approach
+- non-owner-waiting flag is set under control of the
+lock and then it requeues if lock not yet in use.
+Owner notices non-owner-waiting flag after it finishes
+doing its thing, and sets the lock-in-use flag by
+calling a protected operation.  Then use (2) to turn
+off lock.  This approach means that setting the 
+non-owner-waiting flag and queuing are indivisible,
+so that if queue is empty, then it is safe to change
+the state of the lock.
+
+Problem: Non-owner needs to be able to turn on the lock,
+if the owner is not manipulating the region.  So non-owner
+says it is waiting, and then it checks to see whether
+owner is active.  If owner not active, it marks lock
+as active.  If owner is active, it waits for owner
+to turn on the lock.  The owner first checks if lock is active.
+If so, it gets the lock.  If not, it indicates it is active
+and then checks the non-owner waiting.  If a non-owner
+is waiting it might have already decided to use a lock,
+so the owner must use the lock too.  If there is no non-owner
+waiting, it goes ahead and does its thing.  It then
+clears its active flag, and checks again to see if
+non-owner is waiting.  If so, and if lock is not already
+turned on, it turns it on by calling a protected operation.
+
+It can turn the lock off whenever it is using the lock
+and it discovers there is noone waiting on the queue.
+Similarly, a non-owner can turn the lock off if there
+is noone waiting on the queue.
+
+--------- Implementation approach 9/26/2012 -------------
+
+We have added a server index to operations that manipulate
+regions.  This should allow us to do more of the operations
+on a per-server basis.  We may want to do similar things for
+thread masters and for queues of picothreads.
+
+Servers will need more state:
+  1) Free list of master indices
+  2) Free list of region indices
+  3) Free list of region-chunks
+  4) Free list of lock indices(?)
+
+Probably should be separate from Server_State array, as this
+is for debugging, and it is saved/restored around certain
+operations.
+
+Seems like we might want to combine these free lists with
+the various pico-thread queues (though these free lists
+are strictly single-threaded).
+
+We also need to have a lock-per-region, used for allocating
+and deallocating space, when a non-owner is manipulating the
+region.  
+
+-----
+
+If need a new chunk for a region, then borrow chunks from allocator's 
+enclosing region, and then from allocator's free-chunk 
+list, and then from O/S.   
+
+Issue: Do we add chunks to region's list, or does each server maintain its own
+set of chunks for each region?  Problem: region indices are reused, so would
+need a region "generation" and chunks become "free" if region is released by
+bumping its generation number.
+
+Each region has a (spin?) lock which is used for allocations and deallocations
+from the region, as well as adding region chunks to region.
+Don't need to use the lock when releasing region chunks, since owner is only
+user at that point.
+
+On release, if chunk started out empty, then put on owner's free
+list of chunks.
+
+On release, if chunk was borrowed from owner's region, then put it back there.
+
+On release, if chunk was borrowed from some other server's enclosing region,
+then owner of region has choices:
+  a) return to original region from which it was borrowed (implies locking)
+  b) return to enclosing region of current server
+  c) return to "partially-free" list of current server
+
+Idea: Unless we have separate chunks for every server, then allocation
+implies getting a lock.  That means we might as well borrow a chunk
+from owner's enclosing region while we have the lock, since no-one
+else can use the region until we get a chunk.  We need to get locks
+of enclosing regions, which opens up the possibility of a deadlock.
+We need to lock in a consistent order.
+
+Region IDs should be reserved in groups of 16 (say).  Each server requests
+a group of region IDs, and the region manager reserves them and stores
+a pointer to an array for the corresponding group of regions.
+Given a region ID, the region info is found by two-level indexing, one
+into the top-level array, the second into the particular region group.  
+Each server has its own free list of region IDs.
+Each region has its own list of chunks.
+
+Masters should probably be managed the same way; there may be another
+generic package hiding here...  Actually, masters are managed somewhat 
+differently, but are still a potential bottleneck.  The main difference is
+that we preallocate arrays indexed by Master_Index, whereas for Region_IDs
+we use the vector.  Lock IDs are also allocated centrally.
+
+Idea2: If we borrow chunks from allocator's encloser, then freeing it will
+require a lock to release it.
+"free" automatically.
+
+Rationale:
+
+When we need another chunk, what do we do?
+If the enclosing region has the same owner, then we should
+borrow from that region.  This may require a lock if the
+borrower is a non-owner.  On the other hand, if the
+enclosing region has a different owner, then we should
+allocate from either the allocator's free-chunk list,
+or from the owner's free-chunk list.  It would seem
+nice if the free-chunk list could be kept totally single-threaded,
+so we might as well allocate from the allocator's list.
+There seems no harm in having it returned to the region owner's list
+or to the enclosing region.
+

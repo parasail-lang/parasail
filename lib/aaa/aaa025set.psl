@@ -1,0 +1,338 @@
+class PSL::Containers::Set is
+  // A hashed-set module
+
+  // A Set is represented as a hash table, where each bucket is a linked list.
+  // When elements are deleted from the Set they end up a "null"s in the
+  // list.  We expand the table when the Count gets to be twice
+  // that of the length of the table.
+
+    interface KV_Wrapper<> implements Keyed<Element_Type> is
+      // Create a wrapper for a key that implements the Keyed interface
+        var Key : Element_Type
+        func Key_Of(ref const KV : KV_Wrapper) -> ref const Element_Type
+        func Has_Value(KV : KV_Wrapper) -> Boolean
+            // Return #true if KV_Wrapper object has a non-null value
+        func Key_Only(Key : Element_Type) -> KV_Wrapper
+            // Return a KV_Wrapper object given a key, 
+            // having no associated value
+    end interface KV_Wrapper
+
+    class KV_Wrapper is
+      // Create a wrapper for a key that implements the Keyed interface
+      exports
+        func Key_Of(ref const KV : KV_Wrapper) -> ref const Element_Type is
+            return KV.Key
+        end func Key_Of
+
+        func Has_Value(KV : KV_Wrapper) -> Boolean is
+            // Return #true if KV_Wrapper object has a non-null value
+            return #true
+        end func Has_Value
+
+        func Key_Only(Key : Element_Type) -> KV_Wrapper is
+            // Return a KV_Wrapper object given a key, 
+            // having no associated value.
+            // NOTE: This is not really meaningful for sets, since there
+            //       isn't a value.
+            return (Key => Key)
+        end func Key_Only
+    end class KV_Wrapper
+        
+    var Data : Basic_Map<KV_Wrapper<>>
+        // Set is represented as a map from keys to nothing.
+
+  exports
+    op "[]"() -> Set is
+        return (Data => [])
+    end op "[]"
+
+    func Singleton(Elem : Element_Type) -> Result : Set is
+        Result := []
+        Result.Data |= (Key => Elem)
+    end func Singleton
+
+    op "|"(Left, Right : Element_Type) -> Result : Set is
+        Result := []
+        Result.Data |= (Key => Left)
+        Result.Data |= (Key => Right)
+    end op "|"
+
+    op "|"(Left : Set; Right : Element_Type) -> Result : Set is
+        Result := Left
+        Result |= Right
+    end op "|"
+
+    op "|"(Left : Element_Type; Right : Set) -> Result : Set is
+        Result := Right
+        Result |= Left
+    end op "|"
+
+    op "|"(Left : Set; Right : Set) -> Result : Set is
+        // Union, iterate over smaller Set
+        if Count(Left.Data) <= Count(Right.Data) then
+            Result := Right
+            Result |= Left
+        else
+            Result := Left
+            Result |= Right
+        end if
+    end op "|"
+
+    op "|="(var Left : Set; Right : Set) is
+        if Count(Left.Data) == 0 then
+            Left := Right
+        else
+            for Elem in Right loop
+                Left |= Elem
+            end loop
+        end if
+    end op "|="
+
+    op "|="(var Left : Set; Right : Element_Type) is
+        Left.Data |= (Key => Right)
+    end op "|="
+
+    op "<|="(var Left : Set; var Right : optional Element_Type) is
+        // Move Right into Set Left
+        var KV : KV_Wrapper := (Key <== Right)
+        Left.Data <|= KV
+    end op "<|="
+
+    op "<|="(var Left : Set; var Right : Set) is
+        // Move all elements of Right into Left, leaving Right empty.
+        loop
+            // Extract element from Right, in region for Left
+            var Elem for Left := Remove_Any(Right)
+            if Elem is null then
+                // All done
+                return
+            end if
+            // Move element into Left
+            Left <|= Elem
+        end loop
+    end op "<|="
+
+    op "in"(Left : Element_Type; Right : Set) -> Boolean is
+        return Left in Right.Data
+    end op "in"
+
+    op "=?"(Left, Right : Set) -> Ordering is
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left is a proper subset of Right
+        // Return #greater if Left is a proper superset of Right
+        // Return #unordered otherwise
+        var Overlaps := 0
+        var Missing := 0
+        for Elem in Left loop
+            if Elem not in Right then
+                Missing += 1
+            else
+                Overlaps += 1
+            end if
+        end loop
+
+        if Missing > 0 then
+            // Can't be equal, but Left might be a proper superset
+            if Overlaps < Count(Right.Data) then
+                return #unordered
+            else
+                // Left is a superset
+                return #greater
+            end if
+        else
+            // Might be equal or Left might be a proper subset
+            if Overlaps < Count(Right.Data) then
+                // Left is a proper subset of Right
+                return #less
+            else
+                return #equal
+            end if
+        end if
+    end op "=?"
+
+    op "and"(Left, Right : Set) -> Result : Set is
+        // Intersection, iterate over smaller Set
+        if Count(Left.Data) < Count(Right.Data) then
+            // Left is smaller
+            Result := []
+            for Elem in Left loop
+                if Elem in Right then
+                    Result |= Elem
+                end if
+            end loop
+        else
+            // Left is bigger
+            Result := Left
+            for Elem in Right loop
+                if Elem in Left then
+                    Result |= Elem
+                end if
+            end loop
+        end if
+    end op "and"
+
+    op "and="(var Left : Set; Right : Set) is
+        // Intersection, iterate over smaller Set
+        if Count(Left.Data) <= Count(Right.Data) then
+            // Left is smaller
+            for Elem in Left loop
+                if Elem not in Right then
+                    Left -= Elem
+                end if
+            end loop
+        else
+            // Left is bigger
+            var Result : Set for Left := []
+            for Elem in Right loop
+                if Elem in Left then
+                    Result |= Elem
+                end if
+            end loop
+            Left <== Result
+        end if
+    end op "and="
+
+    op "xor"(Left, Right : Set) -> Result : Set is
+        // Symmetric difference
+        // Want elements that are only in one of the two inputs
+        if Count(Left.Data) < Count(Right.Data) then
+            // Swap order to shorten iteration
+            Result := Right
+            Result xor= Left
+        else
+            Result := Left
+            Result xor= Right
+        end if
+    end op "xor"
+    
+    op "xor="(var Left : Set; Right : Set) is
+        // Want elements that are only in one of the two inputs
+        for Elem in Right loop
+            if Elem in Left then
+                Left -= Elem
+            else
+                Left += Elem
+            end if
+        end loop
+    end op "xor="
+
+    op "-"(Left, Right : Set) -> Result : Set is
+        // Set difference, iterate over smaller Set
+        if Count(Left.Data) < Count(Right.Data) then
+            // Left is smaller, build up 
+            Result := []
+            for Elem in Left loop
+                if Elem not in Right then
+                    Result |= Elem
+                end if
+            end loop
+        else
+            // Left is bigger, tear down
+            Result := Left
+            Result -= Right
+        end if
+    end op "-"
+
+    op "-="(var Left : Set; Right : Set) is
+        // Compute Set difference
+        for Elem in Right loop
+            Left -= Elem
+        end loop
+    end op "-="
+
+    op "-="(var S : Set; Elem : Element_Type) is
+      // Remove the given element from the Set, if present
+        S.Data -= Elem
+    end op "-="
+   
+    func Count(S : Set) -> Univ_Integer is
+        return Count(S.Data)
+    end func Count
+
+    func Is_Empty(S : Set) -> Boolean is
+        return Is_Empty(S.Data)
+    end func Is_Empty
+
+    func Remove_Any(var S : Set) -> Result : optional Element_Type is
+        var Result_Wrapper for Result := Remove_Any(S.Data)
+        if Result_Wrapper is null then
+            return null
+        else
+            Result <== Result_Wrapper.Key
+        end if
+    end func Remove_Any
+
+    func Any_Element(S : Set) -> Result : optional Element_Type is
+      // Return an arbitrary element of the Set S;
+      // return null if S is empty.
+        const Result_Wrapper for Result := Any_Element(S.Data)
+        if Result_Wrapper is null then
+            return null
+        else
+            return Result_Wrapper.Key
+        end if
+    end func Any_Element
+
+    optional func Dump_Statistics(S : Set) is
+      // A debugging routine to show bucket sizes of Set
+        Dump_Statistics(S.Data)
+    end func Dump_Statistics
+
+end class PSL::Containers::Set
+
+func PSL::Test::Test_Set(A, X, Y, Z : Univ_Integer) is
+    var S : Set<Univ_Integer> := X | Y | Z
+    if A in S then
+        Println(A | " is in " | X | "|" | Y | "|" | Z)
+    else
+        Println(A | " is *not* in " | X | "|" | Y | "|" | Z)
+    end if
+
+    const Save_Set := S
+
+    const CSet : Set<Univ_Integer> := [Z, Y, X]
+    Println("[Z, Y, X] =? (X | Y | Z) --> " |
+      ( CSet =? S ))
+
+    var Ran := Random::Start(A)
+    Println("Adding 100 random digits to Set.")
+    for I in 1..100 loop
+        const N := Next(Ran) mod 100
+        S |= N
+        S |= N  // Make sure it doesn't produce duplicates
+    end loop
+    Println("Set is now of count = " | Count(S))
+    Println("Contents of Set:")
+    var I := 1
+    for Elem in S loop
+        Print(Elem | " ")
+        if I mod 10 == 0 then
+            Print('\n')
+        end if
+        I += 1
+    end loop
+    if Count(S) mod 10 != 0 then
+        Print('\n')
+    end if
+    Println("S Before adding random elements =? now --> " |
+      (Save_Set =? S))
+    Println("S =? S --> " | (S =? S))
+
+    var Small_Set : Set<Univ_Integer> := []
+    Small_Set += -1
+    Small_Set or= [2]
+
+    Println("S =? (-1 | 2) --> " | (S =? Small_Set))
+    Println("[2 , -1] =? (-1 | 2) --> " | ([2, -1] =? Small_Set))
+
+    Println("S =? [] --> " | (S =? []))
+
+    Println("Count(S) = " | Count(S))
+    
+    const Before_Exclude := S
+    S -= X
+    Println("After Exclude(S, " | X | "), Count(S) = " | Count(S))
+    Println("Before_Exclude =? After Exclude --> " | (Before_Exclude =? S))
+
+    Dump_Statistics(S)
+end func PSL::Test::Test_Set

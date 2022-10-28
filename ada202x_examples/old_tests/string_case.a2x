@@ -1,0 +1,18 @@
+proc Test_String_Case(S : Univ_String) is
+    case S is
+       when "abc" =>
+          Println("Found \"abc\"");
+       when "def" =>
+          Println("Found \"def\"");
+       when "xx"  =>
+          Println("Found \"xx\"");
+       when "yy"|"zz" =>
+          Println("Found \"yy\" or \"zz\"");
+       when "f"..<"h" =>
+          Println("Found word starting with \"f\" or \"g\"");
+       when "abc" =>
+          Println("Found \"abc\" again");  -- TBD: Should be illegal
+       when others =>
+          Println("No special string");
+    end case;
+end proc Test_String_Case;

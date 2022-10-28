@@ -1,0 +1,10 @@
+def Test_Case(X : Univ_Integer) :
+   switch X :
+     case 1..2 :
+	Println("X in 1..2");
+     case 3 | 5..7 :
+	Println("X in 3 | 5..7");
+     else :
+	Println("X in ..");
+   
+

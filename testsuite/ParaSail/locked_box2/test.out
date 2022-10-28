@@ -1,0 +1,2 @@
+locked_box2.psl:72:18: Warning: Result not used: B.Get() -> PSL::Core::Integer<".."(1, 50)>
+Test completed successfully

@@ -1,0 +1,7 @@
+func Pow(Base : Univ_Real; Exp : Univ_Integer) -> Univ_Real is
+   return Base ** Exp;
+end func Pow;
+
+func main(Args : Basic_Array<Univ_String>) is
+   const N := Pow(2.0, 3);
+end func main;

@@ -1,0 +1,47 @@
+def First_Time(var Seen : Countable_Set<Univ_Integer>; I : Univ_Integer) 
+  -> Boolean :
+    if I in Seen :
+	# Already seen it
+	return #false;
+    end if;
+
+    Seen |= I;
+    return #true;
+end def First_Time;
+
+def Test_For_Loop(X, Y : Univ_Integer) :
+
+    Println("unordered loop:");
+    for I in X..Y :
+	Println("I = " | I);
+    end loop;
+
+    Println("forward loop:");
+    for I in X..Y forward :
+	Println("I = " | I);
+    end loop;
+
+    Println("reverse loop:");
+    for I in X..Y reverse :
+	Println("I = " | I);
+    end loop;
+
+    Println("concurrent loop:");
+    for I in X..Y concurrent :
+	Println("I = " | I);
+    end loop;
+
+    Println("then/while loop:");
+    for I = X then I+1 while I <= Y :
+	Println("I = " | I);
+    end loop;
+
+    var Seen : Countable_Set<Univ_Integer> = [];
+    Println("then/while loop, combinations of powers of 2 and 3:");
+    for I = X then 2*I || 3 * I while 
+      I <= Y and then First_Time(Seen, I) :
+	# Only print it the first time
+	Println("I = " | I | ", Seen = " | Count(Seen));
+    end loop;
+
+end def Test_For_Loop;

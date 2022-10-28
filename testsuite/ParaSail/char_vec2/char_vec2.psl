@@ -1,0 +1,33 @@
+func Char_Vec2 (Str : Univ_String) is
+
+    var VC : Vector<Univ_Character> := To_Vector(Str);
+
+    Println("Initial string = \"" | Str | '\"');
+    Println("After converting to and from a vector of chars = \"" | 
+      From_Vector(VC) | '\"' );
+    
+    if Length(VC) >= 3 then
+        VC[3] := 'q';   // Replace the third character
+        Println("After replacing the third character with 'q': \"" |
+          From_Vector(VC) | '\"' );
+    end if;
+
+    const ZStr : ZString := Str;
+    Println("Str as a ZString = \"" | ZStr | '\"');
+    var ZVC : ZVector<Univ_Character> := To_ZVector(ZStr);
+    if Length(ZVC) >= 4 then
+       ZVC[3] := 'x';  // Replace the fourth character
+        Println("After convert to ZVector and replacing 4th char with 'x': \"" |
+          ZString::From_ZVector(ZVC) | '\"' );
+    end if;
+end func Char_Vec2;
+
+func help() is
+    Println("To test Vector<Univ_Character> <-> Univ_String conversions");
+    Println("type: Char_Vec2 \"my string\"");
+end func help;
+   
+
+func main(Args : Basic_Array<Univ_String>) is
+   Char_Vec2 (Args [1]);
+end func main;

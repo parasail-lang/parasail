@@ -1,0 +1,25 @@
+Concurrent objects should probably involve a wrapper, so we don't incur the
+overhead of a lock in the header of every object.  Lock-free concurrent
+objects presumably don't need such a wrapper.
+
+One of the challenges of a wrapper is to deal with sharing the lock
+between the object and its ancestor parts.  We also only want a single
+lock for polymorphic objects and the underlying "real" object.
+
+Perhaps the polymorphic wrapper also includes space for locking.
+
+Or perhaps all lockable objects are derived from a single "lock" type,
+and all have a lock component.  Maybe it is better to think that the
+object reuses the lock of its parent part, rather than vice-versa.
+This would imply that a concurrent object can't *extend* a non-concurrent
+object, though it might (conceivably?) *implement* a non-concurrent interface.
+
+Note that we currently identify which input is the locked input.  We could
+presumably actually give the object to lock, even if it is not one of the
+inputs because the operation was inherited.
+
+Remember that we want to be able to create a concurrent object given a
+non-concurrent type, by turning preconditions into dequeue conditions, etc.
+One question -- how is this accomplished?  Currently it is also quite
+automatic, but that is mostly because the compiler is too lazy to build
+a true wrapper.

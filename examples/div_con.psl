@@ -1,0 +1,18 @@
+func Div_Con (X, Y : Univ_Integer) is
+
+    Println("Div_Con(" | X | ", " | Y | ")!");
+    
+    case X =? Y of
+      [#less] =>
+        const Half := (X + Y) / 2;
+      then
+        Div_Con (X, Half);
+     || 
+        Div_Con (Half+1, Y);
+      [#equal] =>
+        Println(X | " ** 3 = " | X**3);
+      [..] =>
+        null;
+    end case;
+
+end func Div_Con;

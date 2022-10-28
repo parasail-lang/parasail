@@ -1,0 +1,19 @@
+abstract interface PSL::Core::Ordered<> implements Comparable<> is
+  // The "=?" operator on Ordered types never returns #unordered
+  // They also provide a Min and Max operator.
+
+  // Note that Min and Max may be given null operands.
+  // They each return null if both operands are null, and return the
+  // non-null operand if only one of the operands is null.
+  // This allows null to be used as the initial value when computing
+  // the "Max" or "Min" of a possibly-empty sequence, rather than
+  // having to start with the equivalent of negative or positive infinity.
+
+    type Full_Ordering is Ordering
+      // {Full_Ordering in #less | #equal | #greater}
+
+    op "=?"(Left, Right : Ordered) -> Full_Ordering
+
+    func Min(Left, Right : optional Ordered) -> optional Ordered
+    func Max(Left, Right : optional Ordered) -> optional Ordered
+end interface PSL::Core::Ordered

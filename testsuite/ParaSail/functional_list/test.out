@@ -1,0 +1,20 @@
+[1, 2, 3] prints as [1, 2, 3]
+[] prints as []
+[3, 2, 1] prints as [3, 2, 1]
+Testing Nth on [1, 2, 3]
+    The 1th elem is 1
+    The 2th elem is 2
+    The 3th elem is 3
+Testing Nth on []
+Testing Nth on [3, 2, 1]
+    The 1th elem is 3
+    The 2th elem is 2
+    The 3th elem is 1
+Testing Nth on [5]
+    The 1th elem is 5
+Testing Nth on [5, 6]
+    The 1th elem is 5
+    The 2th elem is 6
+[num1, num2, num3]
+sum of [1, 2, 3] is 6
+length of [1, 2, 3] is 3

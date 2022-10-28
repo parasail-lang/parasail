@@ -1,0 +1,104 @@
+import *, GTK::*, Cairo::*
+
+interface Rubiks_GTK<> extends GTK::Controller<> is
+    func On_Delete_Event(var Rubiks_GTK; var Window+; Event+) -> Boolean
+    func On_Destroy(var Rubiks_GTK; var Window+)
+    func On_Clicked(var Rubiks_GTK; var Widget+)
+    func On_Draw (var Rubiks_GTK; var Widget+; var Cairo::Context) -> Boolean
+
+  new
+
+    func Create(locked GTK; Str : Univ_String) -> Rubiks_GTK
+end interface Rubiks_GTK
+
+class Rubiks_GTK is
+    var Top : optional Window := null
+    var Game_Table : optional Table := null
+    var Cube_Game : optional Drawing_Area := null
+    var Randomize : optional Button := null
+    var Startover : optional Button := null
+    var Solve : optional Button := null
+
+    func Randomize_Cube (var Rubiks_GTK) is
+        Println ("In Randomize_Cube")
+    end func Randomize_Cube
+    func Revert_Cube (var Rubiks_GTK) is
+        Println ("in Revert_Cube")
+    end func Revert_Cube
+    func Solve_Cube (var Rubiks_GTK) is
+        Println ("in Solve_Cube")
+    end func Solve_Cube
+  exports
+    func Create(locked GTK; Str : Univ_String) -> Result : Rubiks_GTK is
+        Result := (GTK => GTK);
+
+        Result.Top := Result.GTK.New(#toplevel)
+        Result.Top.Set_Title("Cube Puzzle " | Str)
+        Result.Top.Set_Default_Size(600, 400)
+        Result.Top.Set_Position(#center)
+
+        Result.Game_Table := Result.GTK.New(1, 1, Homogeneous => #false)
+        Result.Cube_Game := Result.GTK.New()
+        Result.Game_Table.Attach(Result.Cube_Game, 0, 3, 1, 4)
+
+        Result.Randomize := Result.GTK.New("Randomize")
+        Result.Game_Table.Attach(Result.Randomize, 0, 1, 4, 5)
+        Println ("Randomize has widget id " | Get_Widget_Id (Result.Randomize))
+
+        Result.Startover := Result.GTK.New("Move the Stickers")
+        Result.Game_Table.Attach(Result.Startover, 1, 2, 4, 5)
+        Println ("Startover has widget id " | Get_Widget_Id (Result.Startover))
+
+        Result.Solve := Result.GTK.New("Solve")
+        Result.Game_Table.Attach(Result.Solve, 2, 3, 4, 5)
+        Println ("Solve has widget id " | Get_Widget_Id (Result.Solve))
+
+        Result.Top.Add (Result.Game_Table);
+        Show_All (Result.Top)
+
+    end func Create
+    
+    func On_Delete_Event(var Rubiks_GTK; var Window+; Event+) -> Boolean is
+        Println("In Rubiks_GTK On_Delete_Event routine")
+        Println("delete event occurred")
+        // Println("Get_Type(Event) = " | Get_Type(Event))
+
+        Println("About to destroy window")
+        Destroy (Window);
+        return #false
+    end func On_Delete_Event
+
+    func On_Destroy(var Rubiks_GTK; var Window+) is
+        Println("In Rubiks_GTK On_Destroy routine")
+        Rubiks_GTK.GTK.Main_Quit()
+    end func On_Destroy
+
+    func On_Clicked(var Rubiks_GTK; var Widget+) is
+        Println("In Rubiks_GTK On_Clicked routine")
+        Println ("Clicked on Widget " | Get_Widget_Id (Widget))
+        case Widget of
+          [Rubiks_GTK.Randomize] => Rubiks_GTK.Randomize_Cube()
+          [Rubiks_GTK.Startover] => Rubiks_GTK.Revert_Cube()
+          [Rubiks_GTK.Solve] => Rubiks_GTK.Solve_Cube()
+          [..] => null
+        end case
+    end func On_Clicked
+
+    func On_Draw (var Rubiks_GTK; var Widget+; var Cairo::Context) -> Boolean is
+        Println("In On_Draw")
+        return #false
+    end func On_Draw
+end class Rubiks_GTK;
+
+func help() is
+    Println("type \"Test_Rubiks_GTK <string>\" to start")
+end func help
+
+func Test_Rubiks_GTK(Str : Univ_String) is
+    var IO := IO::Get_IO()
+    var Hello := Rubiks_GTK::Create(Init(IO, []), Str)
+
+    Println ("About to display button with " | Str);
+    Hello.Main_Loop()
+    Println ("All done!");
+end func Test_Rubiks_GTK;

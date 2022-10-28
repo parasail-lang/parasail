@@ -1,0 +1,129 @@
+interface PSL::Core::Univ_Real<> is
+    op "+"(Right : Univ_Real) -> Univ_Real
+      is import(#identity)
+
+    op "-"(Right : Univ_Real) -> Univ_Real
+      is import(#real_negate)
+
+    op "abs"(Right : Univ_Real) -> Univ_Real
+      is import(#real_abs)
+
+    op "magnitude"(Univ_Real) -> Univ_Real is "abs"
+
+    op "+"(Left, Right : Univ_Real) -> Result : Univ_Real 
+      is import(#real_add)
+
+    op "-"(Left, Right : Univ_Real) -> Result : Univ_Real
+      is import(#real_subtract)
+
+    op "*"(Left, Right : Univ_Real) -> Result : Univ_Real 
+      is import(#real_multiply)
+
+    op "*"(Left : Univ_Real; Right : Univ_Integer) -> Univ_Real
+      is import(#real_int_multiply)
+
+    op "*"(Left : Univ_Integer; Right : Univ_Real) -> Univ_Real
+
+    op "/"(Left, Right : Univ_Real) -> Result : Univ_Real
+      is import(#real_divide)
+
+    op "/"(Left : Univ_Real; Right : Univ_Integer) -> Univ_Real
+      is import(#real_int_divide)
+
+    op "**"(Left : Univ_Real; Right : Univ_Integer) -> Univ_Real
+      is import(#real_exp)
+
+    op "+="(var Left : Univ_Real; Right : Univ_Real) 
+      is import(#real_assign_add)
+
+    op "-="(var Left : Univ_Real; Right : Univ_Real) 
+      is import(#real_assign_subtract)
+
+    op "*="(var Left : Univ_Real; Right : Univ_Real) 
+      is import(#real_assign_multiply)
+
+    op "/="(var Left : Univ_Real; Right : Univ_Real) 
+      is import(#real_assign_divide)
+
+    op "**="(var Left : Univ_Real; Right : Univ_Integer) 
+      is import(#real_assign_exp)
+
+
+    op "=?"(Left, Right : Univ_Real) -> Ordering
+      is import(#real_compare)
+
+    func Min(Left, Right : optional Univ_Real) -> optional Univ_Real
+      is import(#real_min)
+    func Max(Left, Right : optional Univ_Real) -> optional Univ_Real
+      is import(#real_max)
+
+    func Sqrt(Val : Univ_Real {Val >= 0.0}) -> Univ_Real
+      is import(#real_sqrt)
+
+    func Hash(Val : Univ_Real) -> Univ_Integer
+      is import(#identity)
+
+    func To_String(Val : optional Univ_Real) -> Univ_String
+      is import(#to_string_real)
+
+    func From_String(Str : Univ_String) -> optional Univ_Real
+      is import(#from_string_real)
+
+    func Print(X : Univ_Real) is import(#print_real)
+    func Println(X : Univ_Real) is (Println(To_String(X)))
+
+    func Round_To_Int(Real : Univ_Real) -> Univ_Integer
+      is import(#round_to_int)
+
+    func Int_To_Real(Int : Univ_Integer) -> Univ_Real
+      is import(#int_to_real)
+
+    op "in"(Left : Univ_Real; Right : Range_Set<Univ_Real>) -> Boolean
+      is in Range_Set<Univ_Real>
+
+end interface PSL::Core::Univ_Real
+
+class PSL::Core::Univ_Real is
+  exports
+    op "*"(Left : Univ_Integer; Right : Univ_Real) -> Univ_Real is
+        // Hand off to built-in real * int op
+        return Right * Left
+    end op "*"
+
+    // func Sqrt(Val : Univ_Real {Val >= 0.0}) -> Result : Univ_Real is
+    //     {Val >= 0.0}
+    //     Result := Val / 2.0
+    //     while Result > 0.0 and then Result * Result / Val 
+    //       not in 0.9999999999999 .. 1.00000000000001 loop
+    //         Result := (Val / Result + Result)/2.0
+    //     end loop
+    // end func Sqrt
+
+end class PSL::Core::Univ_Real
+    
+func PSL::Test::Test_Real() is
+    var X := 3.5
+    var Y := 5.22
+    var Z := X + Y
+
+    Println("X = " | X | ", Y = " | Y | ", X + Y = " | Z)
+    var Teeny := 0.000023
+    Println("Teeny = " | Teeny)
+    var Small := 0.005
+    Println("Small = " | Small)
+    var Medium := 235.123
+    Println("Medium = " | Medium)
+    var Big := 11.0**5
+    Println("Big = " | Big)
+    var Huge := 13.0**15
+    Println("Huge = " | Huge)
+
+    Println("Y in 1.0 .. 6.0 = " | ( Y in 1.0 .. 6.0 ))
+    
+    Println("Y in 1.0 ..< 5.22 = " | ( Y in 1.0 ..< 5.22 ))
+
+    Println("Sqrt(2.0) = " | Sqrt(2.0))
+
+    var Neg := -2.0;
+    Println("Sqrt(-2.0) = " | Sqrt(Neg))
+end func PSL::Test::Test_Real

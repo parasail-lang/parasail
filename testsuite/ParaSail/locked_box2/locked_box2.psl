@@ -1,0 +1,82 @@
+concurrent interface Locked_Box<Content_Type is Assignable<>> is
+    func Create(C : optional Content_Type) -> Locked_Box;
+        // Create a box with the given content
+
+    func Set_Content(locked var B : Locked_Box; C : optional Content_Type);
+        // Set content of box
+    func Content(locked B : Locked_Box) -> optional Content_Type;
+        // Get a copy of current content
+
+    func Put(queued var B : Locked_Box; C : Content_Type);
+        // Wait for the box to be empty (i.e. null)
+        // and then Put something into it.
+    func Get(queued var B : Locked_Box) -> Content_Type;
+        // Wait until content is non-null, 
+        // then return it, leaving it null.
+end interface Locked_Box;
+
+concurrent class Locked_Box is
+    var Content : optional Content_Type;
+  exports
+    func Create(C : optional Content_Type) -> Locked_Box is
+        // Create a box with the given content
+        return (Content => C);
+    end func Create;
+
+    func Set_Content(locked var B : Locked_Box; C : optional Content_Type) is
+        // Set content of box
+        B.Content := C;
+    end func Set_Content;
+
+    func Content(locked B : Locked_Box) 
+      -> optional Content_Type is
+        // Get a copy of current content
+        return B.Content;
+    end func Content;
+
+    func Put(queued var B : Locked_Box; C : Content_Type) is
+      queued until B.Content is null then
+        // Wait for the box to be empty (i.e. null)
+        // and then Put something into it.
+        B.Content := C;
+    end func Put;
+
+    func Get(queued var B : Locked_Box) 
+      -> Result : Content_Type is
+      queued while B.Content is null then
+        // Wait until content is non-null, 
+        // then return it, leaving it null.
+        Result <== B.Content;
+    end func Get;
+        
+end class Locked_Box;
+
+func Cross_Talk(// TBD: var IO
+  ) is
+    // const Debug := #true;
+    const Debug := #false;
+
+    var B : Locked_Box<Integer<1..50>> := Create(null);
+    for I in 1..100 concurrent loop
+        if I mod 2 == 1 then
+            B.Put(I);
+        else
+            // TBD: prefix of "IO."
+
+            //  JM: Output disabled (to avoid output differences in the tests)
+
+            if Debug then
+               Print("Thread " | I | " got " | B.Get());
+               Println(", content now = " | B.Content());
+            else
+               B.Get();
+            end if;
+        end if;
+    end loop;
+
+    Println("Test completed successfully");
+end func Cross_Talk;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Cross_Talk ();
+end func main;

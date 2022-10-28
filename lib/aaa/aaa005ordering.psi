@@ -1,0 +1,108 @@
+interface PSL::Core::Ordering<> is
+  // Enumeration type used to represent value of "=?" operator
+    op "from_univ"(Lit : Univ_Enumeration) 
+      {Lit in [#less, #equal, #greater, #unordered]}
+      -> Ordering is import(#ordering_from_univ)
+
+    op "to_univ"(Val : Ordering) -> Univ_Enumeration 
+      is import(#ordering_to_univ)
+
+    op "to_bool"(Ord : Ordering; Mask : Univ_Integer) -> Boolean 
+      is import(#ordering_to_bool)
+
+    op "=?"(Left, Right : Ordering) -> Ordering is import("=?")
+
+    func Hash(Val : Ordering) -> Univ_Integer
+      is import(#identity)
+
+    // For Imageable
+    func To_String(Val : Ordering) -> Univ_String
+    func From_String(Str : Univ_String) -> optional Ordering
+
+    // Operators for Countable
+    op "+"(Left : Univ_Integer; Right : Ordering) -> Ordering 
+      is import("+")
+    op "+"(Left : Ordering; Right : Univ_Integer) -> Ordering 
+      is import("+")
+    op "-"(Left, Right : Ordering) -> Univ_Integer 
+      is import("-")
+    op "-"(Left : Ordering; Right : Univ_Integer) -> Ordering 
+      is import("-")
+
+    func Min(Left, Right : optional Ordering) -> optional Ordering
+      is import(#min)
+    func Max(Left, Right : optional Ordering) -> optional Ordering
+      is import(#max)
+
+    // TBD: These should be properties some day (e.g. Ordering#first).
+    func First()->Ordering
+    func Last()->Ordering
+
+    op ".."(Left, Right : Ordering) -> Countable_Set<Ordering>
+    op "<.."(Left, Right : Ordering) -> Countable_Set<Ordering>
+    op "..<"(Left, Right : Ordering) -> Countable_Set<Ordering>
+    op "<..<"(Left, Right : Ordering) -> Countable_Set<Ordering>
+    op "|"(Left, Right : Ordering) -> Countable_Set<Ordering>
+end interface PSL::Core::Ordering
+
+class PSL::Core::Ordering is
+    type Ordering_Set is Countable_Set<Ordering>
+
+  exports
+    func First()->Ordering is
+        return #less
+    end func First
+
+    func Last()->Ordering is
+        return #unordered
+    end func Last
+
+    func To_String(Val : Ordering) -> Univ_String is
+        case Val of
+          [#less] =>
+            return "#less"
+          [#equal] =>
+            return "#equal"
+          [#greater] =>
+            return "#greater"
+          [#unordered] =>
+            return "#unordered"
+        end case
+    end func To_String
+
+    func From_String(Str : Univ_String) -> optional Ordering is
+        case Str of
+          ["#less"] =>
+            return #less
+          ["#equal"] =>
+            return #equal
+          ["#greater"] =>
+            return #greater
+          ["#unordered"] =>
+            return #unordered
+          [..] =>
+            return null
+        end case
+    end func From_String
+
+    // NOTE: For implementation reasons, we put these here rather than defining
+    //       them in the interface using "is in Countable_Set<Ordering>"
+    op ".."(Left, Right : Ordering) -> Countable_Set<Ordering> is
+        return Ordering_Set::".."(Left, Right)
+    end op ".."
+
+    op "<.."(Left, Right : Ordering) -> Countable_Set<Ordering> is
+        return Ordering_Set::"<.."(Left, Right)
+    end op "<.."
+
+    op "..<"(Left, Right : Ordering) -> Countable_Set<Ordering> is
+        return Ordering_Set::"..<"(Left, Right)
+    end op "..<"
+    op "<..<"(Left, Right : Ordering) -> Countable_Set<Ordering> is
+        return Ordering_Set::"<..<"(Left, Right)
+    end op "<..<"
+
+    op "|"(Left, Right : Ordering) -> Countable_Set<Ordering> is
+        return Ordering_Set::"|"(Left, Right)
+    end op "|"
+end class PSL::Core::Ordering

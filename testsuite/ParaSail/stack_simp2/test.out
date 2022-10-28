@@ -1,0 +1,14 @@
+Pushing 1..5
+Pop = 5
+Pop = 4
+Pushing 6
+Pop = 6
+Pop = 3
+Pop = 2
+Pop = 1
+stack_simp2.psl:50:38: Error: Assertion failed:  {> Count(S) > 0 <}
+stack_simp2.psl:52:43: Error: Assertion failed:  {> *Stack_Underflow_Check* Count(S) > 0 <}
+stack_simp2.psl:54:19: Error: Index must be in 1 ..  5, value =  0
+: Error: 
+stack_simp2.psl:50:38: Error: Assertion failed:  {> Count(S) > 0 <}
+stack_simp2.psl:60:1: Error: PSC.INTERPRETER.PROPAGATING_EXCEPTION raised in execution:

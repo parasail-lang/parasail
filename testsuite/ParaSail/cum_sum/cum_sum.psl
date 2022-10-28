@@ -1,0 +1,79 @@
+func Phase1(var Part : Slice<Vector<Univ_Real>>) is
+   // Sum elements of Part, leave total in Part[Part.Last]
+   // and compute partial totals in last of first half, first quarter, ...
+   const Len := |Part|
+   case Len of
+    [0..1] =>
+      null
+    [2] =>
+      Part[Part.Last] += Part[Part.First]
+    [..] =>
+      const Mid := Part.First + Len/2
+      block 
+         Phase1(Part[Part.First .. Mid-1])
+       ||
+         Phase1(Part[Mid .. Part.Last])
+      end block
+      Part[Part.Last] += Part[Mid-1]
+   end case
+end func Phase1
+      
+func Phase2(var Part : Slice<Vector<Univ_Real>>; Base : Univ_Real) is
+   // Presuming Phase1 performed, use Base to update remaining elements.
+   // Do *not* update Part[Part.Last]; caller takes care of doing that
+   const Len := |Part|
+   case Len of
+    [0..1] =>
+      null
+    [2] =>
+      Part[Part.First] += Base
+    [..] =>
+      const Mid := Part.First + Len/2
+      const Sum_Of_Left := Part[Mid-1] + Base
+      block 
+         Part[Mid-1] := Sum_Of_Left
+         Phase2(Part[Part.First .. Mid-1], Base)
+       ||
+         Phase2(Part[Mid .. Part.Last], Sum_Of_Left)
+      end block
+   end case
+end func Phase2
+   
+func Scan(Histo : Vector<Univ_Real>) -> Result : Vector<Univ_Real> is
+   Result := Histo
+   Phase1(Result[..])
+   Phase2(Result[..], 0.0)
+end func Scan
+
+func Vec_Image(Vec : Vector<Univ_Real>) -> Result : Univ_String is
+   Result := ""
+   for (each Elem of Vec; Sep := "[" then ", ") forward loop
+      Result |= Sep | Elem
+   end loop
+   Result |= "]"
+end func Vec_Image
+
+func Cum_Sum (Histo_Arr : Basic_Array<Univ_Real>) is
+   const Histo : Vector<Univ_Real> := [for each X of Histo_Arr => X]
+   Println ("Histo = " | Vec_Image(Histo))
+
+   const Result := Scan(Histo)
+   Println ("Result = " | Vec_Image(Result))
+
+end func Cum_Sum
+
+func Ran_Sum (N : Univ_Integer) is
+   var Ran := Random::Start()
+   var Big_Histo : Vector<Univ_Real> :=
+     [for I in 1..N => 1.0 * Round_To_Int(100.0 * Ran.Next_Real())]
+   Println ("Big_Histo = " | Vec_Image(Big_Histo))
+
+   const Big_Result := Scan(Big_Histo)
+   Println ("Big_Result = " | Vec_Image(Big_Result))
+end func Ran_Sum
+
+func main(Args : Basic_Array<Univ_String>) is
+   const Histo_Arr : Basic_Array<Univ_Real> :=
+                       [2.0, 4.0, 6.0, 8.0, 10.0]; 
+   Cum_Sum (Histo_Arr);
+end func main;

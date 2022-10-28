@@ -1,0 +1,8 @@
+Three::Sub(10, 2) = 8
+Three::Sub(Right => 2, Left => 10) = 8
+Three::Sub(10) = 7
+Three::Sub(Left => 10) = 7
+Four::Sub(10, 2) = 8
+Four::Sub(Right => 2, Left => 10) = 8
+Four::Sub(10) = 6
+Four::Sub(Left => 10) = 6

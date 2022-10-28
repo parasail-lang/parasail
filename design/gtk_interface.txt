@@ -1,0 +1,353 @@
+GTK Interface for ParaSail:
+
+--------- Issues with single-threading the GUI 3/13/2013: ---------
+
+At least in some environments, interactions with the GUI
+must all be done on one thread.  This is clearly a bit of
+a challenge for ParaSail.  Also, there is the call on
+GTK_Main which is supposed to be blocking, but then via
+callbacks we can re-enter user code, which might again
+call the GUI, and which might call GTK_Main in a nested
+fashion.
+
+Should all of the above work in the context of ParaSail?
+If we make the GTK instance concurrent, and make the
+various GTK calls all locking calls, that ensures only
+one call at a time, but doesn't guarantee all calls come
+from the same thread.  Is that necessary?
+
+A recent article on GTK threading indicates that it is
+not necessary for all the calls to be made on the same
+thread, so long as they are all made in the context of
+the main "lock."  This lock is held already in call backs,
+so we need to be careful not to try to relock the same lock,
+because apparently the default locking mechanism is not
+reentrant.
+
+To use threading with GDK/GTK, we need to call g_thread_init(NULL)
+and gdk_threads_init() first.  Before calling gdk_threads_init() we can
+call gdk_threads_set_locking_functions(enter/leave)
+gdk_threads_enter() and gdk_threads_leave() get and release
+the mutex, and will call the user-specified enter/leave functions
+if gdk_threads_set_locking_functions has been called first.
+As implied above, gdk_threads_enter()/leave() are called around
+signal-handling callbacks.
+
+Calls made to GTK *not* from callbacks need to get the lock.
+This would include calls made during setup before entering the main loop.
+
+So what does this mean for ParaSail.  Let's first investigate
+the situation if we do not specify our own locking mechanism.
+
+In the GTK interface we should maintain some indication of whether
+we (believe) the lock is currently held.  That indication will need
+to be at least atomic, and perhaps protected.  It should be initialized
+to False at startup, and initialized to True while in a callback.
+
+This doesn't really work if we have multiple ParaSail picothreads.
+It seems like we will need a per-Ada-task flag.  But in a callback,
+things get tricky, because the lock is held but that proves nothing
+if we have multiple threads that think they can all use GTK
+simultaneously.  What this means is that we need another lock,
+or we release the GDK lock while in the callback and reacquire it
+on the way back.  That might be dangerous if GDK is not prepared
+to have the lock released and then reacquired during a callback.
+This also means that we are doing a lot more locking/unlocking,
+presumably at the kernel level.  But on the other hand, it simplifies
+the model -- we lock around every GTK call.
+
+Conclusion: Release the GDK lock during a callback.  Lock around every
+GTK/GDK call.  Worry about reducing the locking overhead some other day!
+
+Another issue is how we represent the GTK_Main call in ParaSail.
+It should certainly be considered a "queued" call.  It is not
+clear we need to actually do the queuing ourselves.  However,
+if we don't, then it will lock up the thread doing the queued
+call.  That would be a reason to have a separate Ada task doing
+the call on GTK_Main.  If the ParaSail picothread is treated
+somewhat like a delaying thread, we can avoid tying up one of
+the ParaSail server threads.  On the other hand, in a call back,
+we probably want to be back "in the system" as far as ParaSail is
+concerned, so perhaps it is a waste to try to shift over to a separate task.
+
+Conclusion: Don't use a separate Ada task for communicating with GDK/GTK.
+Just use the GDK lock.  Suspend the calling Ada task while in the
+GTK main loop.  The interesting stuff happens on call backs anyway.
+
+Final issue:  If we want to do something which involves
+queuing or a lot of computaion while in a callback, we would be 
+wise to communicate via a concurrent queue to a picothread that is
+operating independently.
+
+--------- More ideas using data-oriented model, 2/19/2013: ---------
+
+Ideally most of the structure of the GUI can be created as a data
+representation.  This could be provided to GTK, or built up
+incrementally.  The problem comes when establishing the handlers.
+If everything is data, there really isn't any problem.
+Let us assume that GTK has a reference to the enclosing "controller"
+or equivalent, or it could conceivably have a "copy" of the model.
+
+The real problem is signal handling.  We would like to connect
+various buttons, etc., with actions to be performed.  But we don't
+want to create a separate module for each action.  
+
+A giant "case" statement might be one way to do this, where every
+signal comes to the same handler.  In some sense a case statement
+(analogous to the "match" statement of functional-programming fame)
+is the way that data is connected to code.  If the "case" statement
+is sufficiently flexible, this might not be so bad.  
+
+   func Handle_Signal (C : Controller; Widget; Event) is
+      case [Widget, Event] of
+        [C.Randomize_Button, ClickedEvent] => Randomize (C.Cube)
+        [C.Solve_Button, ClickedEvent]     => Solve (C.Cube)
+        [C.Cube_Image, BP : ButtonPressEvent] =>
+           Clicked_On_Cube (C.Cube, BP.X, BP.Y)
+        [..] => null
+      end case
+   end func Handle_Signal
+
+We could avoid the need for the two-way "case" by simply
+nesting case statements for situations where a single widget
+has multiple events of interest.
+
+This implies that the "=?" on Widget can work, and presumably
+compares some kind of unique id in the widget.
+
+We would have a separate operation to establish which signals
+are of interest on a given widget.  For some kinds of widgets,
+there would be a default (e.g. for a button, presumably the "clicked"
+signal is always of interest).
+
+When creating an instance of GTK, we would provide a reference
+to the Controller, which would automatically handle all signals.
+As indicated above, we could independently determine which signals
+are of interest on particular widgets.
+
+GTK provides an operation "g_signal_add_emission_hook" which
+allows all emissions of a given signal, independent of the
+instance, to be trapped.  This is not allowed on a signal which
+has the "G_SIGNAL_NO_HOOKS" flag set.
+
+A zero signal "detail" value means the detail is not used as a filter.
+
+Alternatively, gdk_event_handler_set() can set the handler for all
+gdk events.  That is probably too low level, and effectively
+bypasses GTK (though the events could be passed through to GTK
+via gtk_main_do_event()).
+
+---------------- Thoughts as of 2/15/2013:
+
+One challenge for creating a graphic interface in a pointer-free
+language is how to associate context with widgets and event handlers.
+
+Actually, GTK has both events and signals.  Events are local to
+the windowing system, and are very GUI specific.  Signals are the
+way the GUI communicates to the underlying application (aka the "model").
+The intent, I presume, was to create a looser coupling between
+the GUI and the model.  Signals are somewhat looser in that sense.
+Many users will never fiddle with events, because the existing widgets
+have reasonable graphic behaviors.  They will only connect signals to
+their model.
+
+If we look at the Java GTK interface, they map signal handlers
+into Java classes, one per signal, which have a single method
+which handles the signal.  The typical usage idiom is to create
+a widget, and then connect up one or more handlers to particular
+signals of the widget, and then add the widget to some container.
+
+This provides a number of challenges for a pointer-free model.
+We are creating a heterogeneous collection of widgets, where the
+set of signals varies with the kind of widget.  We want to connect
+signal handlers to the widgets, which typically will turn around
+and apply some operation to some aspect of the underlying "model"
+object.
+
+Adding a widget with references to other objects into an enclosing
+container is a recipe for dangling references.  However, if we
+create a new container by moving the old container contents and
+the new object into it, we can avoid the danger.  Looking at the
+Haskell GTK interface, everything is done in the IO monad, so they
+"punt" on creating a pure functional interface, and are essentially
+creating a new "world" as a side-effect of each GTK operation.
+
+How pleasant can we make this?  You pretty much have to create
+things bottom up, or at least the last operation creates the
+final structure.  The signal actions are also a challenge.
+They need to be passed in all of the data they are going to
+manipulate, which needs to be provided somewhere.
+
+Can we do this with a data representation, a la a Simulink model?
+Presume we have a heterogeneous graph structure, using node ids.
+Again we have the problem of building in references, in which case
+we can't then add it to a data structure, or using node ids, in
+which case we lose strong type checking.  Alternatively we wrap
+the node-ids in a stronger type, e.g. some kind of button "handle."
+We want the node-ids to never be reused, so if we delete something
+we can detect dangling handles.  We still need to do a run-time 
+type-check and a conversion when we use the handle, because the
+underlying container treats them all as simply Widgets.
+
+Let's say we use some kind of wrapped node-id for the GUI structure.
+We can't add references into these.  We would need some uber-ref
+which is used for the "model"/"application" reference, and then
+everything would have to be relative to that starting point.
+
+Model-View-Controller seems to provide a separation between the
+Model and the View by inserting a Controller in the middle.  The
+Controller receives the signals from the View, and turns them
+into calls on operations of the Model.  This means the Model
+operations need not match one-for-one with the signals generated
+by the View.  One issue is that the View may want to directly
+*read* the Model.  This seems to be permitted under certain
+circumstances.  Alternatively you could export other interfaces
+which abstract the act of reading the model, sort of like the
+"TreeModel" in GTK.
+
+Or you could include under the umbrella of the Controller the
+code which handles changes to the model, and displays it on
+the GUI.  Essentially the View is very dumb, as is the Model,
+and it is the Controller which knows how the two relate to
+one another.
+
+In the "official" MVC approach, the View does display the
+Model, and sends signals to the Controller, but it seems
+worth it to make a bit of a separation.  We might still
+have a relatively separate component which displays the
+Model on a View element.
+
+The signal handlers, which are part of the Controller,
+need to be passed some data that give the handler
+access to the Model.  Simplest is to have the Model
+be a component of the Controller.  We may want
+different actions on each button, so how do we
+do that?  We need a bunch of separate handlers which 
+have access to the Model but which are handling the same
+signal for different Widgets.
+
+Each signal handler can include a reference of its own choosing
+when creating the signal handler object.  That seems adequate.
+E.g.
+
+    abstract interface Signal_Handler<> is
+        func Handle_Signal(var Signal_Handler; Event+; var Handled : Boolean)
+    end interface Signal_Handler
+
+    interface My_Signal_Handler<> implements Signal_Handler<> is
+        ref M : Model;
+        func Handle_Signal
+           (var My_Signal_Handler; Event+; var Handled : Boolean)
+    end interface My_Signal_Handler;
+
+Oops!  This doesn't work, because we can't assign the handler.
+The "ref" needs to be provided when we create the container that
+holds the handlers.  The signal "system", which receives signals
+and redirects them to appropriate handlers, must have the reference,
+or contain all the interesting data, and it can't be moved elsewhere.
+
+So we seem to be left with a situation where the signal system ends up
+with the model as a component, and the signal handlers are passed this
+model, or, perhaps better, the controller as a whole.
+
+The key interaction is the sending of a signal.
+A widget emits a signal, which is routed to the signal handler, 
+passing it the originating widget, the identifier of the signal,
+and some data that was recorded when the handler was connected.
+If the data includes a reference to some data of interest to the
+signal handler, then that would be ideal, but if not, then the
+data of interest must be a global.  A global variable is generally
+process-relative, and doesn't rely on a single central declaration
+of all globals, but rather allows independent declarations which
+are grouped together by the static or dynamic linker.
+
+ParaSail doesn't provide anything approximating that.  We had originally
+conceived of the idea of the pseudo-object Context which was an instance
+of a pseudo-module Context which contained one instance of each
+concurrent module that had defaults for all parameters, and that had
+a parameterless constructor.  That is essentially
+equivalent to global variables.  The other option we considered
+was to allow a module to have a (concurrent) variable-object as a module 
+parameter, with a default expression defining how to construct the
+variable at program start-up.  This eliminates the need to have a
+"Context" parameter, but saddles a *type* with some global variable state.
+
+Alternatively we allow a function to declare a "global" parameter where
+the type can be any concurrent type, again with a parameterless constructor.
+If the type's module has parameters, we get back into the problem with 
+type equivalence being highly significant, so probably want to limit
+it to modules with any parameters defaulted.  The constructor needs
+a standard name, or we need to have only one constructor, or we have *no*
+constructors and require that all variable components have default 
+initial values (perhaps by being declared "optional").
+By having no constructors, but having operations that take an instance
+of the module, this would make it pretty clear that this is a special
+case, perhaps a singleton object (back to Scala model, gack).
+
+Groan!
+
+------------------------------
+Here are some ideas for event/signal handling:
+
+   1) a) Each widget has a "Handle_Event" operation,
+      which is passed the widget, the event, and a context object.
+
+      b) The overall GTK module, or perhaps the "application" object,
+      has a generic "context type" parameter.  This allows it to
+      have sets, lists, trees of widgets, all of which have the
+      same context type.  If we made the context type a parameter
+      of individual widget types, then it would be hard to have
+      a "polymorphic" list of widgets.
+
+   2) Alternatively, widgets have a reference to context information.
+      This means widgets are reference objects, which makes them
+      more difficult to manage, but perhaps that is OK.
+      How do you add a reference object to an existing object?
+      That seems like a recipe for trouble.  Of course if all
+      widgets have a reference to the *same* context object,
+      then only the "application" widget needs the reference,
+      and it can provide the context to all others.  But they
+      would all need a reference to the application object, so
+      this is just sort of pushing the problem.
+
+Let's try these two approaches:
+
+ Approach (1):
+
+   interface GTK<Context is Any<>> is
+      ...
+   end interface GTK
+
+   interface GTK::Event<> is
+   end interface GTK::Event
+   
+   interface GTK::Widget<> is
+      func New_Widget(var GTK; var Context) -> Widget
+      func Handle_Event(var Context; var Widget; Event; var Handled : Boolean)
+      func Add_To_Container(var Container: Widget;
+        Element for Container : Widget+; Where : Location)
+   end interface GTK::Widget
+
+ Approach (2):
+
+   interface GTK<> is
+      ...
+   end interface GTK
+
+   interface GTK::Event<> is
+   end interface GTK::Event
+   
+   interface GTK::Widget<> is
+      func New_Widget(var GTK) -> Widget
+      func Handle_Event(var Widget; Event+; var Handled : Boolean)
+      func Add_To_Container(var Container: Widget;
+        Element for Container : Widget+; Where : Location)
+   end interface GTK::Widget
+
+   interface GTK::Button<Context is Any<>> extends GTK::Widget is
+      func New_Button(var GTK; ref Context) -> ref Button
+      func Handle_Event(var Button; Event+; var Handled : Boolean)
+      func Handle_Mouse_Click(var Button; Mouse_Click_Event;
+        var Handled : Boolean)
+      
+   end interface GTK::Button

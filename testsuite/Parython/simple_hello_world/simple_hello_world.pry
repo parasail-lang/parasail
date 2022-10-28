@@ -1,0 +1,8 @@
+def Hello_World () :
+
+    Println("Hello world!");
+
+     for I in 1..10 reverse :
+	    Println(I | " ** 3 = " | I**3);
+
+

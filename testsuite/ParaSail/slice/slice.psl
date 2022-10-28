@@ -1,0 +1,79 @@
+interface Slice<Arr is Vector<Countable<>>> is
+    func Select(ref A : Arr; Indices : Countable_Set<Univ_Integer>) -> Slice;
+    op "indexing"(ref S : Slice; Index : Univ_Integer) 
+      -> ref Arr::Element_Type;
+    op "slicing"(ref S : Slice; Indices : Countable_Set<Univ_Integer>) 
+      -> Slice;
+    op "index_set"(S : Slice) -> Countable_Set<Univ_Integer>;
+end interface Slice;
+
+class Slice is
+    ref Base : Arr;
+    const Indices : Countable_Set<Univ_Integer>;
+  exports
+    func Select(ref A : Arr; Indices : Countable_Set<Univ_Integer>) -> Slice is
+        return (Base => A, Indices => Indices);
+    end func Select;
+
+    op "indexing"(ref S : Slice; Index : Univ_Integer) 
+      -> ref Arr::Element_Type is
+        {Index in S.Indices} //index into slice is out of bounds
+        return S.Base[Index];
+    end op "indexing";
+
+    op "slicing"(ref S : Slice; Indices : Countable_Set<Univ_Integer>) 
+      -> Slice is
+	{Indices <= S.Indices} // slice into slice is out of bounds
+	return (Base => S.Base, Indices => Indices);
+    end op "slicing";
+
+    op "index_set"(S : Slice) -> Countable_Set<Univ_Integer> is
+        return S.Indices;
+    end op "index_set";
+end class Slice;
+
+func Test_Slice() is
+    type UV is Vector<Univ_Integer>;
+    type UV_Slice is Slice<UV>;
+    var A : UV := [1, 2, 3, 4, 5, 6, 7];
+    ref var S : UV_Slice => Select(A, 3 .. 5);
+    ref var T : UV_Slice => S[4..5];
+
+    Print("A = ");
+    for each X of A forward loop
+	Print(X | ", ");
+    end loop;
+    Print('\n');
+
+    Print("S = ");
+    for each X of S forward loop
+	Print(X | ", ");
+    end loop;
+    Print('\n');
+
+    S[4] := 44;
+
+    Print("After S[4] := 44, A = ");
+    for each X of A forward loop
+	Print(X | ", ");
+    end loop;
+    Print('\n');
+
+    Print("S = ");
+    for each X of S forward loop
+	Print(X | ", ");
+    end loop;
+    Print('\n');
+
+    Print("T = S[4..5] = ");
+    for each X of T forward loop
+	Print(X | ", ");
+    end loop;
+    Print('\n');
+
+end func Test_Slice;
+    
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Slice ();
+end func main;

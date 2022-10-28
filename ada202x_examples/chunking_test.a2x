@@ -1,0 +1,27 @@
+procedure Chunking_Test (Num : Univ_Integer) is
+   subtype Positive is Integer<1 .. Univ_Integer'Last>;
+   Sums : Array<Integer, Indexed_By => Positive> :=
+     Create (1 .. Num, 0);
+   Sum : Integer := 0;
+begin
+   parallel (Chunk in 1 .. Num)
+   for I in 1 .. 1_000_000 when I mod 2 = 1 loop
+      Sums [Chunk] := Sums [Chunk] + I;
+   end loop;
+
+   for I in 1 .. Num loop
+      Put_Line (" Sums[" & I'Image & "] = " & Sums[I]'Image);
+   end loop;
+
+   Sum := Sums'Reduce ("+", 0);
+
+   Put_Line ("Total Sum = " & Sum'Image);
+
+   Count : Atomic<Integer> := Create(0);
+
+   parallel (Num)
+   for I in 1 .. 1_000_000 when I mod 2 = 1 loop
+      Ignore : constant Integer := Count.Fetch_And_Add (I);
+   end loop;
+   Put_Line ("Sum using atomic counter = " & Count.Value()'Image);
+end Chunking_Test;

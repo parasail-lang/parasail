@@ -1,0 +1,2 @@
+C = #green
+(case C is when #red => 1; when #green => 2; when #blue => 3) = 2

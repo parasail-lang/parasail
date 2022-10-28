@@ -1,0 +1,57 @@
+interface Fun<> is
+   type Primary_Color is Enum<[#red, #yellow, #blue]>;
+   type Color is new Enum<[#purple, #red, #orange, #yellow, #green, #blue]>;
+
+   func To_Color(PC : Primary_Color) -> Color;
+   func To_Primary(C : Color) -> optional Primary_Color;
+end interface Fun;
+
+class Fun is
+ exports
+   func To_Color(PC : Primary_Color) -> Color is
+      case PC of
+        [#red] => return #red;
+        [#yellow] => return #yellow;
+        [#blue] => return #blue;
+      end case;
+   end func To_Color;
+
+   func To_Primary(C : Color) -> optional Primary_Color is
+      case C of
+        [#red]    => return #red;
+        [#yellow] => return #yellow;
+        [#blue]   => return #blue;
+        [..]      => return null;
+      end case;
+   end func To_Primary;
+    
+end class Fun;
+
+interface Fun2<> is
+   type Better_Color is new Fun::Color;
+   func To_Better_Color(C : Fun::Color) -> Better_Color;
+end interface Fun2;
+
+class Fun2 is
+  exports
+   func To_Better_Color(C : Fun::Color) -> Better_Color is
+      case To_Primary (C) of
+        [#red] => return #red;
+        [#yellow] => return #yellow;
+        [#blue] => return #blue;
+      end case;
+   end func To_Better_Color;
+
+end class Fun2
+
+func Test_Conv(C : Univ_Enumeration) is
+   const CC : Fun::Color := C;
+   const PC : Fun::Primary_Color := C;
+   const BC : Fun2::Better_Color := To_Better_Color(CC);
+   const PC2 : Fun::Primary_Color := To_Primary(BC);
+
+   Println ("To_Primary(" | CC | ") = " | To_Primary (CC));
+   Println ("Fun::To_Color(" | PC | ") = " | Fun::To_Color (PC));
+   Println ("To_Better_Color(" | CC | ") = " | BC);
+   Println ("To_Primary(" | BC | ") = " | PC2);
+end func Test_Conv;

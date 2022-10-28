@@ -1,0 +1,31 @@
+PARython is the tentative name for a mixture of ParaSail and Python.
+
+How do we make this work?  We can adjust the syntax of ParaSail
+incrementally to make it closer to Python, though some of the
+operator overloading stuff in Python 3.0 seems particularly gruesome
+to carry over.
+
+The Python library is the real question.
+
+There is a program called "shedskin" which is a compiler
+of an implicitly statically-typed version of Python to
+C++.  We could do better, by automatically using Any+
+or Assignable+ when appropriate, for the type of variables
+that vary dramatically.  This would be a translation approach,
+where we make PARython very Python-like, and then provide
+a translator from regular Python to PARython.
+
+Another issue is the existing C extensions.  If we want to
+capture those, we need to make the "import" capability
+more sophisticated.
+
+Another approach is to simply allow calls on Python code
+from PARython, requiring a Python virtual machine in addition
+to the PARython virtual machine.
+
+The translation approach seems cleaner, as it moves programmers
+to a "superior" (;-) language while also providing support
+for legacy code.  It can also be imperfect, allowing the programmer
+to adjust the output after it has been translated, provided that
+the translation is human editable.  This still doesn't address
+the existing C extensions, but perhaps they can be wrapped automatically.

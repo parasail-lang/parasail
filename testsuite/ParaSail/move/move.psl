@@ -1,0 +1,11 @@
+func Test_Move() is
+    var Z : Basic_Array<Univ_Integer> := Create(10, 0);
+    Println("Length(Z) = " | Length(Z));
+    var V <== Z;
+    Println("After V <== Z, Z is null = " | [[Z is null]]);
+    Println("Length(V) = " | Length(V));
+end func Test_Move;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Move ();
+end func main;

@@ -1,0 +1,150 @@
+
+interface PSL::Containers::Indexed_Set<Element_Type is Hashable<>;
+                                       Id_Type is Integer<>> is
+  //  A set where each element is assigned a unique ID when it is first
+  //  added to the set, and the Id can be used to retrieve the element later.
+
+   op "[]"() -> Indexed_Set
+     // Create an empty indexed set
+
+   func Get_Unique_Id(var Indexed_Set; Element_Type) -> Id_Type
+     // Add element to set if not there; in any case return the unique Id
+     // for the element.
+
+   op "indexing"(ref const Indexed_Set; Id : Id_Type)
+    -> ref const Element_Type
+     //  Return ref to element in Indexed_Set with given Id
+
+   op "index_set"(Indexed_Set) -> Countable_Range<Id_Type>
+     //  Return set of Ids of all elements in the Indexed_Set
+
+   op "in"(Id : Id_Type; Indexed_Set) -> Boolean
+     //  Return #true if Id is in the range of the Indexed_Set
+
+   func All_Ids(Indexed_Set) -> Countable_Range<Id_Type> is "index_set"
+     //  Set of all ids in index set
+
+   func Count(Indexed_Set) -> Univ_Integer
+     //  Count of elements in the indexed set
+
+   op "magnitude"(Indexed_Set) -> Univ_Integer is Count
+
+end interface PSL::Containers::Indexed_Set
+
+class PSL::Containers::Indexed_Set is
+   interface Bucket<> is
+      //  Linked list of indices of all elements with the same hash value
+      var Id : Id_Type
+      var Next : optional Bucket
+   end interface Bucket
+
+   const Empty_Bucket : optional Bucket := null
+
+   interface With_Hash<> is
+      //  Save a copy of the Hash value to avoid repeatedly re-invoking Hash
+      var Elem : Element_Type
+      var Saved_Hash : Univ_Integer
+   end interface With_Hash
+
+   const Initial_Size := 4  //  Length of initial hash-table backbone
+
+   var IS_Vector   : Vector<With_Hash> := []
+   var IS_Hash_Tab : Vector<optional Bucket> :=
+     Create(Initial_Size, Empty_Bucket)
+  exports
+   op "[]"() -> Indexed_Set is
+     // Create an empty indexed set
+      return ()  //  Everything defaults properly
+   end op "[]"
+
+   op "indexing"(ref const Indexed_Set; Id : Id_Type)
+     -> ref const Element_Type is
+     //  Return ref to element in Indexed_Set with given Id
+      return Indexed_Set.IS_Vector[Id].Elem
+   end op "indexing"
+
+   op "index_set"(Indexed_Set) -> Countable_Range<Id_Type> is
+      return 1 .. |Indexed_Set.IS_Vector|
+   end op "index_set"
+
+   op "in"(Id : Id_Type; Indexed_Set) -> Boolean is
+     //  Return #true if Id is in the range of the Indexed_Set
+      return Id in Indexed_Set.All_Ids()
+   end op "in"
+
+   func Get_Unique_Id(var Indexed_Set; Elem : Element_Type) -> Id_Type is
+     // Add element to set if not there; in any case return the unique Id
+     // for the element.
+
+      const Hash_Val := Hash(Elem)
+
+      //  Search to see if it is already in table
+      var Index := Hash_Val mod |Indexed_Set.IS_Hash_Tab| + 1
+      ref Bucket_List => Indexed_Set.IS_Hash_Tab[Index]
+      for B => Bucket_List then B.Next while B not null loop
+         ref Elem_In_Table => Indexed_Set.IS_Vector[B.Id]
+         if Elem_In_Table.Saved_Hash == Hash_Val
+           and then Elem_In_Table.Elem == Elem
+         then
+            //  Already in table
+            return B.Id
+         end if
+      end loop
+
+      //  Not in table; add to end of vector
+      var Elem_With_Hash : With_Hash for Indexed_Set :=
+        (Elem => Elem, Saved_Hash => Hash_Val)
+      Indexed_Set.IS_Vector <|= Elem_With_Hash
+
+      //  Assign it a unique id based on position in Indexed_Set
+      const New_Id : Id_Type := |Indexed_Set.IS_Vector|
+
+      //  Add to appropriate bucket
+      Bucket_List := (Id => New_Id, Next <== Bucket_List)
+
+      //  Now check to see if hash table should be expanded
+      if |Indexed_Set.IS_Vector| > 2 * |Indexed_Set.IS_Hash_Tab| then
+         //  Table was already at double density.  Expand IS_Hash_Tab
+         var Old_HTab <== Indexed_Set.IS_Hash_Tab
+         const New_Len := |Old_HTab| * 2
+         //  Create hash table with double the number of buckets
+         Indexed_Set.IS_Hash_Tab := Create(New_Len, Empty_Bucket)
+         for each Old_Bucket of Old_HTab loop
+            for B => Old_Bucket then B.Next while B not null loop
+               ref Old_Elem => Indexed_Set.IS_Vector[B.Id]
+               ref New_Bucket =>
+                 Indexed_Set.IS_Hash_Tab[Old_Elem.Saved_Hash mod New_Len + 1]
+               //  Insert at front
+               New_Bucket := (Id => B.Id, Next <== New_Bucket)
+            end loop
+         end loop
+         Old_HTab := null  --  Recover storage (TBD: should not be necessary)
+      end if // Expanding table
+
+      return New_Id
+   end func Get_Unique_Id
+
+   func Count(Indexed_Set) -> Univ_Integer is (|Indexed_Set.IS_Vector|)
+     //  Count of elements in the indexed set
+
+end class PSL::Containers::Indexed_Set
+
+func PSL::Test::Test_Indexed_Set() is
+   type String_Id is new Integer<0 .. 1_000>
+   type String_Set is Indexed_Set<Univ_String, String_Id>
+
+   var SST : String_Set := []
+
+   const Hello_Id := SST.Get_Unique_Id("Hello")
+   const There_Id := SST.Get_Unique_Id("There")
+   const My_Id := SST.Get_Unique_Id("My")
+   const Friend_Id := SST.Get_Unique_Id("Friend")
+
+   const Ids : Vector<String_Id> := [Hello_Id, There_Id, My_Id, Friend_Id]
+
+   Print("Secret message:")
+   for each Id of Ids forward loop
+      Print(" " | SST[Id])
+   end loop
+   Print('\n')
+end func PSL::Test::Test_Indexed_Set

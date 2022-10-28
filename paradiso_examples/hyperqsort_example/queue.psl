@@ -1,0 +1,84 @@
+interface Queue<Elem is Assignable<>> is
+   op "[]"() -> Queue
+   func Enqueue(var Queue; Elem)
+   func Dequeue(var Queue) -> optional Elem
+end interface Queue
+
+class Queue is
+   var Data : Vector<Elem> := []
+   var Next_Q : Univ_Integer := 1
+   var Next_DQ : Univ_Integer := 1
+ exports
+   op "[]"() -> Queue is
+      return ()
+   end op "[]"
+
+   func Enqueue(var Queue; Elem) is
+      if Queue.Next_Q > Queue.Data.Length() then
+         //  Can just add at end of vector
+         Queue.Data |= Elem
+         Queue.Next_Q += 1
+      elsif Queue.Next_Q == Queue.Next_DQ then
+         //  Queue is full, reshuffle and extend the vector
+         Queue.Data := Queue.Data[Queue.Next_DQ .. Queue.Data.Length()] |
+                         Queue.Data[1 .. Queue.Next_DQ-1] | Elem
+         Queue.Next_DQ := 1
+         Queue.Next_Q := Queue.Data.Length() + 1
+      else
+         //  Overwrite element
+         Queue.Data[Queue.Next_Q] := Elem
+         Queue.Next_Q += 1
+      end if
+   end func Enqueue
+
+   func Dequeue(var Queue) -> Result: optional Elem is
+      if Queue.Data.Length() == 0 then
+         //  Empty
+         Result := null
+      else
+         Result := Queue.Data[Queue.Next_DQ]
+         Queue.Next_DQ += 1
+         if Queue.Next_DQ == Queue.Next_Q then
+            //  Now empty, start back with an empty vector
+            Queue.Data := []
+            Queue.Next_DQ := 1
+            Queue.Next_Q := 1
+         elsif Queue.Next_DQ > Queue.Data.Length() then
+            //  Wrapped around
+            Queue.Next_DQ := 1
+         end if
+      end if
+   end func Dequeue
+
+end class Queue
+
+func Test_Queue() is
+   var X : Queue<Univ_String> := []
+
+   Println("Enqueue abc");
+   X.Enqueue("abc")
+   Println("Enqueue def");
+   X.Enqueue("def")
+   Println("Dequeue = " | X.Dequeue())
+   Println("Enqueue ghi");
+   X.Enqueue("ghi")
+   Println("Enqueue abc");
+   X.Enqueue("abc")
+   Println("Enqueue def");
+   X.Enqueue("def")
+   Println("Dequeue = " | X.Dequeue())
+   Println("Enqueue ghi");
+   X.Enqueue("ghi")
+   Println("Dequeue = " | X.Dequeue())
+   Println("Enqueue xyz");
+   X.Enqueue("xyz")
+   Println("Dequeue = " | X.Dequeue())
+   Println("Enqueue xyz");
+   X.Enqueue("xyz")
+   Println("Dequeue = " | X.Dequeue())
+   Println("Dequeue = " | X.Dequeue())
+   Println("Dequeue = " | X.Dequeue())
+   Println("Dequeue = " | X.Dequeue())
+   Println("Dequeue = " | X.Dequeue())
+end func Test_Queue
+   

@@ -1,0 +1,3 @@
+func Plus_One(n : Univ_Integer) -> Univ_Integer is
+   return n + 1;
+end func Plus_One;

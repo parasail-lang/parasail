@@ -1,0 +1,4 @@
+*** Test 1: Annotations are OK
+X = 3, Y = 6
+*** Test 2: One annotation failed (original test)
+annotation.pry:7:8: Error: Assertion failed:  {> Y == X * 2 + 1 <}

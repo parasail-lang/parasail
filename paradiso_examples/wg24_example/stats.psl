@@ -1,0 +1,74 @@
+interface Stats <Flt is Float<>> is
+   const Num : Integer
+   const Sum : Flt
+   const Sum_Of_Squares : Flt
+
+   func Compute_From_Vec (Data : Vector<Flt>) -> Stats
+   func Compute_From_Func (N : Integer; Item : func (Integer)
+     -> Flt) -> Stats
+   
+   func Average (Stats) -> Flt
+   func Std_Dev (Stats) -> Flt
+   func Variance (Stats) -> Flt
+   func Min(Stats) -> Flt
+   func Max(Stats) -> Flt
+   op "[]"() -> Stats
+   op "+=" (var Stats; New_Data : Flt)
+end interface Stats
+
+class Stats is
+   var Min : optional Flt := null
+   var Max : optional Flt := null
+ exports
+   func Compute_From_Vec (Data : Vector<Flt>) -> Result : Stats is
+      Result := []
+      for each Item of Data loop
+         Result += Item
+      end loop
+   end func Compute_From_Vec
+     
+   func Compute_From_Func (N : Integer; Item : func (Integer)
+     -> Flt) -> Result : Stats is
+
+      Result := []
+      for I in 1 .. N loop
+         Result += Item(I)
+      end loop
+   end func Compute_From_Func
+
+   op "[]"() -> Stats is
+      ((Num => 0, Sum => 0.0, Sum_Of_Squares => 0.0));
+
+   op "+=" (var S : Stats; New_Data : Flt) is
+      S := (Num => S.Num + 1,
+            Sum => S.Sum + New_Data,
+            Sum_Of_Squares => S.Sum_Of_Squares + New_Data * New_Data,
+            Min => Min(S.Min, New_Data),
+            Max => Max(S.Max, New_Data));
+   end op "+="
+
+   func Average (S : Stats) -> Flt is
+      if S.Num == 0 then
+         return 0.0
+      else
+         return S.Sum / S.Num
+      end if
+   end func Average
+
+   func Variance (S : Stats) -> Flt is
+      if S.Num == 0 then
+         return 0.0
+      else
+         return (S.Sum_Of_Squares -
+                      S.Sum * S.Sum / S.Num) / S.Num
+      end if
+   end func Variance
+
+   func Std_Dev (S : Stats) -> Flt is
+      return Sqrt(S.Variance())
+   end func Std_Dev
+
+   func Min(Stats) -> Flt is (Stats.Min)
+   func Max(Stats) -> Flt is (Stats.Max)
+end class Stats
+

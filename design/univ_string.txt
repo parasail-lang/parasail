@@ -1,0 +1,235 @@
+What needs to change internally to deal with a "large" string representation?
+
+Mostly this is in the builtins.
+We currently presume Univ_Enumeration and Univ_String have identical
+representation.  We will need to change Print_Univ_Enum in builtins, and
+change To_String and From_String to not use #identity, but rather
+have separate #from_string_enum and #to_string_enum.  Similarly we
+need a separate #hash_enum.
+
+We need to change Print_String and Println_String to do something new.
+
+The various #to_string_XYZ and #from_string_XYZ need to be changed to
+create a large representation.
+
+----
+How to integrate a ParaSail implementation of Univ_String with
+the Ada package:
+
+   The Create() routine -- not clear this is relevant -- string literals are
+   a special case, and can be handled that way.  But if implementing
+   concatenation, need to create a new string from the two sub strings,
+   and may want a routine to do that.
+
+   Could we have two different ParaSail univ-string types, one for 
+   packed array of chars, and one for array of substrings?  If we had
+   a polymorphic object, which would it identify?  If we want Univ_String
+   to be a "large" type, then we need a module and a type descriptor
+   that has the appropriate number of components of appropriate sizes.
+
+   The sub-object which is a basic array of substrings will need a type
+   descriptor.  The packed array of 8/16/31-bit characters could all be
+   represented by an array of Univ_Integer, and we could have a module
+   constant of this type to ensure that the type exists, once we have
+   read in the Univ_String module.
+
+   There could be an issue in reading/writing a stream containing a
+   Univ_String object, because in that case we don't know what to reconstruct.
+   We will probably need special stream read/write routines for strings.
+
+   We could only use an array of Univ_Integer, but we are limited to
+   2**16 words, each of which could represent at most 7 characters, so
+   that is a string of length about 450,000 characters.  Also, then we
+   would need a way of efficiently indexing when the array has elements
+   representing different numbers of characters.
+
+   What about the various print routines?  These are currently built in.
+
+   Indexing?  This could call a built-in to check to see if the string is
+   one of the special cases, and if so hand off to the built-in indexing.
+
+   Concatenate to produce new string?  Create a completely new string,
+   or keep or start using a vector representation?  It would depend on what
+   proportion of the original strings are special strings.  We could have a
+   flag that kept track of this somehow, but it is not clear how to update
+   this as the vector grows.
+
+   Concatenate onto the end of an existing string?  If the last element of
+   Left is a short string or a variable string, can possibly merge into that.
+
+   Search string.
+
+-----------
+
+   I think the simplest is to provide a by-reference conversion function
+   from a Basic_Array<Univ_String> to Basic_Array<Univ_Integer>, which
+   is bound to #identity.  We can then have Univ_Integer have as its
+   main component a Basic_Array<Univ_String>, which can be viewed as
+   a Basic_Array<Univ_Integer> when appropriate.  The converter might be:
+
+      func To_Int_Array(ref Basic_Array<Univ_String>)
+        -> ref Basic_Array<Univ_Integer> is import(#identity)
+
+-----------
+We have a new Ada package, psc-univ_strings.ads/b.  This provides support for
+a new implementation of Univ_String.
+
+Goals:  We would like a version of Univ_String that does not involve any
+locking, except when explicitly requesting a conversion to a U_String.
+
+So psc-univ_strings now supports 0-3 character strings as a special case, and
+otherwise uses U_Strings.  We need to have something for longer strings.
+One goal is to allow the "|=" operator to operate more efficiently than
+it does now.  A vector of substrings would work pretty well, ending up with
+a possible tree structure.  We probably want to limit any level to some
+maximum, so we can quickly get to the "nth" character for slicing and
+indexing.  If the RHS of "|=" is not a U-String or a short string, then
+we might want to incorporate it into the LHS.  If we have a separate
+"<|=" operator, then that might change the situation somewhat, as there
+would then be no need to copy, but we could instead move the RHS into a (sub)vector of the LHS.
+
+Each element of the univ-string "vector" could be a sub-Univ-String, or could
+be a (4 char+) slice of a U_String, or could be a packed array of 8-bit
+characters, or could be a packed array of 31-bit characters.
+We could use Basic_Arrays if we limit any one array to 2**16 words.
+We want to use the "normal" copying operations, so we don't want any
+too-fancy representation.  Whether a basic array is 8-bits per char
+or 31-bits per char could be indicated by a separate flag, as could the
+number of characters of the array that are actually used, if we want to
+accommodate adding more characters at the end.
+
+** Need to check whether copy/reclaim work properly on the "special" values
+of Univ_String.
+
+If we presume that either we have a basic_array of univ_strings, or
+a basic array of univ integers, can we avoid an extra level of indirection?
+That is, we look at the type of the object itself to decide whether it is
+the array-of-chars or the recursive array-of-univ-strings?  What happens
+when we have a Univ_String+?  What type is that?  We can also use the
+first element to decide which kind of thing we have.  It it is negative,
+it is a 3-char univ-string giving the length of the string.  If it is
+a positive number, it is the number of characters plus some sort of
+indication of whether the characters are 8 bits, 16 bits, or 31 bits each.
+The standard copying algorithm needs to work on these, but it actually
+looks at the type.  A polymorphic object has a "declared" type as well
+as an underlying "structural" type.  The "declared" type would be a wrapper
+of Basic_Array<Univ_String>
+
+Problem: We need to store the "hash" as well as the length.
+For a Basic_Array<Univ_String> we would need a place to store the hash
+as well as the length.  One possibility is to always have both a
+Basic_Array<Univ_Integer> and Basic_Array<Univ_String>.  But that means
+we have a level of indirection, so we might as well just have the len and
+hash directly in the object.
+
+We could use the Len to encode both the length and the kind of string
+(Substrs, 8-bit chars, 16-bit chars, or 31-bit chars).
+
+As far as hash, is it worth going being 2**32?  That is the hash type
+supported by U_String.
+
+May want to invert PSC.Strings.Hash_String loop, so it goes in reverse?
+In any case, we may want to implement exponentiation on modular types using
+the bit-based efficient mechanism, since we need to multiply the hash
+of one of the two strings being concatenated by 127**(len of other string).
+Since we presume the string being added on the right is usually shorter,
+we would normally want to multiply the left hash by 127**(shorter-len).
+So that implies Hash_String goes in correct order already -- no need for
+reverse order.
+
+------------- thoughts from 12/2013 -------
+Implementing Univ_String properly is non-trivial.
+We would like slicing to be cheap.  We would also
+like to support arbitrary Unicode characters, but
+without going to 32-bits/character.  Finally we
+would like it to be fast, while not leaking storage.
+If we do a concatenation in a loop, we don't want
+it to leak storage.
+
+Some ideas:
+  - Make the hash function something that works on 
+  concatenation, that is, Hash(A|B) = F(Hash(A), Hash(B))
+
+  - Embed the first few characters directly in the
+  64-bit value.  Do we mean first few UTF-8 encodings?
+  Should we use modified UTF-8 where NUL is encoded using
+  two bytes, so a single-byte 0 can be used as a terminator?
+  Probably only embed first N characters if their codes
+  are in the range 1-127.  Any non ASCII code or an embedded
+  NUL would force the "big" representation.
+  If more than 7 characters, we would revert to the big
+  representation.
+
+  - Use a "perfect"/cryptographic hash function 
+    so we don't have to compare the characters.
+    A simple "rolling" hash would use a large prime number
+    applied to the sequence of characters with new characters coming
+    in at the low order, and old characters being "modded" out at
+    the high end.  Can simply add in the whole value, even if not in
+    range 0..127, but shift by only 8 each time.
+
+    Does this work for concatenation?  Yes:
+      Hash(A|B) = (Hash(A)*256**|B| + Hash(B)) mod P
+    Probably want to pre-compute 256**X mod P for smallest X
+    where 256**X >= P, and then we replace "256**|B|" with
+    ((256**X mod P)**(|B|/X) * 256**(|B| mod X)) mod P
+
+    OR: We could invert this so appending characters on the end 
+        doesn't require multiplying the prior Hash by anything, but
+        rather the new characters are multiplied by 256**|A|.
+
+  - Should try to use the global var features for the cache.
+  
+  - Rather than UTF-8, might make sense to use an encoding 
+    where the high-bit being zero means the actual value,
+    if high-bit is non-zero it selects from a list of
+    32-bit characters stored as a separate list.
+
+  - For "big" representation, we would store the length,
+    the hash, the "big" characters.
+
+  - How should slices be represented?  Ideally no extra
+    storage.  If we allow slices of up to 255 characters
+
+  - We could consider strings as possibly-large objects,
+    piggy-backing on the idea of null, with a special
+    "short" version.  We have three possibilities:
+    Large non-null, Null+Region, Small-non-null+Region.
+    The need for a region means that we don't have much
+    left over.  Large is chunk id in high-32 bits, and offset
+    in low 32 bits.  We would like to give a full 32 bits
+    to the "small" value, this implies that we need to reserve
+    enough chunk ids to recognizably cover all the possible
+    region ids.
+
+  - Alternatively, we use a single (large) representation, but with
+    certain chunk ids indicating a "shared" chunk which lives
+    forever, with part of the chunk-id devoted to identifying
+    the region and the other part identifying the shared chunk.
+    Presumably adding a string to the shared dictionary would
+    involve a synchronized operation, so it would only be done
+    if it was known that the string would be copied a lot.
+    We wouldn't even bother looking up strings normally to avoid
+    synchronization overhead.
+
+  - So how would slices work?  Presumably they would only be
+    specially handled for shared strings, to avoid reference
+    counting.  Single-character strings definitely deserve a
+    special representation, at least those in the normal 8-bit
+    character set.
+
+  - Hash for single-character-string should = character code,
+    for characters in 1..127.
+    Hash for empty string = 0?  Hash for null character could also
+    be zero.  Representation for empty string vs. null character?
+    Empty string = 16#FF#?
+
+  - Large strings would have a length, a hash, a vector of words containing
+    8 chars per word, and a datastructure that can answer the questions:
+      1) Any wide characters?  (is non-null)
+      2) Is Nth char wide?
+          (an ordered map from low-bound to count with tree of sums)
+      3) Value of Nth wide character. - (tree of subvectors)
+
+  - Slice of a shared large string would be (ref to) string
+    and offset and length

@@ -1,0 +1,20 @@
+Programming Language Gripes (cf. http://www.codinghorror.com)
+
+   Verbosity -- Simple type inference; higher-level operators
+                Built-in and user-definable sets, maps, extensible vectors, ...
+   Efficiency -- No global heap, no garbage collection
+   Storage bugs -- No manual reclamation
+   Template complexity -- All modules are parameterized
+   Readability -- "end class Stack" rather than simply "}"
+      (can easily scan code backwards)
+   Loop complexity -- General, powerful, user-defined iterators 
+                      combined with parallel loop, map/reduce, for-all,
+                      container comprehension
+   if, elsif, ... for comparing strings -- Generalized "case" statement
+   Awkward literals -- User defined types can use literals
+   Race conditions  -- Compile-time detection; race-condition-free
+      "by construction"
+      
+   
+   
+   

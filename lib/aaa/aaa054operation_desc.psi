@@ -1,0 +1,14 @@
+interface PSL::Core::Operation_Descriptor<> is
+   //  For internal use only
+   const Routine_Addr : Univ_Integer;
+   const Routine_Index : Univ_Integer;
+   const Static_Link : Univ_Integer;
+   const Conv_Desc : Univ_Integer;
+end interface PSL::Core::Operation_Descriptor;
+
+func PSL::Test::Test_Operation_Descriptor() is
+   //  For this Type to appear in the type table,
+   //  it must be used. Don't delete this function
+   const OD : PSL::Core::Operation_Descriptor := (0, 0, 0, 0);
+   Println(OD.Static_Link);
+end func PSL::Test::Test_Operation_Descriptor;

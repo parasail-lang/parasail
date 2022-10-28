@@ -1,0 +1,522 @@
+abstract interface PSL::Containers::Keyed<Key_Type is Hashable<>> is
+    func Key_Of(ref const KV : Keyed) -> ref const Key_Type
+    func Has_Value(KV : Keyed) -> Boolean
+        // Return #true if Keyed object has a non-null value
+    func Key_Only(Key : Key_Type) -> Keyed
+        // Return a Keyed object given a key, having no associated value
+end interface PSL::Containers::Keyed
+
+interface PSL::Containers::Key_Value
+  <Key_Type is Assignable<>; Value_Type is Assignable<>> 
+  implements Keyed<Key_Type> is
+  // This supports the use of [Key => Value] as a way to
+  // add a single element to an existing indexable container of some sort.
+    var Key : optional Key_Type
+    var Value : optional Value_Type
+    op "[]"() -> Key_Value is ((Key => null, Value => null))
+    op "var_indexing"(ref var KV : Key_Value; Index : Key_Type) 
+      -> ref var Value_Type
+    func Key_Of(ref const KV : Key_Value) -> ref const Key_Type
+    func Has_Value(KV : Key_Value) -> Boolean
+        // Return #true if Key_Value object has a non-null value
+    func Key_Only(Key : Key_Type) -> Key_Value is ((Key => Key, Value => null))
+        // Return a Key_Value object given a key, having no associated value
+end interface PSL::Containers::Key_Value
+
+class PSL::Containers::Key_Value is
+  exports
+    op "var_indexing"(ref var KV : Key_Value; Index : Key_Type) 
+      -> ref var Value_Type is
+        KV.Key := Index
+        return KV.Value
+    end op "var_indexing"
+
+    func Key_Of(ref const KV : Key_Value) -> ref const Key_Type is
+        return KV.Key
+    end func Key_Of
+
+    func Has_Value(KV : Key_Value) -> Boolean is
+        // Return #true if Key_Value object has a non-null value
+        return KV.Value not null
+    end func Has_Value
+end class PSL::Containers::Key_Value
+
+interface PSL::Containers::Basic_Map<KV_Type is Keyed<>> is
+  // A basic hashed-map module
+
+    op "[]"() -> Basic_Map
+
+    op "|="(var Left : Basic_Map; Right : KV_Type)
+        // Add Key=>Value to Basic_Map, replacing pre-existing Basic_Mapping
+        // for Key, if any.
+
+    op "<|="(var Left : Basic_Map; var Right : optional KV_Type)
+        // Move Key=>Value into Basic_Map, replacing pre-existing Basic_Mapping
+        // for Key, if any, leaving Right null.
+
+    op "+="(var Left : Basic_Map; Right : KV_Type) is "|="
+        // A synonym for adding a key=>value KV_Type
+
+    op "in"(Left : KV_Type::Key_Type; Right : Basic_Map) -> Boolean
+        // Return True if given key has a Basic_Mapping in the Basic_Map
+
+    op "-="(var M : Basic_Map; Key : KV_Type::Key_Type)   // aka Exclude
+        // Remove Basic_Mapping for Right, if present
+
+    op "index_set"(M : Basic_Map) -> Set<KV_Type::Key_Type>
+        // Return set of keys with Basic_Mappings
+
+    op "indexing"(ref M : Basic_Map; Key : KV_Type::Key_Type) {Key in M} 
+      -> ref KV_Type
+        // Used for references to M[Key]; requires the Key to be in M.
+
+    op "var_indexing"(ref var M : Basic_Map; Key : KV_Type::Key_Type) 
+      -> ref var optional KV_Type
+        // Used for assignments to M[Key]; Key is added to M if not present
+
+    func Remove_Any(var M : Basic_Map) -> optional KV_Type
+        // Remove one Basic_Mapping from the Basic_Map.  
+        // Return null if Basic_Map is empty
+
+    func Any_Element(M : Basic_Map) -> optional KV_Type
+        // Return one Basic_Mapping from the Basic_Map.
+        // Return null if Basic_Map is empty
+
+    func Count(M : Basic_Map) -> Univ_Integer
+        // Number of Basic_Mappings in the table
+
+    op "magnitude"(Basic_Map) -> Univ_Integer is Count
+
+    func Is_Empty(M : Basic_Map) -> Boolean
+        // Return True if map has no mappings
+
+    func Dump_Statistics(M : Basic_Map)
+      // A debugging routine to show bucket sizes of Basic_Map
+
+end interface PSL::Containers::Basic_Map
+
+class PSL::Containers::Basic_Map is
+  // A basic hashed-map module
+
+  // A Basic_Map is represented as a hash table, where each bucket is 
+  // a linked list of key/value KV_Types.
+  // We expand the table when the Count gets to be twice
+  // that of the length of the table.
+
+    interface Hash_Bucket<> is
+      // a simple linked-list is used as a hash bucket
+        var Elem : optional KV_Type
+        var Tail : optional Hash_Bucket
+    end interface Hash_Bucket
+
+    var Count : Univ_Integer
+    var Table : optional Basic_Array<optional Hash_Bucket<>>
+    const Initial_Table_Size := 4
+    const Debugging : Boolean := #false
+    
+    func Empty(Table_Size : Univ_Integer) -> Basic_Map is
+        // Create an empty Basic_Map with the given table size
+        return (Count => 0, Table => Create(Table_Size, null))
+    end func Empty
+
+    func Move_One(var To : Basic_Map; var Elem : optional KV_Type) is
+        // Move Element into table, without expanding table.
+        // Elem is set to null as a result.
+        const Index := Hash(Key_Of(Elem)) mod |To.Table| + 1
+        ref Bucket => To.Table[Index]
+
+        if Bucket is null then
+            // Bucket is now empty, so create bucket
+            // with Elem as its only element.
+            Bucket := (Elem <== Elem, Tail => null)
+        else
+            // See whether Elem already in bucket
+            var Has_Empty_Slot : Boolean := #false
+            for B => Bucket then B.Tail while B not null loop
+                if B.Elem is null then
+                    // Remember there is an empty slot
+                    Has_Empty_Slot := #true
+                elsif Key_Of(Elem) == Key_Of(B.Elem) then
+                    // Already there; replace it in case Value is different.
+                    B.Elem <== Elem
+                    return
+                end if
+            end loop
+
+            if Has_Empty_Slot then
+                // Fill in the empty slot
+                for B => Bucket then B.Tail while B not null loop
+                    if B.Elem is null then
+                        // Use the empty slot
+                        B.Elem <== Elem
+                        exit loop
+                    end if
+                end loop
+            else
+                // Make old bucket the new tail of the new bucket.
+                Bucket := (Elem <== Elem, Tail <== Bucket)
+            end if
+        end if
+
+        To.Count += 1
+    end func Move_One
+
+    func Add_One(var To : Basic_Map; Elem : KV_Type) is
+        // Add Element to table, without expanding it
+        var Elem_Copy for To := Elem
+
+        // Just pass the buck to "Move_One"
+        Move_One(To, Elem_Copy)
+    end func Add_One
+
+    func Expand_Table(var Expanding : Basic_Map) is
+        // Expand table of given Basic_Map.
+        if Debugging then
+            Println(" Expanding hash table, Count = " | Expanding.Count | 
+              ", Length = " | |Expanding.Table|)
+        end if
+        var Old_Basic_Map <== Expanding
+        Expanding := Empty(2 * |Old_Basic_Map.Table|)
+        // Move elements into new table
+        loop
+            var Elem for Expanding := Remove_Any(Old_Basic_Map)
+                // "for Expanding" means to allocate Elem in
+                // region associated with Expanding.
+            if Elem is null then
+                exit loop
+            end if
+            Move_One(Expanding, Elem)
+        end loop
+        if Debugging then
+            Println(" After expansion, Count = " | Expanding.Count |
+              ", Length = " | |Expanding.Table|)
+        end if
+    end func Expand_Table
+
+  exports
+    op "[]"() -> Basic_Map is
+        return (Count => 0, Table => null)
+    end op "[]"
+
+    op "|="(var Left : Basic_Map; Right : KV_Type) is
+        if Left.Table is null then
+            Left := Empty(Initial_Table_Size)
+        elsif Left.Count >= 2*Length(Left.Table) then
+            // Expand table if averaging 2 or more per hash bucket
+            Expand_Table(Left)
+        end if
+        Add_One(Left, Right)
+    end op "|="
+
+    op "<|="(var Left : Basic_Map; var Right : optional KV_Type) is
+        // Move Key=>Value into Basic_Map, replacing pre-existing Basic_Mapping
+        // for Key, if any, leaving Right null.
+        if Left.Table is null then
+            Left := Empty(Initial_Table_Size)
+        elsif Left.Count >= 2*Length(Left.Table) then
+            // Expand table if averaging 2 or more per hash bucket
+            Expand_Table(Left)
+        end if
+        Move_One(Left, Right)
+    end op "<|="
+
+    op "in"(Left : KV_Type::Key_Type; Right : Basic_Map) -> Boolean is
+        if Right.Count == 0 then
+            // Empty Basic_Map
+            return #false
+        end if
+        const Index := Hash(Left) mod Length(Right.Table) + 1
+        ref Bucket => Right.Table[Index]
+        if Bucket is null then
+            // Hash bucket is empty
+            return #false
+        end if
+        // Scan for Elem in hash bucket
+        for B => Bucket then B.Tail while B not null loop 
+            if B.Elem not null and then
+              Key_Of(B.Elem) == Left then
+                // Found it
+                return #true
+            end if
+        end loop
+        // Not in Basic_Map
+        return #false
+    end op "in"
+
+    op "-="(var M : Basic_Map; Key : KV_Type::Key_Type) is
+      // Remove the given key from the Basic_Map, if present
+        if M.Count == 0 then
+            // Empty Basic_Map
+            return
+        end if
+
+        const Index := Hash(Key) mod Length(M.Table) + 1
+        ref Bucket => M.Table[Index]
+        if Bucket is null then
+            // Hash bucket is empty
+            return
+        end if
+
+        // Scan for Key in bucket
+        for B => Bucket then B.Tail while B not null loop
+            if B.Elem not null and then
+              Key_Of(B.Elem) == Key then
+                // Found it.  Map it to null, and decrement Basic_Map count.
+                B.Elem := null
+                M.Count -= 1
+                return
+            end if
+        end loop
+        // Not found
+    end op "-="
+   
+    op "index_set"(M : Basic_Map) -> Result : Set<KV_Type::Key_Type> is
+        // Return set of keys with non-null Basic_Mappings
+        Result := []
+        if M.Count == 0 then
+            return
+        end if
+        for each Bucket of M.Table loop
+            for B => Bucket then B.Tail while B not null loop
+                if B.Elem not null then
+                    Result |= Key_Of(B.Elem)
+                end if
+            end loop
+        end loop
+    end op "index_set"
+
+    op "indexing"(ref M : Basic_Map; Key : KV_Type::Key_Type) {Key in M} 
+      -> ref KV_Type is
+        // Used for references to M[Key]; requires the Key to be in M.
+        {M not null; M.Count > 0}
+        const Index := Hash(Key) mod Length(M.Table) + 1
+        // Scan for Key in bucket
+        for B => M.Table[Index] then B.Tail while B not null loop
+            if B.Elem not null and then Key_Of(B.Elem) == Key then
+               // Found it.  Return reference to element of KV_Type
+               return B.Elem
+            end if
+        end loop
+        {#false}
+    end op "indexing"
+
+    op "var_indexing"(ref var M : Basic_Map; Key : KV_Type::Key_Type) 
+      -> ref var optional KV_Type is
+        // Used for assignments to M[Key]; Key is added to M if not present
+        if M.Table not null then
+            const Index := Hash(Key) mod Length(M.Table) + 1
+            // Scan for Key in bucket
+            for B => M.Table[Index] then B.Tail while B not null loop
+                if B.Elem not null and then
+                  Key_Of(B.Elem) == Key
+                then
+                    // Found it.  Return reference to element of KV_Type
+                    return B.Elem
+                end if
+            end loop
+        end if
+
+        // Not in table.  Add it, and then return reference
+        if M.Table is null then
+            M := Empty(Initial_Table_Size)
+        elsif M.Count >= 2*Length(M.Table) then
+            // Expand table if averaging 2 or more per hash bucket
+            Expand_Table(M)
+        end if
+
+        // Add [Key => null] to front of appropriate bucket.
+        const Index := Hash(Key) mod Length(M.Table) + 1
+        ref Bucket => M.Table[Index]
+        Bucket := (Elem => Key_Only(Key), Tail <== Bucket)
+        M.Count += 1
+
+        // Return ref to new element
+        return Bucket.Elem
+    end op "var_indexing"
+
+    func Count(M : Basic_Map) -> Univ_Integer is
+        if M is null then
+            return 0
+        else
+            return M.Count
+        end if
+    end func Count
+
+    func Is_Empty(M : Basic_Map) -> Boolean is
+        // Return True if map has no mappings
+        return M.Count == 0
+    end func Is_Empty
+
+    func Remove_Any(var M : Basic_Map) -> Result : optional KV_Type is
+        if M.Count == 0 then
+            // Basic_Map is empty
+            return null
+        else
+            // Find a non-empty bucket and pull out an item.
+            for each Bucket of M.Table loop
+                if Bucket not null then
+                    for B => Bucket then B.Tail while B not null loop 
+                        if B.Elem not null then
+                            // Found an item, remove from Bucket and return
+                            Result <== B.Elem
+                            M.Count -= 1
+                            return
+                        end if
+                    end loop
+                    // This bucket is completely empty, so might
+                    // as well empty it out.
+                    Bucket := null
+                end if
+                // Go on to the next bucket, this one's empty
+            end loop
+            // Should never get here
+            return null
+        end if
+    end func Remove_Any
+
+    func Any_Element(M : Basic_Map) -> optional KV_Type is
+        // Return one Basic_Mapping from the Basic_Map.
+        // Return null if Basic_Map is empty
+        if M.Count == 0 then
+            // Basic_Map is empty
+            return null
+        else
+            // Find a non-empty bucket and return first item found
+            for each Bucket of M.Table loop
+                if Bucket not null then
+                    for B => Bucket then B.Tail while B not null loop 
+                        if B.Elem not null then
+                            // Found an item; return it.
+                            return B.Elem
+                        end if
+                    end loop
+                end if
+                // Go on to the next bucket, this one's empty
+            end loop
+            // Should never get here
+            return null
+        end if
+    end func Any_Element
+
+    func Dump_Statistics(M : Basic_Map) is
+      // A debugging routine to show bucket sizes of Basic_Map
+        Println("Basic_Map statistics: Count = " | M.Count)
+        if M.Table is null then
+            Println(" Table is null")
+        else
+            Println(" Table of length " | Length(M.Table))
+            for each [I => Bucket] of M.Table forward loop
+                Print("  Bucket #" | I)
+                if Bucket is null then
+                    Println(" is null")
+                else
+                    var Len := 0
+                    var Holes := 0
+                    for B => Bucket then B.Tail while B not null loop
+                        Len += 1
+                        if B.Elem is null then
+                            // This list has a hole
+                            Holes += 1
+                        end if
+                    end loop
+                    if Holes > 0 then
+                        Println(" of length " | Len | " with " | 
+                          Holes | " holes")
+                    else
+                        Println(" of length " | Len)
+                    end if
+                end if
+            end loop
+        end if
+    end func Dump_Statistics
+
+end class PSL::Containers::Basic_Map
+
+func PSL::Test::Test_Basic_Map(X : Univ_Enumeration; Y : Univ_String;
+  A : Univ_Enumeration; B : Univ_String) is
+    type Enum_String_KV_Type is Key_Value<Univ_Enumeration, Univ_String>
+    type Enum_String_Basic_Map is Basic_Map<Enum_String_KV_Type>
+
+    var M : Enum_String_Basic_Map := [X => [X => Y], A => [A => B]]
+
+    Println("Count = " | Count(M))
+
+    for each KV of M loop
+        ref const K => KV.Key
+        ref const V => KV.Value
+        Println("Basic_Mapping " | K | " => " | V)
+        Println(K | " in M = " | (K in M))
+    end loop
+
+    Println("#xy in M = " | (#xy in M))
+    
+    M -= X
+
+    Println("Count after deletion = " | Count(M))
+
+    for each KV of M loop
+        ref const K => KV.Key
+        ref const V => KV.Value
+        Println("Basic_Mapping " | K | " => " | V)
+    end loop
+
+    M |= [X => "a new value"]
+
+    Println("Count after addition = " | Count(M))
+
+    for each KV of M loop
+        ref const K => KV.Key
+        ref const V => KV.Value
+        Println("Basic_Mapping " | K | " => " | V)
+    end loop
+
+    M |= [X => "a third value"]
+
+    Println("Count after replacement = " | Count(M))
+
+    for each KV of M loop
+        ref const K => KV.Key
+        ref const V => KV.Value
+        Println("Basic_Mapping " | K | " => " | V)
+    end loop
+
+    M -= A
+
+    Println("Count after deletion = " | Count(M))
+
+    for each KV of M loop
+        ref const K => KV.Key
+        ref const V => KV.Value
+        Println("Basic_Mapping " | K | " => " | V)
+    end loop
+
+    var Ran := Random::Start(Hash(A))
+    var MUI : Basic_Map<Key_Value<Univ_Integer, Univ_Integer>> := []
+
+    Println("Adding 100 random KV_Typeings to Basic_Map.")
+    for I in 1..100 loop
+        const Key := Next(Ran) mod 100
+        const Value := Next(Ran) mod 100
+        MUI[Key] := [Key => Value]
+    end loop
+    Println("Basic_Map is now of count = " | Count(MUI))
+
+    for each [K => KV] of MUI loop
+        ref const V => KV.Value
+        Println("Basic_Mapping " | K | " => " | V)
+        Println("MUI[" | K | "] = " | MUI[K].Value)
+    end loop
+
+    var I := 0
+    for KV_Type in MUI loop
+        I += 1
+        Print(" [" | Key_Of(KV_Type) | " => " | KV_Type.Value | "]")
+        if I mod 5 == 0 then
+            Print('\n')
+        end if
+    end loop
+    if I mod 5 != 0 then
+        Print('\n')
+    end if
+
+end func PSL::Test::Test_Basic_Map

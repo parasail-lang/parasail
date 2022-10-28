@@ -1,0 +1,3 @@
+func Object() is
+   const B : Basic_Array<Univ_Integer> := [];
+end func Object;

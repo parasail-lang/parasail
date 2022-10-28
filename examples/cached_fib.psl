@@ -1,0 +1,67 @@
+
+interface Fib_Cache_Type<Integer<>> is
+    func Init_Cache(Cache_Max : Positive) -> Fib_Cache_Type;
+
+    func Get_Cache(queued var Cache : Fib_Cache_Type; N : Integer)
+      -> Result : Integer;
+
+    func Set_Cache(locked var Cache : Fib_Cache_Type; N : Integer;
+      New_Value : Integer);
+
+    func Cached_Fib(var Cache : Fib_Cache_Type; N : Integer) 
+      -> Result : Integer;
+
+    op "indexing"(ref Cache : Fib_Cache_Type; N : Integer) -> ref Integer;
+
+end interface Fib_Cache_Type;
+
+class Fib_Cache_Type<Integer<>> is
+    var Data : Array<Integer, Indexed_By => Integer>;
+    
+    const Not_Computed : Integer := -1;
+    const Being_Computed : Integer := -2;
+
+    const Converted := Some_Integer::[[Not_Computed]];
+	// Test out explicit conversion via "[[...]]"
+    
+  exports
+  
+    func Init_Cache(Cache_Max : Positive) -> Fib_Cache_Type is
+        return (Data => [0..Cache_Max => Not_Computed]);
+        // -1 means not computed yet
+        // -2 means being computed now
+    end func Init_Cache;
+
+    func Get_Cache(queued var Cache : Fib_Cache_Type; N : Integer)
+      -> Result : Integer is 
+      queued while Cache[N] == Being_Computed then
+        Result := Cache[N];
+        if Result < 0 then
+            Cache[N] := Being_Computed;
+        end if;
+        return;
+    end func Get_Cache;
+
+    func Set_Cache(locked var Cache : Fib_Cache_Type; N : Integer;
+      New_Value : Integer) is
+        Cache[N] := New_Value;
+    end func Set_Cache;
+
+    func Cached_Fib(var Cache : Fib_Cache_Type; N : Integer) 
+      -> Result : Integer is
+        Display(N | " passed to Cached_Fib.\n");
+        Result := Get_Cache(Cache, N);
+        if Result < 0 then
+            Result := Cached_Fib(N-1) + Cached_Fib(N-2);  
+                    // Second call run in parallel
+            Set_Cache(Cache, N, Result);
+        end if;
+        return;
+    end func Cached_Fib;
+
+    op "indexing"(ref Cache : Fib_Cache_Type; N : Integer) 
+      -> ref Integer is
+        return Cache.Data[N];
+    end op "indexing";
+
+end class Fib_Cache_Type;

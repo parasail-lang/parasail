@@ -1,0 +1,45 @@
+We are now trying to do semantic analysis of module instantiations.
+Initially assume that formal type declarations do not
+involve partially-instantiated types.  When we process a module
+instantiation, the actuals are themselves module instantiation or
+existing types.  If all of the actuals are "known" then the new instantiation
+is "known"
+-----------------
+Semantic analysis of a ParaSail program is a multi-pass process.  Part of the challenge is to allow files to be compiled in any order.  In AdaMagic, the first "pass" is effectively "adareg" which just provides a mapping from compilation unit name to file.  It is probably not worth having a separate program for ParaSail to create such a mapping.  It is easy enough to keep everything in memory.  I suppose one reason to have a separate adareg is that it allows files to be stored in separate directories, etc.  But that could be solved by having a standard list of files to be read first, though perhaps not compiled again.  There does seem to be a distinction between "read" and "compile," and there does seem to be an advantage to leave "behind" some kind of unit map.  So perhaps the AdaMagic model isn't so bad.
+
+In any case, pass 0 might be the unit-map/register phase.  This would determine what top-level units are in each file.
+
+Pass 1 would read a file and record the names of the modules, and the names of nested modules and nested types.  Objects are probably worth recording as well.   Operations are perhaps not worth worrying about on pass 1.  On the other hand, it would be nice to have at least the names of the operations.  This is also an order-independent process.  When done, we know the top-level names defined in a module.  Does this pass do type name resolution?  For objects that don't have an explicit declared type, that isn't possible.
+
+Or should we do interfaces only on one pass, and then look at classes (implementations) on the next pass?  Could we analyze interfaces completely?  Must everything be done in a lazy fashion?  What about default expressions?  We don't actually care about the details of a default expression until it is used, but we do care that it is present.  We will want to store the "context" associated with every expression so that we can analyze it after the fact.
+
+Pass 2 would analyze the names, expression, operations, etc.  This is the first phase that does overload resolution.
+
+Pass 3 would do checks.
+
+Pass 4 would generate code, using link-names to connect the code together.
+
+----------
+
+If we are doing analysis in a "lazy" fashion, then each definition/declaration needs to keep track of what level of analysis it has received.  This seems like a potentially highly-parallel process.  We have a pool of things to analyze, and we need some things to be in a certain state before we can proceed.  What is the unit of analysis?  How do we deal with recursion?  Generally we process the declaration-ish part before we process the definition.  Does that apply to types as well as operations?  What do we need to know about a module/type to be able to use it?  If it is "mutable" we may need to know that to do appropriate checking.  In general, the "interface" properties of an entity is what we need to know.  Sometimes we will have to iterate until stability, but that should be rare (we could make it illegal).
+
+Generally we have a partial ordering of interface declarations.  Once we get to implementations, there is less ordering and we can work more in parallel.
+
+----------
+
+Let's think top-down, last to first.  The last phase does linking of code to produce a single executable.  There needs to be a set of external defs, and a set of external refs, with a level of indirection using the external refs.  There needs to be a mapping from name to def, which can be built in an initial pass over the "object" modules.
+
+The object-module (code) generator walks the analyzed AST and generates an object-module.  We could create simple examples of analyzed ASTs to allow us to build and test this code generator.  The code generator would work off a list of modules and for each one generate a "routine" for each operation.  To do that it would need to know, for every object, the way to fetch, store, pass as a const parameter, pass as a var parameter, and pass as a mutable parameter.
+
+Let's pick a simple case.  Pass a 64-bit int as a parameter.  Fibonacci could be our first example.  All we need to know is what base register and what offset.
+
+-----------------
+
+function Fib(N : Integer) -> Integer is
+    if N < 2 then
+        return N;
+    else
+        return Fib(N-1) + Fib(N-2);
+    end if;
+end function Fib;
+

@@ -1,0 +1,270 @@
+// Example ParaSail program -- Directed Graph module
+
+// Copyright (C) 2011-2012, AdaCore, New York, NY
+// To be used only for Personal, Academic, or Evaluation Purposes;
+// Not for Commercial Production Use.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+class interface DGraph<Assignable<> as Element> {
+  // Interface to a Directed-Graph module
+
+    type NodeId is new Integer<1..10**6>;
+      // A unique id for each node in the graph
+
+    type NodeSet is CountableSet<NodeId>;
+      // A set of nodes
+
+    DGraph create();
+      // Create an empty graph
+
+    DGraph "[]"() is create;
+
+    NodeId addNode(var DGraph, Element);
+      // Add a node to a graph, and return its node id
+
+    Boolean "in"(NodeId, DGraph);
+      // Return #true if NodeId is in DGraph
+
+    ref Element "indexing"(ref DGraph, NodeId) 
+      {> NodeId in DGraph <};
+      // Return a reference to an element of the graph
+
+    void addEdge(var DGraph, NodeId From, NodeId To)
+      {> From in DGraph; To in DGraph <};
+      // Add an edge in the graph
+
+    Boolean hasEdge(DGraph, NodeId From, NodeId To);
+      // Returns #true if Edge exists in graph going From to To
+
+    ref final NodeSet successors(ref final DGraph, NodeId)
+      {> NodeId in DGraph <};
+      // The set of successors of a given node
+
+    ref final NodeSet predecessors(ref final DGraph, NodeId)
+      {> NodeId in DGraph <};
+      // The set of predecessors of a given node
+
+    NodeSet allNodes(DGraph);
+      // The set of all nodes
+
+    CountableRange<NodeId> nodeRange(DGraph);
+      // The range of node-ids in use in graph
+
+    NodeSet roots(DGraph);
+      // The set of all nodes with no predecessor
+
+    NodeSet leaves(DGraph);
+      // The set of all nodes with no successor
+
+    optional NodeId BFS(DGraph, NodeSet Start,
+      lambda (DGraph, NodeId) -> Boolean IsTarget);
+      // Do a breadth-first search on graph for node that satisfies IsTarget.
+      // Start is set of nodes to start from.
+      // Return NodeId for first node that satisfies IsTarget.  
+      // Return null if no such node.
+}
+
+class DGraph {
+  // Class defining the Directed-Graph module
+
+    interface Node<> {
+      // Local definition of Node structure
+        var Element Elem;
+        var NodeSet Succs;
+        var NodeSet Preds;
+    }
+
+    var Vector<Node> G;
+      // The vector of nodes, indexed by (NodeId-1)
+
+    final Boolean Debug = #false;
+
+    NodeSet boundarySet(DGraph, CountableRange<NodeId> Nodes,
+     Boolean WantRoots) {
+      // Recursive helper for exported Roots and Leaves functions
+        if Debug {
+            println("BoundarySet for " + Nodes.First + ".." + Nodes.Last);
+        }
+        final Len = length(Nodes);
+        switch Len {
+          case 0 :
+            return [];
+          case 1 :
+            if (WantRoots?
+                isEmpty(predecessors(DGraph, Nodes.First)):
+                isEmpty(successors(DGraph, Nodes.First))) {
+                // This is on the desired boundary
+                return [Nodes.First];
+            } else {
+                // This is not on the desired boundary
+                return [];
+            }
+          default :
+            // Divide and conquer
+            final HalfWay = Nodes.First + Len / 2;
+            return 
+              boundarySet(DGraph, 
+                Nodes.First ..< HalfWay, WantRoots) |
+              boundarySet(DGraph,
+                HalfWay .. Nodes.Last, WantRoots);
+        }
+    }
+
+  public
+
+    DGraph create() {
+      // Create an empty graph
+        return (G => []);
+    }
+
+    NodeId addNode(var DGraph, Element) {
+      // Add a node to a graph, and return its node id
+        DGraph.G |= (Elem => Element, Succs => [], Preds => []);
+        return length(DGraph.G);
+    }
+
+    Boolean "in"(NodeId, DGraph) {
+      // Return #true if NodeId is in DGraph
+        return NodeId <= length(DGraph.G);
+    }
+
+    ref Element "indexing"(ref DGraph, NodeId) {
+      // Return a reference to an element of the graph
+        return DGraph.G[ NodeId-1 ].Elem; 
+    }
+
+    void addEdge(var DGraph, NodeId From, NodeId To) {
+      // Add an edge in the graph
+        DGraph.G[ From-1 ].Succs |= To;
+        DGraph.G[ To-1 ].Preds |= From;
+    }
+
+    Boolean hasEdge(DGraph, NodeId From, NodeId To) {
+      // Returns #true if Edge exists in graph going From to To
+        return From <= length(DGraph.G) and then To in DGraph.G[From-1].Succs;
+    }
+
+    ref final NodeSet successors(ref final DGraph, NodeId) {
+      // The set of successors of a given node
+        return DGraph.G[ NodeId-1 ].Succs;
+    }
+
+    ref final NodeSet predecessors(ref final DGraph, NodeId) {
+      // The set of predecessors of a given node
+        return DGraph.G[ NodeId-1 ].Preds;
+    }
+
+    NodeSet allNodes(DGraph) {
+      // The set of all nodes
+        return 1 .. length(DGraph.G);
+    }
+
+    CountableRange<NodeId> nodeRange(DGraph) {
+      // The range of node-ids in use in graph
+        return 1 .. length(DGraph.G);
+    }
+
+    NodeSet roots(DGraph) {
+      // The set of all nodes with no predecessor
+        return boundarySet
+          (DGraph, 1 .. length(DGraph.G), WantRoots => #true);
+    }
+
+    NodeSet leaves(DGraph) {
+      // The set of all nodes with no successor
+        return boundarySet
+          (DGraph, 1 .. length(DGraph.G), WantRoots => #false);
+    }
+
+    optional NodeId BFS(DGraph, NodeSet Start,
+      lambda (DGraph, NodeId) -> Boolean IsTarget)
+      {
+      // Do a breadth-first search on graph for node that satisfies IsTarget.
+      // Start is set of nodes to start from.
+      // Return NodeId for first node that satisfies IsTarget.  
+      // Return null if no such node.
+        var Array<Atomic<Boolean>, IndexedBy => NodeId> Seen =
+          create(1..length(DGraph.G), InitialValue => create(#false));
+
+        // NOTE: This is only an approximate breadth-first search.
+        //       It is possible for some parts of the search to get "ahead"
+        //       of other parts in terms of depth.  A barrier would need
+        //       to be created if it was important that the result returned
+        //       represented the shallowest node that satisfied IsTarget.
+        Outer:
+          for NextSet => Start {  // Start with the initial set of roots
+            for N in NextSet parallel {  // Look at each node in set
+                if not value(Seen[N]) {
+                    // Not yet seen; mark it to prevent re-checking this node.
+                    // NOTE: Race condition here, but we want to avoid overhead
+                    //       of comp-and-swap, and race condition is "benign"
+                    setValue(Seen[N], #true);
+                    if IsTarget(DGraph, N) {
+                        // Found a node that satisfies IsTarget
+                        // This "return" will cancel other concurrent threads
+                        return N;
+                    }
+                    // Continue with successors of this node
+                    continue Outer with NextSet => DGraph.G[N-1].Succs;
+                }
+            }
+        }
+        // No node found
+        return null;
+    }
+}
+
+void testGraph() {
+  // A test program that manipulates a directed graph of univ-enums
+
+    type DGE is DGraph<UnivEnumeration>;
+
+    DGE buildGraph() as NewG {
+      // A function that builds up a graph of UnivEnumerations
+        NewG = create();  // Create the empty graph
+
+        final Hello = NewG.addNode(#hello);
+        final There = NewG.addNode(#there);
+        final Stranger = NewG.addNode(#stranger);
+
+        NewG.addEdge(Hello, There);
+        NewG.addEdge(There, Stranger);
+        NewG.addEdge(Hello, Stranger);
+
+    }
+       
+    void printNodes(DGE, DGE.NodeSet Nodes, UnivString Indent = " ")
+      // Display the elements of a node set, with the given indent
+      {
+        for S in Nodes {
+            println(Indent + DGE[S]);
+        }
+    }
+
+    void printSuccs(DGE, DGE.NodeId N) {
+      // Display the successors of a given node
+        println("Successors of " + DGE[N] + " (node " + N + ")");
+        printNodes(DGE, DGE.successors(N));
+    }
+
+    // Now build the graph and display some info on the graph
+
+    var DGE Gr = buildGraph();
+
+    println("Roots of graph:");
+    Gr.printNodes(Gr.roots());
+
+    println("Leaves of graph:");
+    Gr.printNodes(Gr.leaves());
+    
+    println("All nodes, and their successors:");
+    for N in allNodes(Gr) forward {
+        Gr.printSuccs(N);
+    }
+
+    final StrangeId = BFS(Gr, [1], lambda (G, N) -> (G[N] == #stranger));
+
+    println("BFS(Gr, [1], lambda (G, N) -> (G[N] == #stranger)) = "
+      + StrangeId);
+}
+

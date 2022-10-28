@@ -1,0 +1,186 @@
+Release notes for 2014-Apr-09 ALPHA release 0.5 rev 5.3 of the
+Sparkel Prototype Compiler and Virtual Machine.
+
+All Sparkel-specific parts of this release are:
+
+   Copyright (C) 2011-2014, AdaCore, New York NY, USA
+   This program is provided "as is" with no warranty.
+
+The Sparkel parser was built using aflex and ayacc, which
+were originally developed at the University of California, Irvine.
+Aflex is in turn based on flex, which was originally developed
+at the University of California, Berkeley.
+
+Please report any errors on the Sparkel discussion forum -- link at bottom of:
+
+   http://www.sparkel.org
+
+The binary release contains the following files:
+
+    * doc/sparkel_ref_manual.pdf -- Sparkel Reference Manual
+    * doc/parasail_intro.pdf      -- Introductory article on ParaSail
+    * doc/Sparkel_Intro_Jun_2012.ppt.pdf -- Introductory powerpoint
+    * aaa.ski -- Sparkel Standard Library
+    * sparkel_examples/*.sk? -- Example Sparkel programs
+    * bin/*_st.exe -- Single-threaded Mac/Windows/Linux versions of compiler/VM
+    * bin/*_mt.exe -- Multi-threaded Mac/Windows/Linux versions of compiler/VM
+    * share/tools/* -- Contributed tools, highlighting configuration, etc.
+    * sparkel_release_notes*.txt -- This file
+
+The source release has the following structure:
+
+    * documentation/sparkel_ref_manual/sparkel_ref_manual.pdf
+                                     -- Sparkel Reference Manual
+    * documentation/sparkel_ref_manual/sparkel_ref_manual.ltx
+                                     -- Sparkel Reference Manual latex source
+    * documentation/parasail.pdf -- Introductory article on Sparkel
+    * documentation/Sparkel_Intro_Jun_2012.ppt.pdf -- Introductory powerpoint
+    * sparkel_examples/aaa.ski       -- Sparkel Standard Library (SSL)
+    * sparkel_examples/*.skl         -- Example Sparkel programs
+    * aflex_ayacc/aflex              -- Sources to AFlex lexer generator
+    * aflex_ayacc/ayacc              -- Sources to AYacc parser generator
+    * sparkel_parser/*.l,*.y         -- AFlex/AYacc grammars for Sparkel
+    * sparkel_parser/*.ad?           -- Handwritten skeleton for parser
+    * sparkel_parser/build/Makefile  -- Makefile to build Sparkel parser
+    * semantics/*.ad?                -- Static and Dynamic semantics phases
+    * interpreter/*.ad?              -- Sparkel virtual machine interpreter
+    * build/sparkel.gpr              -- Project file for building Sparkel
+    * share/tools/*                  -- Various tools, highlighting info, etc.
+    * Makefile                       -- Makefile to build executable, etc.
+
+After running the Makefile ("make" or "make all_no_gtk"),
+the following will be present:
+
+    * install/bin/sklc               -- Executable will be built here
+    * install/share/doc/sparkel/*    -- Copies of documentation
+    * install/share/examples/sparkel/*.sk? -- Copies of examples and SSL
+    * install/share/tools/sparkel/*  -- Various tools, highlighting info, etc.
+
+You can test the installation by "cd sparkel_examples" and then:
+
+   % ../install/bin/sklc aaa.ski dgraph.skl hippo_game.skl
+
+Program should produce, approximately:
+
+   Sparkel Prototype Compiler and Virtual Machine alpha 0.5 Revision: 4.7 
+   ...
+   Parsing aaa.ski
+   Parsing dgraph.skl
+   Parsing hippo_game.skl
+   ---- Beginning semantic analysis ----
+    102 trees in library.
+   ...
+   Finishing type descriptors.
+
+   Command to execute: 
+
+You can then type: Place_Hippos
+
+Program should produce:
+
+   Piece 4,3 is at 11,21
+   Piece 5,2 is at 12,13
+   Piece 5,4 is at 14,24
+   Piece 4,2 is at 33,22
+   Piece 5,3 is at 23,34
+   Piece 3,2 is at 32,31
+
+   Command to execute:
+
+And then you can type: quit
+
+You can look at the sparkel_examples/{aaa.ski,dgraph.skl,hippo_game.skl}
+files to better understand what it is doing.
+
+The Sparkel reference manual (sparkel_ref_manual.pdf) contains
+the description of the full Sparkel language.  The file README.txt
+contains a short explanation of how to use the compiler/virtual-machine.  
+Please READ THIS FIRST!  It has important information on usage of the compiler,
+and on the use of "vim -q" for handling compiler error messages.
+
+Not all features are currently implemented.  See the standard library
+(aaa.ski) and the example programs for illustrations of features that 
+are implemented.  The standard library (aaa.ski) contains quite a number 
+of examples of Sparkel coding, so be sure to look it over.
+See below for the list of unimplemented features.
+
+The compiler does some error recovery, but after a couple of syntax
+errors it sometimes gets totally confused.  That means you should 
+not spend too much time diagnosing syntax errors unless they are some of the
+first ones reported in a given run.  Use "vim -q" to fix the first
+few syntax errors, and then try again.
+
+The following Sparkel features are *not* yet implemented:
+
+  * infinite precision implementations of Univ_Integer and Univ_Real
+    (at the moment these are 64-bit signed integer and 64-bit IEEE Float,
+     respectively, except that -2**63 is reserved as the null value for
+     Univ_Integer, and all ones (NaN) is reserved as the null value for
+     Univ_Real)
+  * formal operation parameters of generic packages
+  * "optional" applied to an operation
+  * "global" mode for operation inputs
+  * a "case" statement where the choices are named polymorphic types
+  * multiple outputs from an operation
+      (e.g. "func Foo() return (X : Set; Y : Map)")
+  * an aggregate as the LHS of an assignment (e.g. "(X, Y) := (Y, X);")
+  * type conversions (e.g. "My_Int_Type(X)")  -- this can often be
+    worked around by going "through" a universal type, using the "[[ ... ]]"
+    operator.  That is, [[X]] where X is on one integer type converts to
+    Univ_Integer, and that in turn can be converted to any other integer type.
+  * full compile-time checking of annotations, null-ness, and aliasing
+    (simple assertions and some null-ness is checked at run-time currently)
+  * subtype predicate annotations on subtype and object declarations
+      (e.g. "subtype Teens is Age with Predicate => Teens in 13..19;")
+  * many of the equivalences intended to increase SPARK compatibility
+
+The following Sparkel features or fixes have recently been implemented:
+
+  * [rev 4.7] First Sparkel release
+
+  * [rev 4.8] Fixed problem relating to defining a "new" type by instantiating
+              a generic package which in turn had a "new" type defined within
+              it.  As an example, generic package DGraph in dgraph.skl contains
+                 type Node_Id is new Integer<1..10**6>
+              and it is instantiated in hippo_game.skl using:
+                 type Hippo_Graph is new DGraph<Hole>
+              This didn't work in rev 4.7, unless either Node_Id or Hippo_Graph
+              were defined as a "subtype" rather than a "new" type.  Now "new"
+              can be used in both places.
+  * [rev 4.9] Re-implementation of region-based storage management to minimize
+              contention between processors.
+              Allow packages and instantiations inside of subprograms in
+              Sparkel.
+              Allow listing to be turned on and off with "-listing on/off"
+              on the command line; default is off if "-command ..." given.
+  * [rev 5.0] Initial release of "Javallel" and "Parython" compilers, parallel
+              languages inspired by Java and Python.
+  * [rev 5.1] Provide "Dest_Name" in PSVM "Store" and "Move" Instructions
+              when used to initialize a local variable or constant, so as
+              to help in debugging.
+  * [rev 5.2] Re-implementation of work stealing to reduce contention
+              between processors.  Each server now has a private double-ended
+              queue (deque) of pico-threads, along with the shared triplet of 
+              deques which has existed before.  This produced another two
+              times speedup (in addition to the rev 4.9 improvements), thereby
+              speeding up execution by four times or more since rev 4.8.
+              The main procedures for each language (ParaSail, Sparkel, etc.)
+              have been refactored to share more common code.
+              Allow a command-line flag "-servers nnn" to specify the number
+              of heavy-weight server threads to use.  Default is 6.
+              Command can also be given interactively, as "servers nnn".
+              Interactively it only works to increase the number; there is
+              no way to shut down servers that already have been activated.
+
+We are very interested in your feedback.  Please use the Sparkel Forum
+(see link at bottom of web page http:/www.sparkel.org) to provide
+whatever comments or suggestions you might have, as well as bug reports.  
+Please include a minimal self-contained Sparkel example program with each
+bug report.
+
+Sincerely,
+-Tucker Taft
+Director of Language Research
+AdaCore
+Lexington, MA  USA
+April 2014

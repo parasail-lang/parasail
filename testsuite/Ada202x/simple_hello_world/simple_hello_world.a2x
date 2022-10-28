@@ -1,0 +1,10 @@
+proc Hello_World () is
+
+    Println("Hello world!");
+
+    for I in 1..10 reverse loop
+	 Println(I | " ** 3 = " | I**3);
+    end loop
+
+end proc Hello_World;
+

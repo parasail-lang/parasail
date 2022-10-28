@@ -1,0 +1,36 @@
+for_loop.pry:42:34: Warning: Data Race in loop updating Seen
+I = 1
+I = 1
+I = 1
+I = 1
+I = 1
+I = 1, Seen = 1
+I = 2
+I = 2
+I = 2
+I = 2
+I = 2
+I = 2, Seen = 2
+I = 3
+I = 3
+I = 3
+I = 3
+I = 3
+I = 3, Seen = 3
+I = 4
+I = 4
+I = 4
+I = 4
+I = 4
+I = 4, Seen = 4
+I = 5
+I = 5
+I = 5
+I = 5
+I = 5
+concurrent loop:
+forward loop:
+reverse loop:
+then/while loop, combinations of powers of 2 and 3:
+then/while loop:
+unordered loop:

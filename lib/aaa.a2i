@@ -1,0 +1,3928 @@
+-- Ada202X Prototype Standard Library
+
+-- Copyright (C) 2011-2019, AdaCore, New York, NY
+-- To be used only for Personal, Academic, or Evaluation Purposes
+-- Not for Commercial Production Use.
+
+package A2X is
+end A2X
+
+use A2X;
+package A2X.Core is
+   type Operation_Descriptor is record
+      --  For internal use only
+      Routine_Addr : Univ_Integer;
+      Routine_Index : Univ_Integer;
+      Static_Link : Univ_Integer;
+      Conv_Desc : Univ_Integer;
+   end record;
+end A2X.Core
+
+package A2X.Core.Any is
+    type Any is abstract limited null record;
+end A2X.Core.Any
+
+package A2X.Core.Assignable is
+    type Assignable is abstract null record;
+
+end A2X.Core.Assignable
+
+package A2X.Containers is
+end A2X.Containers
+
+package A2X.Test is
+end A2X.Test
+
+package A2X.Core.Imageable is
+    type Imageable is abstract private;
+
+    abstract function Imageable'Image(Val : Imageable) return Univ_String
+
+    abstract function Imageable'Value(Str : Univ_String) return Imageable
+
+    -- NOTE: We include Hashable<> operations here
+    --       so that Set<Imageable'Class> works nicely.
+    --       Clearly if something is Imageable it is possible
+    --       to implement "=?" and Hash using the string image,
+    --       so we might as well requires these operations too.
+
+    abstract function "=?"(Left, Right : Imageable) return Ordering
+    abstract function Hash(Val : Imageable) return Univ_Integer
+end A2X.Core.Imageable
+
+package A2X.Core.Univ_Integer is
+    type Univ_Integer is private;
+
+    function "+"(Right : Univ_Integer) return Univ_Integer
+      with Import, External_Name => #identity;
+
+    function "-"(Right : Univ_Integer) return Univ_Integer
+      with Import, External_Name => #negate;
+
+    function "abs"(Right : Univ_Integer) return Univ_Integer
+      with Import, External_Name => "abs";
+
+    function "magnitude"(Val : Univ_Integer) return Univ_Integer renames "abs"
+
+    function "+"(Left, Right : Univ_Integer) return Univ_Integer 
+      with Import, External_Name => #univ_add;
+
+    function "-"(Left, Right : Univ_Integer) return Univ_Integer
+      with Import, External_Name => #univ_subtract;
+
+    function "*"(Left, Right : Univ_Integer) return Univ_Integer 
+      with Import, External_Name => #univ_multiply;
+
+    function "/"(Left, Right : Univ_Integer) return Univ_Integer
+      with Import, External_Name => #univ_divide;
+
+    function "**"(Left, Right : Univ_Integer) return Univ_Integer
+      with Import, External_Name => #univ_exp;
+
+    function "mod"(Left, Right : Univ_Integer) return Univ_Integer
+      with Import, External_Name => #univ_mod;
+
+    function "rem"(Left, Right : Univ_Integer) return Univ_Integer
+      with Import, External_Name => #univ_rem;
+
+    function "=?"(Left, Right : Univ_Integer) return Ordering
+      with Import, External_Name => #univ_compare;
+
+    function Univ_Integer'Min(Left, Right : Univ_Integer) return Univ_Integer
+      with Import, External_Name => #univ_min;
+    function Univ_Integer'Max(Left, Right : Univ_Integer) return Univ_Integer
+      with Import, External_Name => #univ_max;
+
+    function Hash(Val : Univ_Integer) return Univ_Integer
+      with Import, External_Name => #identity;
+
+    procedure Print(X : Univ_Integer)
+      with Import, External_Name => #print_univ_int;
+
+    procedure Put(X : Univ_Integer) renames Print
+
+    function Univ_Integer'Image(Val : Univ_Integer) return Univ_String
+      with Import, External_Name => #to_string_univ_int;
+
+    function Univ_Integer'Value(Str : Univ_String) return Univ_Integer
+      with Import, External_Name => #from_string_univ_int;
+
+    function Univ_Integer'First return Univ_Integer
+      with Import, External_Name => #univ_integer_first;
+
+    function Univ_Integer'Last return Univ_Integer
+      with Import, External_Name => #univ_integer_last;
+
+    subtype Univ_Integer_Range is Countable_Range<Univ_Integer>;
+
+    function ".."(Left, Right : Univ_Integer) return Univ_Integer_Range
+      is ((Left, Right));
+
+end A2X.Core.Univ_Integer
+
+package A2X.Core.Integer_64 is
+    type Integer_64 is private;
+
+    function "from_univ"(Lit : Univ_Integer) return Integer_64 
+      with Import, External_Name => #integer_from_univ;
+
+    function "to_univ"(Val : Integer_64) return Univ_Integer 
+      with Import, External_Name => #integer_to_univ;
+
+    function "+"(Right : Integer_64) return Integer_64
+      with Import, External_Name => #identity;
+
+    function "-"(Right : Integer_64) return Integer_64
+      with Import, External_Name => #negate;
+
+    function "abs"(Right : Integer_64) return Integer_64
+      with Import, External_Name => "abs";
+
+    function "magnitude"(Val : Integer_64) return Integer_64 renames "abs"
+
+    function "+"(Left, Right : Integer_64) return Integer_64 
+      with Import, External_Name => "+";
+
+    function "-"(Left, Right : Integer_64) return Integer_64
+      with Import, External_Name => "-";
+
+    function "*"(Left, Right : Integer_64) return Integer_64 
+      with Import, External_Name => "*";
+
+    function "/"(Left, Right : Integer_64) return Integer_64
+      with Import, External_Name => "/";
+
+    function "mod"(Left, Right : Integer_64) return Integer_64
+      with Import, External_Name => "mod";
+
+    function "rem"(Left, Right : Integer_64) return Integer_64
+      with Import, External_Name => "rem";
+
+    function "**"(Left, Right : Integer_64) return Integer_64
+      with Import, External_Name => "**";
+
+    function "=?"(Left, Right : Integer_64) return Ordering
+      with Import, External_Name => #compare_optional;
+
+    function Integer_64'Min(Left, Right : Integer_64) return Integer_64
+      with Import, External_Name => #min;
+    function Integer_64'Max(Left, Right : Integer_64) return Integer_64
+      with Import, External_Name => #max;
+
+    function Hash(Val : Integer_64) return Univ_Integer
+      with Import, External_Name => #identity;
+
+    procedure Print(X : Integer_64) with Import, External_Name => #print_int;
+
+    procedure Put(X : Integer_64) renames Print
+
+    function Integer_64'Image(Val : Integer_64) return Univ_String
+      with Import, External_Name => #to_string_int;
+
+    function Integer_64'Value(Str : Univ_String) return Integer_64
+      with Import, External_Name => #from_string_int;
+
+    function Integer_64'First return Integer_64
+
+    function Integer_64'Last return Integer_64
+
+    function "[..]" return Countable_Range<Integer_64>;
+
+    function ".."(Left, Right : Integer_64) return Countable_Range<Integer_64>;
+
+private
+    -- for Countable
+
+    -- These operations are needed so Integer_64 satifies
+    -- requirements of "Countable" interface, but these
+    -- operations are not directly callable (if they were callable,
+    -- we would have ambiguity when adding an Integer_64 to an int-literal).
+
+    function "+"(Left : Integer_64; Right : Univ_Integer) return Integer_64 
+      with Import, External_Name => "+";
+
+    function "+"(Left : Univ_Integer; Right : Integer_64) return Integer_64 
+      with Import, External_Name => "+";
+
+    function "-"(Left : Integer_64; Right : Univ_Integer) return Integer_64 
+      with Import, External_Name => "-";
+
+    function "-"(Left, Right : Integer_64) return Univ_Integer
+      with Import, External_Name => "-";
+
+end A2X.Core.Integer_64
+
+package body A2X.Core.Integer_64 is
+    type Integer_64 is record
+       Content : Univ_Integer;  -- So this ends up as a wrapper
+    end record Integer_64
+
+    function Integer_64'First return Integer_64 is
+        return -Univ_Integer'(2)**63 + Univ_Integer'(1)
+    end Integer_64'First
+
+    function Integer_64'Last return Integer_64 is
+        return +Univ_Integer'(2)**63 - Univ_Integer'(1)
+    end Integer_64'Last
+
+    function "[..]" return Countable_Range<Integer_64> is
+      ((-Univ_Integer'(2)**63 + Univ_Integer'(1),
+        +Univ_Integer'(2)**63 - Univ_Integer'(1)));
+
+    function ".."(Left, Right : Integer_64)
+      return Countable_Range<Integer_64> is
+      ((Left, Right));
+
+end A2X.Core.Integer_64
+
+package A2X.Core.Unsigned_64 is
+    type Unsigned_64 is private;
+
+    function "from_univ"(Lit : Univ_Integer) return Unsigned_64 
+      with Import, External_Name => #uns_from_univ;
+
+    function "to_univ"(Val : Unsigned_64) return Univ_Integer 
+      with Import, External_Name => #uns_to_univ;
+
+    function "+"(Right : Unsigned_64) return Unsigned_64
+      with Import, External_Name => #identity;
+
+    function "-"(Right : Unsigned_64) return Unsigned_64
+      with Import, External_Name => #uns_negate;
+
+    function "abs"(Right : Unsigned_64) return Unsigned_64
+      with Import, External_Name => #identity;
+
+    function "magnitude"(Val : Unsigned_64) return Unsigned_64 renames "abs"
+
+    function "+"(Left, Right : Unsigned_64) return Unsigned_64 
+      with Import, External_Name => #uns_add;
+
+    function "-"(Left, Right : Unsigned_64) return Unsigned_64
+      with Import, External_Name => #uns_subtract;
+
+    function "*"(Left, Right : Unsigned_64) return Unsigned_64 
+      with Import, External_Name => #uns_multiply;
+
+    function "/"(Left, Right : Unsigned_64) return Unsigned_64
+      with Import, External_Name => #uns_divide;
+
+    function "**"(Left : Unsigned_64; Right : Univ_Integer) return Unsigned_64
+      with Import, External_Name => #uns_exp;
+
+    function "mod"(Left, Right : Unsigned_64) return Unsigned_64
+      with Import, External_Name => #uns_mod;
+
+    function "rem"(Left, Right : Unsigned_64) return Unsigned_64
+      with Import, External_Name => #uns_mod;  --  Same as "mod"
+
+    function "=?"(Left, Right : Unsigned_64) return Ordering
+      with Import, External_Name => #uns_compare;
+
+    function Unsigned_64'Min(Left, Right : Unsigned_64) return Unsigned_64
+      with Import, External_Name => #uns_min;
+    function Unsigned_64'Max(Left, Right : Unsigned_64) return Unsigned_64
+      with Import, External_Name => #uns_max;
+
+    function Hash(Val : Unsigned_64) return Unsigned_64
+      with Import, External_Name => #identity;
+
+    procedure Print(X : Unsigned_64) is (Print (Unsigned_64'Image (X)));
+
+    procedure Put(X : Unsigned_64) renames Print
+
+    function Unsigned_64'Image(Val : Unsigned_64) return Univ_String
+      with Import, External_Name => #to_string_uns;
+
+    function Unsigned_64'Value(Str : Univ_String) return Unsigned_64
+      with Import, External_Name => #from_string_uns;
+
+    function Unsigned_64'First return Unsigned_64
+      is ("from_univ"(0));
+
+    function Unsigned_64'Last return Unsigned_64
+      is ("from_univ"(-1));
+
+    subtype Unsigned_64_Range is Countable_Range<Unsigned_64>;
+
+    function ".."(Left, Right : Unsigned_64) return Unsigned_64_Range
+      is ((Left, Right));
+
+private
+    -- for Countable
+
+    -- These operations are needed so Integer_64 satifies
+    -- requirements of "Countable" interface, but these
+    -- operations are not directly callable (if they were callable,
+    -- we would have ambiguity when adding an Integer_64 to an int-literal).
+
+    function "+"(Left : Unsigned_64; Right : Univ_Integer) return Unsigned_64 
+      with Import, External_Name => #uns_add_univ;
+
+    function "+"(Left : Univ_Integer; Right : Unsigned_64) return Unsigned_64 
+      is (Right + Univ_Integer'(Left));
+
+    function "-"(Left : Unsigned_64; Right : Univ_Integer) return Unsigned_64 
+      is (Left + (-Right));
+
+    function "-"(Left, Right : Unsigned_64) return Univ_Integer
+      with Import, External_Name => #uns_subtract_returns_univ;
+
+end A2X.Core.Unsigned_64
+
+package A2X.Core.Ordering is
+    type Ordering is private;
+
+    function "from_univ"(Lit : Univ_Enumeration) 
+      return Ordering
+        with Import, External_Name => #ordering_from_univ,
+             Pre => Lit in [#less, #equal, #greater, #unordered];
+
+    function "to_univ"(Val : Ordering) return Univ_Enumeration 
+      with Import, External_Name => #ordering_to_univ;
+
+    function "to_bool"(Ord : Ordering; Mask : Univ_Integer) return Boolean 
+      with Import, External_Name => #ordering_to_bool;
+
+    function "=?"(Left, Right : Ordering) return Ordering
+      with Import, External_Name => #compare_optional;
+
+    function Hash(Val : Ordering) return Univ_Integer
+      with Import, External_Name => #identity;
+
+    -- For Imageable
+    function Ordering'Image(Val : Ordering) return Univ_String
+    function Ordering'Value(Str : Univ_String) return Ordering
+
+    -- Operators for Countable
+    function "+"(Left : Univ_Integer; Right : Ordering) return Ordering 
+      with Import, External_Name => "+";
+    function "+"(Left : Ordering; Right : Univ_Integer) return Ordering 
+      with Import, External_Name => "+";
+    function "-"(Left, Right : Ordering) return Univ_Integer 
+      with Import, External_Name => "-";
+    function "-"(Left : Ordering; Right : Univ_Integer) return Ordering 
+      with Import, External_Name => "-";
+
+    -- TBD: These should be properties some day (e.g. Ordering#first).
+    function Ordering'First return Ordering
+    function Ordering'Last return Ordering
+
+    function Ordering'Min(Left, Right : Ordering) return Ordering
+      with Import, External_Name => #min;
+    function Ordering'Max(Left, Right : Ordering) return Ordering
+      with Import, External_Name => #max;
+
+    --  function ".."(Left, Right : Ordering) return Countable_Range<Ordering>
+end A2X.Core.Ordering
+
+package A2X.Core.Comparable is
+    type Comparable is abstract private; -- new Assignable;
+    abstract function "=?"(Left, Right : Comparable) return Ordering
+end A2X.Core.Comparable
+
+package A2X.Core.Hashable is
+    type Hashable is abstract new Comparable with private;
+    -- Types which aren't ordered nevertheless are often
+    -- hashable, which makes it possible to create an efficient
+    -- set or map using them as the index type.
+
+    --  function "=?"(Left, Right : Hashable) return Ordering
+    --  TBD: overriding of abstracts NYI
+    abstract function Hash(Val : Hashable) return Univ_Integer
+end A2X.Core.Hashable
+
+package A2X.Core.Ordered is
+    type Ordered is abstract new Comparable with private;
+  -- The "=?" operator on Ordered types never return s #unordered
+  -- They also provide a Min and Max operator.
+
+  -- Note that Min and Max may be given null operands.
+  -- They each return null if both operands are null, and return the
+  -- non-null operand if only one of the operands is null.
+  -- This allows null to be used as the initial value when computing
+  -- the "Max" or "Min" of a possibly-empty sequence, rather than
+  -- having to start with the equivalent of negative or positive infinity.
+
+    subtype Full_Ordering is Ordering
+      -- {Full_Ordering in #less | #equal | #greater}
+
+    --  function "=?"(Left, Right : Ordered) return Full_Ordering
+    --  TBD: overriding of abstracts NYI
+
+    abstract function Ordered'Min(Left, Right : Ordered) return Ordered
+    abstract function Ordered'Max(Left, Right : Ordered) return Ordered
+end A2X.Core.Ordered
+
+package A2X.Core.Countable is
+    type Countable is abstract new Ordered with private
+    --  TBD: All operations should be declared "abstract"
+    --       unless perhaps we allow the whole package to be declared "abstract"
+
+    abstract
+      function "+"(Left : Countable; Right : Univ_Integer)
+        return Countable
+    abstract
+      function "+"(Left : Univ_Integer; Right : Countable)
+        return Countable
+
+    abstract
+      function "-"(Left : Countable; Right : Univ_Integer)
+        return Countable
+    abstract
+      function "-"(Left, Right : Countable) return Univ_Integer
+
+    --  function "=?"(Left, Right : Countable) return Ordered.Full_Ordering
+    --  TBD: Overriding of abstracts NYI
+
+    abstract
+      function Countable'First return Countable
+
+    abstract
+      function Countable'Last return Countable
+
+    --  function Hash(Val : Countable) return Univ_Integer
+    --  TBD: Overriding of abstracts NYI
+
+    --  TBD: operations (or package?) should be declared abstract
+
+    abstract
+      function ".."(Left, Right : Countable) return Countable_Range<Countable>
+end A2X.Core.Countable
+
+package body A2X.Core.Ordering is
+
+    function Ordering'First return Ordering is
+        return #less
+    end Ordering'First
+
+    function Ordering'Last return Ordering is
+        return #unordered
+    end Ordering'Last
+
+    function Ordering'Image(Val : Ordering) return Univ_String is
+        case Val is
+          when #less =>
+            return "#less"
+          when #equal =>
+            return "#equal"
+          when #greater =>
+            return "#greater"
+          when #unordered =>
+            return "#unordered"
+        end case
+    end Ordering'Image
+
+    function Ordering'Value(Str : Univ_String) return Ordering is
+        case Str is
+          when "#less" =>
+            return #less
+          when "#equal" =>
+            return #equal
+          when "#greater" =>
+            return #greater
+          when "#unordered" =>
+            return #unordered
+          when others =>
+            return null
+        end case
+    end Ordering'Value
+
+    -- NOTE: For implementation reasons, we put these here rather than defining
+    --       them in the interface using "is of Countable_Range<Ordering>"
+    --  function ".."(Left, Right : Ordering) return Countable_Range<Ordering> is
+    --     return Ordering_Range.".."(Left, Right)
+    --  end ".."
+
+end A2X.Core.Ordering
+
+generic
+    type Bound_Type is new Countable
+package A2X.Core.Countable_Range is
+    -- Simple contiguous Countable_Range of integers (i.e. an interval)
+    type Countable_Range is record
+       First : Bound_Type
+       Last : Bound_Type
+    end record Countable_Range
+
+    --  function ".."(Left, Right : Bound_Type) return Countable_Range
+    function "in"(Val : Bound_Type; Int : Countable_Range) return Boolean
+    function Countable_Range'Length(R : Countable_Range) return Univ_Integer
+    function "magnitude"(Val : Countable_Range) return Univ_Integer
+      renames Countable_Range'Length
+    function "[..]" return Countable_Range
+    function "[]" return Countable_Range
+    function Singleton(Bound : Bound_Type) return Countable_Range
+
+    function Remove_First(S : in out Countable_Range) return Bound_Type
+    function Remove_Last(S : in out Countable_Range) return Bound_Type
+    function Remove_Any(S : in out Countable_Range) return Bound_Type
+
+    function Split (R : Countable_Range; Num_Pieces : Univ_Integer)
+      return Array<Countable_Range, Indexed_By => Univ_Integer>
+      with Pre => Num_Pieces > 0;
+       -- Divide a range into a vector of subranges, each of similar size
+end A2X.Core.Countable_Range
+
+package body A2X.Core.Countable_Range is
+    -- function ".."(Left, Right : Bound_Type) return Countable_Range is
+        -- return (First => Left, Last => Right)
+    -- end ".."
+
+    function "in"(Val : Bound_Type; Int : Countable_Range) return Boolean is
+        return Val >= Int.First and then Val <= Int.Last
+    end "in"
+
+    function Countable_Range'Length(R : Countable_Range) return Univ_Integer is
+        return R.Last - R.First + 1
+    end Countable_Range'Length
+
+    function "[]" return Countable_Range is
+        return (First => Bound_Type'First+1, Last => Bound_Type'First);
+    end "[]"
+
+    function "[..]" return Countable_Range is
+        return (Bound_Type'First, Bound_Type'Last);
+    end "[..]"
+
+    function Singleton(Bound : Bound_Type) return Countable_Range is
+        return (Bound, Bound)
+    end Singleton
+
+    function Remove_First(S : in out Countable_Range) 
+      return Bound_Type is
+        if S.First <= S.Last then
+            return Result : Bound_Type := S.First do
+               S := (First => S.First+1, Last => S.Last)
+            end return;
+        else
+            return null
+        end if
+    end Remove_First
+  
+    function Remove_Last(S : in out Countable_Range) 
+      return Bound_Type is
+        if S.First <= S.Last then
+            return Result : Bound_Type := S.Last do
+               S := (First => S.First, Last => S.Last-1)
+            end return;
+        else
+            return null
+        end if
+    end Remove_Last
+
+    function Remove_Any(S : in out Countable_Range) 
+      return Bound_Type is
+        if S.First <= S.Last then
+            if (S.Last - S.First) mod 2 = 0 then
+                return Remove_First(S)
+            else
+                return Remove_Last(S)
+            end if
+        else
+            return null
+        end if
+    end Remove_Any
+
+    function Split(R : Countable_Range; Num_Pieces : Univ_Integer)
+      return Array<Countable_Range, Indexed_By => Univ_Integer> is
+    begin
+       -- Divide a range into a vector of subranges, each of similar size
+       return Result : Array<Countable_Range, Indexed_By => Univ_Integer> :=
+         Create (1 .. Num_Pieces, R) do
+
+          if Num_Pieces = 1 then
+             --  Just one piece wanted
+             Result[1] := R;
+             return;
+          end if;
+
+          Size : constant := R'Length;
+          Small_Piece_Size : constant := Size / Num_Pieces
+          Big_Piece_Size : constant := Small_Piece_Size + 1
+          Num_Big_Pieces : constant := Size rem Num_Pieces
+  
+          --  Fill in the elements of the result vector with slices of the set.
+          Index : Bound_Type := R.First
+  
+          --  Big pieces first
+          for I in 1 .. Num_Big_Pieces loop
+             Result[I] := (Index, Index + Big_Piece_Size - 1);
+             Index := Index + Big_Piece_Size
+          end loop
+  
+          --  Small pieces next
+          for I in Num_Big_Pieces + 1 .. Num_Pieces loop
+             Result[I] := (Index, Index + Small_Piece_Size - 1);
+             Index := Index + Small_Piece_Size
+          end loop
+  
+          pragma Assert (Index = R.Last + 1);
+
+       end return;
+    end Split;
+end A2X.Core.Countable_Range
+
+generic
+    type Elem_Type is new Assignable;
+    type Index_Type is new Countable;
+package A2X.Core.Indexable is
+    -- An indexable container
+    type Indexable is abstract private
+
+    abstract function "indexing"(A : aliased Indexable; Index : Index_Type)
+      return aliased constant Elem_Type
+    abstract function "var_indexing"
+      (A : aliased in out Indexable; Index : Index_Type)
+      return aliased Elem_Type
+    abstract function Indexable'Length(A : Indexable) return Univ_Integer
+    abstract function Indexable'First(A : Indexable) return Index_Type;
+    abstract function Indexable'Last(A : Indexable) return Index_Type;
+    function "magnitude"(A : Indexable) return Univ_Integer
+      renames Indexable'Length
+    abstract function "index_set"(A : Indexable)
+      return Countable_Range<Index_Type>
+    function Bounds(A : Indexable) return Countable_Range<Index_Type>
+      renames "index_set"
+end A2X.Core.Indexable
+
+generic
+    type Element_Type is new Assignable  -- tbd "is private"
+package A2X.Containers.Basic_Array is
+  -- Builtin array type, not extendable, indexed by Univ_Integer, 1..Length
+    type Basic_Array is private;
+
+    function Create(Length : Univ_Integer; Val : Element_Type)
+      return Basic_Array 
+      with Import, External_Name => #basic_array_create;
+    function "[]" return Basic_Array is (Create(0, ()))
+    function "indexing"(V : aliased Basic_Array; Index : Univ_Integer) return 
+      aliased constant Element_Type
+        with Import, External_Name => #basic_array_indexing;
+    function "var_indexing"
+      (V : aliased in out Basic_Array; Index : Univ_Integer)
+      return aliased Element_Type
+      with Import, External_Name => #basic_array_indexing;
+    function Basic_Array'Length(V : Basic_Array) return Univ_Integer
+      with Import, External_Name => #basic_array_length;
+    function "magnitude"(V : Basic_Array) return Univ_Integer
+      renames Basic_Array'Length
+    function Basic_Array'First(V : Basic_Array) return Univ_Integer
+      is (1);
+    function Basic_Array'Last(V : Basic_Array) return Univ_Integer
+      renames Basic_Array'Length
+    function "&"(Left, Right : Basic_Array) return Basic_Array
+    function "slicing"
+      (V : Basic_Array; Index_Set : Countable_Range<Univ_Integer>)
+      return Basic_Array  -- a "read-only" slice
+    function "index_set"(A : Basic_Array) return Countable_Range<Univ_Integer>
+    procedure "<|=" (Left : in out Basic_Array; Right : in out Element_Type)
+end A2X.Containers.Basic_Array
+
+package body A2X.Containers.Basic_Array is
+  -- Builtin array type, not extendable, indexed by Univ_Integer, 1..Length
+    function "&"(Left, Right : Basic_Array) return Basic_Array is
+        Left_Len : constant := Left'Length
+
+    begin
+        if Left_Len = 0 then
+            return Right
+        end if
+
+        return Result : Basic_Array := Create(Left_Len + Right'Length, ())
+          do
+
+           -- Copy the Left elements
+           parallel
+           for I in 1..Left_Len loop
+               Result[I] := Left[I]
+           end loop
+
+           -- Copy the Right elements
+           
+           parallel
+           for J in 1..Right'Length loop
+               Result[Left_Len + J] := Right[J]
+           end loop
+        end return;
+    end "&"
+            
+    function "index_set"(A : Basic_Array)
+      return Countable_Range<Univ_Integer> is
+        return 1..A'Length
+    end "index_set"
+
+    function "slicing"
+      (V : Basic_Array; Index_Set : Countable_Range<Univ_Integer>)
+        return Basic_Array
+    is
+      Len : constant := |Index_Set|
+      Offset : constant := Index_Set.First - 1
+
+      return Result : Basic_Array := Create(Len, ()) do
+         for I in 1 .. Len loop
+            Result[I] := V [I + Offset];
+         end loop;
+      end return;
+       
+    end "slicing"
+
+    procedure "<|=" (Left : in out Basic_Array; Right : in out Element_Type) is
+        Left_Len : constant := |Left|
+        a_loop: declare
+           Result : Basic_Array := Create(Left_Len+1, ());
+
+        begin
+           parallel
+           for I in 1 .. Left_Len loop
+               Result[I] := Left[I]
+           end loop
+
+           Result[Left_Len+1] := Right
+
+           Left := Result
+        end a_loop
+    end "<|=" 
+end A2X.Containers.Basic_Array
+
+procedure A2X.Test.Test_Basic_Array is
+    A : Basic_Array<Univ_Integer<>> := Create(3, 7)
+    A[1] := 42
+    A[2] := A[2] + 6
+    A[3] := A[3] + A[2]
+    Print("The answer is: " & Univ_Integer'Image(A[1] + A[2] + A[3]) & "\n")
+    Print("A'Length = " & A'Length'Image & "\n")
+
+    B : constant := A & A
+    Print("B'Length = " & B'Length'Image & ", B[5] = " & B[5]'Image & "\n")
+    for I in 1..B'Length loop
+        Print("B[" & I'Image & "] = " & B[I]'Image & ", ")
+    end loop
+    Print("\n")
+end A2X.Test.Test_Basic_Array
+    
+generic
+    type Element_Type is new Assignable  -- tbd: is private
+package A2X.Core.Vector is
+  -- Extendable vector, indexed by Univ_Integer, 1..Length
+    type Vector is new Indexable<Element_Type, Univ_Integer> with private
+
+    function "[]"() return Vector
+    function Create(Length : Univ_Integer; Initial_Value : Element_Type)
+      return Vector with Pre => Length >= 0;
+    function "indexing"
+      (V : aliased Vector; Index : Univ_Integer) return 
+       aliased constant Element_Type
+    function "var_indexing"
+      (V : aliased in out Vector; Index : Univ_Integer) return 
+       aliased Element_Type
+    function "index_set"(V : Vector) return Countable_Range<Univ_Integer>
+    function "slicing"(V : Vector; Index_Set : Countable_Range<Univ_Integer>)
+      return Vector  -- a "read-only" slice
+    function "&"(Left, Right : Vector) return Vector
+    function "&"(Left : Vector; Right : Element_Type) return Vector
+    function Vector'Length(V : Vector) return Univ_Integer
+    function Vector'First(V : Vector) return Univ_Integer is (1);
+    function Vector'Last(V : Vector) return Univ_Integer is (V'Length);
+    procedure "<|="(V : in out Vector; Elem : in out Element_Type);
+    procedure Append(V : in out Vector; Elem : in Element_Type);
+    procedure Append_Vector(V : in out Vector; Right : in Vector);
+end A2X.Core.Vector
+    
+package body A2X.Core.Vector is
+  -- Extendable vector, indexed by Univ_Integer, 1..Length
+    Debug : constant Boolean := #False;
+    Initial_Size : constant := 4
+    Leaf_Vec_Capacity : constant := 256
+    Vec_Of_Vec_Length : constant := 256
+    Subvec_Capacity : constant Basic_Array<Univ_Integer> :=
+      -- Capacity of each subvec at given level
+      [Leaf_Vec_Capacity,
+       Vec_Of_Vec_Length * Leaf_Vec_Capacity,
+       Vec_Of_Vec_Length ** 2 * Leaf_Vec_Capacity]
+    Ordinal : constant Basic_Array<Univ_String> :=
+      ["th","st","nd","rd","th","th","th","th","th","th"]
+
+    type Vector is record       
+       Level       : Univ_Integer := 0; --  Level = 0 means only Data array
+       Count       : Univ_Integer := 0;  --  Overall count
+       Width       : Univ_Integer := 0;  --  Num Subvecs in use;
+                                         --  is 0 if level = 0
+       Data        : Basic_Array<Element_Type> := null;
+       Subvecs     : Basic_Array<Vector> := null;
+    end record;
+
+    procedure Expand_Count(V : in out Vector; Amount : Univ_Integer := 1) is
+        -- Expand count by "Amount"
+        pragma Assert (Amount > 0);
+        --Rep_Ok(V, 1)
+        New_Count : constant := V.Count + Amount;
+
+        loop
+            Next_Count : Univ_Integer := New_Count
+
+            if V.Level = 0 then
+                --  A single Basic_Array of elements
+                Next_Count := Univ_Integer'Min (New_Count, Leaf_Vec_Capacity)
+                if V.Data is null then
+                    --  Very first element
+                    if Debug then
+                        Println("Very first element");
+                    end if;
+                    V.Data := Create
+                      (Univ_Integer'Max(Initial_Size, Next_Count), null)
+                    --Rep_Ok(V, 5555);
+                elsif V.Count = V.Data'Length or New_Count > V.Data'Length
+                then
+                    --  Double the size if below capacity, else add a level
+                    if V.Count < Leaf_Vec_Capacity then
+                        -- Double the size (up to the max)
+                        if Debug then
+                            Put_Line("Doubling Data, V.Count was " &
+                              V.Count'Image)
+                        end if
+
+                        Old_Data : Basic_Array<Element_Type> := V.Data'Move
+
+                        V.Data := Create
+                           (Univ_Integer'Min
+                              (Univ_Integer'Max (2*V.Count, Next_Count),
+                               Leaf_Vec_Capacity), null)
+                        for I in 1..V.Count loop
+                            V.Data[I] := "var_indexing"(Old_Data,I)'Move
+                        end loop
+                        Old_Data := null
+                        --Rep_Ok(V, 6666);
+                    else
+                        -- Reached maximum, add one level
+                        pragma Assert (Next_Count = V.Count);
+                        --Rep_Ok(V, 3333);
+                        if Debug then
+                            Put_Line("Adding second level, V.Count was " &
+                              V.Count'Image)
+                        end if;
+                        Old_V : Vector := V'Move;
+                        V := (Level => 1,
+                              Count => Next_Count,
+                              Width => 2,
+                              Subvecs => Create (Vec_Of_Vec_Length, null),
+                              Data => null)
+                        V.Subvecs[1] := Old_V'Move
+                        V.Subvecs[2] :=
+                          (Level => 0, Count => 0, Width => 0,
+                           Subvecs => null,
+                           Data => Create(Leaf_Vec_Capacity, null));
+                        --  Will loop around to extend this two-level structure
+                        --Rep_Ok(V, 4444);
+                    end if;
+                else
+                    if Debug then
+                        Put_Line(Next_Count'Image & ", " & New_Count'Image);
+                    end if;
+                end if
+            else
+                --  Multi-level structure, expand last subvec or add another
+                if V.Width > 0 and then
+                    V.Subvecs[V.Width].Count < Subvec_Capacity[V.Level]
+                then
+                    --  Can expand this subvec up to its capacity
+                    if Debug then
+                        Put_Line("Expand Subvec " & V.Width'Image &
+                          ", V.Count was " & V.Count'Image)
+                    end if;
+                    Last_Subvec renames V.Subvecs[V.Width]
+                    Subvec_Increase : constant :=
+                      Univ_Integer'Min (New_Count - V.Count,
+                      Subvec_Capacity[V.Level] - Last_Subvec.Count)
+                    Expand_Count (Last_Subvec, Subvec_Increase);
+                    --  Compute next value for V.Count
+                    Next_Count := V.Count + Subvec_Increase;
+                    --Rep_Ok(V, 7777);
+                elsif V.Width < Vec_Of_Vec_Length then
+                    --  Add another subvec
+                    V.Width := @ + 1
+                    if V.Level = 1 then
+                        --  Add another leaf vec
+                        --  Compute amount in this new leaf vec
+                        Amount_In_New_Leaf : constant :=
+                          Univ_Integer'Min (Leaf_Vec_Capacity,
+                            New_Count - V.Count)
+
+                        if Debug then
+                            Put_Line("Add " & V.Width'Image &
+                                Ordinal[V.Width mod 10+1] &
+                                " leaf vec, V.Count was " & V.Count'Image &
+                                ", adding " & Amount_In_New_Leaf'Image &
+                                " in new leaf")
+                        end if;
+
+                        V.Subvecs[V.Width] :=
+                          (Level => 0, Count => Amount_In_New_Leaf,
+                           Width => 0, Subvecs => null,
+                           Data => Create(Leaf_Vec_Capacity, null))
+
+                        --  Compute total count of vector
+                        Next_Count := V.Count + Amount_In_New_Leaf
+                        --Rep_Ok(V, 8888);
+                    else
+                        --  Add another multi-level subvec
+                        if Debug then
+                            Put_Line("Add " & V.Width'Image &
+                                Ordinal[V.Width mod 10+1] &
+                                " level " & Univ_Integer'Image (V.Level-1) &
+                                " sub vec, V.Count was " & V.Count'Image)
+                        end if;
+                        V.Subvecs[V.Width] :=
+                          (Level => V.Level-1,
+                           Count => 0,
+                           Width => 0,
+                           Subvecs => Create(Vec_Of_Vec_Length, null),
+                           Data => null)
+                        --Rep_Ok(V, 9999);
+
+                        --  Count not increased yet
+                        Next_Count := V.Count
+                    end if
+                else
+                    --  Must add another level
+                    if Debug then
+                        Put_Line("Adding another level, V.Level was " &
+                          V.Level'Image & ", V.Count was " & V.Count'Image &
+                          ", Next_Count = " & Next_Count'Image)
+                    end if;
+                    Old_V : Vector := V'Move;
+                    V := (Level => Old_V.Level+1,
+                          Count => Old_V.Count,
+                          Width => 1,
+                          Subvecs => Create (Vec_Of_Vec_Length, null),
+                          Data => null)
+                    V.Subvecs[1] := Old_V'Move;
+
+                    --  Count not increased yet
+                    Next_Count := V.Count
+                    --  Will loop around to extend this multi-level structure
+                end if
+            end if
+            --Rep_Ok(V, 1212);
+            V.Count := Next_Count
+            --Rep_Ok(V, 2323);
+            exit when Next_Count = New_Count;
+            if Debug then
+                Put_Line("Trying again, Next_Count = " & Next_Count'Image &
+                  ", New_Count = " & New_Count'Image)
+                Put_Line("V.Level = " & V.Level'Image &
+                  ", V.Width = " & V.Width'Image);
+            end if;
+            --Rep_Ok(V, 2);
+        end loop
+        --Rep_Ok(V, 2222);
+    end Expand_Count;
+
+    function "[]"() return Vector is
+        return (Level => 0, Count => 0, Width => 0,
+                Data => null, Subvecs => null)
+    end "[]"
+
+    function Create(Length : Univ_Integer; Initial_Value : Element_Type)
+        return Vector is
+
+        if Length <= Leaf_Vec_Capacity then
+            return (Level => 0, Width => 0,
+                    Count => Length, Subvecs => null,
+                    Data => Create (Length, Initial_Value))
+        else
+            More_Needed : constant := Length - Leaf_Vec_Capacity;
+
+            return Result : Vector :=
+                (Level => 0, Count => Leaf_Vec_Capacity,
+                 Width => 0, Subvecs => null,
+                 Data => Create (Leaf_Vec_Capacity, Initial_Value)) do
+
+               Result.Expand_Count(More_Needed);
+
+               if Initial_Value not null then
+                   for I in 1 .. More_Needed loop
+                       Result[Leaf_Vec_Capacity + I] := Initial_Value
+                   end loop
+               end if;
+               --Rep_Ok(Result, 3);
+            end return;
+        end if;
+
+    end Create
+
+    function Vector'Length(V : Vector) return Univ_Integer is
+        --Rep_Ok(V, 4);
+        return V.Count
+    end Vector'Length
+
+    function "indexing"(V : aliased Vector; Index : Univ_Integer)
+      return aliased constant Element_Type is
+        --Rep_Ok(V, 5);
+        if Index not in 1 .. V.Count then
+           Put_Line("Vector index " & Index'Image & " out of bounds 1 .. " &
+             V.Count'Image)
+           pragma Assert (Index in 1..V.Count, "vector_index_out_of_bounds");
+        end if
+        if V.Level = 0 then
+            --  Simple case
+            return V.Data[Index]
+        else
+           Subvec_Size : constant := Subvec_Capacity[V.Level]
+           Which_Subvec : constant := (Index-1) / Subvec_Size + 1
+           Subvec_Index : constant := (Index-1) mod Subvec_Size + 1
+           --  Recurse with appropriate subvec
+           return V.Subvecs[Which_Subvec][Subvec_Index]
+        end if;
+    end "indexing"
+
+    function "var_indexing"
+      (V : aliased in out Vector; Index : Univ_Integer)
+       return aliased Element_Type is
+        --Rep_Ok(V, 5);
+        if Index = V.Count + 1 then
+           --  Allow expanding by one
+           Expand_Count (V, 1);
+        elsif Index not in 1 .. V.Count then
+           Put_Line("Vector index " & Index'Image & " out of bounds 1 .. " &
+             V.Count'Image)
+           pragma Assert (Index in 1..V.Count, "vector_index_out_of_bounds");
+        end if
+        if V.Level = 0 then
+            --  Simple case
+            return V.Data[Index]
+        else
+           Subvec_Size : constant := Subvec_Capacity[V.Level]
+           Which_Subvec : constant := (Index-1) / Subvec_Size + 1
+           Subvec_Index : constant := (Index-1) mod Subvec_Size + 1
+           --  Recurse with appropriate subvec
+           return V.Subvecs[Which_Subvec][Subvec_Index]
+        end if;
+    end "var_indexing"
+
+    function "slicing"(V : Vector; Index_Set : Countable_Range<Univ_Integer>)
+      return Vector is
+      -- a "read-only" slice
+        --Rep_Ok(V, 6);
+        return [for I in Index_Set => V[I]]
+    end "slicing"
+
+    function "index_set"(V : Vector) return Countable_Range<Univ_Integer> is
+        --Rep_Ok(V, 7);
+        return 1..V'Length
+    end "index_set"
+
+    procedure "<|="(V : in out Vector; Elem : in out Element_Type) is
+        --Rep_Ok(V, 8);
+        Expand_Count(V, Amount => 1)
+        --Rep_Ok(V, 9);
+        V[V.Count] := Elem'Move
+        --Rep_Ok(V, 10);
+    end "<|="
+
+    procedure Append(V : in out Vector; Elem : in Element_Type) is
+        --Rep_Ok(V, 11);
+        Expand_Count(V, Amount => 1)
+        --Rep_Ok(V, 12);
+        V[V.Count] := Elem
+        --Rep_Ok(V, 13);
+    end Append;
+    
+    procedure Append_Vector(V : in out Vector; Right : in Vector) is
+        --Rep_Ok(V, 14);
+        Orig_Count : constant := V.Count
+        if Orig_Count = 0 then
+            -- Just copy right
+            V := Right;
+        elsif Right.Count > 0 then
+            -- Grow V, and then copy in Right
+            Expand_Count(V, Right.Count)
+            for I in 1..Right.Count loop
+                --Rep_Ok(V, 15);
+                if Debug then
+                    Put_Line(V.Level'Image & ", " & V.Count'Image &
+                      ", " & V.Width'Image);
+                end if;
+                V[I+Orig_Count] := Right[I]
+                --Rep_Ok(V, 16);
+            end loop
+        end if
+        --Rep_Ok(V, 17);
+    end Append_Vector;
+
+    function "&"(Left, Right : Vector) return Vector is
+        --Rep_Ok(Left, 18);
+        --Rep_Ok(Right, 19);
+        -- Copy left into result, and then add in the Right elements
+    begin
+        if Left.Count = 0 then
+            -- Left is null Vector; result is determined by Right
+            return Right
+        elsif Right.Count = 0 then
+            -- Right is null Vector; result is determined by Left
+            return Left
+        else
+            -- Start with Left
+            return Result : Vector := Left do
+               --Rep_Ok(Result, 20);
+               Append_Vector (Result, Right);
+            end return;
+        end if
+        --Rep_Ok(Result, 21);
+    end "&"
+
+    function "&"(Left : Vector; Right : Element_Type) return Vector is
+        --Rep_Ok(Left, 22);
+        return Result : Vector := Left do
+           --Rep_Ok(Result, 23);
+           Append(Result, Right);
+        end return;
+        --Rep_Ok(Result, 24);
+    end "&"
+
+end A2X.Core.Vector
+
+procedure A2X.Test.Test_Vector() is
+    function Img (Val : Univ_Integer) return Univ_String
+      renames Univ_Integer'Image;
+
+    V : Vector<Univ_Integer> := []
+    U : Vector<Univ_Integer> := []
+    V := V & 23
+    U := U & 24
+    V := V & U
+    Put_Line("V = " & Img(V[1]) & ", " & Img(V[2]))
+    for I in 1..10 loop
+        V := V & I
+    end loop
+    for I in 1..V'Length loop
+        Put_Line("V[" & I'Image & "] = " & Img(V[I]))
+    end loop
+    Put_Line("""var_indexing""(V, 12) := 33;")
+    "var_indexing"(V, 12) := 33
+    for I in 1..V'Length loop
+        Put_Line("V[" & I'Image & "] = " & Img(V[I]))
+    end loop
+    Slice : constant := V[3..7]
+    Put_Line("Slice := V[3..7]")
+    for I in 1..Slice'Length loop
+        Put_Line("Slice[" & I'Image & "] = " & Img(Slice[I]))
+    end loop
+end A2X.Test.Test_Vector
+
+package A2X.Core.Univ_Character is
+    type Univ_Character is private;
+
+    procedure Print(C : Univ_Character)
+      with Import, External_Name => #print_char;
+    procedure Put(C : Univ_Character) renames Print
+
+    function "+"(Left : Univ_Character; Right : Univ_Integer)
+      return Univ_Character
+      with Import, External_Name => "+";
+    function "+"(Left : Univ_Integer; Right : Univ_Character)
+      return Univ_Character
+      with Import, External_Name => "+";
+
+    function "-"(Left : Univ_Character; Right : Univ_Integer)
+      return Univ_Character
+      with Import, External_Name => "-";
+    function "-"(Left, Right : Univ_Character) return Univ_Integer
+      with Import, External_Name => "-";
+
+    function "*"(Left : Univ_Integer; Right : Univ_Character)
+      return Univ_String
+      -- Produce specified number of "Right" chars in a row
+    function "*"(Left : Univ_Character; Right : Univ_Integer)
+      return Univ_String
+      -- Produce specified number of "Left" chars in a row
+
+    function "=?"(Left, Right : Univ_Character) return Ordering
+      with Import, External_Name => #compare_optional;
+
+    function Univ_Character'Image(Val : Univ_Character) return Univ_String
+      with Import, External_Name => #to_string_char;
+
+    function Univ_Character'Value(Str : Univ_String) return Univ_Character
+      with Import, External_Name => #from_string_char;
+
+    function Hash(Val : Univ_Character) return Univ_Integer
+      with Import, External_Name => #identity;
+
+    function Univ_Character'First return Univ_Character
+    function Univ_Character'Last return Univ_Character
+
+    function Univ_Character'Min(Left, Right : Univ_Character)
+      return Univ_Character
+      with Import, External_Name => #min;
+    function Univ_Character'Max(Left, Right : Univ_Character)
+      return Univ_Character
+      with Import, External_Name => #max;
+
+    function ".."(Left, Right : Univ_Character)
+      return Countable_Range<Univ_Character>;
+end A2X.Core.Univ_Character
+    
+generic
+    type Elem_Type is new Assignable;
+    type Indexed_By is new Countable
+package A2X.Containers.Array is
+    type Array is new Indexable<Elem_Type, Indexed_By> with private
+
+  -- An array abstraction where the index type is not necessarily
+  -- Univ_Integer, but instead can be any Countable type (e.g. Enum<...>)
+
+    function Create
+      (Bounds : Countable_Range<Indexed_By>; Initial_Value : Elem_Type)
+      return Array
+
+    function Array'Length(Arr : Array) return Univ_Integer
+    function "magnitude"(Arr : Array) return Univ_Integer renames Array'Length
+
+    function Bounds(Arr : Array) return Countable_Range<Indexed_By>
+
+    function Array'First(Arr : Array) return Indexed_By
+      is (Bounds(Arr).First);
+    function Array'Last(Arr : Array) return Indexed_By
+      is (Bounds(Arr).Last);
+
+    function "indexing"(Arr : aliased Array; Index : Indexed_By)
+      return aliased constant Elem_Type
+    function "var_indexing"(Arr : aliased in out Array; Index : Indexed_By) 
+      return aliased Elem_Type
+    function "index_set"(Arr : Array) return Countable_Range<Indexed_By>
+    function "slicing"
+      (Arr : Array;
+       Bounds : Countable_Range<Indexed_By>) return Array
+    --  A "read-only" slice
+    procedure "<|="(Left : in out Array; Right : in out Elem_Type)
+    function "|"(Left : Array; Right : Key_Value<Indexed_By, Elem_Type>)
+      return Array
+    function "&"(Left, Right : Array) return Array
+    function "[]" return Array
+end A2X.Containers.Array
+
+package body A2X.Containers.Array is
+  -- An array abstraction where the index type is not necessarily
+  -- Univ_Integer, but instead can be any Countable type (e.g. Enum<...>)
+    subtype Elem_Array is Basic_Array<Elem_Type>
+
+    type Array is record
+        Data : Elem_Array
+        Bounds : Countable_Range<Indexed_By>
+    end record Array
+
+
+    function Create
+      (Bounds : Countable_Range<Indexed_By>; Initial_Value : Elem_Type)
+      return Array is
+        return (Data => Create(Bounds'Length, Initial_Value),
+          Bounds => Bounds)
+    end Create
+
+    function Array'Length(Arr : Array) return Univ_Integer is
+        return Arr.Data'Length
+    end Array'Length
+
+    function Bounds(Arr : Array) return Countable_Range<Indexed_By> is
+        return Arr.Bounds
+    end Bounds
+
+    function "indexing"(Arr : aliased Array; Index : Indexed_By)
+      return aliased constant Elem_Type is
+        return Arr.Data[ Index - Arr.Bounds.First + 1 ]
+    end "indexing"
+
+    function "var_indexing"(Arr : aliased in out Array; Index : Indexed_By) 
+      return aliased Elem_Type is
+        if Arr'Length = 0 then
+            -- Create a one-element array
+            Arr := (Data => Create(1, null),
+              Bounds => Index .. Index)
+        elsif Index < Arr.Bounds.First then
+            -- Extend below
+            Arr := (Data => 
+              Elem_Array.Create(Arr.Bounds.First - Index, null) & Arr.Data,
+              Bounds => Index .. Arr.Bounds.Last)
+        elsif Index > Arr.Bounds.Last then
+            -- Extend above
+            Arr := (Data => 
+              Arr.Data & Elem_Array.Create(Index - Arr.Bounds.Last, null),
+              Bounds => Arr.Bounds.First .. Index)
+        end if
+        return Arr.Data[ Index - Arr.Bounds.First + 1 ]
+    end "var_indexing"
+
+    function "index_set"(Arr : Array) return Countable_Range<Indexed_By> is
+        return Arr.Bounds.First .. Arr.Bounds.Last
+    end "index_set"
+
+    function "slicing"
+      (Arr : Array;
+       Bounds : Countable_Range<Indexed_By>)
+      return Array is
+        return Result : Array := Create (Bounds, Arr[Bounds.First]) do
+           for I in Bounds.First + 1 .. Bounds.Last loop
+              Result [I] := Arr [I];
+           end loop
+        end return;
+    end "slicing"
+
+    procedure "<|="(Left : in out Array; Right : in out Elem_Type) is
+        -- Add Right onto Array
+        if Left'Length = 0 then
+            Left := (Data => Create(1, null),
+              Bounds => Indexed_By'First .. Indexed_By'First)
+            Left[Indexed_By'First] := Right
+        else
+            Left[Left.Bounds.Last + 1] := Right
+        end if
+    end "<|="
+    
+    function "|"(Left : Array; Right : Key_Value<Indexed_By, Elem_Type>) 
+      return Array is
+        return Result : Array := Left do
+           Result[Right.Key] := Right.Value
+        end return;
+    end "|"
+
+    function "&"(Left, Right : Array) return Array is
+        if Left'Length = 0 then
+           return Right;
+        elsif Right'Length = 0 then
+           return Left;
+        else
+           return (Data => Left.Data & Right.Data,
+                   Bounds =>
+                     Left.Bounds.First .. Left.Bounds.Last + Right'Length);
+        end if;
+    end "&";
+
+    function "[]" return Array is
+        return (Data => Create(0, null),
+          Bounds => Indexed_By'First+1 .. Indexed_By'First)
+            -- Bounds not meaningful when empty
+    end "[]"
+
+end A2X.Containers.Array
+
+procedure A2X.Test.Test_Array is
+    type Color is new Enum< [#red, #green, #blue] >
+    type RCB1 is new Array<Integer<Range => 0..16#FF#>, Indexed_By => Color>;
+    subtype RCB is RCB1;
+
+    Red : constant RCB := [#red => 16#33#, #green => 0, #blue => 0]
+    Blue : constant RCB := [#red => 0, #green => 0, #blue => 16#33#]
+    Yellow : constant RCB := [0, 16#33#, 16#33#]
+    White : constant RCB := [16#FF#, 16#FF#, 16#FF#]
+    
+    RCBs : constant Basic_Array<RCB> := [Red, Blue, Yellow, White]
+
+    for C of RCBs loop
+        Println("#red => " & C[#red]'Image & ", #green => " & C[#green]'Image &
+          ", #blue => " & C[#blue]'Image)
+    end loop
+end A2X.Test.Test_Array
+
+generic
+    type Content_Type is new Countable;
+package A2X.Core.Atomic is
+    type Atomic is synchronized private;
+
+    function Create(Initial_Val : Content_Type) return Atomic
+      -- Create an atomic object with given initial value
+
+    procedure Set_Value(A : aliased in out Atomic; Val : Content_Type)
+      with Import, External_Name => #atomic_set_value;
+      -- Atomically set the new value
+
+    function Value(A : aliased Atomic) return Content_Type
+      with Import, External_Name => #atomic_value;
+      -- Return the current value
+
+    function Exchange(A : aliased in out Atomic;
+      New_Val : Content_Type) return Content_Type
+      with Import, External_Name => #atomic_exchange;
+      -- Result := Value(A); Set_Value(A, New_Val)
+
+    function Test_And_Set(A : aliased in out Atomic; New_Val : Content_Type)
+      return Content_Type
+      renames Exchange;
+      -- Set Value(A) to New_Val; Return the prior value.
+
+    function Compare_And_Exchange(A : aliased in out Atomic;
+      Expected_Val, New_Val : Content_Type) return Content_Type
+      with Import, External_Name => #atomic_compare_and_exchange;
+      -- If Value(A) = Expected_Val, then set Value(A) to New_Val.
+      -- In any case, return the prior value.
+
+    function Compare_And_Swap(A : aliased in out Atomic;
+      Expected_Val, New_Val : Content_Type) return Content_Type
+      renames Compare_And_Exchange;
+      --  Just a more familiar name for Compare_And_Exchange
+
+    function Fetch_And_Add(A : aliased in out Atomic;
+      Value : Content_Type) return Content_Type
+      with Import, External_Name => #atomic_fetch_and_add;
+      -- Result := Value (A); Set_Value(A) = Result + Value
+end A2X.Core.Atomic
+
+package body A2X.Core.Atomic is
+    type Atomic is synchronized record
+        Value : Content_Type
+    end record Atomic
+
+    function Create(Initial_Val : Content_Type) return Atomic is
+      -- Create an atomic object with given initial value
+        return (Value => Initial_Val)
+    end Create
+
+end A2X.Core.Atomic
+
+procedure A2X.Test.Test_Atomic(X, Y : Univ_Integer) is
+    subtype Atomic_Univ is Atomic<Univ_Integer>
+    AX : Atomic_Univ := Atomic_Univ.Create(X)
+
+    Println("Value(X) = " & Value(AX)'Image)
+
+    Set_Value(AX, X+1)
+    Println("After Set_Value(" & Univ_Integer'Image(X+1) &
+      "), Value(X) = " & Value(AX)'Image)
+
+    Z : constant := Test_And_Set(AX, Y)
+    Println("Test_And_Set(X, " & Y'Image & ") = " & Z'Image)
+
+    CAS : constant := Compare_And_Swap(AX, Expected_Val => X-1, New_Val => Y-1)
+    Println("Compare_And_Swap(X, " & Univ_Integer'Image(X-1) &
+      ", " & Univ_Integer'Image(Y-1) & 
+      ") = " & CAS'Image & ", Value(X) = " & Value(AX)'Image)
+
+    CAS2 : constant := Compare_And_Swap(AX, Y, Y-2)
+    Println("Compare_And_Swap(X, " & Y'Image & ", " &
+      Univ_Integer'Image(Y-2) & 
+      ") = " & CAS2'Image & ", Value(X)'Image = " & Value(AX)'Image)
+
+end A2X.Test.Test_Atomic
+
+package A2X.Core.Univ_String is
+    type Univ_String is private;
+    procedure Print(U: Univ_String)
+      with Import, External_Name => #print_string;
+    procedure Println(U: Univ_String)
+      with Import, External_Name => #println_string;
+    function Readln
+      return Univ_String with Import, External_Name => #read_string;
+
+    --  Text_IO-ish equivalents
+    procedure Put(U: Univ_String) renames Print
+    procedure Put_Line(U: Univ_String) renames Println
+    procedure New_Line is (Put("\n"))
+    function Get_Line return Univ_String
+      with Import, External_Name => #read_string;
+
+    function "*"(Left : Univ_Integer; Right : Univ_String) return Univ_String
+     -- Produce specified number of "Right" strings in a row
+    function "*"(Left : Univ_String; Right : Univ_Integer) return Univ_String
+     -- Produce specified number of "Left" strings in a row
+
+    function "&"(Left, Right : Univ_String) return Univ_String
+      with Import, External_Name => #concat_string;
+
+    function "&"(Left : Univ_String; Right : Univ_Character) return Univ_String
+      with Import, External_Name => #concat_char;
+
+    function "&"(Left : Univ_Character; Right : Univ_String) return Univ_String
+      with Import, External_Name => #concat_char_str;
+
+    function "=?"(Left, Right : Univ_String) return Ordering
+      with Import, External_Name => #string_compare;
+
+    procedure "&="(Left : in out Univ_String; Right : Univ_String)
+      with Import, External_Name => #assign_concat_string;
+
+    function "indexing"(Str : Univ_String; Index : Univ_Integer)
+      return Univ_Character
+      with Import, External_Name => #string_indexing;
+     -- a "read-only" element, indexed 1 .. |Str|
+
+    function "index_set"(Str : Univ_String)
+      return Countable_Range<Univ_Integer>
+        -- Return set of indices for string
+
+    function "slicing"(Str : Univ_String;
+      Index_Set : Countable_Range<Univ_Integer>) 
+      return Univ_String with Import, External_Name => #string_slicing;
+        -- a "read-only" slice
+
+    function Univ_String'First(Str : Univ_String) return Univ_Integer
+      is (1);
+
+    function Univ_String'Length(Str : Univ_String) return Univ_Integer
+      with Import, External_Name => #string_length;
+
+    function Univ_String'Last(Str : Univ_String) return Univ_Integer
+      is (Str'Length);
+
+    function "magnitude"(Str : Univ_String) return Univ_Integer
+      with Import, External_Name => #string_length;
+
+    function Hash(Val : Univ_String) return Univ_Integer
+      with Import, External_Name => #identity;
+
+    -- Operations to convert to/from an Array of Univ_Character's
+    subtype Char_Array is Array<Univ_Character, Indexed_By => Univ_Integer>
+    function To_Array(Str : Univ_String) return Char_Array
+    function From_Array(Arr : Char_Array) return Univ_String
+
+    function Hex_Image(Val : Univ_Integer) return Univ_String;
+    
+private
+    -- for Imageable
+
+    -- These operations are needed so Univ_String satifies
+    -- requirements of "Imageable" interface, but these
+    -- operations are not directly callable, to avoid ambiguities.
+
+    function Univ_String'Image(Val : Univ_String) return Univ_String
+      with Import, External_Name => #identity;
+    function Univ_String'Value(Str : Univ_String) return Univ_String
+      with Import, External_Name => #identity;
+
+end A2X.Core.Univ_String
+    
+procedure Test_Str is
+    X : Univ_String := "Hello, Sparkeling World";
+    Println (X);
+    Println ("Hello with a string literal");
+    Univ_String.Println (X);
+    A2X.Core.Univ_String.Println (X);
+    A2X.Core.Univ_String.Println (X);
+    Univ_String.Println (X);
+    Univ_String.Println ("Hello, Sparkel World with a literal")
+    --  Construct a new string from an existing one
+    Y : Univ_String := From_Array ([for C of X => C]);
+    Univ_String.Println ("Y, constructed from X, = " & Y);
+end Test_Str
+
+package body A2X.Core.Univ_String is
+    subtype Substr_Array is Basic_Array<Univ_String>;
+
+    type Univ_String is record
+        Parts : Substr_Array;
+        Dummy : Univ_Integer;  -- make sure this doesn't end up as a wrapper
+    end record Univ_String
+    function "index_set"(Str : Univ_String)
+      return Countable_Range<Univ_Integer> is
+        -- Return set of indices for string
+        return 1..|Str|
+    end "index_set"
+
+    function "*"(Left : Univ_Integer; Right : Univ_String)
+      return Univ_String is
+        -- Produce specified number of "Right" strings in a row
+        if Left <= 0 then
+            return ""
+        elsif Left = 1 then
+            return Right
+        else
+            -- Recurse to produce half-length, and then combine
+            Partial : constant Univ_String := (Left/2) * Right
+            if Left mod 2 = 1 then
+                return Partial & Partial & Right
+            else
+                return Partial & Partial
+            end if
+        end if
+    end "*"
+
+    function "*"(Left : Univ_String; Right : Univ_Integer)
+      return Univ_String is
+        -- Produce specified number of "Left" strings in a row
+        return Right * Left   -- Just pass the buck to other "*"
+    end "*"
+
+    function To_Array(Str : Univ_String) return Char_Array is
+        return [for I in 1 .. |Str| => Str[I]]
+    end To_Array
+
+    function From_Array(Arr : Char_Array) return Univ_String is
+        return Result : Univ_String := "" do
+           for C of Arr loop
+              Result := Result & C
+           end loop;
+        end return;
+    end From_Array
+
+    function Hex_Image(Val : Univ_Integer) return Univ_String is
+       Word_Size : constant := 64
+       Max_Digits : constant := Word_Size / 4
+
+       if Val = null then
+          return '8' & ((Max_Digits-1)*'0')
+       elsif Val = 0 then
+          return "0"
+       else
+          Vec : Char_Array := Create(1..Max_Digits, ' ')
+          V : Univ_Integer := Val;
+
+          for Index in reverse 1 .. Max_Digits loop
+             exit when V = 0;
+
+             Digit : constant := V mod 16
+
+             if Digit >= 10 then
+                Vec[Index] := 'A' + (Digit-10)
+             else
+                Vec[Index] := '0' + Digit
+             end if
+    
+             if V = Digit then
+                return From_Array(Vec[Index .. Max_Digits])
+             else
+                V := (V - Digit) / 16
+             end if
+          end loop
+          return From_Array(Vec)
+       end if
+    end Hex_Image
+end A2X.Core.Univ_String
+
+procedure A2X.Test.Test_String is
+    U : constant := "tab\t"
+    T : constant := U[4]
+    Println("U = " & U & ", |U| = " & Univ_Integer'Image(|U|) &
+      ", U[4] = '" & T & "'")
+    X : constant := "this is a string"
+    Y : constant := X[3]
+    pragma Assert (Y = 'i'); -- string indexing problem
+    Z : constant := X[6..7]
+    pragma assert (Z = "is"); -- string slicing problem, expected 'is', found Z 
+    Println("X = " & X & ", X[3] = " & Y & ", X[6..7] = " & Z)
+
+    Println("About to indent 4 and then print 'hello'")
+    Println(4 * " " & "hello")
+
+    Seven_Xs : constant := "x" * 7
+    pragma Assert (Seven_Xs = "xxxxxxx"); -- Char multiplication check
+
+    Println("Here are seven x's: " & Seven_Xs)
+    
+    Print("Here are 6 y's: ")
+    Println('y' * 6)
+end A2X.Test.Test_String
+
+package body A2X.Core.Univ_Character is
+    type Univ_Character is record
+       Pos : Univ_Integer;
+    end record;
+    function "*"(Left : Univ_Integer; Right : Univ_Character)
+      return Univ_String is
+        -- Produce specified number of "Right" chars in a row
+        return Left * Right'Image   
+           -- Just pass the buck to the string function
+    end "*"
+
+    function "*"(Left : Univ_Character; Right : Univ_Integer)
+      return Univ_String is
+        -- Produce specified number of "Left" chars in a row
+        return Right * Left'Image   
+           -- Just pass the buck to the string function
+    end "*"
+
+    function Univ_Character'First return Univ_Character is
+        return (Pos => 0);
+    end Univ_Character'First
+
+    function Univ_Character'Last return Univ_Character is
+        return (Pos => 2**31-1);
+    end Univ_Character'Last
+
+    function ".."(Left, Right : Univ_Character)
+      return Countable_Range<Univ_Character> is
+        subtype Char_Range is Countable_Range<Univ_Character>;
+        return Char_Range'(Left .. Right);
+    end "..";
+end A2X.Core.Univ_Character
+
+package A2X.Core.Univ_Enumeration is
+    type Univ_Enumeration is private;
+
+    function "=?"(Left, Right : Univ_Enumeration) return Ordering 
+      with Import, External_Name => #unordered_compare;
+    procedure Print(Val : Univ_Enumeration) 
+      with Import, External_Name => #print_univ_enum;
+
+    procedure Put(Val : Univ_Enumeration) renames Print
+
+    function Univ_Enumeration'Image(Val : Univ_Enumeration) return Univ_String
+      with Import, External_Name => #to_string_enum;
+
+    function Univ_Enumeration'Value(Str : Univ_String) return Univ_Enumeration
+      with Import, External_Name => #from_string_enum;
+
+    function Hash(Val : Univ_Enumeration) return Univ_Integer
+      with Import, External_Name => #hash_enum;
+
+    function "in"(Val : Univ_Enumeration; Arr : Basic_Array<Univ_Enumeration>)
+      return Boolean is ((for some A of Arr => Val = A));
+
+end A2X.Core.Univ_Enumeration
+
+package A2X.Core.Boolean is
+    type Boolean is private;
+
+    function "from_univ"(Lit : Univ_Enumeration) 
+      return Boolean with Import, External_Name => #ada202x_bool_from_univ,
+       Pre => Lit in [#False, #True];
+
+    function "to_univ"(Val : Boolean) return Univ_Enumeration 
+      with Import, External_Name => #ada202x_bool_to_univ;
+
+    function False  return Boolean is (#False)
+
+    function True  return Boolean is (#True)
+
+    function "=?"(Left, Right : Boolean) return Ordering
+      with Import, External_Name => #compare_optional;
+        -- NOTE: #True > #False
+
+    function "not"(B : Boolean) return Boolean
+      with Import, External_Name => "not";
+    function "and"(Left, Right : Boolean) return Boolean
+      with Import, External_Name => "and";
+    function "or"(Left, Right : Boolean) return Boolean
+      with Import, External_Name => "or";
+    function "xor"(Left, Right : Boolean) return Boolean
+      with Import, External_Name => "xor";
+
+    procedure "and="(Left : in out Boolean; Right : Boolean)
+    procedure "or="(Left : in out Boolean; Right : Boolean)
+    procedure "xor="(Left : in out Boolean; Right : Boolean)
+
+    function Hash(Val : Boolean) return Univ_Integer
+      with Import, External_Name => #identity;
+
+    -- For Imageable
+    function Boolean'Image(Val : Boolean) return Univ_String
+    function Boolean'Value(Str : Univ_String) return Boolean
+
+    -- Operators for Countable
+    function "+"(Left : Univ_Integer; Right : Boolean) return Boolean 
+      with Import, External_Name => "+";
+    function "+"(Left : Boolean; Right : Univ_Integer) return Boolean 
+      with Import, External_Name => "+";
+    function "-"(Left, Right : Boolean) return Univ_Integer 
+      with Import, External_Name => "-";
+    function "-"(Left : Boolean; Right : Univ_Integer) return Boolean 
+      with Import, External_Name => "-";
+
+    -- TBD: These should be properties some day (e.g. Boolean#first).
+    function Boolean'First return Boolean is (#False)
+    function Boolean'Last return Boolean is (#True)
+
+    function Boolean'Min(Left, Right : Boolean) return Boolean
+      with Import, External_Name => #min;
+    function Boolean'Max(Left, Right : Boolean) return Boolean
+      with Import, External_Name => #max;
+
+    function ".."(Left, Right : Boolean) return Countable_Range<Boolean>
+end A2X.Core.Boolean
+
+package body A2X.Core.Boolean is
+    subtype Boolean_Range is Countable_Range<Boolean>
+
+    procedure "and="(Left : in out Boolean; Right : Boolean) is
+      Left := Left and Right
+    end "and="
+
+    procedure "or="(Left : in out Boolean; Right : Boolean) is
+      Left := Left or Right
+    end "or="
+
+    procedure "xor="(Left : in out Boolean; Right : Boolean) is
+      Left := Left xor Right
+    end "xor="
+
+    function Boolean'Image(Val : Boolean) return Univ_String is
+      if Val then
+          return "True"
+      else
+          return "False"
+      end if
+    end Boolean'Image
+
+    function Boolean'Value(Str : Univ_String) return Boolean is
+      if Str = "#True" or else Str = "True" then
+          return #True
+      elsif Str = "#False" or else Str = "False" then
+          return #False
+      else
+          return null
+      end if
+    end Boolean'Value
+
+    -- NOTE: For implementation reasons, we put these here rather than defining
+    --       them in the interface using "is of Countable_Range<Boolean>"
+    function ".."(Left, Right : Boolean) return Countable_Range<Boolean> is
+        return Boolean_Range'(".."(Left, Right))
+    end ".."
+
+end A2X.Core.Boolean
+
+procedure A2X.Test.Test_Boolean(UX, UY : Univ_Enumeration) is
+    X : constant Boolean := UX
+    Y : constant Boolean := UY
+
+    And_XY : constant := X and Y
+    Or_XY : constant := X or Y
+    Xor_XY : constant := X xor Y
+    Println(X'Image & " and " & Y'Image & " = " & Boolean'Image(X and Y))
+    Println(X'Image & " or " & Y'Image & " = " & Boolean'Image(X or Y))
+    Println(X'Image & " xor " & Y'Image & " = " & Boolean'Image(X xor Y))
+
+    XX : Boolean := X
+    XX := XX and Y
+    Println("X and= Y = " & XX'Image)
+    XX := X
+    XX := XX or Y
+    Println(X'Image & " or= " & Y'Image & " = " & XX'Image)
+    XX := X
+    XX := XX xor Y
+    Println(X'Image & " xor= " & Y'Image & " = " & XX'Image)
+end A2X.Test.Test_Boolean
+
+generic
+    type Key_Type is new Hashable
+package A2X.Containers.Keyed is
+    type Keyed is abstract private
+
+    abstract function Key_Of(KV : aliased Keyed)
+      return aliased constant Key_Type
+    abstract function Has_Value(KV : Keyed) return Boolean
+      -- Return True if Keyed object has a non-null value
+    abstract function Key_Only(Key : Key_Type) return Keyed
+      -- Return a Keyed object given a key, having no associated value
+end A2X.Containers.Keyed
+
+generic
+    type Key_Type_KV is new Hashable;
+    type Value_Type is new Assignable
+package A2X.Containers.Key_Value is
+  -- This supports the use of [Key => Value] as a way to
+  -- add a single element to an existing indexable container of some sort.
+    type Key_Value is new Keyed<Key_Type_KV> with record
+         Key : Key_Type_KV
+         Value : Value_Type
+    end record Key_Value
+
+    function "[]" return Key_Value
+    function "var_indexing"
+      (KV : aliased in out Key_Value; Index : Key_Type_KV) 
+      return aliased Value_Type
+    function Key_Of(KV : aliased Key_Value)
+      return aliased constant Key_Type_KV
+    function Has_Value(KV : Key_Value) return Boolean
+      -- Return True if Key_Value object has a non-null value
+    function Key_Only(Key : Key_Type_KV) return Key_Value
+      -- Return a Key_Value object given a key, having no associated value
+end A2X.Containers.Key_Value
+
+package body A2X.Containers.Key_Value is
+    function "[]" return Key_Value is
+        return (Key => null, Value => null)
+    end "[]"
+
+    function "var_indexing"
+      (KV : aliased in out Key_Value; Index : Key_Type_KV) 
+      return aliased Value_Type is
+        KV.Key := Index
+        return KV.Value
+    end "var_indexing"
+
+    function Key_Of(KV : aliased Key_Value)
+      return aliased constant Key_Type_KV is
+        return KV.Key
+    end Key_Of
+
+    function Has_Value(KV : Key_Value) return Boolean is
+        -- Return True if Key_Value object has a non-null value
+        return KV.Value not null
+    end Has_Value
+
+    function Key_Only(Key : Key_Type_KV) return Key_Value is
+        -- Return a Key_Value object given a key, having no associated value
+        return [Key => null]
+    end Key_Only
+end A2X.Containers.Key_Value
+
+-- package A2X.Core.Countable_Base is
+--     type Countable_Base is abstract new Ordered
+--     --  TBD: All operations should be declared "abstract"
+--     --       unless perhaps we allow the whole package to be
+--     --       declared "abstract"
+-- 
+--     abstract
+--       function "+"(Left : Countable_Base; Right : Univ_Integer)
+--         return Countable_Base
+--     abstract
+--       function "+"(Left : Univ_Integer; Right : Countable_Base)
+--         return Countable_Base
+-- 
+--     abstract
+--       function "-"(Left : Countable_Base; Right : Univ_Integer)
+--         return Countable_Base
+--     abstract
+--       function "-"(Left, Right : Countable_Base) return Univ_Integer
+-- 
+--     --  function "=?"(Left, Right : Countable_Base)
+--     --     return Ordered.Full_Ordering
+--     --  TBD: Overriding of abstracts NYI
+-- 
+--     abstract
+--       function Countable_Base'First return Countable_Base
+-- 
+--     abstract
+--       function Countable_Base'Last return Countable_Base
+-- 
+--     --  function Hash(Val : Countable_Base) return Univ_Integer
+--     --  TBD: Overriding of abstracts NYI
+-- end A2X.Core.Countable_Base
+-- 
+generic
+    type Bound_Type is new Comparable
+package A2X.Core.Closed_Interval is
+    -- This provides a simple "closed" interval X..Y
+    -- If a type is countable, then half-open or fully open intervals
+    -- can be converted into the equivalent closed interval.
+    type Closed_Interval is record
+       Low : Bound_Type
+       High : Bound_Type
+    end record Closed_Interval
+
+    function "in"(Left : Bound_Type; Right : Closed_Interval) return Boolean
+    function "=?"(Left, Right : Closed_Interval) return Ordering
+end A2X.Core.Closed_Interval
+
+package body A2X.Core.Closed_Interval is
+    function "in"(Left : Bound_Type; Right : Closed_Interval) return Boolean is
+        return Left >= Right.Low and then Left <= Right.High
+    end "in"
+
+    function "=?"(Left, Right : Closed_Interval) return Ordering is
+        -- Compare two intervals, and consider them #unordered
+        -- if they overlap at all, unless they are identical.
+        -- If they don't overlap, then return #less or #greater as appropriate.
+
+        if Left.High < Right.Low then
+            return #less
+        elsif Left.Low > Right.High then
+            return #greater
+        elsif Left.Low = Right.Low and then
+          Left.High = Right.High then
+            return #equal
+        else
+            return #unordered
+        end if
+    end "=?"
+
+end A2X.Core.Closed_Interval
+
+generic
+  Range : Countable_Range<Univ_Integer> := -2**63+1 .. +2**63-1
+package A2X.Core.Integer is
+    -- NOTE: We restrict Integer to this range so Univ_Integer can use
+    --       values outside this range as indices into an extended-range
+    --       integer table.
+    type Integer is private;
+
+    function "from_univ"(Lit : Univ_Integer) return Integer 
+      with Import, External_Name => #integer_from_univ;
+
+    function "to_univ"(Val : Integer) return Univ_Integer 
+      with Import, External_Name => #integer_to_univ;
+
+    function "+"(Right : Integer) return Integer
+      with Import, External_Name => #identity;
+
+    function "-"(Right : Integer) return Integer
+      with Import, External_Name => #negate;
+
+    function "abs"(Right : Integer) return Integer
+      with Import, External_Name => "abs";
+
+    function "magnitude"(Val : Integer) return Integer renames "abs"
+
+    function "+"(Left, Right : Integer) return Integer 
+      with Import, External_Name => "+";
+
+    function "-"(Left, Right : Integer) return Integer
+      with Import, External_Name => "-";
+
+    function "*"(Left, Right : Integer) return Integer 
+      with Import, External_Name => "*";
+
+    function "/"(Left, Right : Integer) return Integer
+      with Import, External_Name => "/";
+
+    function "mod"(Left, Right : Integer) return Integer
+      with Import, External_Name => "mod";
+
+    function "rem"(Left, Right : Integer) return Integer
+      with Import, External_Name => "rem";
+
+    function "**"(Left, Right : Integer) return Integer
+      with Import, External_Name => "**";
+
+    function "=?"(Left, Right : Integer) return Ordering
+      with Import, External_Name => #compare_optional;
+
+    function Integer'Min(Left, Right : Integer) return Integer
+      with Import, External_Name => #min;
+    function Integer'Max(Left, Right : Integer) return Integer
+      with Import, External_Name => #max;
+
+    function Hash(Val : Integer) return Univ_Integer
+      with Import, External_Name => #identity;
+
+    procedure Print(X : Integer) with Import, External_Name => #print_int;
+
+    procedure Put(X : Integer) renames Print
+
+    function Integer'Image(Val : Integer) return Univ_String
+      with Import, External_Name => #to_string_int;
+
+    function Integer'Value(Str : Univ_String) return Integer
+      with Import, External_Name => #from_string_int;
+
+    function Integer'First return Integer
+
+    function Integer'Last return Integer
+
+    function "[..]" return Countable_Range<Integer>;
+
+    function ".."(Left, Right : Integer) return Countable_Range<Integer>;
+
+private
+    -- for Countable
+
+    -- These operations are needed so Integer satifies
+    -- requirements of "Countable" interface, but these
+    -- operations are not directly callable (if they were callable,
+    -- we would have ambiguity when adding an integer to an int-literal).
+
+    function "+"(Left : Integer; Right : Univ_Integer) return Integer 
+      with Import, External_Name => "+";
+
+    function "+"(Left : Univ_Integer; Right : Integer) return Integer 
+      with Import, External_Name => "+";
+
+    function "-"(Left : Integer; Right : Univ_Integer) return Integer 
+      with Import, External_Name => "-";
+
+    function "-"(Left, Right : Integer) return Univ_Integer
+      with Import, External_Name => "-";
+
+end A2X.Core.Integer
+
+package body A2X.Core.Integer is
+    type Integer is record
+       Content : Univ_Integer;  -- So this ends up as a wrapper
+    end record Integer
+
+    function Integer'First return Integer is
+        return Range.First
+    end Integer'First
+
+    function Integer'Last return Integer is
+        return Range.Last
+    end Integer'Last
+
+    function "[..]" return Countable_Range<Integer> is
+      ((Range.First, Range.Last));
+
+    function ".."(Left, Right : Integer) return Countable_Range<Integer> is
+      ((Left, Right));
+
+end A2X.Core.Integer
+
+procedure A2X.Test.Test_Integer(X, Y : Univ_Integer) is
+   -- type I6 is new Integer<1..10**6>
+   subtype I6 is Integer<1..10**6>
+   A : I6 := X
+   B : I6 := Y
+
+   C : I6 := A + B
+   Println (" " & A'Image & " + " & B'Image & " = " & C'Image)
+end A2X.Test.Test_Integer
+    
+generic
+    type Bound_Type is new Comparable
+package A2X.Core.Interval is
+    -- This supports closed, half-open, and open intervals.
+    -- This is appropriate for uncountable types where you
+    -- can't normalize all intervals into closed intervals.
+
+    type Interval is record
+        Low : Bound_Type
+        Low_Is_Open : Boolean
+        High : Bound_Type
+        High_Is_Open : Boolean
+    end record Interval
+
+    function Singleton(Val : Bound_Type) return Interval
+      -- Return interval consisting of a single value
+
+    function Is_Empty(IV : Interval) return Boolean
+      -- Return True if interval is null or it represents
+      -- no values
+
+    function "in"(Left : Bound_Type; Right : Interval) return Boolean
+
+    function "=?"(Left, Right : Interval) return Ordering
+      -- "#greater" means Left is strictly greater than Right
+      -- "#less" means Left is strictly less than Right
+      -- "#equal" means Left and Right are the same interval
+      -- "#unordered" means anything else
+
+    function "and"(Left, Right : Interval) return Interval
+      -- Return intersection of the two intervals
+
+    procedure "and="(Left : aliased in out Interval; Right : Interval)
+      -- Intersect Right into Left
+
+    function Is_Strictly_Within(Left, Right : Interval) return Boolean
+      -- Return True if Left is strictly within Right,
+      -- meaning low bound of Left is higher, and high bound is lower.
+      -- NOTE: If True, then removing Right from Left will produce two 
+      --       non-overlapping intervals.
+
+    function "-"(Left, Right : Interval)
+      return Interval
+      with Pre => not Is_Strictly_Within(Right, Left)
+      -- Subtract out Right interval from Left interval
+      -- Right must not be strictly within Left, since
+      -- that would require returning two intervals.
+
+    procedure "-="(Left : aliased in out Interval; Right : Interval) 
+      with Post => not Is_Strictly_Within(Right, Left)
+      -- Subtract Right interval from Left
+
+    function Overlaps(Left, Right : Interval) return Boolean
+      -- Return True if intervals overlap
+
+    function "or"(Left, Right : Interval)  return Interval
+      with Pre => Overlaps(Left, Right)
+      -- Return union of two intervals.  Must have some overlap
+      -- to ensure that result can be represented as a single interval.
+    function "|"(Left, Right : Interval) return Interval renames "or"
+
+    procedure "or="(Left : aliased in out Interval; Right : Interval) 
+      with Post => Overlaps(Left, Right)
+      -- Compute union of two intervals.  Must have some overlap
+      -- to ensure that result can be represented as a single interval.
+    procedure "|="(Left : aliased in out Interval; Right : Interval) 
+      renames "or="
+
+    procedure "<|="(Left, Right : in out Interval)
+      with Pre => Overlaps(Left, Right)
+      -- Compute union of two intervals; leave Right empty.  
+      -- Must have some overlap to ensure that result can be 
+      -- represented as a single interval.
+
+end A2X.Core.Interval
+
+package body A2X.Core.Interval is
+    function Singleton(Val : Bound_Type) return Interval is
+      -- Return interval consisting of a single value
+        return (Low => Val, Low_Is_Open => False,
+          High => Val, High_Is_Open => False)
+    end Singleton
+
+    function Is_Empty(IV : Interval) return Boolean is
+      -- Return True if interval is null or it represents
+      -- no values
+        return IV = null or else
+          IV.Low > IV.High or else
+          (IV.Low = IV.High and then (IV.Low_Is_Open or IV.High_Is_Open))
+    end Is_Empty
+
+    function "in"(Left : Bound_Type; Right : Interval) return Boolean is
+        case "=?" (Left, Right.Low) is
+          when #less => return False
+          when #equal => return not Right.Low_Is_Open
+          when #greater =>
+            case "=?" (Left, Right.High) is
+              when #less => return True
+              when #equal => return not Right.High_Is_Open
+              when #greater => return False
+            end case
+        end case
+    end "in"
+
+    function "=?"(Left, Right : Interval) return Ordering is
+        -- Compare two intervals, and consider them #unordered
+        -- if they overlap at all, unless they are identical.
+        -- If they don't overlap, then return #less or #greater as appropriate.
+        -- Return #unordered if any of the comparisons return #unordered.
+
+        -- First check for perfect equality
+        if Left.Low = Right.Low and then
+          Left.High = Right.High and then
+          Left.Low_Is_Open = Right.Low_Is_Open and then
+          Left.High_Is_Open = Right.High_Is_Open then
+            -- NOTE: We are considering X..Y-1 /= X..<Y since
+            --       we don't require countable elements.
+            return #equal
+        end if
+
+        case "=?" (Left.High, Right.Low) is
+          when #unordered =>
+            return #unordered
+          when #less =>
+            return #less
+          when #equal =>
+            if Left.High_Is_Open or else Right.Low_Is_Open then
+                -- No overlap
+                return #less
+            else
+                -- We have already ruled out #equal
+                return #unordered
+            end if
+          when #greater =>
+            -- Not clearly less, see whether clearly greater.
+            case "=?" (Left.Low, Right.High) is
+              when #unordered =>
+                return #unordered
+              when #less =>
+                -- We have already ruled out #equal
+                return #unordered
+              when #equal =>
+                if Left.Low_Is_Open or else Right.High_Is_Open then
+                    -- No overlap
+                    return #greater
+                else
+                    -- We have already ruled out #equal
+                    return #unordered
+                end if
+              when #greater =>
+                return #greater
+            end case
+        end case
+    end "=?"
+
+    function "and"(Left, Right : Interval) return Interval is
+      -- Return intersection of the two intervals
+        New_Low : Bound_Type
+        New_High : Bound_Type
+        New_Low_Is_Open : Boolean
+        New_High_Is_Open : Boolean
+        
+        case "=?" (Left.Low, Right.Low) is
+          when #less => 
+            New_Low := Right.Low
+            New_Low_Is_Open := Right.Low_Is_Open
+          when #greater => 
+            New_Low := Left.Low
+            New_Low_Is_Open := Left.Low_Is_Open
+          when #equal => 
+            New_Low := Left.Low
+            New_Low_Is_Open := Left.Low_Is_Open or Right.Low_Is_Open
+          when #unordered => 
+            return null
+        end case
+      
+        case "=?" (Left.High, Right.High) is
+          when #less => 
+            New_High := Left.High
+            New_High_Is_Open := Left.High_Is_Open
+          when #greater => 
+            New_High := Right.High
+            New_High_Is_Open := Right.High_Is_Open
+          when #equal => 
+            New_High := Left.High
+            New_High_Is_Open := Left.High_Is_Open or Right.High_Is_Open
+          when #unordered => 
+            return null
+        end case
+      
+        return (Low => New_Low, Low_Is_Open => New_Low_Is_Open,
+          High => New_High, High_Is_Open => New_High_Is_Open)
+    end "and"
+
+    procedure "and="(Left : aliased in out Interval; Right : Interval) is
+      -- Intersect Right into Left
+        if Left /= null then
+            Left := Left and Right
+        end if
+    end "and="
+
+    function Is_Strictly_Within(Left, Right : Interval) return Boolean is
+      -- Return True if Left is strictly within Right,
+      -- meaning low bound of Left is higher, and high bound is lower.
+      -- NOTE: If True, then removing Right from Left will produce two 
+      --       non-overlapping intervals.
+        if Right = null or else Left = null then
+            return False
+        end if
+        return (Left.Low > Right.Low or else 
+          (Left.Low = Right.Low and then Left.Low_Is_Open > Right.Low_Is_Open))
+          and then
+            (Left.High < Right.High or else
+             (Left.High = Right.High and then 
+              Left.High_Is_Open > Right.High_Is_Open))
+    end Is_Strictly_Within
+
+    function "-"(Left, Right : Interval)
+      return Interval is
+      -- Subtract out Right interval from Left interval
+      -- Right must not be strictly within Left, since
+      -- that would require return ing two intervals.
+        New_Low : Bound_Type
+        New_High : Bound_Type
+        New_Low_Is_Open : Boolean
+        New_High_Is_Open : Boolean
+        Result : Interval;
+  
+        case "=?" (Left.Low, Right.Low) is
+          when #less => 
+            -- Return left part of Left
+            Result := (Low => Left.Low, Low_Is_Open => Left.Low_Is_Open,
+              High => Right.Low, High_Is_Open => not Right.Low_Is_Open)
+          when #greater => 
+            -- Return right part of Left
+            Result := (Low => Right.High, Low_Is_Open => not Right.High_Is_Open,
+              High => Left.High, High_Is_Open => Left.High_Is_Open)
+          when #equal => 
+            if Left.Low_Is_Open >= Right.Low_Is_Open then
+                -- Return right part of Left
+                Result := (Low => Right.High, 
+                  Low_Is_Open => not Right.High_Is_Open,
+                  High => Left.High, 
+                  High_Is_Open => Left.High_Is_Open)
+            else
+                -- Only one element is left
+                return (Left.Low, False, Left.Low, False)
+            end if
+          when #unordered => 
+            --  Return a "null" range
+            return (Left.Low, True, Left.Low, True)
+        end case
+      
+        if Result.Low > Result.High then
+            -- Empty interval
+            --  Return a "null" range
+            return (Result.Low, True, Result.Low, True)
+        else
+            return Result
+        end if
+    end "-"
+
+    procedure "-="(Left : aliased in out Interval; Right : Interval) is
+      -- Subtract Right interval from Left
+        if Left /= null then
+            Left := Left - Right
+        end if
+    end "-="
+
+    function Overlaps(Left, Right : Interval) return Boolean is
+        if Left = null or else Right = null then
+            return False
+        else
+            case "=?" (Left, Right) is
+              when #equal | #unordered => return True
+              when #less | #greater => return False
+            end case
+        end if
+    end Overlaps
+
+    function "or"(Left, Right : Interval)
+      return Interval is
+      -- Return union of two intervals.  Must have some overlap
+      -- to ensure that result can be represented as a single interval.
+  
+        return Result : Interval := Left do
+           Result := Result or Right
+        end return;
+    end "or"
+
+    procedure "or="(Left : aliased in out Interval; Right : Interval) is
+      -- Compute union of two intervals.  Must have some overlap
+      -- to ensure that result can be represented as a single interval.
+        Right_Copy : Interval := Right
+        "<|=" (Left, Right_Copy)
+    end "or="
+
+    procedure "<|="(Left, Right : in out Interval) is
+      -- Compute union of two intervals; leave Right empty.  
+      -- Must have some overlap to ensure that result can be 
+      -- represented as a single interval.
+        if Left = null then
+            Left := Right
+        elsif Right /= null then
+            Right_Copy : Interval := Right
+                -- Make copy and null out Right, so
+                -- we don't end up with Right partially nulled out
+            
+            case "=?" (Left.Low, Right_Copy.Low) is
+              when #less => 
+                -- No change to Left.Low
+                null
+              when #greater => 
+                Left.Low := Right_Copy.Low
+                Left.Low_Is_Open := Right_Copy.Low_Is_Open
+              when #equal => 
+                Left.Low_Is_Open := Left.Low_Is_Open and Right_Copy.Low_Is_Open
+            end case
+      
+            case "=?" (Left.High, Right_Copy.High) is
+              when #less => 
+                Left.High := Right_Copy.High
+                Left.High_Is_Open := Right_Copy.High_Is_Open
+              when #greater => 
+                -- No change to Left.High
+                null
+              when #equal => 
+                Left.High_Is_Open := Left.High_Is_Open and Right_Copy.High_Is_Open
+            end case
+        end if
+    end "<|="
+
+end A2X.Core.Interval
+
+procedure A2X.Test.Test_Interval(X, Y, Z : Univ_Integer) is
+    Y_Up_To_Z : Interval<Univ_Integer> := 
+      (Low => Y, Low_Is_Open => False, High => Z, High_Is_Open => True)
+
+    Println(X'Image & " in " & Y'Image & "..<" & Z'Image & " = " & Boolean'Image(X in Y_Up_To_Z))
+
+    Y_To_Z : Closed_Interval<Univ_Integer> := (Low => Y, High => Z)
+
+    Println(X'Image & " in " & Y'Image & ".." & Z'Image & " = " & Boolean'Image(X in Y_To_Z))
+
+    One_To_X : Closed_Interval<Univ_Integer> :=
+      (Low => 1, High => X)
+
+    Println(Univ_Integer'Image(1) & ".." & X'Image & "=?" & Y'Image & ".." & Z'Image & " = " & 
+      "=?" (One_To_X, Y_To_Z)'Image)
+
+end A2X.Test.Test_Interval
+
+generic
+    Literals : Basic_Array<Univ_Enumeration>
+package A2X.Core.Enum is
+    type Enum is private;
+
+    function "from_univ"(Univ : Univ_Enumeration) 
+      return Enum
+      with Pre => (for some Lit of Literals => Lit = Univ);
+    function "to_univ"(Val : Enum)
+      return Univ_Enumeration
+      with Post => "to_univ"'Result = null
+        or else (for some Lit of Literals => Lit = "to_univ"'Result);
+
+    -- Functions for Imageable
+    function Enum'Image(Val : Enum) return Univ_String
+    function Enum'Value(Str : Univ_String) return Enum
+
+    -- Operators for Countable
+    function "+"(Left : Univ_Integer; Right : Enum) return Enum 
+      with Import, External_Name => "+";
+    function "+"(Left : Enum; Right : Univ_Integer) return Enum 
+      with Import, External_Name => "+";
+    function "-"(Left, Right : Enum) return Univ_Integer 
+      with Import, External_Name => "-";
+    function "-"(Left : Enum; Right : Univ_Integer) return Enum 
+      with Import, External_Name => "-";
+
+    -- TBD: These should be properties some day (e.g. Color#first).
+    function Enum'First return Enum
+    function Enum'Last return Enum
+    function Enum'Range return Countable_Range<Enum>;
+
+    function "[..]" return Countable_Range<Enum>;
+
+    function "=?"(Left, Right : Enum) return Ordering
+      with Import, External_Name => #compare_optional;
+
+    function Hash(Val : Enum) return Univ_Integer
+      with Import, External_Name => #identity;
+
+    function ".."(Left, Right : Enum) return Countable_Range<Enum>;
+
+    function Enum'Min(Left, Right : Enum) return Enum
+      with Import, External_Name => #min;
+    function Enum'Max(Left, Right : Enum) return Enum
+      with Import, External_Name => #max;
+end A2X.Core.Enum
+
+package body A2X.Core.Enum is
+    type Enum is record
+        Value : Univ_Integer
+    end record;
+    function "from_univ"(Univ : Univ_Enumeration) 
+      return Enum is
+        for I in 1 .. |Literals| loop
+            if Literals[I] = Univ then
+                return (Value => I-1)
+            end if
+        end loop
+        pragma Assert (#False);
+    end "from_univ"
+
+    function "to_univ"(Val : Enum)
+      return Univ_Enumeration is
+        if Val = null then
+            return null
+        else
+            return Literals[Val.Value+1]
+        end if
+    end "to_univ"
+
+    -- Functions for Imageable
+    function Enum'Image(Val : Enum) return Univ_String is
+        return Univ_Enumeration'Image([[Val]])
+    end Enum'Image
+
+    function Enum'Value(Str : Univ_String) return Enum is
+        return Univ_Enumeration'Value(Str)
+    end Enum'Value
+
+    function Enum'First return Enum is
+        return (Value => 0)
+    end Enum'First
+
+    function Enum'Last return Enum is
+        return (Value => |Literals| - 1)
+    end Enum'Last
+
+    function Enum'Range return Countable_Range<Enum> is
+       ((Enum'First, Enum'Last));
+
+    function "[..]" return Countable_Range<Enum> is
+       ((Enum'First, Enum'Last));
+
+    function ".."(Left, Right : Enum) return Countable_Range<Enum> is
+       ((Left, Right));
+
+end A2X.Core.Enum
+
+procedure A2X.Test.Test_Enum is
+    subtype Color is Enum<[#red, #green, #blue]>
+    subtype Day_Of_Week is Enum<[#Monday, #Tuesday, #Wednesday, #Thursday, 
+        #Friday, #Saturday, #Sunday]>
+
+    for C : Color in Color'First .. Color'Last loop
+        Println("Next color = " & C'Image)
+    end loop
+
+    for C2 in reverse Color'Range loop
+        Println("Prev color = " & C2'Image)
+    end loop
+
+    for D3 in Day_Of_Week'Range loop
+        Println("Random day of week = " & D3'Image)
+    end loop
+
+    pragma Assert (#Monday in Day_Of_Week'Range);
+
+end A2X.Test.Test_Enum
+
+package A2X.Core.Univ_Real is
+    type Univ_Real is private
+
+    function "+"(Right : Univ_Real) return Univ_Real
+      with Import, External_Name => #identity;
+
+    function "-"(Right : Univ_Real) return Univ_Real
+      with Import, External_Name => #real_negate;
+
+    function "abs"(Right : Univ_Real) return Univ_Real
+      with Import, External_Name => #real_abs;
+
+    function "magnitude"(Val : Univ_Real) return Univ_Real renames "abs"
+
+    function "+"(Left, Right : Univ_Real) return Univ_Real 
+      with Import, External_Name => #real_add;
+
+    function "-"(Left, Right : Univ_Real) return Univ_Real
+      with Import, External_Name => #real_subtract;
+
+    function "*"(Left, Right : Univ_Real) return Univ_Real 
+      with Import, External_Name => #real_multiply;
+
+    function "*"(Left : Univ_Real; Right : Univ_Integer) return Univ_Real
+      with Import, External_Name => #real_int_multiply;
+
+    function "*"(Left : Univ_Integer; Right : Univ_Real) return Univ_Real
+
+    function "/"(Left, Right : Univ_Real) return Univ_Real
+      with Import, External_Name => #real_divide;
+
+    function "/"(Left : Univ_Real; Right : Univ_Integer) return Univ_Real
+      with Import, External_Name => #real_int_divide;
+
+    function "**"(Left : Univ_Real; Right : Univ_Integer) return Univ_Real
+      with Import, External_Name => #real_exp;
+
+    function "=?"(Left, Right : Univ_Real) return Ordering
+      with Import, External_Name => #real_compare;
+
+    function Univ_Real'Min(Left, Right : Univ_Real) return Univ_Real
+      with Import, External_Name => #real_min;
+    function Univ_Real'Max(Left, Right : Univ_Real) return Univ_Real
+      with Import, External_Name => #real_max;
+
+    function Sqrt(Val : Univ_Real) return Univ_Real
+      with Pre => Val >= 0.0;
+
+    function Hash(Val : Univ_Real) return Univ_Integer
+      with Import, External_Name => #identity;
+
+    procedure Print(X : Univ_Real) with Import, External_Name => #print_real;
+
+    procedure Put(X : Univ_Real) renames Print
+
+    function Univ_Real'Image(Val : Univ_Real) return Univ_String
+      with Import, External_Name => #to_string_real;
+
+    function Univ_Real'Value(Str : Univ_String) return Univ_Real
+      with Import, External_Name => #from_string_real;
+
+    function Round_To_Int(Real : Univ_Real) return Univ_Integer
+      with Import, External_Name => #round_to_int;
+
+    function Int_To_Real(Int : Univ_Integer) return Univ_Real
+      with Import, External_Name => #int_to_real;
+
+    --  function "in"(Left : Univ_Real; Right : Interval<Univ_Real>)
+      --  return Boolean;
+
+    function ".."(Left, Right : Univ_Real) return Interval<Univ_Real>
+      is ((Low => Left, Low_Is_Open => False,
+           High => Right, High_Is_Open => False));
+end A2X.Core.Univ_Real
+
+package body A2X.Core.Univ_Real is
+    function "*"(Left : Univ_Integer; Right : Univ_Real) return Univ_Real is
+        -- Hand off to built-in real * int function
+        return Right * Left
+    end "*"
+
+    function Sqrt(Val : Univ_Real) return Univ_Real is
+        pragma Assert (Val >= 0.0);
+        Result : Univ_Real := Val / 2.0
+        while Result > 0.0 and then Result * Result / Val 
+          not in 0.9999999999999 .. 1.00000000000001 loop
+            Result := (Val / Result + Result)/2.0
+        end loop
+    end Sqrt
+
+    --  subtype Real_Interval is Interval<Univ_Real>;
+
+    --  function "in"(Left : Univ_Real; Right : Interval<Univ_Real>)
+      --  return Boolean is (Real_Interval."in"(Left, Right));
+
+end A2X.Core.Univ_Real
+    
+procedure A2X.Test.Test_Real is
+    X : Univ_Real := 3.5
+    Y : Univ_Real := 5.22
+    Z : Univ_Real := X + Y
+
+    Println("X = " & X'Image & ", Y = " & Y'Image & ", X + Y = " & Z'Image)
+    Teeny : Univ_Real := 0.000023
+    Println("Teeny = " & Univ_Real'Image(Teeny))
+    Small : Univ_Real := 0.005
+    Println("Small = " & Univ_Real'Image(Small))
+    Medium : Univ_Real := 235.123
+    Println("Medium = " & Univ_Real'Image(Medium))
+    Big : Univ_Real := 11.0**5
+    Println("Big = " & Univ_Real'Image(Big))
+    Huge : Univ_Real := 13.0**15
+    Println("Huge = " & Univ_Real'Image(Huge))
+
+    Println("Y in 1.0 .. 6.0 = " & Boolean'Image( Y in 1.0 .. 6.0 ))
+    
+    Println("Y in 1.0 ..< 5.22 = " & Boolean'Image( Y in 1.0 .. 5.219999 ))
+
+    Println("Sqrt(2.0) = " & Univ_Real'Image(Sqrt(2.0)))
+
+    Neg : Univ_Real := -2.0;
+    Println("Sqrt(-2.0) = " & Univ_Real'Image(Sqrt(Neg)))
+end A2X.Test.Test_Real
+
+generic
+    Digits : Univ_Integer := 15
+package A2X.Core.Float is
+        -- A floating point type that provides at least the
+        -- given number of digits of precision.
+    type Float is private
+
+    function "from_univ"(Univ : Univ_Real) return Float
+            with Import, External_Name => #identity;
+
+    function "to_univ"(Val : Float) return Univ_Real
+            with Import, External_Name => #identity;
+
+    function "+"(Right : Float) return Float
+            with Import, External_Name => #identity;
+
+    function "-"(Right : Float) return Float
+            with Import, External_Name => #real_negate;
+
+    function "abs"(Right : Float) return Float
+            with Import, External_Name => #real_abs;
+
+    function "magnitude"(Val : Float) return Float renames "abs"
+
+    function "+"(Left, Right : Float) return Float 
+            with Import, External_Name => #real_add;
+
+    function "-"(Left, Right : Float) return Float
+            with Import, External_Name => #real_subtract;
+
+    function "*"(Left, Right : Float) return Float 
+            with Import, External_Name => #real_multiply;
+
+    function "*"(Left : Float; Right : Univ_Integer) return Float 
+            with Import, External_Name => #real_int_multiply;
+
+    function "*"(Left : Univ_Integer; Right : Float) return Float
+
+    function "/"(Left, Right : Float) return Float
+            with Import, External_Name => #real_divide;
+
+    function "/"(Left : Float; Right : Univ_Integer) return Float
+            with Import, External_Name => #real_int_divide;
+
+    function "**"(Left : Float; Right : Univ_Integer) return Float
+            with Import, External_Name => #real_exp;
+
+    function "=?"(Left, Right : Float) return Ordering
+            with Import, External_Name => #real_compare;
+
+    function Float'Min(Left, Right : Float) return Float
+            with Import, External_Name => #real_min;
+    function Float'Max(Left, Right : Float) return Float
+            with Import, External_Name => #real_max;
+
+    function Hash(Val : Float) return Univ_Integer
+            with Import, External_Name => #identity;
+
+    function Round_To_Int(Val : Float) return Univ_Integer
+            with Import, External_Name => #round_to_int;
+
+    function Int_To_Float(Int : Univ_Integer) return Float
+            with Import, External_Name => #int_to_real;
+
+    procedure Print(X : Float) with Import, External_Name => #print_real;
+
+    procedure Put(X : Float) renames Print
+
+    function Float'Image(Val : Float) return Univ_String
+            with Import, External_Name => #to_string_real;
+
+    function Float'Value(Str : Univ_String) return Float
+            with Import, External_Name => #from_string_real;
+
+    function "in"(Left : Float; Right : Interval<Float>) return Boolean;
+          
+end A2X.Core.Float
+
+package body A2X.Core.Float is
+    type Float is record
+        Value : Univ_Real
+    end record;
+    function "*"(Left : Univ_Integer; Right : Float) return Float is
+        -- Hand off to built-in real*int function
+        return Right * Left
+    end "*"
+
+    subtype Float_Interval is Interval<Float>;
+
+    function "in"(Left : Float; Right : Interval<Float>) return Boolean
+            is (Float_Interval."in"(Left, Right));
+end A2X.Core.Float
+          
+procedure A2X.Test.Test_Float is
+    subtype My_Float is Float<Digits => 8>
+
+    X : My_Float := 3.5
+    Y : My_Float := 5.22
+    Z : My_Float := X + Y
+
+    Println("X = " & My_Float'Image(X) & ", Y = " & My_Float'Image(Y) & ", X + Y = " & My_Float'Image(Z))
+    Teeny : My_Float := 0.000023
+    Println("Teeny = " & My_Float'Image(Teeny))
+    Small : My_Float := 0.005
+    Println("Small = " & My_Float'Image(Small))
+    Medium : My_Float := 235.123
+    Println("Medium = " & My_Float'Image(Medium))
+    Big : My_Float := 11.0**5
+    Println("Big = " & My_Float'Image(Big))
+    Huge : My_Float := 13.0**15
+    Println("Huge = " & My_Float'Image(Huge))
+
+    X2 : My_Float := 3.5 * 2
+
+    Println("X * 2 = " & My_Float'Image(X * 2) & ", 2 * X = " & My_Float'Image(2 * X) & ", X2 = " & My_Float'Image(X2))
+    Println("X / 2 = " & My_Float'Image(X / 2 ))
+
+    if X in 1.5 .. 3.5999999 then
+        Println("X *is* in 1.5 ..< 3.6")
+    else
+        Println("X *not* in 1.5 ..< 3.6??")
+    end if
+
+    Println("X in 1.5 ..< 3.5 = " & Boolean'Image((X in 1.5 .. 3.499999) ))
+end A2X.Test.Test_Float
+
+generic
+    Delta : Univ_Real
+package A2X.Core.Fixed is
+  -- Fixed point types, represented as an integer
+  -- multiple of the given Delta
+    type Fixed is private
+
+    function "from_univ"(Univ : Univ_Real) return Fixed
+    function "to_univ"(Val : Fixed) return Univ_Real
+
+    function "+"(Right : Fixed) return Fixed
+            with Import, External_Name => #identity;
+
+    function "-"(Right : Fixed) return Fixed
+            with Import, External_Name => #negate;
+
+    function "abs"(Right : Fixed) return Fixed
+            with Import, External_Name => "abs";
+
+    function "magnitude"(Val : Fixed) return Fixed renames "abs"
+
+    function "+"(Left, Right : Fixed) return Fixed
+            with Import, External_Name => "+";
+    function "-"(Left, Right : Fixed) return Fixed
+            with Import, External_Name => "-";
+    function "*"(Left : Fixed; Right : Univ_Real) return Fixed
+            with Import, External_Name => #fixed_real_mul;
+    function "*"(Left : Univ_Real; Right : Fixed) return Fixed
+            with Import, External_Name => #real_fixed_mul;
+    function "*"(Left : Fixed; Right : Univ_Integer) return Fixed
+            with Import, External_Name => "*";
+    function "*"(Left : Univ_Integer; Right : Fixed) return Fixed
+            with Import, External_Name => "*";
+    function "/"(Left : Fixed; Right : Univ_Real) return Fixed
+            with Import, External_Name => #fixed_real_div;
+    function "/"(Left : Fixed; Right : Univ_Integer) return Fixed
+            with Import, External_Name => "/";
+
+    function "=?"(Left, Right : Fixed) return Ordering
+            with Import, External_Name => #compare_optional;
+
+    function Fixed'Min(Left, Right : Fixed) return Fixed
+            with Import, External_Name => #min;
+    function Fixed'Max(Left, Right : Fixed) return Fixed
+            with Import, External_Name => #max;
+
+    function Hash(Val : Fixed) return Univ_Integer
+            with Import, External_Name => #identity;
+
+    function Round_To_Int(Val : Fixed) return Univ_Integer
+
+    procedure Print(X : Fixed)
+
+    procedure Put(X : Fixed) renames Print
+
+    function Fixed'Image(Val : Fixed) return Univ_String
+
+    function Fixed'Value(Str : Univ_String) return Fixed
+
+    function ".."(Left, Right : Fixed) return Interval<Fixed>;
+
+    -- function "in"(Left : Fixed; Right : Interval<Fixed>) 
+            -- return Boolean;
+          
+end A2X.Core.Fixed
+
+package body A2X.Core.Fixed is
+    type Fixed is record
+        Value : Univ_Integer
+    end record;
+
+    function "from_univ"(Univ : Univ_Real) return Fixed is
+        return (Value => Univ_Real.Round_To_Int(Univ/Delta))
+    end "from_univ"
+
+    function "to_univ"(Val : Fixed) return Univ_Real is
+        if Val is null then
+            return null
+        else
+            return Delta * Int_To_Real(Val.Value)
+        end if
+    end "to_univ"
+
+    procedure "/="(Left : in out Fixed; Right : Univ_Real) is
+        Left := Left / Right
+    end "/="
+
+    procedure Print(X : Fixed) is
+        Val : Univ_Real := [[X]]
+        Print(Val)
+    end Print
+
+    function Fixed'Image(Val : Fixed) return Univ_String is
+        return Univ_Real'Image([[Val]])
+    end Fixed'Image
+
+    function Fixed'Value(Str : Univ_String) return Fixed is
+        return Univ_Real'Value(Str)
+    end Fixed'Value
+
+    function Round_To_Int(Val : Fixed) return Univ_Integer is
+        return Univ_Real.Round_To_Int([[Val]])
+    end Round_To_Int
+
+    subtype Fixed_Interval is Interval<Fixed>;
+
+    function ".."(Left, Right : Fixed) return Interval<Fixed> is
+      ((Low => Left, Low_Is_Open => False,
+        High => Right, High_Is_Open => False));
+
+    -- function "in"(Left : Fixed; Right : Interval<Fixed>) 
+            -- return Boolean is (Fixed_Interval."in"(Left, Right));
+end A2X.Core.Fixed
+
+procedure A2X.Test.Test_Fixed(X : Univ_Real) is
+    subtype My_Fixed is Fixed<Delta => 1.0E-6>
+
+    XTI : My_Fixed := X
+    Minute : constant My_Fixed := 60.0
+    Println("X = " & My_Fixed'Image(XTI))
+    Println("X * 2 = " & My_Fixed'Image((XTI*2)))
+    Println("X + X = " & My_Fixed'Image((XTI + XTI)))
+    Println("X - X = " & My_Fixed'Image((XTI - XTI)))
+    Println("X / 2 = " & My_Fixed'Image((XTI / 2)))
+    Println("X / 2.0 = " & My_Fixed'Image((XTI / 2.0)))
+    Println("X * 3.0 = " & My_Fixed'Image((XTI * 3.0)))
+    Println("5.0 * X = " & My_Fixed'Image((5.0 * XTI)))
+    Println("-5.0 * X = " & My_Fixed'Image((-5.0 * XTI)))
+    Println("-5.0 = " & My_Fixed'Image(-5.0))
+    Println("Minute = " & My_Fixed'Image(Minute))
+    Println("-5.0*Minute = " & My_Fixed'Image(-5.0*Minute))
+
+    Println("Round_To_Int(X) = " & Round_To_Int(XTI)'Image)
+
+    Rng : constant Interval<My_Fixed> := My_Fixed'(1.0) .. 4.999999999
+
+    Print("Rng = " & My_Fixed'Image(Rng.Low) & ".." & My_Fixed'Image(Rng.High))
+    Print("\n")
+
+    Println("X = " & My_Fixed'Image(XTI))
+    Println("X in Rng = " & Boolean'Image(XTI in Rng))
+
+    if XTI in 1.0 .. 4.999999999 then
+        Println("X in 1.0 ..< 5.0")
+    else
+        Println("X not in 1.0 ..< 5.0")
+    end if
+
+    Println("X in 1.0 ..< 5.0 = " & Boolean'Image(XTI in 1.0 .. 4.999999999999))
+
+end A2X.Test.Test_Fixed
+
+package A2X.Core.Time is
+  -- Time in nanoseconds since Jan 1, 1970
+    type Time is private
+
+    type Time_Interval is new Fixed<Delta => 1.0E-9>
+
+    Second : constant Time_Interval := 1.0
+    Millisecond : constant Time_Interval := 1.0/1000
+    Microsecond : constant Time_Interval := 1.0/10**6
+    Nanosecond : constant Time_Interval := 1.0/10**9
+
+    Minute : constant Time_Interval := 60.0
+    Hour : constant Time_Interval := 60 * Minute
+    Day : constant Time_Interval := 24 * Hour
+
+    type Month_Enum is new Enum< 
+       [#Jan, #Feb, #Mar, #Apr, #May, #Jun,
+        #Jul, #Aug, #Sep, #Oct, #Nov, #Dec] >
+
+    function Create(Year : Univ_Integer; Month : Month_Enum;
+      Day_Of_Month : Univ_Integer;
+      Time_Of_Day : Time_Interval := 0.0;
+      Time_Zone : Time_Interval := 0.0)
+      return Time
+      with Pre => Year in 1970 .. 2399
+        and then Day_Of_Month in 1..31
+        and then Time_Zone in -12.0*Hour .. +12.0*Hour
+        and then Time_Of_Day in 0.0 .. 86400.0;
+
+    function Zero return Time
+
+    function "+"(Left : Time; Right : Time_Interval) return Time
+      with Import, External_Name => "+";
+    function "+"(Left : Time_Interval; Right : Time) return Time
+      with Import, External_Name => "+";
+    function "-"(Left : Time; Right : Time_Interval) return Time
+      with Import, External_Name => "-";
+    function "-"(Left, Right : Time) return Time_Interval
+      with Import, External_Name => "-";
+
+    function "=?"(Left, Right : Time) return Ordering
+      with Import, External_Name => #compare_optional;
+end A2X.Core.Time
+
+package body A2X.Core.Time is
+    type Time is record
+        Since_1970 : Time_Interval
+    end record
+
+    type Year_Kind is new Enum< [#normal, #leap] >
+
+    Month_Base : constant Array<Array<Univ_Integer, Indexed_By => Year_Kind>,
+      Indexed_By => Month_Enum> := 
+        [#Jan => [0, 0], #Feb => [31, 31], #Mar => [59, 60], #Apr => [90, 91],
+         #May => [120, 121], #Jun => [151, 152], #Jul => [181, 182],
+         #Aug => [212, 213], #Sep => [243, 244], #Oct => [273, 274],
+         #Nov => [304, 305], #Dec => [334, 335]]
+
+    function Kind_Of_Year(Year : Univ_Integer) return Year_Kind is
+        if Year mod 4 = 0 and then
+          (Year mod 100 /= 0 or else Year mod 400 = 0) then
+            -- Every 100 years leap year is omitted, 
+            -- except for multiples of 400 which *are* leap years.
+            return #leap
+        else
+            return #normal
+        end if
+    end Kind_Of_Year
+
+    function Leaps_Before(Year : Univ_Integer) return Univ_Integer is
+        -- Number of leap years before this year, starting from 1970
+        if Year < 2101 then
+            return (Year-1969)/4
+        else
+            -- Every 100 years leap year is omitted, 
+            -- except for multiples of 400 which *are* leap years.
+            return (Year-1969)/4 - (Year-2001)/100
+        end if
+    end Leaps_Before
+
+
+    function Create(Year : Univ_Integer; Month : Month_Enum;
+      Day_Of_Month : Univ_Integer;
+      Time_Of_Day : Time_Interval := 0.0;
+      Time_Zone : Time_Interval := 0.0)
+      return Time is
+        -- Determine number of nanos since Jan 1, 1970
+        Kind : constant := Kind_Of_Year(1970)
+        Base : constant := Month_Base[Month][Kind]
+
+        return (Since_1970 => 
+          (Year-1970) * (365*Day) + 
+          (Leaps_Before(Year) + Base + Day_Of_Month)*Day +
+          Time_Of_Day - Time_Zone)
+    end Create
+
+    function Zero return Time is
+        return (Since_1970 => 0.0)
+    end Zero
+
+end A2X.Core.Time
+
+procedure A2X.Test.Test_Time(X : Univ_Real) is
+    XTI : Time.Time_Interval := X
+    Local_Minute : constant Time.Time_Interval := 60.0
+    Put_Line("X = " & XTI'Image)
+    Put_Line("X * 2 = " & Time.Time_Interval'Image(XTI*2))
+    Put_Line("X + X = " & Time.Time_Interval'Image(XTI + XTI))
+    Put_Line("X - X = " & Time.Time_Interval'Image(XTI - XTI))
+    Put_Line("X / 2 = " & Time.Time_Interval'Image(XTI / 2))
+    Put_Line("X / 2.0 = " & Time.Time_Interval'Image(XTI / 2.0))
+    Put_Line("X * 3.0 = " & Time.Time_Interval'Image(XTI * 3.0))
+    Put_Line("5.0 * X = " & Time.Time_Interval'Image(5.0 * XTI))
+    Put_Line("-5.0 * X = " & Time.Time_Interval'Image(-5.0 * XTI))
+    Put_Line("-5.0 = " & Time.Time_Interval'Image(-5.0))
+    Put_Line("Local_Minute = " & Time.Time_Interval'Image(Local_Minute))
+    Put_Line
+      ("-5.0*Local_Minute = " & Time.Time_Interval'Image(-5.0*Local_Minute))
+    Put_Line("Time.Minute = " & Time.Time_Interval'Image(Time.Minute))
+    Put_Line
+      ("-5.0*Time.Minute = " & Time.Time_Interval'Image(-5.0*Time.Minute))
+    Put_Line("Time.Hour = " & Time.Time_Interval'Image(Time.Hour ))
+    Put_Line("-5.0*Time.Hour = " & Time.Time_Interval'Image(-5.0*Time.Hour))
+
+    T : Time := Create(Year => 2011, Month => #Oct, Day_Of_Month => 18,
+      Time_Of_Day => 10*Time.Hour + 5*Time.Minute,
+      Time_Zone => -5.0*Time.Hour)
+
+    Put_Line("18-Oct-2011 = " & Time.Time_Interval'Image( T - Zero() ))
+    Put_Line("X = " & Time.Time_Interval'Image(XTI ))
+    Put_Line
+      ("18-Oct-2011 - X = " & Time.Time_Interval'Image( (T - XTI) - Zero() ) )
+
+end A2X.Test.Test_Time
+     
+package A2X.Core.Clock is
+    -- A module that provides access to a wall clock and
+    -- to other timers, and an ability to delay the caller
+    -- for a given amount of time, or until a specified time
+    -- in the future.
+    type Clock is synchronized private
+    
+    function Create() return Clock
+        -- Create a clock, which corresponds to the current wall clock time
+
+    function Create(Now : Time) return Clock
+        -- Create a clock, where Now() return s the given time when created
+
+    function Now(C : Clock) return Time
+        -- Return current reading of clock
+
+    procedure Delay(C : Clock; Until : Time)  --  NOTE: Not yet implemented
+      with Synchronization => By_Entry;
+        -- Wait until the given clock reads >= Until
+
+    procedure Delay(C : Clock; For : Time.Time_Interval)  --  NYI
+      with Synchronization => By_Entry;
+        -- Wait until the given clock reads "Now(C) + For"
+
+    procedure Set(C : in out Clock; To : Time)
+        -- Update clock so it reads the given time
+end A2X.Core.Clock
+
+package body A2X.Core.Clock is
+    type Clock is synchronized record
+        Timer_Delta : Time.Time_Interval
+        -- Amount to be subtracted from Current Time
+        -- to produce value of timer
+    end record
+
+    function Current_Time(C : Clock) return Time 
+      with Import, External_Name => #clock_current_time;
+        -- NOTE: Clock parameter is ignored; return s wall clock
+
+    procedure Wait_For_Delay(C : Clock; Until : Time)
+      with Import, External_Name => #clock_delay;
+        -- Wait until the wall clock reads >= Until
+        -- NOTE: Clock parameter is ignored
+
+    function Create() return Clock is
+        -- Create a clock, which corresponds to the current wall clock time
+        -- Put_Line("Create Clock with Delta 0.0")
+        return (Timer_Delta => 0.0)
+    end Create
+
+    function Create(Now : Time) return Clock is
+        -- Create a clock, where Now() return s the given time when created
+        C : Clock := Create();
+        Delta : constant := Current_Time(C) - Now
+        -- Put_Line("Create Clock with Delta = " & Delta)
+        return (Timer_Delta => Delta);
+    end Create
+
+    function Now(C : Clock) return Time is
+        -- Return current reading of clock
+        return Current_Time(C) - C.Timer_Delta
+        -- Put_Line("Now return ing " & Result-Zero())
+    end Now
+
+    procedure Delay(C : Clock; Until : Time) is
+        -- Wait until the given clock reads >= Until
+        --  NYI: Wait_For_Delay(C, Until + C.Timer_Delta)
+        Put_Line ("Delay NYI");
+    end Delay
+
+    procedure Delay(C : Clock; For : Time.Time_Interval) is
+        -- Wait until the given clock reads "Now(C) + For"
+        -- NOTE: Timer_Delta is irrelevant for this one
+        -- Put_Line("Wait for delay of " & For)
+        Time_Now : constant := Current_Time(C)
+        Until : constant := Time_Now + For
+        -- Put_Line("Time_Now + " & For & " - Time_Now = " & Until - Time_Now)
+        --  NYI: Wait_For_Delay(C, Until)
+        Put_Line ("Delay NYI");
+    end Delay
+
+    procedure Set(C : in out Clock; To : Time) is
+        -- Update clock so it reads the given time
+        C.Timer_Delta := Current_Time(C) - To
+    end Set
+
+end A2X.Core.Clock
+
+procedure A2X.Test.Test_Clock() is
+  C : Clock := Clock.Create()
+  Start : constant := C.Now()
+
+begin
+   
+  parallel do
+    Put_Line("About to delay 4.0 seconds")
+    C.Delay(4.0)
+    Put_Line("Done with delay of 4.0")
+  and
+    Put_Line("About to delay 2.0 seconds")
+    C.Delay(2.0)
+    Put_Line("Done with delay of 2.0")
+  and
+    for I in 1..7 loop
+        Put_Line("In loop delaying for 1.0")
+        C.Delay(1.0)
+        Put_Line("Done with delay " & I'Image & " of 1.0")
+    end loop
+  end do;
+
+  Put_Line("Elapsed time: " & Time.Time_Interval'Image(C.Now() - Start))
+end A2X.Test.Test_Clock
+
+generic
+    Modulus : Univ_Integer
+package A2X.Core.Modular is
+  -- This is an unsigned type whose arithmetic is "modulo" the modulus
+    type Modular is private
+
+    function "from_univ"(Lit : Univ_Integer) return Modular 
+      with Import, External_Name => #integer_from_univ;
+
+    function "to_univ"(Val : Modular) return Univ_Integer 
+      with Import, External_Name => #integer_to_univ;
+
+    function "+"(Right : Modular) return Modular
+      with Import, External_Name => #identity;
+
+    function "-"(Right : Modular) return Modular
+
+    function "abs"(Right : Modular) return Modular
+      with Import, External_Name => #identity;
+
+    function "magnitude"(Val : Modular) return Modular renames "abs"
+
+    function "+"(Left, Right : Modular) return Modular
+
+    function "-"(Left, Right : Modular) return Modular
+
+    function "*"(Left, Right : Modular) return Modular
+
+    function "/"(Left, Right : Modular) return Modular
+      with Import, External_Name => "/";
+
+    function "mod"(Left, Right : Modular) return Modular
+      with Import, External_Name => "mod";
+
+    function "rem"(Left, Right : Modular) return Modular
+      with Import, External_Name => "rem";
+
+    function "**"(Left : Modular; Right : Univ_Integer) return Modular
+
+    function "=?"(Left, Right : Modular) return Ordering
+      with Import, External_Name => #compare_optional;
+
+    function "and"(Left, Right : Modular) return Modular with Import, External_Name => #bit_and;
+    function "or"(Left, Right : Modular) return Modular
+    function "xor"(Left, Right : Modular) return Modular
+    function "not"(M : Modular) return Modular
+
+    function Modular'Min(Left, Right : Modular) return Modular
+      with Import, External_Name => #min;
+    function Modular'Max(Left, Right : Modular) return Modular
+      with Import, External_Name => #max;
+
+    function Hash(Val : Modular) return Univ_Integer
+      with Import, External_Name => #identity;
+
+    procedure Print(X : Modular) with Import, External_Name => #print_int;
+
+    procedure Put(X : Modular) renames Print
+
+    function Modular'Image(Val : Modular) return Univ_String
+      with Import, External_Name => #to_string_int;
+
+    function Modular'Value(Str : Univ_String) return Modular
+
+    function Modular'First return Modular
+
+    function Modular'Last return Modular
+
+    function "[..]" return Countable_Range<Modular>;
+
+    function ".."(Left, Right : Modular) return Countable_Range<Modular>;
+
+private
+    -- for Countable
+    -- These operations are needed so Modular satifies
+    -- requirements of "Countable" interface, but these
+    -- operations are not directly callable (if they were callable,
+    -- we would have ambiguity when adding an Modular to an int-literal).
+
+    function "+"(Left : Modular; Right : Univ_Integer) return Modular
+
+    function "+"(Left : Univ_Integer; Right : Modular) return Modular
+
+    function "-"(Left : Modular; Right : Univ_Integer) return Modular
+
+    function "-"(Left, Right : Modular) return Univ_Integer
+
+end A2X.Core.Modular
+
+package body A2X.Core.Modular is
+    type Modular is record
+        Content : Unsigned_64;  -- So this ends up as a wrapper
+    end record Modular
+
+    function Bit_Or(Left, Right : Univ_Integer) return Univ_Integer 
+      with Import, External_Name => #bit_or;
+
+    function Bit_Xor(Left, Right : Univ_Integer) return Univ_Integer 
+      with Import, External_Name => #bit_xor;
+    function "-"(Right : Modular) return Modular is
+        return (Content => Modulus - Right.Content)
+    end "-"
+
+    function "+"(Left, Right : Modular) return Modular is
+        return (Content => (Left.Content + Right.Content) mod Modulus)
+    end "+"
+
+    function "-"(Left, Right : Modular) return Modular is
+        return Left + (-Right)
+    end "-"
+
+    function "*"(Left, Right : Modular) return Modular is
+        return (Content => (Left.Content * Right.Content) mod Modulus)
+    end "*"
+
+    function "**"(Left : Modular; Right : Univ_Integer) return Modular is
+        return (Content => (Left.Content ** Right) mod Modulus)
+    end "**"
+
+    function Modular'Value(Str : Univ_String) return Modular is
+        Val : constant Univ_Integer := Univ_Integer'Value(Str)
+        if Val is null or else Val in 0..Modulus-1 then
+            return (Content => Val)
+        else
+            return null
+        end if
+    end Modular'Value
+
+    function "or"(Left, Right : Modular) return Modular is
+        return (Content => Bit_Or(Left.Content, Right.Content) mod Modulus)
+    end "or"
+
+    function "xor"(Left, Right : Modular) return Modular is
+        return (Content => Bit_Xor(Left.Content, Right.Content) mod Modulus)
+    end "xor"
+
+    function "not"(M : Modular) return Modular is
+        return (Content => Modulus - 1 - M.Content)
+    end "not"
+
+    function Modular'First return Modular is
+        return (Content => 0)
+    end Modular'First
+
+    function Modular'Last return Modular is
+        return (Content => Modulus-1)
+    end Modular'Last
+
+    function "[..]" return Countable_Range<Modular>
+      is (Modular'First .. Modular'Last)
+
+    function ".."(Left, Right : Modular) return Countable_Range<Modular>
+      is (Left .. Right)
+
+    -- implements -- for Countable
+    -- These operations are needed so Modular satifies
+    -- requirements of "Countable" interface, but these
+    -- operations are not directly callable (if they were callable,
+    -- we would have ambiguity when adding an Modular to an int-literal).
+
+    function "+"(Left : Modular; Right : Univ_Integer) return Modular is
+        return (Content => (Left.Content + Right) mod Modulus)
+    end "+"
+
+    function "+"(Left : Univ_Integer; Right : Modular) return Modular is
+        return (Content => (Left + Right.Content) mod Modulus)
+    end "+"
+
+    function "-"(Left : Modular; Right : Univ_Integer) return Modular is
+        return (Content => (Left.Content - Right) mod Modulus)
+    end "-"
+
+    function "-"(Left, Right : Modular) return Univ_Integer is
+        return (Left.Content - Right.Content) mod Modulus
+    end "-"
+end A2X.Core.Modular
+    
+procedure A2X.Test.Test_Modular is
+    type Mod16 is new Modular<16>
+
+    Println("Testing mod 16")
+    Println("0xA + 0xA = " & Mod16'Image(Mod16'(16#A#) + Mod16'(16#A#)))
+    Println("0xA or 0x1 = " & Mod16'Image(Mod16'(16#A#) or Mod16'(16#1#)))
+    Println("0xA xor 0x2 = " & Mod16'Image(Mod16'(16#A#) xor Mod16'(16#2#)))
+    Println("not 0xA = " & Mod16'Image(not Mod16'(16#A#)))
+end A2X.Test.Test_Modular
+
+package A2X.Core.Exception_Type is
+    type Exception_Type is private;
+    function Create(Msg : Univ_String := "") return Exception_Type
+    function Exception_Message (Occurrence : Exception_Type'Class)
+      return Univ_String
+    function Exception_Name (Occurrence : Exception_Type'Class)
+      return Univ_String
+      with Import, External_Name => #exception_name;
+    procedure Raise_Occurrence (Occurrence : Exception_Type'Class)
+      with Import, External_Name => #raise_exception_occurrence;
+    function "[..]" return Exception_Type'Class is (null);
+end A2X.Core.Exception_Type
+
+package body A2X.Core.Exception_Type is
+    type Exception_Type is record
+        Msg : Univ_String;
+        Id : Univ_Integer;
+    end record Exception_Type
+
+    function Create(Msg : Univ_String := "") return Exception_Type is
+        ((Msg => Msg, Id => 42));
+
+    function Exception_Message (Occurrence : Exception_Type'Class)
+      return Univ_String is
+        ((Occurrence.Msg));
+
+end A2X.Core.Exception_Type
+
+package A2X.Core.Exceptions is
+   Constraint_Error : exception;
+   Program_Error : exception;
+   Tasking_Error : exception;
+end A2X.Core.Exceptions;
+
+procedure A2X.Test.Test_Exceptions is
+   My_Exception : exception;
+   
+begin
+   Put_Line ("About to raise My_Exception");
+
+   raise My_Exception with "this is only a test"
+
+   Put_Line ("After raise exception -- should NOT get here");
+
+exception
+   when Exceptions.Tasking_Error | Exceptions.Constraint_Error =>
+      Put_Line ("Tasking_Error or C_E raised");
+   when E : My_Exception =>
+       Put_Line ("Got into handler for My_Exception");
+       Put_Line ("Exception_Name: " & Exception_Name (E));
+       Put_Line ("Exception_Message: " & Exception_Message (E));
+   when E : others =>
+       Put_Line ("Got into exception handler");
+       Put_Line ("Exception_Name: " & Exception_Name (E));
+       Put_Line ("Exception_Message: " & Exception_Message (E));
+end A2X.Test.Test_Exceptions
+
+package A2X.Core.Storage_Pool is
+   type Storage_Pool is private;
+   function Create return Storage_Pool;
+end A2X.Core.Storage_Pool;
+
+
+generic
+   type Desig_Type is new Assignable;
+package A2X.Core.Access_Type is
+   --  Access types designate Aliased objects
+   --  Aliased objects include a self reference.
+   type Access_Type is private;
+   function "=?"(Left, Right : Access_Type) return Ordering;
+   function Is_Null (Acc : Access_Type) return Boolean;
+   function Null_Value return Access_Type;
+   function Non_Null_Value (Index : Univ_Integer) return Access_Type;
+   function Index (Acc : Access_Type) return Univ_Integer;
+   function Allocate (Pool : in out Storage_Pool'Class; Val : Desig_Type)
+     return Access_Type
+     with Import, External_Name => #allocate_from_pool;
+end A2X.Core.Access_Type;
+
+generic
+   type Desig_Type is new Assignable;
+package A2X.Core.Access_All_Type is
+   --  Access types designate Aliased objects
+   --  Aliased objects include a self reference.
+   type Access_All_Type is new Access_Type<Desig_Type> with private;
+--    function "=?"(Left, Right : Access_All_Type) return Ordering;
+--    function Is_Null (Acc : Access_All_Type) return Boolean;
+--    function Null_Value return Access_All_Type;
+--    function Non_Null_Value (Index : Univ_Integer) return Access_All_Type;
+--    function Index (Acc : Access_All_Type) return Univ_Integer;
+--    function Allocate (Pool : in out Storage_Pool'Class; Val : Desig_Type)
+--      return Access_All_Type
+--      with Import, External_Name => #allocate_from_pool;
+end A2X.Core.Access_All_Type;
+
+generic
+   type Desig_Type is new Assignable;
+package A2X.Core.Access_Const_Type is
+   --  Access types designate Aliased objects
+   --  Aliased objects include a self reference.
+   type Access_Const_Type is private;
+   function "=?"(Left, Right : Access_Const_Type) return Ordering;
+   function Is_Null (Acc : Access_Const_Type) return Boolean;
+   function Null_Value return Access_Const_Type;
+   function Non_Null_Value (Index : Univ_Integer) return Access_Const_Type;
+   function Index (Acc : Access_Const_Type) return Univ_Integer;
+   function Allocate (Pool : in out Storage_Pool'Class; Val : Desig_Type)
+     return Access_Const_Type
+     with Import, External_Name => #allocate_from_pool;
+end A2X.Core.Access_Const_Type;
+
+generic
+   type Desig_Type is new Assignable;
+   type Acc is new Access_Type <Desig_Type>;
+package A2X.Core.Aliased_Obj is
+   type Aliased_Obj is limited private;
+   function Value (Ali : Aliased_Obj) return Desig_Type;
+   procedure Set_Value (Ali : in out Aliased_Obj; New_Val : Desig_Type);
+   function Deref (A : Acc) return aliased Aliased_Obj
+     with Import, External_Name => #deref_var;
+   function Deref_Const(A : Acc) return aliased constant Aliased_Obj
+     with Import, External_Name => #deref_const;
+   function Tick_Access (Ali : aliased in out Aliased_Obj) return Acc
+     with Import, External_Name => #tick_access;
+   function Create (Val : Desig_Type;
+                Self : Acc := Null_Value()) return Aliased_Obj;
+
+end A2X.Core.Aliased_Obj;
+
+package body A2X.Core.Storage_Pool is
+   type Storage_Pool is record
+      Handle : Aliased_Obj<Integer, Access_Type<Integer> > := Create(0);
+   end record;
+      
+   function Create return Storage_Pool
+      is ((Handle => Create(Val => 0, Self => Null_Value())));
+           --  TBD: (others => <>)
+           --  TBF: fails in code-gen if "Self" is allowed to default
+end A2X.Core.Storage_Pool;
+
+package body A2X.Core.Access_Type is
+   type Access_Type is record
+       Index : Univ_Integer := null;
+   end record;
+
+   subtype AO is Aliased_Obj<Desig_Type, Access_Type>;
+
+   function "=?"(Left, Right : Access_Type) return Ordering is
+     ("=?" (Left.Index, Right.Index));
+
+   function Is_Null (Acc : Access_Type) return Boolean
+     is (Acc is null or else Acc.Index is null or else Acc.Index = 0);
+
+   function Null_Value return Access_Type is ((Index => null));
+
+   function Non_Null_Value (Index : Univ_Integer) return Access_Type is
+     ((Index => Index));
+
+   function Index (Acc : Access_Type) return Univ_Integer is (Acc.Index);
+
+end A2X.Core.Access_Type;
+
+package body A2X.Core.Access_Const_Type is
+   type Access_Const_Type is record
+       Index : Univ_Integer := null;
+   end record;
+
+   subtype AO is Aliased_Obj<Desig_Type, Access_Const_Type>;
+
+   function "=?"(Left, Right : Access_Const_Type) return Ordering is
+     ("=?" (Left.Index, Right.Index));
+
+   function Is_Null (Acc : Access_Const_Type) return Boolean
+     is (Acc is null or else Acc.Index is null or else Acc.Index = 0);
+
+   function Null_Value return Access_Const_Type is ((Index => null));
+
+   function Non_Null_Value (Index : Univ_Integer) return Access_Const_Type is
+     ((Index => Index));
+
+   function Index (Acc : Access_Const_Type) return Univ_Integer is (Acc.Index);
+
+end A2X.Core.Access_Const_Type;
+
+package body A2X.Core.Aliased_Obj is
+   type Aliased_Obj is record
+       Self : Acc;
+       Desig : Desig_Type;
+   end record;
+   Check_Digit_Multiplier : constant Univ_Integer := 2**32;
+   The_Pool : Storage_Pool := Create();
+   function Value (Ali : Aliased_Obj) return Desig_Type is
+      return Ali.Desig;
+   end Value;
+
+   procedure Set_Value (Ali : in out Aliased_Obj; New_Val : Desig_Type) is
+      Ali.Desig := New_Val;
+   end Set_Value;
+
+   function Create (Val : Desig_Type;
+                Self : Acc := Null_Value()) return Aliased_Obj is
+      return (Self => Self, Desig => Val);
+   end Create;
+end A2X.Core.Aliased_Obj;
+
+procedure A2X.Test.Test_Access is
+   Put_Line ("Running Test_Access");
+   type Acc_Int is access all Integer;
+   Pool : Storage_Pool := Create();
+   X : Acc_Int := Null_Value();
+   Y : Aliased_Obj<Integer, Acc_Int> :=
+     Create (42, Self => Null_Value());
+   Put_Line ("Value(Y) = " & Value(Y)'Image);
+   Set_Value (Y, 35);
+   Put_Line ("Value(Y) = " & Value(Y)'Image);
+   X := Tick_Access(Y);
+   Put_Line ("Y'Access = " & Hex_Image (Index(X)));
+   Z : Aliased_Obj<Integer, Acc_Int> := Deref_Const(X);
+   Put_Line ("Value(Deref_Const(X)) = " & Value(Z)'Image);
+   Set_Value(Z, 33);
+   Put_Line ("Updating Deref_Const(X) to " & Value(Z)'Image);
+   Put_Line ("Value(Y) now = " & Value(Y)'Image);
+   subtype Ali is Aliased_Obj<Integer, Acc_Int>;
+   Q renames Ali.Deref(X)
+   Set_Value (Q, 55);
+   Put_Line ("Udating Deref(X) to " & Value(Q)'Image);
+   Put_Line ("Value(Y) now = " & Value(Y)'Image);
+   Put_Line ("Value(Deref_Const(X)) now = " & Value(Z)'Image);
+   A : Acc_Int := Allocate(Pool, 77);
+   Put_Line ("new Integer'(77) = " & Hex_Image (Index(A)));
+   AA renames Ali.Deref(A);
+   Put_Line ("Value(Deref(Allocate(Pool,77)) = " & Value(AA)'Image);
+end A2X.Test.Test_Access;
+
+generic
+    type Component_Type is new Assignable;
+    type Indexed_By is new Countable;
+package A2X.Core.Array_Type is
+    type Array_Type is new Indexable<Component_Type, Indexed_By> with private
+    function "indexing"(A : aliased Array_Type; Index : Indexed_By)
+      return aliased constant Component_Type
+    function "var_indexing"(Arr : aliased in out Array_Type; Index : Indexed_By)
+      return aliased Component_Type
+    function Array_Type'Length(A : Array_Type) return Univ_Integer
+    function "magnitude"(A : Array_Type) return Univ_Integer
+      renames Array_Type'Length
+    function Array_Type'Length(A : Array_Type; Dimension : Univ_Integer)
+      return Univ_Integer
+    function "index_set"(A : Array_Type) return Countable_Range<Indexed_By>
+    function Bounds(A : Array_Type) return Countable_Range<Indexed_By>
+      renames "index_set"
+
+    function Array_Type'First(A : Array_Type) return Indexed_By
+      is (Bounds (A).First)
+    function Array_Type'First(A : Array_Type; Dimension : Univ_Integer)
+      return Indexed_By
+      is (Array_Type'First(A))  --  TBD use Dimension
+    function Array_Type'Last(A : Array_Type) return Indexed_By
+      is (Bounds (A).Last)
+    function Array_Type'Last(A : Array_Type; Dimension : Univ_Integer)
+      return Indexed_By
+      is (Array_Type'Last(A))  --  TBD use Dimension
+
+    function Create(Bounds : Countable_Range<Indexed_By>; Initial_Value : Component_Type)
+      return Array_Type
+
+    procedure "<|="(Left : in out Array_Type; Right : in out Component_Type)
+    function "&"(Left, Right : Array_Type) return Array_Type
+    function "[]" return Array_Type
+end A2X.Core.Array_Type
+
+package body A2X.Core.Array_Type is
+    subtype Elem_Array is Basic_Array<Component_Type>
+
+    type Array_Type is record
+        Bounds : Countable_Range <Indexed_By>;
+        Data : Elem_Array;
+    end record Array_Type
+
+    function "indexing"(A : aliased Array_Type; Index : Indexed_By)
+      return aliased constant Component_Type is
+        return A.Data [(Index - A.Bounds.First) + 1]
+    end "indexing"
+
+    function "var_indexing"(Arr : aliased in out Array_Type; Index : Indexed_By) 
+      return aliased Component_Type is
+        if Arr'Length = 0 then
+            -- Create a one-element array
+            Arr := (Data => Create(1, null),
+              Bounds => Index .. Index)
+        elsif Index < Arr.Bounds.First then
+            -- Extend below
+            Arr := (Data => 
+              Elem_Array.Create(Arr.Bounds.First - Index, null) & Arr.Data,
+              Bounds => Index .. Arr.Bounds.Last)
+        elsif Index > Arr.Bounds.Last then
+            -- Extend above
+            Arr := (Data => 
+              Arr.Data & Elem_Array.Create(Index - Arr.Bounds.Last, null),
+              Bounds => Arr.Bounds.First .. Index)
+        end if
+        return Arr.Data[ Index - Arr.Bounds.First + 1 ]
+    end "var_indexing"
+
+    function Array_Type'Length(A : Array_Type) return Univ_Integer is
+        --  TBD: Should be first dim len
+        return |A.Bounds|
+    end Array_Type'Length
+
+    function Array_Type'Length
+      (A : Array_Type; Dimension : Univ_Integer) return Univ_Integer
+    is
+        --  TBD: should be based on specified dimension
+        return A'Length
+    end Array_Type'Length
+
+    function "index_set"(A : Array_Type) return Countable_Range<Indexed_By> is
+        return A.Bounds
+    end "index_set"
+
+    function Create(Bounds : Countable_Range<Indexed_By>; Initial_Value : Component_Type)
+      return Array_Type is
+        return (Data => Create(Bounds'Length, Initial_Value),
+          Bounds => Bounds)
+    end Create
+
+    procedure "<|="(Left : in out Array_Type; Right : in out Component_Type) is
+        -- Add Right onto Array
+        if Left'Length = 0 then
+            Left := (Data => Create(1, null),
+              Bounds => Indexed_By'First .. Indexed_By'First)
+            Left[Indexed_By'First] := Right
+        else
+            Left[Left.Bounds.Last + 1] := Right
+        end if
+    end "<|="
+    
+    function "&"(Left, Right : Array_Type) 
+      return Array_Type is
+        if Left'Length = 0 then
+           return Right;
+        elsif Right'Length = 0 then
+           return Left;
+        else
+           return (Bounds => Left.Bounds.First .. Left.Bounds.Last + |Right|,
+                   Data => Left.Data & Right.Data);
+        end if; 
+    end "&"
+
+    function "[]" return Array_Type is
+        return (Data => [],
+          Bounds => Indexed_By'First+1 .. Indexed_By'First)
+            -- Bounds not meaningful when empty
+    end "[]"
+
+end A2X.Core.Array_Type
+
+procedure A2X.Test.Test_Array_Type is
+    type Color is new Enum< [#red, #green, #blue] >
+    type RCB is array (Color) of Integer<Range => 0..16#FF#>
+
+    Red : constant RCB := [#red => 16#33#, #green => 0, #blue => 0]
+    Blue : constant RCB := [#red => 0, #green => 0, #blue => 16#33#]
+    Yellow : constant RCB := [0, 16#33#, 16#33#]
+    White : constant RCB := [16#FF#, 16#FF#, 16#FF#]
+    
+    RCBs : constant Basic_Array<RCB> := [Red, Blue, Yellow, White]
+
+    for C of RCBs loop
+        Println("#red => " & C[#red]'Image &
+              ", #green => " & C[#green]'Image &
+              ", #blue => " & C[#blue]'Image)
+    end loop
+end A2X.Test.Test_Array_Type
+
+package A2X.Core.Random is
+    type Random is private;
+
+    function Start(Seed : Univ_Integer := 1) return Random
+      -- Start a new random number sequence with a standard multiplier/modulus
+
+    function Start(Seed : Univ_Integer;
+       Mult, Mod : Univ_Integer) return Random
+      -- Start a new random number sequence with given multiplier and modulus
+
+    function Next(Seq : in out Random) return Univ_Integer
+      -- Get next value in random number sequence
+end A2X.Core.Random
+
+package body A2X.Core.Random is
+    type Random is record
+       Last_Value : Univ_Integer
+       Mult : Univ_Integer
+       Mod : Univ_Integer
+    end record Random
+
+    Debugging : constant Boolean := False
+    function Start(Seed : Univ_Integer) return Random is
+      -- Start a new random number sequence with a standard multiplier/modulus
+        return (Last_Value => Seed,
+          Mult => 7**5, Mod => 2**31 - 1)
+    end Start
+
+    function Start(Seed : Univ_Integer;
+      Mult, Mod : Univ_Integer) return Random is
+      -- Start a new random number sequence with given multiplier and modulus
+        if Debugging then
+            Println("Random: Seed = " & Seed'Image & ", Mult = " & Mult'Image &
+              ", Mod = " & Mod'Image)
+        end if
+        return (Last_Value => Seed, Mult => Mult, Mod => Mod)
+    end Start
+
+    function Next(Seq : in out Random) return Univ_Integer is
+      -- Get next value in random number sequence
+        Seq.Last_Value := Seq.Last_Value * Seq.Mult mod Seq.Mod
+        return Seq.Last_Value
+    end Next
+end A2X.Core.Random
+
+package A2X.Core.IO is
+  -- Locked versions of the Print, Println and Readln operations
+    type IO is limited private; -- TBD: synchronized
+
+    function Get_IO return IO;  -- Get handle on IO subsystem
+
+    procedure Println(IO : in out Core.IO; Val : Univ_String);
+    procedure Print(IO : in out Core.IO; Val : Univ_String);
+    procedure Print(IO : in out Core.IO; Val : Univ_Character);
+    procedure Print(IO : in out Core.IO; Val : Univ_Integer);
+    procedure Print(IO : in out Core.IO; Val : Univ_Real);
+    procedure Print(IO : in out Core.IO; Val : Univ_Enumeration) ;
+
+    function Readln(IO : in out Core.IO) return Univ_String;
+
+    procedure Put_Line(IO : in out Core.IO; Val : Univ_String) renames Println;
+    procedure Put(IO : in out Core.IO; Val : Univ_String) renames Print;
+    procedure New_Line(IO : in out Core.IO) is (Put("\n"));
+    procedure Put(IO : in out Core.IO; Val : Univ_Character) renames Print;
+    procedure Put(IO : in out Core.IO; Val : Univ_Integer) renames Print;
+    procedure Put(IO : in out Core.IO; Val : Univ_Real) renames Print;
+    procedure Put(IO : in out Core.IO; Val : Univ_Enumeration) renames Print;
+
+    function Get_Line(IO : in out Core.IO) return Univ_String renames Readln
+end A2X.Core.IO
+
+package body A2X.Core.IO is
+    type IO is limited null record
+
+    function Get_IO return IO is
+        return () -- TBD: (others => <>)
+    end Get_IO
+
+    procedure Println(IO : in out Core.IO; Val : Univ_String) is
+        Println (Val)
+    end Println
+
+    procedure Print(IO : in out Core.IO; Val : Univ_String) is
+        Print (Val)
+    end Print
+
+    procedure Print(IO : in out Core.IO; Val : Univ_Character) is
+        Print (Val)
+    end Print
+
+    procedure Print(IO : in out Core.IO; Val : Univ_Integer) is
+        Print (Val)
+    end Print
+
+    procedure Print(IO : in out Core.IO; Val : Univ_Real) is
+        Print (Val)
+    end Print
+
+    procedure Print(IO : in out Core.IO; Val : Univ_Enumeration) is
+        Print (Val)
+    end Print
+
+    function Readln(IO : in out Core.IO) return Univ_String is
+        return Readln()
+    end Readln
+
+end A2X.Core.IO
+
+procedure A2X.Test.Test_IO (X, Y : Univ_String; Z : Univ_Integer) is
+    IO : Core.IO := Core.IO.Get_IO()
+    Pi : constant := 3.141592653589793
+    True_Val : constant Boolean := Boolean'(True)
+
+    IO.Print ("Pi = ")
+    IO.Print (Pi)
+    IO.Print (", True prints as ")
+    IO.Print (True_Val)
+    IO.Print ("\n")
+    IO.Print ("X = """ & X & '"')
+    IO.Print (", Y = """ & Y & '"')
+    IO.Println (", Z = " & Z'Image )
+    IO.Print ("Give me somethin: ")
+    Input : constant Univ_String := IO.Readln()
+    IO.Println ("You gave me: """ & Input & '"')
+
+end A2X.Test.Test_IO
+

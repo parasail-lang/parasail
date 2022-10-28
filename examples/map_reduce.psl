@@ -1,0 +1,46 @@
+// Map/Reduce operation
+interface Map_Reduce<
+  Map : func (Input is Any<>) -> (Output is Any<>);
+  Reduce : func (Left, Right : Output) -> Output> is
+
+    func Perform(Initial_Input : Vec is Vector<Input>) 
+      {Length(Initial_Input) > 0} -> Final_Result : Output;
+
+end interface Map_Reduce;
+
+class Map_Reduce is
+
+  exports
+    func Perform(Initial_Input : Vec is Vector<Input>) 
+      {Length(Initial_Input) > 0} -> Final_Result : Output is
+	-- Handle simple inputs directly, recurse for longer inputs
+	case Length(Initial_Input) of
+	  [1] => 
+	    return Map(Initial_Input[1]);
+	  [2] =>
+	    return Reduce(Map(Initial_Input[1]), Map(Initial_Input[2]));
+	  [3] =>
+	    return Reduce(
+	      Reduce(Map(Initial_Input[1]), Map(Initial_Input[2])), 
+	      Map(Initial_Input[3]));
+	  [..] =>
+	    -- Split and recurse
+	    const Half_Length := Length(Initial_Input)/2;
+
+	    return Reduce(
+	      Perform(Initial_Input[1..Half_Length]),
+	      Perform(Initial_Input[Half_Length <.. Length(Initial_Input)]));
+	end case;
+    end func Perform;
+
+end class Map_Reduce;
+
+func Test() is
+    var Count : Integer<> := 0;
+
+    type MR is Map_Reduce
+      <lambda(X) -> (Count += 1; X**2), "+">;
+
+    Print_Int(MR::Perform([1, 3, 5, 8, 9]));
+
+end func Test;

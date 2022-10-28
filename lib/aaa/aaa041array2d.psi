@@ -1,0 +1,147 @@
+interface PSL::Containers::Array2D
+  <Elem_Type is Assignable<>; Index1 is Countable<>; Index2 is Countable<>> is
+  // A 2-D array abstraction where the index types are not necessarily
+  // Univ_Integer, but instead can be any Countable type (e.g. Enum<...>)
+
+    const Bounds1 : Countable_Range<Index1>
+    const Bounds2 : Countable_Range<Index2>
+
+    func Create(Bounds1 : Countable_Range<Index1>;
+      Bounds2 : Countable_Range<Index2>;
+      Initial_Value : optional Elem_Type)
+      -> Array2D
+
+    type Indices is Index_Pair<Index1, Index2>
+    type Set_Of_Indices is Index_Pair_Set<Indices>
+
+    func Length1(Arr : Array2D) -> Univ_Integer
+    func Length2(Arr : Array2D) -> Univ_Integer
+
+    func Bounds1(Arr : Array2D) -> Countable_Range<Index1>
+    func Bounds2(Arr : Array2D) -> Countable_Range<Index2>
+
+    // Indexing operations using an index pair
+    op "indexing"(ref Arr : Array2D; Indices) -> ref Elem_Type
+    op "var_indexing"(ref var Arr : Array2D; Indices)
+      -> ref var Elem_Type
+
+    // Indexing operations using two individual indices
+    op "indexing"(ref Arr : Array2D; Index1; Index2) -> ref Elem_Type
+    op "var_indexing"(ref var Arr : Array2D; Index1; Index2)
+      -> ref var Elem_Type
+
+    // Set of index pairs that cover the 2D array.
+    op "index_set"(Arr : Array2D) -> Set_Of_Indices
+
+    op "[]"() -> Array2D
+end interface PSL::Containers::Array2D
+
+class PSL::Containers::Array2D is
+  // An array abstraction where the index type is not necessarily
+  // Univ_Integer, but instead can be any Countable type (e.g. Enum<...>)
+    type Elem_Array is
+      Big_Array<optional Elem_Type, Indexed_By => Univ_Integer>
+    var Data : Elem_Array
+
+    func Extend_Array(var Arr : Array2D; Index1; Index2) is
+        // Extend array if necessary to include Index1 and Index2
+        if Index1 not in Arr.Bounds1 or else Index2 not in Arr.Bounds2 then
+            var Old_Arr <== Arr
+            Arr := Create
+              (Bounds1 => Min(Old_Arr.Bounds1.First, Index1) ..
+                 Max(Old_Arr.Bounds1.Last, Index1),
+               Bounds2 => Min(Old_Arr.Bounds2.First, Index2) ..
+                 Max(Old_Arr.Bounds2.Last, Index2),
+               Initial_Value => null)
+
+            // Move over old data
+            for I in Old_Arr.Bounds1 loop
+                for J in Old_Arr.Bounds2 loop
+                    // Explicitly use "indexing" to avoid infinite recursion
+                    "indexing"(Arr, I, J) <== Old_Arr[I, J]
+                end loop
+            end loop
+
+            // Reclaim old data space
+            Old_Arr := null
+        end if
+    end func Extend_Array
+
+  exports
+
+    func Create(Bounds1 : Countable_Range<Index1>;
+      Bounds2 : Countable_Range<Index2>;
+      Initial_Value : optional Elem_Type)
+      -> Array2D is
+        return
+          (Data =>
+             Create(1 .. Length(Bounds1) * Length(Bounds2), Initial_Value),
+           Bounds1 => Bounds1, Bounds2 => Bounds2)
+    end func Create
+
+    func Length1(Arr : Array2D) -> Univ_Integer is
+        return Length(Arr.Bounds1)
+    end func Length1
+
+    func Length2(Arr : Array2D) -> Univ_Integer is
+        return Length(Arr.Bounds2)
+    end func Length2
+
+    func Bounds1(Arr : Array2D) -> Countable_Range<Index1> is (Arr.Bounds1)
+    func Bounds2(Arr : Array2D) -> Countable_Range<Index2> is (Arr.Bounds2)
+
+    // Indexing operations using an index pair
+    op "indexing"(ref Arr : Array2D; Indices) -> ref Elem_Type is
+        {> Indices.Index1 in Arr.Bounds1; Indices.Index2 in Arr.Bounds2 <}
+        return Arr.Data[Pair_Position(Arr.Bounds1, Arr.Bounds2, Indices)]
+    end op "indexing"
+
+    op "var_indexing"(ref var Arr : Array2D; Indices)
+      -> ref var Elem_Type is
+        Extend_Array(Arr, Indices.Index1, Indices.Index2)
+        return "indexing"(Arr, Indices.Index1, Indices.Index2)
+    end op "var_indexing"
+
+    // Indexing operations using two individual indices
+    op "indexing"(ref Arr : Array2D; Index1; Index2) -> ref Elem_Type is
+        {> Index1 in Arr.Bounds1; Index2 in Arr.Bounds2 <}
+        return Arr.Data
+          [Indices::Pair_Position(Arr.Bounds1, Arr.Bounds2, (Index1, Index2))]
+    end op "indexing"
+
+    op "var_indexing"(ref var Arr : Array2D; Index1; Index2)
+      -> ref var Elem_Type is
+        //  We don't allow extending the array when indices given separately
+        //  Return ref to appropriate element
+        return "indexing"(Arr, Index1, Index2)
+    end op "var_indexing"
+
+    // Set of index pairs that cover the 2D array.
+    op "index_set"(Arr : Array2D) -> Set_Of_Indices is
+        return Create(Arr.Bounds1, Arr.Bounds2)
+    end op "index_set"
+
+    op "[]"() -> Array2D is
+        return (Data => [],
+          Bounds1 => Index1::First()+1 .. Index1::First(),
+          Bounds2 => Index2::First()+1 .. Index2::First())
+            // Bounds not meaningful when empty
+    end op "[]"
+
+end class PSL::Containers::Array2D
+
+func PSL::Test::Test_Array2D() is
+    type Shade is Enum< [#white, #black] >
+    type Chess_Board is Array2D<Shade,
+      Index1 => Integer<1..8>, Index2 => Integer<1..8>>
+
+    const Board_Indices : Chess_Board::Set_Of_Indices := Create(1..8, 1..8)
+    var CB : Chess_Board := [for Ix in Board_Indices =>
+      (if (Ix.Index1 - Ix.Index2) mod 2 == 0 then #white else #black)]
+
+    for each [Ix => C] of CB forward loop
+        Println("CB[" | Ix.Index1 | ", " | Ix.Index2 | "] = " | C)
+
+        {> CB[Ix.Index1, Ix.Index2] == C <}
+    end loop
+end func PSL::Test::Test_Array2D

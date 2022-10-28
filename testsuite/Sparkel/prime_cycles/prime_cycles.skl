@@ -1,0 +1,20 @@
+proc Power2_Cycles(Max : Univ_Integer) is
+    -- Look for primes P <= Max such that 
+    --   for all N in 1..P-2 => 2**N mod P != 1
+    -- NOTE: for all primes P => 2**(P-1) mod P == 1
+    --    (according to Fermat's little theorem)
+    var Mod := 3;
+    while Mod <= Max loop
+	var I := 1;
+	var Pow := 2**1;
+	while Pow mod Mod != 1 loop
+	    I += 1;
+	    Pow := (Pow * 2) mod Mod;
+	end loop;
+	if I = Mod-1 then
+	    Print(">>>");
+	end if;
+	Println("  2**" | I | " mod " | Mod | " == 1");
+        Mod += 2;
+    end loop;
+end proc Power2_Cycles;

@@ -1,0 +1,3 @@
+Length(Z) = 10
+After V <== Z, Z is null = #True
+Length(V) = 10

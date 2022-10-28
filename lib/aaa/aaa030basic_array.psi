@@ -1,0 +1,83 @@
+interface PSL::Containers::Basic_Array<Element_Type is Assignable<>> is
+  // Builtin array type, not extendable, indexed by Univ_Integer, 1..Length
+    func Create(Length : Univ_Integer<>; Val : optional Element_Type) 
+      -> Basic_Array 
+      is import(#basic_array_create)
+    op "[]"() -> Basic_Array is (Create(0, null))
+    op "indexing"(ref V : Basic_Array; Index : Univ_Integer<>) -> 
+      ref Element_Type is import(#basic_array_indexing)
+    op "var_indexing"(ref var V : Basic_Array; Index : Univ_Integer<>) -> 
+      ref var Element_Type is import(#basic_array_indexing)
+    func Length(V : Basic_Array) -> Univ_Integer<>
+      is import(#basic_array_length)
+    op "magnitude"(Basic_Array) -> Univ_Integer<> is Length
+    op "|"(Left, Right : Basic_Array) -> Basic_Array
+    op "index_set"(A : Basic_Array) -> Countable_Range<Univ_Integer>
+    op "<|="(var Left : Basic_Array; var Right : optional Element_Type)
+end interface PSL::Containers::Basic_Array
+
+class PSL::Containers::Basic_Array is
+  // Builtin array type, not extendable, indexed by Univ_Integer, 1..Length
+  exports
+    op "|"(Left, Right : Basic_Array) -> Result : Basic_Array is
+        const Left_Len := Length(Left)
+
+        if Left_Len == 0 then
+            return Right
+        end if
+
+        Result := Create(Left_Len + Length(Right), null)
+
+        // Copy the Left elements
+        for I in 1..Left_Len concurrent loop
+            Result[I] := Left[I]
+        end loop
+
+        // Copy the Right elements
+        
+        for J in 1..Length(Right) concurrent loop
+            Result[Left_Len + J] := Right[J]
+        end loop
+    end op "|"
+            
+    op "index_set"(A : Basic_Array) -> Countable_Range<Univ_Integer> is
+        return 1..Length(A)
+    end op "index_set"
+
+    op "<|="(var Left : Basic_Array; var Right : optional Element_Type) is
+        const Left_Len := |Left|
+        var Result : Basic_Array for Left := Create(Left_Len+1, null)
+
+        for I in 1 .. Left_Len concurrent loop
+            Result[I] <== Left[I]
+        end loop
+
+        Result[Left_Len+1] <== Right
+
+        Left <== Result
+    end op "<|="
+end class PSL::Containers::Basic_Array
+
+func PSL::Test::Test_Basic_Array() is
+    var A : Basic_Array<Univ_Integer<>> := Create(3, 7)
+    A[1] := 42
+    A[2] += 6
+    A[3] += A[2]
+    Print("The answer is: " | A[1] + A[2] + A[3] | "\n")
+    Print("Length(A) = " | Length(A) | "\n")
+
+    var B := A | A
+    Print("Length(B) = " | Length(B) | ", B[5] = " | B[5] | "\n")
+    for I in 1..Length(B) forward loop
+        Print("B[" | I | "] = " | B[I] | ", ")
+    end loop
+    Print("\n")
+
+    const C : Basic_Array<Univ_Integer> := [1, 3, 5, 7];
+    Print("C = [")
+    for each [I => E] of C forward loop
+        Print((I > 1? ", " : "") | E)
+    end loop
+    Println("]")
+    Println("|C| = " | |C|)
+end func PSL::Test::Test_Basic_Array

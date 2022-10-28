@@ -1,0 +1,21 @@
+interface Set[#output] is
+    func Text_Image(S : Set) -> Univ_String;
+    func XML_Image(S : Set) -> Univ_String;
+end interface Set;
+
+class Set[#output, 2] is
+  exports
+    func Text_Image(S : Set) -> Univ_String is
+        return "";
+    end func Text_Image;
+
+    func XML_Image(S : Set) -> Univ_String is
+	return "<br/>";
+    end func XML_Image;
+
+end class Set;
+    
+
+func main(Args : Basic_Array<Univ_String>) is
+   null;
+end func main;

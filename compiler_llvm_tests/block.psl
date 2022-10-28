@@ -1,0 +1,6 @@
+func Block() is
+   var I := 0;
+   block
+      I += 1;
+   end block;
+end func Block;

@@ -1,0 +1,20 @@
+abstract interface Monad<Inner_Type is Assignable<>> is
+   func Return(A : Inner_Type) -> Monad  // P. Wadler calls this "unit"
+   func Bind
+     (M : Monad; Op : func Inner_Type -> Monad) -> Monad  // P. Wadler's "*" 
+end interface Monad
+
+abstract interface Expr<Data_Monad is Monad<Integer>> is
+   func Eval(E : Expr) -> Data_Monad
+end interface Expr
+
+interface Const extends Expr is
+   const Val : Integer
+   func Eval(C : Const) -> Data_Monad is (Data_Monad::Return(C.Val))
+end interface Const
+
+interface Divide extends Expr is
+   const Left : Integer
+   const Right : Integer
+   func Eval(D : Divide) -> Data_Monad is (Data_Monad::Return(D.Left / D.Right))
+end interface Divide

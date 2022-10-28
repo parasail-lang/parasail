@@ -1,0 +1,48 @@
+interface Project<> is
+end interface Project;
+
+interface Project::Utils<More_Fun_Type is Assignable<>> is
+end interface Project::Utils;
+
+interface Project::Utils::List<Element_Type is Assignable<>> is
+    func Create(Elem : Element_Type) -> List;
+    func Next(ref L : List) -> ref optional List;
+    func Prepend(var L : optional List; Elem : Element_Type);
+    func Elem(ref L : List) -> ref optional Element_Type;
+end interface Project::Utils::List;
+
+class Project::Utils::List is
+    var Next : optional List;
+    var Elem : optional Element_Type;
+  exports
+    func Create(Elem : Element_Type) -> List is
+	return (Elem => Elem, Next => null);
+    end func Create;
+    func Next(ref L : List) -> ref optional List is
+        return L.Next;
+    end func Next;
+    func Prepend(var L : optional List; Elem : Element_Type) is
+        L := (Elem => Elem, Next <== L);
+    end func Prepend;
+    func Elem(ref L : List) -> ref optional Element_Type is
+	return L.Elem;
+    end func Elem;
+end class Project::Utils::List;
+
+func Test_List(X, Y : Univ_Integer) is
+    type P is Project<>;
+    type U is Project::Utils<Univ_Integer>;
+    // var L : Project::Utils::List<Univ_Integer> := Create(Y);
+    var L : U::List<Univ_Integer> := Create(Y);
+    Prepend(L, X);
+    Print("Contents of list:");
+    for Lx => L then Next(Lx) while Lx not null loop
+	Print(" " | Elem(Lx));
+    end loop;
+    Print("\n");
+end func Test_List;
+    
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_List (10, 20);
+end func main;

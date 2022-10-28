@@ -1,0 +1,28 @@
+proc Case_Expr(X, Y, Z : Univ_Integer) is
+
+   subtype Color is Enum<[#red, #green, #blue]>;
+   --  type Color is (red, green, blue);                            -- FAIL
+   --  ??? these two enumeration type declarations fail
+   --      (but this is the syntax described in the RM (Section 3.1.2,
+   --       page 17)
+
+   var C : Color := #green;
+
+   if X in 0..2 then
+      C := #red + X;
+   end if;
+
+   Println("C = " | C);
+
+   const Result :=
+     (case C is when #red => X; when #green => Y; when #blue => Z);
+
+   const Result2 :=
+     (case C is when #red => X; when #green => Y; when #blue => Z);
+
+   {Result = Result2}
+
+   Println("(case C is when #red => " | X | "; when #green => " | Y |
+      "; when #blue => " | Z | ") = " | Result);
+
+end proc Case_Expr;

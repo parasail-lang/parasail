@@ -1,0 +1,10 @@
+func main(Args : Basic_Array<Univ_String>) is
+   for I := 0 then I + 1 while I < 10 loop
+      Print(I);
+      if I == 5 then
+         {#hi == #hi};
+         return;
+      end if;
+   end loop;
+   Println("stuff");
+end func main;

@@ -1,0 +1,5 @@
+proc main() is
+   SSL.Test.Test_Boolean(#True, #False);
+   SSL.Test.Test_Boolean(#True, #True);
+   SSL.Test.Test_Boolean(#False, #False);
+end proc main;

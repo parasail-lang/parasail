@@ -1,0 +1,7 @@
+This implementation of K-Means was based on one created by Andrea Ferretti.
+Please visit: https://github.com/andreaferretti/kmeans for the original.
+
+This version is designed to execute faster with the current ParaSail
+compiler and run-time.  See ../kmeans for a version based more closely
+on Andrea Ferretti's original.
+This reads points from the "points.json" file in ../kmeans.

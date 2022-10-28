@@ -1,0 +1,161 @@
+func PSL::Test::Test_IO (X, Y : Univ_String; Z : Univ_Integer):
+    var IO := IO::Get_IO()
+    const Pi := 3.141592653589793
+    const True := Boolean::#true
+
+    IO.Print ("Pi = ")
+    IO.Print (Pi)
+    IO.Print (", True prints as ")
+    IO.Print (True)
+    IO.Print ('\n')
+    IO.Print ("X = \"" | X | '"')
+    IO.Print (", Y = \"" | Y | '"')
+    IO.Println (", Z = " | Z )
+    IO.Print ("Give me somethin: ")
+    var Input := IO.Readln()
+    IO.Println ("You gave me: \"" | Input | '"')
+
+    IO.Stderr.Println ("This is going to standard error output");
+    IO.Stdout.Println ("This is going to standard output");
+    IO.Stdout.Println ("About to flush stderr and stdout");
+    IO.Stderr.Flush ()
+    IO.Stdout.Flush ()
+
+    const Vec : Imageable_Vector<Univ_Integer> := [1, 3, 5, 7, 9]
+    IO.Println ("About to print out imageable vector")
+    IO.Print (Vec); IO.Print('\n')
+end func PSL::Test::Test_IO
+    
+import PSL::Test::Test_IO
+
+func Test_IO (X, Y : Univ_String; Z : Univ_Integer):
+    PSL::Test::Test_IO (X, Y, Z)
+end func Test_IO
+
+interface PSL::Core::Output_Stream<> is
+  // Output stream interface; all operations
+  // expressed in terms of Univ_String print and close
+    abstract func Print(var Output_Stream; Univ_String)
+    abstract func Flush(var Output_Stream)
+    abstract func Close(var optional Output_Stream)
+
+    func Println(var Output_Stream+; Univ_String)
+
+    func Print(var Output_Stream+; Val : Val_Type is Imageable<>)
+
+    func Println(var Output_Stream+; Val : Val_Type is Imageable<>)
+
+end interface PSL::Core::Output_Stream
+
+class PSL::Core::Output_Stream is
+  // Output stream interface; all operations
+  // expressed in terms of Univ_String print
+  exports
+    func Println(var Output_Stream+; Univ_String):
+        Output_Stream.Print(Univ_String)
+        Output_Stream.Print("\n")
+
+    func Print(var Output_Stream+; Val : Val_Type is Imageable<>):
+        Output_Stream.Print (Val_Type::To_String(Val))
+
+    func Println(var Output_Stream+; Val : Val_Type is Imageable<>):
+        Output_Stream.Print (Val_Type::To_String(Val))
+        Output_Stream.Print("\n")
+
+end class PSL::Core::Output_Stream
+
+abstract interface PSL::Core::Input_Stream<> is
+    func Readln(var Input_Stream) -> optional Univ_String
+        //  Read input up to a newline, from input stream.
+        //  Return null value when reaching end of file of input stream.
+    func Close(var optional Input_Stream)
+end interface PSL::Core::Input_Stream
+
+interface PSL::Core::File_Output_Stream<> extends Output_Stream<> is
+    func Create(var IO; Name : Univ_String) -> optional File_Output_Stream
+      is import(#create_output_file)
+    func Append(var IO; Name : Univ_String) -> optional File_Output_Stream
+      is import(#append_output_file)
+    func Flush(var File_Output_Stream)
+      is import(#flush_output_file)
+    func Close(var optional File_Output_Stream)
+      is import(#close_output_file)
+    func Delete(var optional File_Output_Stream)
+      is import(#delete_output_file)
+
+    func Print(var File_Output_Stream; Univ_String)
+      is import(#print_to_file)
+end interface PSL::Core::File_Output_Stream
+
+class PSL::Core::File_Output_Stream is
+    const Name : Univ_String
+    const Index : Univ_Integer
+  exports
+end class PSL::Core::File_Output_Stream
+
+interface PSL::Core::File_Input_Stream<> extends Input_Stream is
+    func Open(var IO; Name : Univ_String) -> optional File_Input_Stream
+      is import(#open_input_file)
+    func Close(var optional File_Input_Stream)
+      is import(#close_input_file)
+    func Readln(var File_Input_Stream) -> optional Univ_String
+      is import(#read_from_file)
+        //  Read input up to a newline, from given file.
+        //  Return null value when reaching end of file.
+end interface PSL::Core::File_Input_Stream
+
+class PSL::Core::File_Input_Stream is
+    const Name : Univ_String;
+    const Index : Univ_Integer
+  exports
+end class PSL::Core::File_Input_Stream
+
+interface PSL::Core::Standard_Output_Stream<> extends Output_Stream is
+  //  Output stream for one of the "standard" output channels
+    type Output_Channel_Enum is Enum<[#stdout, #stderr]>
+    const Channel : Output_Channel_Enum
+
+    func Print(var Standard_Output_Stream; Univ_String)
+      is import(#print_to_standard_file)
+
+    func Flush(var Standard_Output_Stream)
+      is import(#flush_standard_file)
+
+    func Close(var optional Standard_Output_Stream)
+      is Flush
+end interface PSL::Core::Standard_Output_Stream
+
+func PSL::Test::Test_File (Name, X, Y : Univ_String; Z : Univ_Integer):
+    var IO := IO::Get_IO()
+    var File := File_Output_Stream::Create(IO, Name);
+    const Pi := 3.14159265389793
+    const True := Boolean::#true
+
+    IO.Println ("Writing to file: " | Name)
+
+    File.Print ("Pi = ")
+    Output_Stream::Print (File, Pi)
+    File.Print (", True prints as ")
+    Print (File, True)
+    Print (File, '\n')
+    File.Print ("X = \"" | X | '"')
+    Println (File, ", Y = \"" | Y | '"')
+    IO.Print ("Give me somethin: ")
+    var Inp := IO.Readln()
+    IO.Println ("You gave me: \"" | Inp | '"')
+    File.Println ("User input = \"" | Inp | '"')
+    File.Close();
+
+    var Inp_File := File_Input_Stream::Open(IO, Name)
+    IO.Println ("Contents of file " | Name)
+    loop
+        const Line := Inp_File.Readln()
+        if Line is null then
+            exit loop
+        end if
+        IO.Println(Line)
+    end loop
+
+    IO.Println("All done")
+
+end func PSL::Test::Test_File

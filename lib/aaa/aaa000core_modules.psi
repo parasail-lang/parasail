@@ -1,0 +1,23 @@
+// ParaSail Prototype Standard Library
+
+// Copyright (C) 2011-2015, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+interface PSL<> is
+end interface PSL
+
+interface PSL::Core<> is
+end interface PSL::Core
+
+interface PSL::Containers<> is
+end interface PSL::Containers
+
+interface PSL::Test<> is
+end interface PSL::Test
+
+abstract interface PSL::Core::Any<> is
+end interface PSL::Core::Any
+
+abstract interface PSL::Core::Assignable<> is
+end interface PSL::Core::Assignable

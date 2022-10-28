@@ -1,0 +1,4 @@
+nqueens_gtk.psl:230:5: Error: Operation func On_Delete_Event(var Nqueens_GTK; var Window+; Event+) -> (Boolean) must override an inherited operation or it should be grouped with the "new" operations:
+nqueens_gtk.psl:230:5: Info:   func On_Delete_Event(var Nqueens_GTK; var Window+; Event+) -> (Boolean)
+nqueens_gtk.psl:230:56: Info: Param of original operation is of type GTK::Event, not matched by GTK::Event+
+ 1 semantic errors found

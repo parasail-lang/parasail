@@ -1,0 +1,106 @@
+9/27/2013: Handling implicit "#" for enum types
+
+We would like to support overload resolution which can "insert" an implicit "#" for enumeration types.  If we have a target type that has a "from_univ" with source type being Univ_Enumeration, we should create a Univ_Enumeration interpretation as a literal.  We need to look up the literal with "#" as a prefix.
+
+--------
+
+The prototype Sparkel compiler will be based on the prototype ParaSail
+compiler. We will try to reuse as much of the ParaSail infrastructure as
+possible. The Display_Subtree routines will be able to check the
+Language function so that it can reconstruct the source with the
+appropriate syntax.  Eventually we might dispatch on the Language, but
+for now we will just use "case" statements.  To dispatch on the
+language, we would just have Display_Sparkel_Subtree and
+Display_ParaSail_Subtree which by default redispatch to Display_Subtree.
+
+Record type definitions (and tuple types) cause the implicit declaration
+of a new module.  Tuple types are supposed to have some equivalence, so
+how does that work if we create a new module for each one?  Is there a
+notion of "equivalent" modules?  This could perhaps use our existing
+mechanisms for finding equivalent instantiations of a given module,
+where we keep a hash table of instantiations of the same module.  In
+this case we could pretend that "Tuple" is the module, and come up with
+unique U_Base_Types based on the types of the components, and U_Types
+for tuple types that differ in constraints or component names.
+
+-----
+
+Overload resolution relies on the notion of "type regions" and keeping
+track of whether we have included all interpretations of a symbol from a
+given type region.  Hanging off of the sem_info node of an identifier is
+an "interp" tree, each branch being labeled by the type region it came
+from.
+
+For ParaSail we presume all operations are "inside" the region of the
+type.  For Sparkel, and for "new" types in ParaSail, we also want to
+consider operations that are declared in the same scope as the "new"
+type.
+
+Currently we use Add_Type_Region_For_Operation_Name and
+Add_Operation_Interps to add interps to the operation name, and then
+iterate over those to create a tree of "call" interps.  These routines
+could presumably start including operations from the enclosing region
+when appropriate.
+
+We aren't currently handling "new" properly in ParaSail.  What would
+that entail?  First of all, we will want a notion of
+structurally-equivalent, which generally means type-equivalent in
+ParaSail, but not when "new" is applied.  We will allow explicit
+conversions between types that are structurally equivalent but not the
+"same" type because of "new."  Given that U_Base_Type just points at
+another type, we essentially have to add yet another field
+U_Base_Structure or equivalent which points to U_Base_Type unless we
+have a "new" in which case U_Base_Type is the "real" type and
+U_Base_Structure determines whether two types are interconvertible.
+
+--> TBD for ParaSail: Currently polymorphic types are a bit of a kludge.
+ The U_Base_Type of a polymorphic type is the non-polymorphic type, and
+that can create problems.  We should really treat polymorphic types and
+non-polymorphic types as distinct types, but with a Non_Poly_Type field
+which points at itself if non-polymorphic, or points at the root
+non-poly type if is polymorphic.
+
+Similarly it would be nice to go from a type to the polymorphic type,
+but it is not clear that is as critical, though that is clearly what
+happens when we see "T+".  To do that we copy and set Is_Polymorphic and
+then look it up via Find_U_Type or Find_U_Base_Type.  That is a bit of
+an expensive approach if we need to do this regularly, but if it is only
+when parsing "T+" that is probably fine.  We could always provide a
+function to do this step and add a "hard" pointer at some point if
+appropriate.
+
+----
+
+Back to Sparkel -- what we need initially is a change to the overloading
+to include the enclosing scope if the type is marked "new" (which
+essentially all Sparkel types will be, other than anonymous types like
+tuple types).  We might as well implement "new" properly for ParaSail
+while we are at it.
+
+----
+
+Implementing "new" in ParaSail:
+
+   The tricky part is that the subtype of a "new" type does not generate
+   a new type.  So perhaps what we need to do is bump some kind of
+   global counter when we see a "new" and that creates an arbitrary
+   distinction which must match for two types to be the same.
+
+----
+
+Back to Sparkel again -- "new" now works in ParaSail, with a
+New_Type_Counter being > 0 and Parent_Type pointing to the underlying
+type, and a U_Base_Structure pointing to the U_Base_Type of the ultimate
+ancestor type.  We have a flag "Treat_As_Type" for a module to indicate
+it is the module implicitly declared by a "private" or "record" type
+declaration.  Currently we are using the current instance of this module
+as the type.  But we probably want to instead use it as the ultimate
+ancestor, and hence the parent type of the declared type.  By marking
+the type as a "new" type, we will get the appropriate region visibility.
+ So we should create a new type decl and use that as the definition for
+the type, and add this new type to the region.  Both the module and its current instance would be anonymous.
+
+Question: what do we walk when we analyze a package?  We walk the list built in the parser.  This means that the module will have to walk the type_decl.  Where will it hang from the module?  I suppose we could make it the current instance of the module.  The current instance is just represented by a type_sem, but I wonder whether we assume it has an invocation as its definition.  It could have a type_decl, presumably.  Alternatively we dispense with the type_decl node, and just mark it as new.  The reason for marking it as "new" is to get the extra visibility.  We need to check where that happens.  Add_Operation_Interps loops over the ancestors and for each "new" type it looks where the associated symbol is declared.  Similarly, Set_Identifier_Sem_Info when having a "new" type as a prefix, looks where type and its ancestors are declared, as well as inside associated module.  This might be used for discriminants (const components) when known, conceivably.
+
+But what happens with a tuple type?  Well in that case we have an anonymous type, handled specially as though they are all instances of the tuple module.  Does that really work?  We need a unique associated module for each tuple type, or at least each distinct set of component names, if we are going to have a region somewhere.  But I suppose the key is that for tuple types, they can have different associated modules but still be grouped into a single hash table for find_u_base_type.  But why do we want to treat them as the same type?  Perhaps it is just a question of interconvertibility, not equivalence.
+

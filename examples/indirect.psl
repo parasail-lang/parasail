@@ -1,0 +1,42 @@
+import PSL::Short_Names::*, *
+
+abstract interface Addable<> extends Assignable<> is
+   op "+"(Left, Right : Addable) -> Addable;
+end interface Addable;
+
+interface Container<E is Addable<>> is
+   func Create(Elem : E) -> Container;
+   op "+="(var C : Container; Right : E);
+   func Get(C : Container) -> E;
+end interface Container;
+
+class Container<E is Addable<>> is
+   var Val : E;
+   
+   exports
+
+   func Create(Elem : E) -> Container is
+      return (Val => Elem);
+   end func Create;
+
+   op "+="(var C : Container; Right : E) is
+      C.Val := C.Val + Right;
+   end op "+=";
+
+   func Get(C : Container) -> E is
+      return C.Val;
+   end func Get;
+end class Container;
+
+func main(Args : Basic_Array<String>) is
+   if Args not null then
+      var I := 1;
+      var C : Container<Int> := Create(0);
+      Print("Before summing args, container = "); Print(Get(C)); Print('\n');
+      while I <= Length(Args) loop
+         C += From_String(Args[I]);
+         I += 1;
+      end loop;
+      Print("After summing args, container = "); Print(Get(C)); Print('\n');
+   end if;
+end func main;

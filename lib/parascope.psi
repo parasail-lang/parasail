@@ -1,0 +1,1701 @@
+// ParaScope: ParaSail Static Catcher of Programming Errors
+
+// Copyright (C) 2011-2016, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+import PSC::Reflection
+
+interface PSC::CFG<> is
+   // Control Flow graph of nodes connected by edges
+   type Node_Id is new Integer<0 .. 100_000>
+   type Edge_Id is new Integer<0 .. 100_000>
+
+   type Node_Set is Countable_Set<Node_Id>
+
+   const First_Node_Id := 1
+   const First_Edge_Id := 1
+
+   interface Edge<> is
+      const From : Node_Id
+      const To   : Node_Id
+   end interface Edge
+
+   interface Node<> is
+      var First : optional Reflection::Routine::Code_Offset := null
+      var Last  : optional Reflection::Routine::Code_Offset := null
+      var Incoming_Edges : Vector<Edge_Id> := []
+      var Outgoing_Edges : Vector<Edge_Id> := []
+   end interface Node
+
+   interface Node_List<> is
+     // A list of nodes; used to represent an order for walking the graph.
+      const Id   : Node_Id
+      const Next : optional Node_List
+   end interface Node_List
+
+   op "[]"() -> CFG
+   //  Create an empty control-flow graph
+
+   func Add_Node(var CFG) -> Node_Id
+   //  Add node to control-flow graph
+
+   func Last_Node_Id(CFG) -> Node_Id
+
+   op "magnitude"(CFG) -> Univ_Integer is ([[Last_Node_Id(CFG)]])
+   //  Number of nodes in control-flow graph
+
+   func Add_Edge(var CFG; From, To : Node_Id) -> Edge_Id
+   //  Add edge to control-flow graph
+
+   func Remove_Edge(var CFG; E : Edge_Id)
+   //  Remove edge from Incoming_Edges and Outgoing_Edges of To/From nodes
+
+   func Last_Edge_Id(CFG) -> Edge_Id;
+
+   func Nth_Node(ref CFG; Node_Id) -> ref Node
+   //  Return reference to Node given Node_Id
+
+   op "indexing"(ref CFG; Node_Id) -> ref Node is Nth_Node
+
+   func Nth_Edge(ref CFG; Edge_Id) -> ref Edge
+   //  Return reference to Edge given Edge_Id
+
+   func Add_Root(var CFG; Root : Node_Id)
+   //  Add another Node to the set of roots
+
+   func Roots(ref CFG) -> ref Node_Set
+   //  Return reference to set of root nodes
+
+   func Successors(CFG; Node_Id) -> Vector<Node_Id>
+
+   func Predecessors(CFG; Node_Id) -> Vector<Node_Id>
+
+   func All_Nodes(CFG) -> Countable_Range<Node_Id>
+     is (1 .. Last_Node_Id(CFG))
+
+   func All_Edges(CFG) -> Countable_Range<Edge_Id>
+     is (1 .. Last_Edge_Id(CFG))
+
+   func Reverse_Postorder
+     (CFG; Connected_Nodes_Only : Boolean := #false)
+     -> Result : optional Node_List
+     {|CFG| > 0 ==> Result not null}
+     //  Return list of all nodes (or Connected_Nodes_Only if #true)
+     //  in a reverse postorder 
+
+   interface Dominator_Tree<> is
+      func Dominates (Dominator_Tree; Dominator, Dominated : Node_Id)
+        -> Boolean
+      //  Return true if Dominator dominates Dominated
+
+      func Postdominates (Dominator_Tree;
+                          Postdominator, Postdominated : Node_Id)
+        -> Boolean
+      //  Return true if Postdominator postdominates Postdominated
+
+      func Immediate_Dominator (Dominator_Tree; Node_Id) -> Node_Id
+      //  Return immediate dominator of given node.  Returns
+      //  self only if node is the entry node of the CFG.
+
+      func Immediate_Postdominator (Dominator_Tree; Node_Id) -> Node_Id
+      //  Return immediate postdominator of given node.  Returns
+      //  self only if node is the exit node of the CFG.
+
+      func Primary_Root (Dominator_Tree) -> Node_Id
+      //  Return the primary "root" of the dominator tree
+
+      func Roots (Dominator_Tree) -> Node_Set
+      //  Return the set of roots of the dominator tree
+
+      func Is_Connected (Dominator_Tree; Node_Id) -> Boolean
+      //  Return #true if Node is connected to the root
+
+      func Dominance_Frontier (ref const Dominator_Tree; Node_Id)
+        -> ref const Set<Node_Id>
+      //  Return the "dominance frontier" for the given node.  R. Cytron et al
+      //  defines this in "Efficiently computing static single assignment form
+      //  and the control dependence graph"(1991) as "...the set of all cfg
+      //  nodes, y, such that b dominates a predecessor of y but does not
+      //  strictly dominate y."
+      //  Dominance frontiers are useful in SSA -- an assignment occurring
+      //  in a node b generally needs a phi-node in all nodes in the
+      //  dominance frontier of node b.
+      //  NOTE: A node can be in its own dominance frontier (generally
+      //        this means the node is a loop header).
+
+      func Reverse_Postorder(ref const Dominator_Tree)
+        -> ref const Node_List
+      //  Return Node_List in Reverse Postorder for the CFG from which the
+      //  control-flow graph was computed.
+
+      func Postorder(ref const Dominator_Tree)
+        -> ref const Node_List
+      //  Return Node_List in Postorder for the CFG from which the
+      //  control-flow graph was computed.
+
+      func Is_Loop_Header (Dominator_Tree; Node_Id) -> Boolean
+      //  Return #true if the specified node is a loop header
+      //  (which is defined to be a node that has itself in its
+      //  dominance frontier).
+
+      func Enclosing_Loop (Dominator_Tree; Node_Id) -> optional Node_Id
+      //  Return Node_Id of innermost loop header that (strictly) dominates
+      //  the given node.  If Node_Id is itself a loop header, this is the
+      //  enclosing loop, if any.  It is null if this is an outermost
+      //  loop header, or the block is not inside any loop.
+
+      func Is_Within_Loop(Dominator_Tree; Member, Loop_Header : Node_Id)
+        -> Boolean
+      //  Return #true if Member is inside the loop headed by Loop_Header,
+      //  directly or indirectly.
+      //  Loop_Header is within its own loop, presuming it is a loop header.
+      //  This returns false if Loop_Header is not in fact a loop header.
+
+      func Is_Back_Edge (Dominator_Tree; Edge_Id) -> Boolean
+      //  Return #true if the specified edge is a back edge
+      //  (meaning its "From" is dominated by its "To" node).
+
+      func Compute(var CFG) {|CFG| > 0} -> Dominator_Tree
+      //  Compute the dominator tree for the given control-flow graph.
+      //  Eliminate edges from disconnected nodes from the graph.
+
+   end interface Dominator_Tree
+
+   func Compute_Dominator_Tree(var CFG)
+   //  Compute dominator tree of CFG if not already computed;
+
+   func Get_Dominator_Tree(ref const CFG) -> ref const optional Dominator_Tree
+     {|CFG| > 0 ==> Get_Dominator_Tree not null}
+   //  Return reference to dominator tree.
+
+   func Dump_Graph(var File : Output_Stream+; CFG;
+     Reflection::Routine; Label : Univ_String;
+     Node_Attrib_Map : Map<CFG::Node_Id, Univ_String> := [];
+     Edge_Attrib_Map : Map<CFG::Edge_Id, Univ_String> := [];
+     DT : optional Dominator_Tree := null)
+   //  Dump the control-flow graph.  If DT is non-null, then include
+   //  the dominator tree and the dominance frontiers
+
+end interface PSC::CFG
+
+import PSC::Reflection, PSC::Analysis::*
+import PSC::CFG
+import PSC::VN_IL_Type
+
+interface PSC::Analysis<> is
+   const Debug : Boolean := #false
+   const Debug_Verbose : Boolean := #false
+   const Debug_Propagation : Boolean := #false
+   const Debug_Value_Numbering : Boolean := #false
+   const Debug_VN_IL : Boolean := #false
+   const Debug_Phis : Boolean := #false
+   const Dump_CFG : Boolean := #false
+   const Msg_File_Name : optional Univ_String := "errors.err"
+
+   type Node_Set is CFG::Node_Set
+   
+   type Code_Index is Reflection::Routine::Code_Index
+
+   type VN_Id is PSC::VN_IL_Type::VN_Id
+      //  type VN_Id is new Integer<0 .. 100_000>  
+      //  Unique id assigned to value number and index into VN_Table
+
+   type Addr_VN_Id is VN_Id
+      //  VN used to repesent an address
+
+   type OID is new Integer<0 .. 100_000>
+      //  Unique id assigned to an "origin" info and index into OID_Table
+
+   type Object_Locator is Reflection::Object_Locator
+
+   type Code_Nesting_Level is Reflection::Code_Nesting_Level
+      //  Used for dealing with up-level references
+
+   type Output_Index is new Integer<0 .. 1_000>
+
+   func Analyze(File_Name : Univ_String)
+
+   func Analyze_Operation (Item : Reflection::Decl)
+      //  Analyze one operation
+
+   func Put_Error
+     (Message : Univ_String;
+      Source_Pos : optional Reflection::Source_Position := null;
+      Message_Kind : Univ_String := "Error")
+   //  Put out an error message on the standard error stream
+
+   func Put_Warning
+     (Message : Univ_String;
+      Source_Pos : optional Reflection::Source_Position := null;
+      Message_Kind : Univ_String := "Warning") is Put_Error
+
+   func Compare_VN_Vectors(Left, Right : Vector<VN_Id>) -> Ordering;
+
+   type VN_To_VN_Map_Type is
+     Ordered_Map<Key_Type => VN_Id, Value_Type => VN_Id>
+
+   type VN_To_OID_Map_Type is Ordered_Map<Key_Type => VN_Id, Value_Type => OID>
+   type OID_To_VN_Map_Type is Ordered_Map<Key_Type => OID, Value_Type => VN_Id>
+   type OID_To_UV_Map_Type is
+     Ordered_Map<Key_Type => OID, Value_Type => Updated_Value>
+
+   // type VN_OID_Two_Way_Map_Type is
+     // Two_Way_Map<Key_Type => VN_Id, Value_Type => OID>
+
+   type VN_Set is Ordered_Set<VN_Id>
+
+   type VN_To_Value_Set_Map_Type is
+     Ordered_Map<Key_Type => VN_Id, Value_Type => Value_Set+>
+
+   type VN_Table is Indexed_Set<Value_Number+, VN_Id>
+
+   type OID_Table is Indexed_Set<Origin_Info+, OID>
+
+   interface Value_Numbering_Id_Data
+      <Id_Type is Integer<>;
+       Table_Type is Indexed_Set<Assignable<>, Id_Type>;
+       Map_To_Id_Type is Ordered_Map<Integer<>, Id_Type>> is
+     //  The set of data maintained in Op_Ctx for OIDs and for VNs
+
+      var Table : Table_Type := []
+        // Indexed Set of OIDs/VNs for current operation
+
+      var Node_To_Id_Map :
+        Map<Key_Type => CFG::Node_Id, Value_Type => Map_To_Id_Type> := []
+         // Table of all AO/OV maps, indexed by Node_Id
+
+      var Loop_Header_Id_Map : 
+        Map<Key_Type => CFG::Node_Id, Value_Type => Map_To_Id_Type> := []
+         // For OID/VN references through a loop header that did not
+         // end up as a "phi."
+
+      var Phi_Id_Inputs : 
+        Map<Key_Type => Id_Type, Value_Type => Vector<Id_Type>> := []
+         // Vector of inputs to Phi, indexed by incoming edge number
+
+      var Node_Phi_Id_Maps :
+        Map<Key_Type => CFG::Node_Id, Value_Type => Map_To_Id_Type> := []
+         // Map of phis associated with given node
+
+      func Default() -> Value_Numbering_Id_Data is (()) // Default init
+   end interface Value_Numbering_Id_Data
+
+   type OI_Data_Record is
+     Value_Numbering_Id_Data<OID, OID_Table, VN_To_OID_Map_Type>
+
+   type VN_Data_Record is
+     Value_Numbering_Id_Data<VN_Id, VN_Table, OID_To_VN_Map_Type>
+
+   type VN_Live_Range is Map<VN_Id, Countable_Set<Code_Index>>
+     //  A map from VN to a set of instruction indices where the VN is live
+
+   interface VN_Init_Place<> is 
+     //  The instruction index where a VN is initialized
+      const VN : VN_Id
+      const Place : Code_Index
+   end interface VN_Init_Place
+
+   type Addr_VN_To_VN_Ref is Map<Addr_VN_Id, VN_Init_Place>
+     //  A map from object locator to the place where it is referenced
+     //  and has the value defined by the given VN.
+
+   type Addr_VN_To_VN_Live_Range_Map is Map<Key_Type => Addr_VN_Id,
+                                           Value_Type => VN_Live_Range>
+     //  A map from a particular Addr_VN (i.e. location of a memory cell) to
+     //  the set of VNs that are "live" in the memory cell, and the instruction
+     //  indices where they are live.
+
+   func Is_Literal_VN(VN_Table; VN : VN_Id) -> Boolean
+      //  Return #true if VN is the value number for a literal VN
+
+   func Int_Literal_Value(VN_Table; VN : VN_Id) -> optional Univ_Integer
+      //  Return value of int literal, or null if VN is not an int-literal VN
+
+   func Enum_Literal_Value(VN_Table; VN : VN_Id) -> optional Univ_Enumeration
+      //  Return value of enum literal, or null if VN is not an enum-literal VN
+
+   func Str_Literal_Value(VN_Table; VN : VN_Id) -> optional Univ_String
+      //  Return value of string lit, or null if VN is not an str-literal VN
+
+   func Get_Int_Literal_VN(var VN_Table; Int_Val : Univ_Integer) -> VN_Id
+      //  Return Int_Literal_VN for given int value
+
+   func Get_Bool_Literal_VN(var VN_Table; Bool_Val : Boolean) -> VN_Id
+      //  Return Bool_Literal_VN for given bool value
+
+   func Boolean_Vals(Vals : Value_Set+) -> Boolean_Value_Set
+      //  Convert value set to Boolean_Vals if possible
+
+   func Boolean_Vals(VN_Values : VN_To_Value_Set_Map_Type; VN : VN_Id)
+     -> Boolean_Value_Set
+      //  Return stored Boolean_Value_Set of VN, or return an anything-goes
+      //  value set (Might be null/true/false) if nothing stored yet.
+
+   func Countable_Vals(Vals : Value_Set+) -> Countable_Value_Set
+      //  Convert value set to Countable_Vals if possible
+
+   func Countable_Vals(VN_Values : VN_To_Value_Set_Map_Type; VN : VN_Id)
+     -> Countable_Value_Set
+      //  Return stored Countable_Value_Set of VN, or return an anything-goes
+      //  value set (Might be null/-inf .. +inf) if nothing stored yet.
+
+   func Union_In_Vals
+     (var Merged_VSet : optional Value_Set+;
+      New_Vals : Value_Set+)
+      //  Union New_Vals into Merged_VSet.  Value_Kind might change.
+
+   type How_Reduced is Enum<[#unchanged, #reduced, #reduced_to_empty]>
+
+   func Intersect_With_Vals
+     (var Shared_VSet : optional Value_Set+;
+      New_Vals : Value_Set+;
+      Restore_If_Empty : Boolean := #false) -> How_Reduced
+      //  Intersect New_Vals with Shared_VSet.  Value_Kind might change.
+      //  Return #reduced or #reduced_to_empty if Shared_VSet shrinks.
+      //  If Restore_If_Empty is #true, and Shared_VSet would go to empty,
+      //  restore it to its original value (though possibly converted to
+      //  Boolean or Countable set)
+
+   func Intersect_Value_Maps
+     (var Combined_VN_Values : VN_To_Value_Set_Map_Type;
+      VN_Values : VN_To_Value_Set_Map_Type) -> Changed_VNs : VN_Set
+     //  Combine Combined_VN_Values and VN_Values by intersecting
+     //  their value sets
+     //  Return set of VNs that have their value set reduced
+
+   func Union_Value_Maps
+     (var Join_Point_Vals : optional VN_To_Value_Set_Map_Type;
+      Edge_Vals : optional VN_To_Value_Set_Map_Type)
+     //  Union Edge_Vals into Join_Point_Vals
+     //  If Join_Point_Vals is null, replace with Edge_Vals.
+     //  If Edge_Vals is null, this is a no-op.
+
+   //  Routines that do "careful" operations to avoid overflow
+   func Saturating_Plus(Left, Right : Univ_Integer) -> Univ_Integer
+   func Saturating_Minus(Left, Right : Univ_Integer) -> Univ_Integer
+   func Saturating_Times(Left, Right : Univ_Integer) -> Univ_Integer
+end interface PSC::Analysis
+
+abstract interface PSC::Analysis::Value_Set<> is
+  // Value sets are represented in various ways, depending on the
+  // kind of value.  Initially we have Boolean_Value_Sets and
+  // Countable_Value_Sets.  We will also have value sets for
+  // floating point numbers (and perhaps Fixed as well?).
+  // We might also have CTK_Value_Sets, which
+  // would be sets of compile-time-known VNs that a given value number
+  // might contain.
+
+   var Might_Be_Null : Boolean := #true
+   op "|="(var Left : Value_Set; Right : Value_Set)
+   op "and="(var Left : Value_Set; Right : Value_Set)
+
+   type Value_Set_Kind is Enum<[#Object, #Boolean, #Countable]>
+
+   func Value_Kind(Value_Set) -> Value_Set_Kind
+
+   optional func Set_Is_Null(var Value_Set)
+     // Makes sure everything but Might_Be_Null is #false.
+     // This means Is_Empty should return #true if Might_Be_Null is #false.
+   func Is_Empty(Value_Set) -> Boolean
+   op "=?"(Left, Right : Value_Set) -> Ordering
+   func Hash(Value_Set) -> Univ_Integer
+   func To_String(Value_Set) -> Univ_String
+   optional func From_String(Univ_String) -> optional Value_Set
+end interface PSC::Analysis::Value_Set
+
+abstract interface PSC::Analysis::Value_Number<> is
+   //  Value numbers are all extensions of this root interface
+   //  TBD: Add a "type" field to all value numbers?
+   func Hash(Value_Number) -> Univ_Integer
+   op "=?"(Left, Right : Value_Number) -> Ordering
+
+   optional func Child_Vec(Value_Number) -> optional Vector<VN_Id>
+
+   optional func Compute_Value_Set
+     (Value_Number; VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+
+   optional func Propagate_To_Operands
+     (Value_Number; Value_Set+;
+      VNT : VN_Table; VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional VN_To_Value_Set_Map_Type is ([])
+     //  Do a top-down propagation to operands of value number.
+     //  Return null if top-down propagation fails.
+     //  Otherwise, return a mapping of operands to their new value sets.
+
+   optional func Can_Have_Null_Value(Value_Number)
+     -> optional Boolean is (#true)
+     //  Return #true if Value_Number can in some cases have a null value
+
+   func To_String(Value_Number) -> Univ_String
+   optional func From_String(Univ_String) -> optional Value_Number
+
+end interface PSC::Analysis::Value_Number
+
+interface PSC::Analysis::Op_Ctx<> is
+  // Data maintained during the static analysis of one operation
+   type Pass_Enum is Enum<[#find_basic_blocks, #build_cfg, #value_number]>
+
+   const Routine : Reflection::Routine
+                             // Ref to associated Routine
+
+   var Pass : Pass_Enum := #find_basic_blocks
+                             // Current analysis "pass" for cur operation
+   var CFG : PSC::CFG := []  // Control-flow graph for current operation
+
+   var Node_Starts : Ordered_Set<Code_Index> := []
+                             // Instr indices where basic blocks start
+   var Nested_Block_Starts : Ordered_Set<Code_Index> := []
+                             // Instr indices where nested blocks start
+
+   var Nested_Block_Param_Area : Map<CFG::Node_Id,
+                                     Reflection::Offset_Within_Area> := []
+                             // Offset in enclosing block where nested block's
+                             // param area starts
+
+   var Last_End_Instr : optional Code_Index := null
+                             // Last return/exit stmt in op/nested block
+   var CFG_Ends : Ordered_Set<Code_Index> := []
+                             // Instr indices where op/nested-block ends
+   var Instr_To_Node_Map : Map<Code_Index, CFG::Node_Id> := []
+                             // CFG node that starts at given instr, if any
+   var Cur_Node_Id : optional CFG::Node_Id := null
+                             // Current CFG node, in #build_cfg pass
+                             // and thereafter.
+   var Cur_Entry_Node : optional CFG::Node_Id := null
+                             // Node id for basic-block that starts
+                             // current control-flow graph, where each
+                             // nested block is treated as a separate CFG.
+   var Cur_Exit_Node : optional CFG::Node_Id := null
+                             // Node id for basic-block that ends
+                             // current control-flow graph, where each
+                             // nested block is treated as a separate CFG.
+   var CFG_Entry_Nodes : Node_Set := []
+                             //  Nodes where CFGs start
+   var CFG_Exit_Nodes  : Node_Set := []
+                             //  Nodes where CFGs end
+   var Entry_Node_To_Exit_Node_Map :
+     Two_Way_Map<CFG::Node_Id, CFG::Node_Id> := []
+                             // For each entry node, corresponding exit node
+                             // where all exit/return statements converge.
+
+   var Cur_Out_Of_Line_Root : optional CFG::Node_Id := null
+                             // Node id for nearest basic-block that is the
+                             // root of the CFG for a routine or an out-of-line
+                             // nested block.
+   var Cur_Out_Of_Line_Level : Code_Nesting_Level := 0
+                             // Level for nearest basic-block that is the
+                             // root of the CFG for a routine or an out-of-line
+                             // nested block.
+   var Invoking_Block : Map<CFG::Node_Id, CFG::Node_Id> := []
+                             // For each block that is the root of an
+                             // out-of-line nested block, identify the
+                             // node containing the Start_Parallel_Op
+                             // that invokes it
+
+   var Rerun_Value_Numbering : Boolean := #false
+
+   var Null_VN : VN_Id := 0; // Initialized to value number for "null"
+
+   var Boolean_VNs : VN_Set := []
+                             // Set of VNs that are booleans
+
+   var CTK_VNs : VN_Set := []
+                             // Set of VNs that are compile-time known;
+                             // i.e. literals or functions of literals.
+
+   var Loops_With_Uplevel_Refs : Node_Set := []
+                             // Set of BBs that contain calls on nested
+                             // operations or nested blocks that make up-level
+                             // references.
+
+   var OI_Data : OI_Data_Record := Default()
+                             // Data kept for OIDs of current operation
+
+   var VN_Data : VN_Data_Record := Default()
+                             // Data kept for VNs of current operation
+
+   var Non_Null_Inputs : VN_Set := []
+                             // Set of addresses of inputs known to be non-null
+
+   var Deref_Non_Null : VN_Set := []
+                             // Set of VNs whose deref is addr of non-null obj
+
+   var Addr_To_OID_Map : VN_To_OID_Map_Type := []
+                             // Current BB's Address-to-OID mapping
+   var OID_To_VN_Map : OID_To_VN_Map_Type := []
+                             // Current BB's OID-to-VN mapping
+
+   var OID_To_UV_Map : OID_To_UV_Map_Type := []
+                             // Current BB's OID-to-Updated-Value mapping
+
+   var All_Component_OIDs : Set<OID> := []
+                             // Set of OIDs that are for components
+
+   var Component_OID_To_Addr_Map : OID_To_VN_Map_Type := []
+                             // Map from Component_OID to Component_Addr
+                             // where it originated
+
+   var Node_To_OUV_Map :
+     Map<Key_Type => CFG::Node_Id, Value_Type => OID_To_UV_Map_Type> := []
+                             // Map of all OUV-maps, indexed by Node_Id
+
+   var Instr_To_Assertions_Map : Ordered_Map<Key_Type => Code_Index,
+                                     Value_Type => Ordered_Set<VN_Id>> := []
+                             // Map from instruction to set of assertions
+                             // that need to be proven.
+   var Edge_Condition : Ordered_Map<Key_Type => CFG::Edge_Id,
+                            Value_Type => VN_Id> := []
+                             // Map from edge-id to condition that must
+                             // be true to traverse the edge.
+                             // Default condition is "#true".
+
+   var Dead_Edges : Ordered_Set<CFG::Edge_Id> := []
+                             // Set of edges that are determined to be dead
+
+   var Edge_Values : 
+     Array<VN_To_Value_Set_Map_Type, Indexed_By => CFG::Edge_Id> := []
+                             // Map from VN to Value set for each edge
+
+   var VN_To_Parent_Set_Map : Array<VN_Set, Indexed_By => VN_Id> := []
+                             // Set of immediate parent VNs of each VN
+                             // (inverse of Child_Vec function)
+
+   var Propagating_Values : Boolean := #false
+                             //  Indicates we are in the middle of value
+                             //  propagation and shouldn't produce error
+                             //  messages yet.
+
+   var Error_Found_During_Propagation : Boolean := #false
+                             //  Indicates we found an error while
+                             //  propagating values, and so should perform
+                             //  another pass to display the errors.
+
+   var Addr_Fetch_VNs : optional Map<Addr_VN_Id, VN_Id> := null
+                             //  A map from Addr_VN fetched
+                             //  to associated (content) VN
+
+   var Instr_To_Addr_Fetch_VNs : Ordered_Map<Key_Type => Code_Index,
+                                Value_Type => Map<Addr_VN_Id, VN_Id>> := []
+                             //  For each code index, a map from Addr_VN
+                             //  fetched to associated (content) VN
+
+   var Instr_To_Addr_Store_VNs : Ordered_Map<Key_Type => Code_Index,
+                                Value_Type => Map<Addr_VN_Id, VN_Id>> := []
+                             //  For each code index, a map from Addr_VN
+                             //  stored to associated (content) VN
+
+   var Locator_To_Addr : Map<Object_Locator, VN_Id> := []
+                            //  Temp map from locator to address VN;
+                            //  Re-initialized for each PSVM instruction
+
+   var Instr_To_Locator_Map : Ordered_Map<Key_Type => Code_Index,
+                                Value_Type => Map<Object_Locator, VN_Id>> := []
+                            //  For each code index, a map from locator
+                            //  to address VN
+
+   var Addr_VN_Live_Ranges : Addr_VN_To_VN_Live_Range_Map := []
+                            //  For each Addr_VN, where it has a "live"
+                            //  value representing a particular VN.
+                            //  The content at a given Addr_VN is irrelevant
+                            //  when it is not in the live range of any VN.
+
+   func Entry_Node_For_BB(Op_Ctx; BB : CFG::Node_Id;
+     Uplevel : Code_Nesting_Level := 0) -> CFG::Node_Id
+     // Return id of entry block for enclosing nested block/operation
+     // given current basic block, and uplevel count, if any, from
+     // Enclosing_Local_Area or Enclosing_Param_Area locator.
+     // Return 0 for entry node if this is an up-level reference to an
+     // enclosing operation.
+
+   func Level_Of_BB(Op_Ctx; BB : CFG::Node_Id;
+     Uplevel : Code_Nesting_Level := 0) -> Code_Nesting_Level
+     // Return nesting level of enclosing nested block/operation
+     // given current basic block, and uplevel, if any, from
+     // Enclosing_Local_Area or Enclosing_Param_Area locator.
+
+   func Enclosing_Node(Op_Ctx; I : Code_Index) -> CFG::Node_Id
+     //  Return ID of Node enclosing given Code_Index
+
+   func Addr_VN_For_Locator(var Op_Ctx; Locator : Object_Locator;
+     I : Code_Index) -> optional Addr_VN_Id is in PSC::Analysis::ParaScope
+    //  Return an addr value number for given object locator if pre-computed
+
+end interface PSC::Analysis::Op_Ctx
+
+interface PSC::Analysis::Boolean_Value_Set<> extends Value_Set is
+  // A representation for the set of possible Boolean values, namely
+  // #true, #false, and null.
+  // TBD: We might have simply used Countable_Value_Set for this instead.
+   var Might_Be_True : Boolean := #true
+   var Might_Be_False : Boolean := #true
+   op "|="(var Left : Boolean_Value_Set; Right : Boolean_Value_Set)
+   
+   op "and="(var Left : Boolean_Value_Set; Right : Boolean_Value_Set)
+
+   func Value_Kind(Boolean_Value_Set) -> Value_Set::Value_Set_Kind
+     is (#Boolean)
+
+   func Set_Is_Null(var Vals : Boolean_Value_Set)
+     // Makes sure everything but Might_Be_Null is #false.
+     // This means Is_Empty should return #true if Might_Be_Null is #false.
+
+   func Is_Empty(Vals : Boolean_Value_Set) -> Boolean
+     is (not (Vals.Might_Be_True
+              or Vals.Might_Be_False
+              or Vals.Might_Be_Null))
+
+   op "=?"(Left, Right : Boolean_Value_Set) -> Ordering
+     is (Left.Might_Be_True == Right.Might_Be_True
+           and then Left.Might_Be_False == Right.Might_Be_False
+           and then Left.Might_Be_Null == Right.Might_Be_Null? #equal :
+         Left.Might_Be_True <= Right.Might_Be_True
+           and then Left.Might_Be_False <= Right.Might_Be_False
+           and then Left.Might_Be_Null <= Right.Might_Be_Null? #less :
+         Left.Might_Be_True >= Right.Might_Be_True
+           and then Left.Might_Be_False >= Right.Might_Be_False
+           and then Left.Might_Be_Null >= Right.Might_Be_Null? #greater :
+         #unordered)
+
+   func Hash(Vals : Boolean_Value_Set) -> Univ_Integer
+     is ((Vals.Might_Be_True - Boolean::First())*2 +
+         (Vals.Might_Be_False - Boolean::First()))
+
+   func To_String(Vals : Boolean_Value_Set) -> Univ_String
+     is ("Boolean::[" | (Vals.Might_Be_Null? "null " : "") |
+         (Vals.Might_Be_False? "false " : "") |
+         (Vals.Might_Be_True? "true " : "") | "]")
+end interface PSC::Analysis::Boolean_Value_Set
+
+interface PSC::Analysis::Countable_Value_Set<> extends Value_Set is
+  // A representation for a set of integer or integer-like values.
+   var Possible_Values : Countable_Set<Univ_Integer> := [..]
+   op "|="(var Left : Countable_Value_Set; Right : Countable_Value_Set)
+   
+   op "and="(var Left : Countable_Value_Set; Right : Countable_Value_Set)
+
+   func Value_Kind(Countable_Value_Set) -> Value_Set::Value_Set_Kind
+     is (#Countable)
+
+   func Set_Is_Null(var Vals : Countable_Value_Set)
+     // Makes sure everything but Might_Be_Null is #false.
+     // This means Is_Empty should return #true if Might_Be_Null is #false.
+
+   func Is_Empty(Vals : Countable_Value_Set) -> Boolean
+     is (not Vals.Might_Be_Null and then Is_Empty(Vals.Possible_Values))
+
+   func Hash(Vals : Countable_Value_Set) -> Univ_Integer
+     is ((Vals.Might_Be_Null - Boolean::First())*100 + |Vals.Possible_Values|)
+
+   op "=?"(Left, Right : Countable_Value_Set) -> Ordering
+     is (Left.Might_Be_Null == Right.Might_Be_Null
+           and then Left.Possible_Values == Right.Possible_Values? #equal :
+         Left.Might_Be_Null <= Right.Might_Be_Null
+           and then Left.Possible_Values <= Right.Possible_Values? #less :
+         Left.Might_Be_Null >= Right.Might_Be_Null
+           and then Left.Possible_Values >= Right.Possible_Values?
+              #greater : #unordered)
+
+   func To_String(Vals : Countable_Value_Set) -> Univ_String
+
+   type Univ_Operation is func (Left, Right : Univ_Integer) -> Univ_Integer
+
+   func Combine(Countable_Op : Univ_Operation; Op_Name : Univ_String;
+     Left, Right : Countable_Value_Set) -> Countable_Value_Set
+     //  Combine Value sets using countable op
+
+   func Compare_Sets(Left, Right : Countable_Value_Set) -> Countable_Value_Set
+     //  Combine Value sets using "=?" producing a set of ordering values
+
+end interface PSC::Analysis::Countable_Value_Set
+
+interface PSC::Analysis::Object_Value_Set<> extends Value_Set is
+  // A representation for possible values of an arbitrary object.
+  // We only worry about whether or not overall is null.  All other
+  // info is carried on value sets associated with individual components.
+   var Might_Be_Non_Null : Boolean := #true
+
+   op "|="(var Left : Object_Value_Set; Right : Object_Value_Set)
+   
+   op "and="(var Left : Object_Value_Set; Right : Object_Value_Set)
+
+   func Value_Kind(Object_Value_Set) -> Value_Set::Value_Set_Kind
+     is (#Object)
+
+   func Set_Is_Null(var Vals : Object_Value_Set)
+     // Makes sure everything but Might_Be_Null is #false.
+     // This means Is_Empty should return #true if Might_Be_Null is #false.
+
+   func Is_Empty(Vals : Object_Value_Set) -> Boolean
+     is (not Vals.Might_Be_Null and not Vals.Might_Be_Non_Null)
+
+   op "=?"(Left, Right : Object_Value_Set) -> Ordering
+     is (Left.Might_Be_Non_Null == Right.Might_Be_Non_Null
+           and then Left.Might_Be_Null == Right.Might_Be_Null? #equal :
+         Left.Might_Be_Non_Null <= Right.Might_Be_Non_Null
+           and then Left.Might_Be_Null <= Right.Might_Be_Null? #less :
+         Left.Might_Be_Non_Null >= Right.Might_Be_Non_Null
+           and then Left.Might_Be_Null >= Right.Might_Be_Null? #greater :
+         #unordered)
+
+   func Hash(Vals : Object_Value_Set) -> Univ_Integer
+     is ((Vals.Might_Be_Non_Null - Boolean::First())*2 +
+         (Vals.Might_Be_Null - Boolean::First()))
+
+   func To_String(Vals : Object_Value_Set) -> Univ_String
+     is ("Object::[" | (Vals.Might_Be_Null? "null " : "") |
+         (Vals.Might_Be_Non_Null? "non-null" : "") | "]")
+end interface PSC::Analysis::Object_Value_Set
+
+//  Begin Literal Value Numbers
+
+abstract interface PSC::Analysis::Literal_VN<>
+   extends PSC::Analysis::Value_Number is
+   type Literal_Kind is Enum<[#Null, #Univ_String, #Univ_Enumeration,
+            #Univ_Integer, #Univ_Real, #Univ_Character, #Boolean]>;
+   func Kind(L : Literal_VN) -> Literal_Kind;
+   func Hash(L : Literal_VN) -> Univ_Integer;
+   op "=?"(Left, Right : Literal_VN) -> Ordering;
+
+   optional func Compute_Value_Set
+     (L : Literal_VN;
+      VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type) -> optional Value_Set+
+     is (Object_Value_Set::(Might_Be_Null => #false,
+                            Might_Be_Non_Null => #true))
+     //  Do a bottom-up computation of the value set of the given VN
+end interface PSC::Analysis::Literal_VN;
+
+interface PSC::Analysis::Null_Literal_VN<>
+   extends PSC::Analysis::Literal_VN is
+   const Origin : optional Code_Index;
+                            //  Make the null unique so its value is not lost
+                            //  when used as an LLVM value number.
+   func Kind(L : Null_Literal_VN) -> Literal_Kind is (#Null);
+   func Hash(L : Null_Literal_VN) -> Univ_Integer is
+     (L.Origin is null? 0 : Hash(L.Origin));
+   op "=?"(Left, Right : Null_Literal_VN) -> Ordering is
+      (Left.Origin is null or else Right.Origin is null?
+       #unordered : Left.Origin =? Right.Origin)
+   func Compute_Value_Set
+     (L : Null_Literal_VN;
+      VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type) -> optional Value_Set+
+     is (Object_Value_Set::(Might_Be_Null => #true,
+                            Might_Be_Non_Null => #false))
+   func To_String(L : Null_Literal_VN) -> Univ_String
+     is ("(Null_Literal" | (L.Origin is null? "" : ", #" | L.Origin) | ")")
+end interface PSC::Analysis::Null_Literal_VN;
+
+interface PSC::Analysis::String_Literal_VN<>
+   extends PSC::Analysis::Literal_VN is
+   const Value : Univ_String;
+   func Kind(L : String_Literal_VN) -> Literal_Kind is (#Univ_String);
+   func Hash(L : String_Literal_VN) -> Univ_Integer is (Hash(L.Value));
+   op "=?"(Left, Right : String_Literal_VN) -> Ordering is
+      (Left.Value =? Right.Value);
+   func To_String(L : String_Literal_VN) -> Univ_String
+     is ("(String_Literal, \"" | L.Value | "\")")
+end interface PSC::Analysis::String_Literal_VN;
+
+interface PSC::Analysis::Enum_Literal_VN
+   extends PSC::Analysis::Literal_VN is
+   const Value : Univ_Enumeration;
+   func Kind(L : Enum_Literal_VN) -> Literal_Kind is (#Univ_Enumeration);
+   func Hash(L : Enum_Literal_VN) -> Univ_Integer is (Hash(L.Value));
+   op "=?"(Left, Right : Enum_Literal_VN) -> Ordering is
+      ((Left.Value =? Right.Value));
+   func To_String(L : Enum_Literal_VN) -> Univ_String
+     is ("(Enum_Literal, " | L.Value | ")")
+end interface PSC::Analysis::Enum_Literal_VN;
+
+interface PSC::Analysis::Int_Literal_VN<>
+   extends PSC::Analysis::Literal_VN is
+   const Value : Univ_Integer;
+   func Kind(L : Int_Literal_VN) -> Literal_Kind is (#Univ_Integer);
+   func Hash(L : Int_Literal_VN) -> Univ_Integer is (L.Value);
+   op "=?"(Left, Right : Int_Literal_VN) -> Ordering is
+      (Left.Value =? Right.Value);
+   
+   func Compute_Value_Set
+     (Int_Lit : Int_Literal_VN;
+      VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type) -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+
+   func To_String(L : Int_Literal_VN) -> Univ_String
+     is ("(Int_Literal, " | L.Value | ")")
+
+  new
+   
+end interface PSC::Analysis::Int_Literal_VN;
+
+interface PSC::Analysis::Real_Literal_VN<>
+   extends PSC::Analysis::Literal_VN is
+   const Value : Univ_Real;
+   func Kind(L : Real_Literal_VN) -> Literal_Kind is (#Univ_Real);
+   func Hash(L : Real_Literal_VN) -> Univ_Integer is (Hash(L.Value));
+   op "=?"(Left, Right : Real_Literal_VN) -> Ordering is
+      (Left.Value =? Right.Value);
+   func To_String(L : Real_Literal_VN) -> Univ_String
+     is ("(Real_Literal, " | L.Value | ")")
+end interface PSC::Analysis::Real_Literal_VN;
+
+interface PSC::Analysis::Char_Literal_VN<>
+   extends PSC::Analysis::Literal_VN is
+   const Value : Univ_Character;
+   func Kind(L : Char_Literal_VN) -> Literal_Kind is (#Univ_Character);
+   func Hash(L : Char_Literal_VN) -> Univ_Integer is (Hash(L.Value));
+   op "=?"(Left, Right : Char_Literal_VN) -> Ordering is
+      (Left.Value =? Right.Value);
+   func To_String(L : Char_Literal_VN) -> Univ_String
+     is ("(Char_Literal, '" | L.Value | "')")
+end interface PSC::Analysis::Char_Literal_VN;
+
+interface PSC::Analysis::Bool_Literal_VN<>
+   extends PSC::Analysis::Literal_VN is
+   const Value : Boolean
+   func Kind(L : Bool_Literal_VN) -> Literal_Kind is (#Boolean);
+   func Hash(L : Bool_Literal_VN) -> Univ_Integer is (Hash(L.Value));
+   op "=?"(Left, Right : Bool_Literal_VN) -> Ordering is
+      (Left.Value =? Right.Value);
+   func To_String(L : Bool_Literal_VN) -> Univ_String
+     is ("(Bool_Literal, " | L.Value | ")")
+
+   func Compute_Value_Set
+     (Bool_Lit : Bool_Literal_VN;
+      VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type) -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+
+end interface PSC::Analysis::Bool_Literal_VN;
+
+//  Begin Component selector value numbers
+
+abstract interface PSC::Analysis::Component_Selector_VN<>
+   extends PSC::Analysis::Value_Number is
+   type Component_Selector_VN_Id is VN_Id
+   type Selector_Kind is
+     Enum<[#named, #static_index, #dynamic_index, #referenced_part]>
+   func Kind(Component_Selector_VN) -> Selector_Kind
+end interface PSC::Analysis::Component_Selector_VN
+
+interface PSC::Analysis::Named_Selector_VN<>
+   extends PSC::Analysis::Component_Selector_VN is
+   //  A named selector is determined completely by the offset
+   const Offset : Reflection::Offset_Within_Area;
+
+   func Kind(Named_Selector_VN) -> Selector_Kind is (#named)
+
+   func Hash(S : Named_Selector_VN) -> Univ_Integer is ([[S.Offset]])
+   op "=?"(Left, Right : Named_Selector_VN) -> Ordering is
+      (Left.Offset =? Right.Offset);
+   func To_String(S : Named_Selector_VN) -> Univ_String
+     is ("(Named_Selector, " | S.Offset | ")")
+end interface PSC::Analysis::Named_Selector_VN
+
+interface PSC::Analysis::Indexed_Selector_VN<>
+   extends PSC::Analysis::Component_Selector_VN is
+   //  An indexed selector is determined by the indexing routine
+   //  and its (non-ref) operands.
+   const Indexing_Routine_Id : VN_Id;
+   const Indexing_Operands : Vector<VN_Id>
+   const Is_Indexing_Op : Boolean  //  If true, may assume no overlap when
+                                   //  Indexing_Operands are distinct.
+   const Is_Static_Indexing : Boolean //  If true, all Indexing_Operands
+                                      //  are literals
+
+   func Kind(S : Indexed_Selector_VN) -> Selector_Kind
+     is (not S.Is_Indexing_Op? #referenced_part:
+         S.Is_Static_Indexing? #static_index: #dynamic_index)
+
+   func Hash(S : Indexed_Selector_VN) -> Univ_Integer
+     is ((for each [I => V] of S.Indexing_Operands => <0> + I * [[V]]))
+
+   op "=?"(Left, Right : Indexed_Selector_VN) -> Ordering is
+      (Left.Indexing_Routine_Id != Right.Indexing_Routine_Id?
+        Left.Indexing_Routine_Id =? Right.Indexing_Routine_Id:
+       Compare_VN_Vectors(Left.Indexing_Operands, Right.Indexing_Operands))
+
+   func Child_Vec(S : Indexed_Selector_VN) -> Vector<VN_Id>
+     is ([S.Indexing_Routine_Id] | S.Indexing_Operands)
+
+   func To_String(S : Indexed_Selector_VN) -> Univ_String
+     is ("(Indexed_Selector, routine VN" | S.Indexing_Routine_Id |
+          (S.Is_Indexing_Op?
+            (for each V of S.Indexing_Operands forward =>
+               <""> | "[VN" | V | "]") :
+            (for each V of S.Indexing_Operands forward =>
+               <""> | ", VN" | V)) | ")")
+end interface PSC::Analysis::Indexed_Selector_VN
+
+//  Begin Address Value Numbers
+
+abstract interface PSC::Analysis::Addr_VN<>
+  extends PSC::Analysis::Value_Number is
+   //  Address VNs are all extensions of this
+end interface PSC::Analysis::Addr_VN
+
+interface PSC::Analysis::Local_Addr_VN<>
+  extends PSC::Analysis::Addr_VN is
+   //  Address of a variable in the Local_Area
+   const Level : Code_Nesting_Level
+   const BB_Id : CFG::Node_Id  //  Zero for up-level reference
+   const Offset : Reflection::Offset_Within_Area
+
+   func Hash(Local_Addr_VN) -> Univ_Integer is (Local_Addr_VN.Offset)
+
+   op "=?"(Left, Right : Local_Addr_VN) -> Ordering
+     is (Left.Level != Right.Level? Left.Level =? Right.Level:
+         Left.BB_Id != Right.BB_Id?  Left.BB_Id =? Right.BB_Id:
+         Left.Offset =? Right.Offset)
+
+   func To_String(A : Local_Addr_VN) -> Univ_String
+     is ("(Local, L" | A.Level | ",BB" | A.BB_Id | "," | A.Offset | ")")
+end interface PSC::Analysis::Local_Addr_VN
+
+interface PSC::Analysis::Param_Addr_VN<>
+  extends PSC::Analysis::Addr_VN is
+   //  Address of a variable in the Param_Area
+   const Level : Code_Nesting_Level
+   const BB_Id : CFG::Node_Id  //  Zero for up-level reference
+   const Offset : Reflection::Offset_Within_Area
+
+   func Hash(Param_Addr_VN) -> Univ_Integer is (Param_Addr_VN.Offset)
+
+   op "=?"(Left, Right : Param_Addr_VN) -> Ordering
+     is (Left.Level != Right.Level? Left.Level =? Right.Level:
+         Left.BB_Id != Right.BB_Id?  Left.BB_Id =? Right.BB_Id:
+         Left.Offset =? Right.Offset)
+
+   func To_String(A : Param_Addr_VN) -> Univ_String
+     is ("(Param, L" | A.Level | ",BB" | A.BB_Id | "," | A.Offset | ")")
+end interface PSC::Analysis::Param_Addr_VN
+
+interface PSC::Analysis::Type_Addr_VN<>
+  extends PSC::Analysis::Addr_VN is
+   //  Address of a variable in the Type_Area
+   const Uplevel : Code_Nesting_Level
+   const Offset : Reflection::Offset_Within_Area
+
+   func Hash(Type_Addr_VN) -> Univ_Integer is (Type_Addr_VN.Offset)
+
+   op "=?"(Left, Right : Type_Addr_VN) -> Ordering
+     is (Left.Uplevel != Right.Uplevel? Left.Uplevel =? Right.Uplevel:
+         Left.Offset =? Right.Offset)
+
+   func To_String(A : Type_Addr_VN) -> Univ_String
+     is ("(Type_Area, L" | A.Uplevel | "," | A.Offset | ")")
+end interface PSC::Analysis::Type_Addr_VN
+
+interface PSC::Analysis::Const_Area_VN<>
+  extends PSC::Analysis::Addr_VN is
+   //  Address of a variable in the Const_Area
+   const Offset : Reflection::Offset_Within_Area
+
+   func Hash(Const_Area_VN) -> Univ_Integer is (Const_Area_VN.Offset)
+
+   op "=?"(Left, Right : Const_Area_VN) -> Ordering
+     is (Left.Offset =? Right.Offset)
+
+   func To_String(A : Const_Area_VN) -> Univ_String
+     is ("(Const_Area, " | A.Offset | ")")
+end interface PSC::Analysis::Const_Area_VN
+
+interface PSC::Analysis::Component_Addr_VN<>
+  extends PSC::Analysis::Addr_VN is
+   //  Address of component of a large object
+   const Base_Obj : OID  //  Origin ID for base object
+   const Selector : Component_Selector_VN::Component_Selector_VN_Id
+
+   const Comp_Type : optional Object_Locator
+   const Comp_Might_Be_Null : Boolean
+
+   func Hash(Component_Addr_VN) -> Univ_Integer
+     is ([[Component_Addr_VN.Base_Obj]] + [[Component_Addr_VN.Selector]])
+
+   op "=?"(Left, Right : Component_Addr_VN) -> Ordering
+     is (Left.Base_Obj != Right.Base_Obj?
+           Left.Base_Obj =? Right.Base_Obj :
+           Left.Selector =? Right.Selector)
+
+   func Child_Vec(A : Component_Addr_VN) -> Vector<VN_Id> 
+     is ([A.Selector])
+
+   func To_String(A : Component_Addr_VN) -> Univ_String
+     is ("(Component_Addr, Base => OID" | A.Base_Obj |
+         ", Selector => VN" | A.Selector |
+         (A.Comp_Type not null? ", Comp_Type => " | A.Comp_Type : "") |
+         (A.Comp_Might_Be_Null? " [optional]" : "") | ")")
+
+end interface PSC::Analysis::Component_Addr_VN
+
+//  Begin Compound Value Numbers (VNs that contain one or more other VNs)
+
+abstract interface PSC::Analysis::Typed_VN<>
+  extends PSC::Analysis::Value_Number is
+   const Type_Info : optional Object_Locator;
+   const Might_Be_Null : Boolean;
+
+   optional func Can_Have_Null_Value(TVN : Typed_VN) -> optional Boolean
+     is (TVN.Might_Be_Null)
+     //  Return #true if Value_Number can in some cases have a null value
+
+   optional func Type_And_Null_Info(TVN : Typed_VN) -> optional Univ_String
+     is ((TVN.Type_Info not null? ", Type_Info => " | TVN.Type_Info : "") |
+         (TVN.Might_Be_Null? " [optional]" : ""))
+
+end interface PSC::Analysis::Typed_VN
+
+interface PSC::Analysis::Call_VN<> extends PSC::Analysis::Typed_VN is
+   const Routine_Id : VN_Id;
+   const Operands   : Vector<VN_Id>;
+
+   //  Use the hashes of all the operands
+   //  Multiply by index so that order matters
+   func Hash(C : Call_VN) -> Univ_Integer is
+      ([[C.Routine_Id]] +
+        (for each [I => Val_Num] of C.Operands => <0> + I * [[Val_Num]]));
+
+   op "=?"(Left, Right : Call_VN) -> Ordering is
+      (Left.Routine_Id != Right.Routine_Id?
+         Left.Routine_Id =? Right.Routine_Id :
+         Compare_VN_Vectors(Left.Operands, Right.Operands));
+
+   func Compute_Value_Set
+     (Call : Call_VN; VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+
+   func Propagate_To_Operands
+     (Call : Call_VN; Val_Set : Value_Set+;
+      VNT : VN_Table; VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional VN_To_Value_Set_Map_Type
+     //  Do a top-down propagation to operands of value number.
+     //  Return null if top-down propagation fails.
+     //  Otherwise, return a mapping of operands to their new value sets.
+
+   func Child_Vec(C : Call_VN) -> Vector<VN_Id> 
+     is ([C.Routine_Id] | C.Operands)
+
+   func To_String(C : Call_VN) -> Univ_String
+     is ("(Call VN" | C.Routine_Id | (C.Might_Be_Null? " [optional]" : "") |
+          (for each Opnd of C.Operands forward => <""> | ", VN" | Opnd) |
+          Type_And_Null_Info(C) | ")")
+end interface PSC::Analysis::Call_VN;
+
+interface PSC::Analysis::Input_VN<> extends PSC::Analysis::Typed_VN is
+   //  Represents the initial value of an input to the operation.
+   const Input_Addr : Addr_VN_Id;
+
+   func Hash(I : Input_VN) -> Univ_Integer is ([[I.Input_Addr]]);
+
+   op "=?"(Left, Right : Input_VN) -> Ordering
+     is (Left.Input_Addr =? Right.Input_Addr);
+
+   func Child_Vec(I : Input_VN) -> Vector<VN_Id> 
+     is ([I.Input_Addr])
+
+   func To_String(I : Input_VN) -> Univ_String is
+      ("(Input_VN, VN" | I.Input_Addr |
+       Type_And_Null_Info(I) | ")");
+
+   func Compute_Value_Set
+     (I : Input_VN; VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+
+end interface PSC::Analysis::Input_VN;
+
+interface PSC::Analysis::Not_Null_VN<> extends PSC::Analysis::Value_Number is
+   //  Represents the boolean test "Tested_Val not null"
+   const Tested_Val : VN_Id;
+
+   func Hash(N : Not_Null_VN) -> Univ_Integer is ([[N.Tested_Val]]);
+
+   op "=?"(Left, Right : Not_Null_VN) -> Ordering
+     is (Left.Tested_Val =? Right.Tested_Val)
+
+   func Child_Vec(N : Not_Null_VN) -> Vector<VN_Id> 
+     is ([N.Tested_Val])
+
+   func Compute_Value_Set
+     (NN : Not_Null_VN; VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+
+   func Propagate_To_Operands
+     (NN: Not_Null_VN; Val_Set : Value_Set+;
+      VNT : VN_Table; VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional VN_To_Value_Set_Map_Type
+     //  Do a top-down propagation to operands of value number.
+     //  Return null if top-down propagation fails.
+     //  Otherwise, return a mapping of operands to their new value sets.
+
+   func Can_Have_Null_Value(NN : Not_Null_VN)
+     -> Boolean is (#false)
+     //  Return #true if Value_Number can in some cases have a null value
+
+   func To_String(N : Not_Null_VN) -> Univ_String
+     is ("(Not_Null, VN" | N.Tested_Val | ")")
+end interface PSC::Analysis::Not_Null_VN;
+
+interface PSC::Analysis::Countable_Membership_VN<>
+  extends PSC::Analysis::Value_Number is
+   //  Represents the boolean test "Tested_Val in Countable_Value_Set"
+   const Tested_Val : VN_Id;
+   const Tested_Set : Countable_Value_Set;
+
+   func Hash(N : Countable_Membership_VN) -> Univ_Integer is ([[N.Tested_Val]]);
+
+   op "=?"(Left, Right : Countable_Membership_VN) -> Ordering
+     is (Left.Tested_Val == Right.Tested_Val and then
+         Left.Tested_Set == Right.Tested_Set? #equal: #unordered)
+
+   func Child_Vec(N : Countable_Membership_VN) -> Vector<VN_Id> 
+     is ([N.Tested_Val])
+
+   func Compute_Value_Set
+     (CM : Countable_Membership_VN; VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+
+   func Propagate_To_Operands
+     (CM: Countable_Membership_VN; Val_Set : Value_Set+;
+      VNT : VN_Table; VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional VN_To_Value_Set_Map_Type
+     //  Do a top-down propagation to operands of value number.
+     //  Return null if top-down propagation fails.
+     //  Otherwise, return a mapping of operands to their new value sets.
+
+   func Can_Have_Null_Value(CM : Countable_Membership_VN)
+     -> Boolean is (#false)
+     //  Return #true if Value_Number can in some cases have a null value
+
+   func To_String(N : Countable_Membership_VN) -> Univ_String
+     is ("(Countable_Membership, VN" | N.Tested_Val |
+         " in " | N.Tested_Set | ")")
+end interface PSC::Analysis::Countable_Membership_VN;
+
+interface PSC::Analysis::Logical_Not_VN<> extends PSC::Analysis::Value_Number
+   //  Represents the boolean operation "not Tested_Val"
+  is
+   const Tested_Val : VN_Id;
+
+   func Hash(N : Logical_Not_VN) -> Univ_Integer is ([[N.Tested_Val]]);
+
+   op "=?"(Left, Right : Logical_Not_VN) -> Ordering
+     is (Left.Tested_Val =? Right.Tested_Val)
+
+   func Child_Vec(N : Logical_Not_VN) -> Vector<VN_Id> 
+     is ([N.Tested_Val])
+
+   func Compute_Value_Set
+     (N : Logical_Not_VN; VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+
+   func Propagate_To_Operands
+     (N: Logical_Not_VN; Val_Set : Value_Set+;
+      VNT : VN_Table; VN_Values : VN_To_Value_Set_Map_Type)
+     -> Result : optional VN_To_Value_Set_Map_Type
+     //  Do a top-down propagation to operands of value number.
+     //  Return null if top-down propagation fails.
+     //  Otherwise, return a mapping of operands to their new value sets.
+
+   func Can_Have_Null_Value(N : Logical_Not_VN)
+     -> Boolean is (#false)
+     //  Return #true if Value_Number can in some cases have a null value
+
+   func To_String(N : Logical_Not_VN) -> Univ_String
+     is ("(Logical_Not, VN" | N.Tested_Val | ")")
+end interface PSC::Analysis::Logical_Not_VN;
+
+interface PSC::Analysis::Logical_And_VN<> extends PSC::Analysis::Value_Number
+   //  Represents the boolean operation "Left and Right"
+  is
+   const Left : VN_Id;
+   const Right : VN_Id;
+
+   func Hash(N : Logical_And_VN) -> Univ_Integer is ([[N.Left]] + [[N.Right]]);
+
+   op "=?"(Left, Right : Logical_And_VN) -> Ordering
+     is (Left.Left != Right.Left?
+         Left.Left =? Right.Left : Left.Right =? Right.Right)
+
+   func Child_Vec(N : Logical_And_VN) -> Vector<VN_Id> 
+     is ([N.Left, N.Right])
+
+   func Compute_Value_Set
+     (And : Logical_And_VN; VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+
+   func Propagate_To_Operands
+     (And: Logical_And_VN; Val_Set : Value_Set+;
+      VNT : VN_Table; VN_Values : VN_To_Value_Set_Map_Type)
+     -> Result : optional VN_To_Value_Set_Map_Type
+     //  Do a top-down propagation to operands of value number.
+
+   func Can_Have_Null_Value(And : Logical_And_VN)
+     -> Boolean is (#false)
+     //  Return #true if Value_Number can in some cases have a null value
+
+   func To_String(N : Logical_And_VN) -> Univ_String
+     is ("(Logical_And, VN" | N.Left | ",VN" | N.Right | ")")
+end interface PSC::Analysis::Logical_And_VN;
+
+interface PSC::Analysis::Logical_Or_VN<> extends PSC::Analysis::Value_Number
+   //  Represents the boolean operation "Left or Right"
+  is
+   const Left : VN_Id;
+   const Right : VN_Id;
+
+   func Hash(N : Logical_Or_VN) -> Univ_Integer is ([[N.Left]] + [[N.Right]]);
+
+   op "=?"(Left, Right : Logical_Or_VN) -> Ordering
+     is (Left.Left != Right.Left?
+         Left.Left =? Right.Left : Left.Right =? Right.Right)
+
+   func Propagate_To_Operands
+     (Or: Logical_Or_VN; Val_Set : Value_Set+;
+      VNT : VN_Table; VN_Values : VN_To_Value_Set_Map_Type)
+     -> Result : optional VN_To_Value_Set_Map_Type
+     //  Do a top-down propagation to operands of value number.
+
+   func Compute_Value_Set
+     (Or : Logical_Or_VN; VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+ 
+   func Can_Have_Null_Value(Or : Logical_Or_VN)
+     -> Boolean is (#false)
+     //  Return #true if Value_Number can in some cases have a null value
+
+   func Child_Vec(N : Logical_Or_VN) -> Vector<VN_Id> 
+     is ([N.Left, N.Right])
+
+   func To_String(N : Logical_Or_VN) -> Univ_String
+     is ("(Logical_Or, VN" | N.Left | ",VN" | N.Right | ")")
+end interface PSC::Analysis::Logical_Or_VN
+
+interface PSC::Analysis::Negate_VN<> extends PSC::Analysis::Value_Number
+   //  Represents the countable operation "- Operand"
+  is
+   const Operand : VN_Id;
+
+   func Hash(N : Negate_VN) -> Univ_Integer is ([[N.Operand]]);
+
+   op "=?"(Left, Right : Negate_VN) -> Ordering
+     is (Left.Operand =? Right.Operand)
+
+   func Child_Vec(N : Negate_VN) -> Vector<VN_Id> 
+     is ([N.Operand])
+
+   func Compute_Value_Set
+     (N : Negate_VN; VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+
+   func Propagate_To_Operands
+     (N: Negate_VN; Val_Set : Value_Set+;
+      VNT : VN_Table; VN_Values : VN_To_Value_Set_Map_Type)
+     -> Result : optional VN_To_Value_Set_Map_Type
+     //  Do a top-down propagation to operands of value number.
+     //  Return null if top-down propagation fails.
+     //  Otherwise, return a mapping of operands to their new value sets.
+
+   func Can_Have_Null_Value(N : Negate_VN)
+     -> Boolean is (#false)
+     //  Return #true if Value_Number can in some cases have a null value
+
+   func To_String(N : Negate_VN) -> Univ_String
+     is ("(Negate, VN" | N.Operand | ")")
+end interface PSC::Analysis::Negate_VN;
+
+interface PSC::Analysis::Addition_VN<> extends PSC::Analysis::Value_Number
+   //  Represents the countable operation "Left + Right"
+  is
+   const Left : VN_Id;
+   const Right : VN_Id;
+
+   func Hash(N : Addition_VN) -> Univ_Integer is ([[N.Left]] + [[N.Right]]);
+
+   op "=?"(Left, Right : Addition_VN) -> Ordering
+     is (Left.Left != Right.Left?
+         Left.Left =? Right.Left : Left.Right =? Right.Right)
+
+   func Child_Vec(N : Addition_VN) -> Vector<VN_Id> 
+     is ([N.Left, N.Right])
+
+   func Compute_Value_Set
+     (Add : Addition_VN; VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+
+   func Propagate_To_Operands
+     (Add: Addition_VN; Val_Set : Value_Set+;
+      VNT : VN_Table; VN_Values : VN_To_Value_Set_Map_Type)
+     -> Result : optional VN_To_Value_Set_Map_Type
+     //  Do a top-down propagation to operands of value number.
+
+   func Can_Have_Null_Value(Add : Addition_VN)
+     -> Boolean is (#false)
+     //  Return #true if Value_Number can in some cases have a null value
+
+   func To_String(N : Addition_VN) -> Univ_String
+     is ("(Addition, VN" | N.Left | ",VN" | N.Right | ")")
+end interface PSC::Analysis::Addition_VN;
+
+interface PSC::Analysis::Subtraction_VN<> extends PSC::Analysis::Value_Number
+   //  Represents the countable operation "Left - Right"
+  is
+   const Left : VN_Id;
+   const Right : VN_Id;
+
+   func Hash(N : Subtraction_VN) -> Univ_Integer is ([[N.Left]] + [[N.Right]]);
+
+   op "=?"(Left, Right : Subtraction_VN) -> Ordering
+     is (Left.Left != Right.Left?
+         Left.Left =? Right.Left : Left.Right =? Right.Right)
+
+   func Propagate_To_Operands
+     (Sub: Subtraction_VN; Val_Set : Value_Set+;
+      VNT : VN_Table; VN_Values : VN_To_Value_Set_Map_Type)
+     -> Result : optional VN_To_Value_Set_Map_Type
+     //  Do a top-down propagation to operands of value number.
+
+   func Compute_Value_Set
+     (Sub : Subtraction_VN; VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+
+   func Can_Have_Null_Value(Sub : Subtraction_VN)
+     -> Boolean is (#false)
+     //  Return #true if Value_Number can in some cases have a null value
+
+   func Child_Vec(N : Subtraction_VN) -> Vector<VN_Id> 
+     is ([N.Left, N.Right])
+
+   func To_String(N : Subtraction_VN) -> Univ_String
+     is ("(Subtraction, VN" | N.Left | ",VN" | N.Right | ")")
+end interface PSC::Analysis::Subtraction_VN
+
+interface PSC::Analysis::Condition_Mask_VN<>
+  extends PSC::Analysis::Value_Number is
+   //  Represents the boolean test "Tested_Val satisfies Mask"
+   const Tested_Val : VN_Id;
+   const Mask : Reflection::Instruction::Condition_Bit_Mask;
+
+   func Hash(N : Condition_Mask_VN) -> Univ_Integer
+     is ([[N.Tested_Val]] + N.Mask.To_Rep());
+
+   op "=?"(Left, Right : Condition_Mask_VN) -> Ordering
+     is (Left.Tested_Val != Right.Tested_Val?
+           Left.Tested_Val =? Right.Tested_Val : Left.Mask =? Right.Mask)
+
+   func Compute_Value_Set
+     (C_Mask_VN : Condition_Mask_VN;
+      VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type) -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+
+   func Propagate_To_Operands
+     (CM: Condition_Mask_VN; Val_Set : Value_Set+;
+      VNT : VN_Table; VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional VN_To_Value_Set_Map_Type
+     //  Do a top-down propagation to operands of value number.
+     //  Return null if top-down propagation fails.
+     //  Otherwise, return a mapping of operands to their new value sets.
+
+   func Can_Have_Null_Value(CM : Condition_Mask_VN)
+     -> Boolean is (#false)
+     //  Return #true if Value_Number can in some cases have a null value
+
+   func Child_Vec(N : Condition_Mask_VN) -> Vector<VN_Id> 
+     is ([N.Tested_Val])
+
+   func To_String(N : Condition_Mask_VN) -> Univ_String
+     is ("(Condition_Mask, VN" | N.Tested_Val | "," | N.Mask | ")")
+end interface PSC::Analysis::Condition_Mask_VN;
+
+interface PSC::Analysis::Cond_VN<> extends PSC::Analysis::Typed_VN is
+   //  Represents the conditional expression "Cond? Then : Else"
+   const Cond : VN_Id;
+   const Then : VN_Id;
+   const Else : VN_Id;
+
+   func Hash(C : Cond_VN) -> Univ_Integer is
+      ([[C.Cond]] + 2 * [[C.Then]] + 3 * [[C.Else]]);
+
+   op "=?"(Left, Right : Cond_VN) -> Ordering;
+
+   func Child_Vec(C : Cond_VN) -> Vector<VN_Id> 
+     is ([C.Cond, C.Then, C.Else])
+
+   func To_String(C : Cond_VN) -> Univ_String
+     is ("(Cond, VN" | C.Cond | "? VN" | C.Then | ": VN" | C.Else |
+         Type_And_Null_Info(C) | ")")
+end interface PSC::Analysis::Cond_VN;
+
+interface PSC::Analysis::Phi_VN<> extends PSC::Analysis::Typed_VN is
+   //  Represents a "phi" node in block Phi_Block, for object Phi_OID
+   //  NOTE: We originally had a Phi_Addr VN component, but that
+   //        created various difficulties keeping a mapping between
+   //        OIDs and Address VNs.  So now we just use the OID and
+   //        create a new Phi_VN if a Phi_OID is created after the Phi_VN.
+   const Phi_Block : CFG::Node_Id;    // Basic block where phi created
+   const Phi_OID   : OID;             // OID associated with phi
+   const Phi_Addr  : optional Addr_VN_Id      //  Addr if known
+
+   //  Use the hashes of Phi_Block and Phi_OID
+   func Hash(P : Phi_VN) -> Univ_Integer is
+      ([[P.Phi_Block]] + 2 * [[P.Phi_OID]]);
+
+   op "=?"(Left, Right : Phi_VN) -> Ordering is
+      (Left.Phi_Block != Right.Phi_Block? Left.Phi_Block =? Right.Phi_Block:
+        Left.Phi_OID =? Right.Phi_OID)
+
+   func Child_Vec(P : Phi_VN) -> Vector<VN_Id> 
+     is ([])
+
+   func To_String(P : Phi_VN) -> Univ_String
+     is ("(Phi, BB" | P.Phi_Block | ", Addr_OID" | P.Phi_OID |
+         (P.Phi_Addr is null? "" : ", Addr_VN" | P.Phi_Addr) |
+         Type_And_Null_Info(P) | ")")
+end interface PSC::Analysis::Phi_VN;
+
+interface PSC::Analysis::Aggregate_VN<> extends PSC::Analysis::Typed_VN is
+   //  Represents a composite object, formed from an initial computation
+   //  followed by a set of component assignments.
+
+   const Base_Val   : optional VN_Id;  //  Value before component assignments
+   const Kind_Of_Selectors : Component_Selector_VN::Selector_Kind
+   const Components : VN_To_VN_Map_Type;
+      //  This is a mapping from component offsets/selectors to their values.
+      //  The keys are literal offsets, or a combination of indexing op id
+      //  and indexing operands.
+      //  All keys of Components map in Component_Selector_VN+
+      //    with Kind() == Kind_Of_Selectors
+      //  This map has at most one element if Kind_Of_Selectors in
+      //    [#dynamic_indexing, #referenced_part]
+
+   //  Use the hashes of all the components
+   //  Multiply by selector so that selector matters
+   func Hash(A : Aggregate_VN) -> Univ_Integer is
+      ((for each [Sel => Val] of A.Components => <0> +
+         [[Sel]] * [[Val]]));
+
+   op "=?"(Left, Right : Aggregate_VN) -> Ordering is
+      ((Left.Base_Val is null) != (Right.Base_Val is null)? #unordered:
+       Left.Base_Val not null and then Left.Base_Val != Right.Base_Val?
+        Left.Base_Val =? Right.Base_Val:
+       |Left.Components| != |Right.Components|?
+        |Left.Components| =? |Right.Components|:
+       (for all [Sel => Val] of Left.Components =>
+          Sel in Right.Components and then Right.Components[Sel] == Val)?
+        #equal : #unordered)
+
+   func Child_Vec(A : Aggregate_VN) -> Vector<VN_Id> 
+     is ((A.Base_Val not null? [A.Base_Val] : [])|
+            [for each C of A.Components forward => C])
+
+   func To_String(A : Aggregate_VN) -> Univ_String
+     is ("(Aggregate, " | (A.Base_Val is null? "[]": "VN" | A.Base_Val) |
+          ", " | A.Kind_Of_Selectors |
+          (for each [Sel => Val] of A.Components forward => <""> |
+            ", VN" | Sel | "=>VN" | Val) |
+           Type_And_Null_Info(A) | ")")
+
+   func Compute_Value_Set
+     (A : Aggregate_VN;
+      VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type) -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+     is (Object_Value_Set::(Might_Be_Null => #false,
+           Might_Be_Non_Null => #true))
+   
+   func Can_Have_Null_Value(A : Aggregate_VN)
+     -> Boolean is (#false)
+     //  Return #true if Value_Number can in some cases have a null value
+
+end interface PSC::Analysis::Aggregate_VN;
+
+interface PSC::Analysis::Component_Value_VN<>
+  extends PSC::Analysis::Typed_VN is
+   //  Represents the value of a component of a composite value
+   const Base_Val : VN_Id;
+   const Selector : Component_Selector_VN::Component_Selector_VN_Id
+
+   func Hash(C : Component_Value_VN) -> Univ_Integer is
+      ([[C.Base_Val]] + 2 * [[C.Selector]]);
+
+   op "=?"(Left, Right : Component_Value_VN) -> Ordering is
+      (Left.Base_Val != Right.Base_Val? Left.Base_Val =? Right.Base_Val:
+         Left.Selector =? Right.Selector)
+
+   func Child_Vec(C : Component_Value_VN) -> Vector<VN_Id> 
+     is (C.Base_Val not null? [C.Base_Val, C.Selector] : [C.Selector])
+
+   func To_String(C : Component_Value_VN) -> Univ_String
+     is ("(Component_Val" | (C.Might_Be_Null? " [optional]" : "") |
+         ", Base => VN" | C.Base_Val |
+         ", Selector => VN" | C.Selector |
+           Type_And_Null_Info(C) | ")")
+
+end interface PSC::Analysis::Component_Value_VN;
+
+interface PSC::Analysis::Copied_VN<> extends PSC::Analysis::Typed_VN is
+   //  A wrapper around a value to indicate it has been copied
+   //  and has a new OID.
+   const New_OID  : OID;
+   const Orig_Val : VN_Id;
+
+   func Hash(C : Copied_VN) -> Univ_Integer
+      is ([[C.New_OID]])
+
+   op "=?"(Left, Right : Copied_VN) -> Ordering is
+      (Left.Orig_Val != Right.Orig_Val?
+         Left.Orig_Val =? Right.Orig_Val :
+       Left.New_OID =? Right.New_OID)
+
+   func Child_Vec(C : Copied_VN) -> Vector<VN_Id> 
+     is ([C.Orig_Val])
+
+   func To_String(C : Copied_VN) -> Univ_String is
+      ("(Copied_VN, OID" | C.New_OID | ", VN" | C.Orig_Val | ")");
+
+   func Compute_Value_Set
+     (C : Copied_VN;
+      VNT : VN_Table;
+      VN_Values : VN_To_Value_Set_Map_Type) -> optional Value_Set+
+     //  Do a bottom-up computation of the value set of the given VN
+     is (Compute_Value_Set(VNT[C.Orig_Val], VNT, VN_Values))
+   
+   func Propagate_To_Operands
+     (C: Copied_VN; Val_Set : Value_Set+;
+      VNT : VN_Table; VN_Values : VN_To_Value_Set_Map_Type)
+     -> optional VN_To_Value_Set_Map_Type
+     //  Do a top-down propagation to operands of value number.
+     //  Return null if top-down propagation fails.
+     //  Otherwise, return a mapping of operands to their new value sets.
+     is ([C.Orig_Val => Val_Set])
+
+end interface PSC::Analysis::Copied_VN;
+
+interface PSC::Analysis::Unknown_VN<> extends PSC::Analysis::Typed_VN is
+   //  Just a wrapper around one value
+   const Unknown : VN_Id;
+
+   func Hash(U : Unknown_VN) -> Univ_Integer is ([[U.Unknown]]);
+
+   op "=?"(Left, Right : Unknown_VN) -> Ordering is
+      (Left.Unknown =? Right.Unknown);
+
+   func Child_Vec(U : Unknown_VN) -> Vector<VN_Id> 
+     is ([U.Unknown])
+
+   func To_String(U : Unknown_VN) -> Univ_String is
+      ("(Unknown_VN, VN" | U.Unknown | ")");
+end interface PSC::Analysis::Unknown_VN;
+
+abstract interface PSC::Analysis::Origin_Info<> is
+  // Origin_Info identifies where an object comes from,
+  // and is used to identify a potentially updatable object
+  // Value numbering maintains two mappings:
+  //   Address => Origin
+  //   Origin => Value
+   func Hash(Origin_Info) -> Univ_Integer
+   op "=?"(Left, Right : Origin_Info) -> Ordering
+   func To_String(Origin_Info) -> Univ_String
+   optional func From_String(Univ_String) -> optional Origin_Info
+   optional func Instr_Index(Origin_Info) -> optional Code_Index
+end interface PSC::Analysis::Origin_Info
+
+interface PSC::Analysis::Code_Origin<>
+  extends PSC::Analysis::Origin_Info is
+  //  Object that originates from an instruction
+   const Instr : Code_Index
+   const Which_Output : Output_Index
+   func Hash(CO : Code_Origin) -> Univ_Integer
+     is (Hash(CO.Instr) + Hash(CO.Which_Output))
+   op "=?"(Left, Right : Code_Origin) -> Ordering
+     is (Left.Instr == Right.Instr? Left.Which_Output =? Right.Which_Output:
+         Left.Instr =? Right.Instr)
+   func To_String(CO : Code_Origin) -> Univ_String
+     is ("(Code_Origin: Instr#" | CO.Instr |
+            ", Output#" | CO.Which_Output | ")")
+   func Instr_Index(Code_Origin) -> optional Code_Index is (Code_Origin.Instr)
+end interface PSC::Analysis::Code_Origin
+
+interface PSC::Analysis::Phi_Origin<>
+  extends PSC::Analysis::Origin_Info is
+  //  Object that originates as a phi-node of a join point in the CFG
+   const Phi_Block : CFG::Node_Id
+   const Phi_Addr : Addr_VN_Id  // Address of "var"
+   func Hash(PO : Phi_Origin) -> Univ_Integer
+     is (Hash(PO.Phi_Block) + Hash(PO.Phi_Addr))
+   op "=?"(Left, Right : Phi_Origin) -> Ordering
+     is (Left.Phi_Block == Right.Phi_Block? Left.Phi_Addr =? Right.Phi_Addr:
+         Left.Phi_Block =? Right.Phi_Block)
+   func To_String(PO : Phi_Origin) -> Univ_String
+     is ("(Phi_Origin: BB" | PO.Phi_Block | ", VN" | PO.Phi_Addr | ")")
+end interface PSC::Analysis::Phi_Origin
+
+interface PSC::Analysis::Input_Origin<>
+  extends PSC::Analysis::Origin_Info is
+  //  Object that comes from an input parameter, directly or indirectly
+   const Input_Addr : Addr_VN_Id  // Param_Addr_VN or Input_VN
+
+   func Hash(IO : Input_Origin) -> Univ_Integer is (Hash(IO.Input_Addr))
+   op "=?"(Left, Right : Input_Origin) -> Ordering
+     is (Left.Input_Addr =? Right.Input_Addr)
+   func To_String(IO : Input_Origin) -> Univ_String
+     is ("(Input_Origin: VN" | IO.Input_Addr | ")")
+end interface PSC::Analysis::Input_Origin
+
+interface PSC::Analysis::Updated_Value<> is
+  //  An updated value is used to represent a composite object's value
+  //  after some number of assignments to its components
+   const Base_Val      : VN_Id
+   const Kind_Of_Selectors : Component_Selector_VN::Selector_Kind
+   var Component_OIDs : VN_To_OID_Map_Type := []
+      //  All keys of Component_OIDs map are in Component_Selector_VN+
+      //    and have Kind() == Kind_Of_Selectors
+      //  This map has at most one element if Kind_Of_Selectors in
+      //    [#dynamic_indexing, #referenced_part]
+
+   //  Imageable operations on Updated_Value
+   op "=?"(Left, Right : Updated_Value) -> Ordering
+   func Hash(Updated_Value) -> Univ_Integer
+   func To_String(Updated_Value) -> Univ_String
+   optional func From_String(Univ_String) -> optional Updated_Value is (null)
+
+  //  TBD: Other Operations on Updated_Values
+end interface PSC::Analysis::Updated_Value
+
+import PSC::*
+
+interface PSC::Analysis::ParaScope<> is
+
+   func Addr_VN_For_Locator(var Op_Ctx; Locator : Object_Locator;
+     I : Code_Index) -> optional Addr_VN_Id
+    //  Return an addr value number for given object locator if pre-computed
+
+   func Analyze_Operation (Item : Reflection::Decl;
+                           var Op_Ctx : PSC::Analysis::Op_Ctx)
+   //  Analyze one operation, given an operation context
+end interface PSC::Analysis::ParaScope

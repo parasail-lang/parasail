@@ -1,0 +1,6 @@
+ordered_list_fancy.psl:49:14: Warning: Postconditions differ between body and spec; body postconditions override those on spec
+ordered_list_fancy.psl:97:32: Warning: Right operand of short-circuit needs early evaluation
+List is now length = 3
+Element 3 = 20
+Element 1 = 20
+Element 2 = 10

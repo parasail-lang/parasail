@@ -1,0 +1,41 @@
+import Stats, Point
+
+interface Correlation<Flt is Float<>> is
+   func Run (Data : Vector<Point<Flt>>) -> Correlation
+   func To_String (Correlation) -> Univ_String
+   func Covariance (Correlation) -> Flt
+   func Coefficient (Correlation) -> Flt
+end interface Correlation
+
+class Correlation is
+   const Data : Vector<Point<Flt>>
+   const X_Stats : Stats<Flt>
+   const Y_Stats : Stats<Flt>
+   const XY_Stats : Stats<Flt>
+ exports
+   func Run (Data : Vector<Point<Flt>>) -> Correlation is
+      return (Data => Data,
+              X_Stats => Compute_From_Func (|Data|, (lambda (I) -> Data[I].X)),
+              Y_Stats => Compute_From_Func (|Data|, (lambda (I) -> Data[I].Y)),
+              XY_Stats => Compute_From_Func (|Data|,
+                            (lambda (I) -> Data[I].X * Data[I].Y)))
+   end func Run
+
+   func Covariance (C : Correlation) -> Flt is
+      return (C.XY_Stats.Sum -
+              C.X_Stats.Sum * C.Y_Stats.Sum / |C.Data|) / |C.Data|
+   end func Covariance
+
+   func Coefficient (C : Correlation) -> Flt is
+      return Sqrt(Covariance(C))
+   end func Coefficient
+
+   func To_String (C : Correlation) -> Univ_String is
+      {C.X_Stats.Num == |C.Data|}
+      {C.Y_Stats.Num == |C.Data|}
+      return "Correlation over `(|C.Data|) points is `(C.Coefficient());\n" |
+       "X Avg/Std-dev = `(C.X_Stats.Average()) / `(C.X_Stats.Std_Dev());\n" |
+       "Y Avg/Std-dev = `(C.Y_Stats.Average()) / `(C.Y_Stats.Std_Dev())"
+   end func To_String
+end class Correlation
+

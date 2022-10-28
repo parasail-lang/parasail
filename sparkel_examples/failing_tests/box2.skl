@@ -1,0 +1,32 @@
+--  Dies in code generation with Constraint_Error 9/18/2013
+
+generic
+   type Element_Type is new Integer<>;
+package Box2 is
+   type Box2 is private;
+   func Create(Elem : Element_Type) return Box2;
+   func Value (B    : Box2) return Element_Type;
+end Box2;
+
+package body Box2 is
+   type Box2 is record
+      const Contents : Element_Type;
+   end record Box2;
+
+ exports
+
+   func Create(Elem : Element_Type) return Box2 is
+      return with (Contents => Elem);
+   end func Create;
+
+   func Value(B : Box2) return Element_Type is
+      return B.Contents;
+   end func Value;
+end Box2;
+
+func Test_Box2() return Integer is
+     const B : Box2<Integer<>> := Create(1);
+     const C : Box2<Integer<>> := Create(Value(B) + 2);
+ 
+     return Value(B) + Value(C);
+end func Test_Box2;

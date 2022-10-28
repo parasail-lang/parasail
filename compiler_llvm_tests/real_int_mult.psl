@@ -1,0 +1,3 @@
+func Real_Int_Mult(R : Univ_Real; I : Univ_Integer) -> Univ_Real is
+   return R * I;
+end func Real_Int_Mult;

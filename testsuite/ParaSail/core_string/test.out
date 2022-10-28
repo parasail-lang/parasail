@@ -1,0 +1,10 @@
+U = tab	, |U| = 4, U[4] = '	'
+X = this is a string, X[3] = i, X[6..7] = is
+About to indent 4 and then print 'hello'
+    hello
+Here are seven x's: xxxxxxx
+Here are 6 y's: yyyyyy
+About to iterate over 'this is a string'
+ t h i s   i s   a   s t r i n g
+X.Replace('s', With => 'x') = thix ix a xtring
+X.Replace("is", With => "at") = that at a string

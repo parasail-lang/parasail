@@ -1,0 +1,319 @@
+// Example ParaSail program -- Memoizing of Trig functions
+
+// Copyright (C) 2011-2014, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+// The following is for memoizing functions
+abstract interface Memoizable<Output_Type is Assignable<>> 
+  implements Hashable<> is
+  // Original uncached computation
+    func Compute(Key : Memoizable) -> Output_Type;
+
+    // TBD: The following should not be necessary; should be
+    //      implicit in "implements Hashable<>".
+    func Hash(Key : Memoizable) -> Univ_Integer;
+    op "=?"(Left, Right : Memoizable) -> Ordering;
+end interface Memoizable;
+
+concurrent interface Memo_Cache <Input_Type is Memoizable<>> is
+  // A (concurrent) cache to be used for saving already-computed values
+  // The default implementation of this cache uses a direct-mapped
+  // cache of specified size.  Some kind of LRU cache might be
+  // better in some cases.
+
+    func Lookup(locked C : Memo_Cache; Key : Input_Type)
+      -> optional Input_Type::Output_Type;
+      // Return non-null value if already in cache
+
+    func Enter
+      (locked var C : Memo_Cache; Key : Input_Type;
+       Value : Input_Type::Output_Type);
+      // Enter value into cache
+
+    func Create(Size : Univ_Integer) -> Memo_Cache;
+      // Create direct-mapped cache with given number of entries.
+end interface Memo_Cache;
+
+concurrent class Memo_Cache is
+    var Keys : Basic_Array<optional Input_Type>;
+    var Values : Basic_Array<optional Input_Type::Output_Type>;
+
+  exports
+
+    // {(for all [H => K] of Keys => (K not null ==> Values[H] not null))}
+        // If key not null, then corresponding value not null
+
+    func Lookup(locked C : Memo_Cache; Key : Input_Type)
+      -> optional Input_Type::Output_Type is
+      // Return non-null value if already in cache
+        const H := Hash(Key) mod Length(C.Keys) + 1;
+        if C.Keys[H] is null then 
+            // Not in cache
+            return null;
+        else
+            // Return saved value
+            return C.Values[H];
+        end if;
+    end func Lookup;
+
+    func Enter
+      (locked var C : Memo_Cache; Key : Input_Type;
+       Value : Input_Type::Output_Type) is
+      // Enter value into cache
+        const H := Hash(Key) mod Length(C.Keys) + 1;
+        C.Keys[H] := Key;
+        C.Values[H] := Value;
+    end func Enter;
+
+    func Create(Size : Univ_Integer) -> Memo_Cache is
+      // Create direct-mapped cache with given number of entries.
+        return (Keys => Create(Size, null), Values => Create(Size, null));
+          // All initialized to null
+    end func Create;
+
+end class Memo_Cache;
+
+
+interface Memoized
+  <Input_Type is Memoizable<>;
+   Cache_Type is Memo_Cache<Input_Type>> is
+  // A standard module for providing caching computation
+  // The result of Init_Cache(My_Cache) would be passed as a
+  // module parameter.  It is a pseudo R/O cache.
+
+    func Compute(Memo : Memoized; Key : Input_Type) 
+      -> Input_Type::Output_Type;
+      // Return value, from the internal cache if present, otherwise by
+      // computing it (and saving in the cache).
+
+    func Init_Cache(locked Underlying_Cache : Cache_Type) -> Memoized;
+      // Init a memoized computation object based on a user-provided cache
+      // The actual R/W cache object is kept internally, identified
+      // by the value returned by Create_Cache.
+end interface Memoized;
+
+class Memoized is
+    const Internal_Cache_Id : Univ_Integer;
+    const Debug : Boolean := #true;
+  exports
+    func Compute(Memo : Memoized; Key : Input_Type) 
+      -> Input_Type::Output_Type is
+      // Return value, from the internal cache if present, otherwise by
+      // computing it (and saving in the cache).
+        if Debug then
+           Println(" Compute: Hash(Key) = " | Hash(Key));
+        end if;
+        return Compute(Key);  // TBD: We should check the cache
+    end func Compute;
+
+    func Init_Cache(locked Underlying_Cache : Cache_Type) -> Memoized is
+      // Init a memoized computation object based on a user-provided cache
+      // The actual R/W cache object is kept internally, identified
+      // by the value returned by Create_Cache.
+        return (Internal_Cache_Id => 42);  // TBD: We should assign a unique id
+    end func Init_Cache;
+    
+end class Memoized;
+
+//////////////////
+
+// Usage example:
+
+interface Uncached_Trig<Float_Type is Float<>> is
+    // Here is our "normal" un-cached module for trigonometric functions
+    func Sin(F : Float_Type) -> Float_Type;
+    func Cos(F : Float_Type) -> Float_Type;
+    // ...
+end interface Uncached_Trig;
+
+class Uncached_Trig is
+    func Fact(N : Univ_Integer; Start : Univ_Integer := 1)
+      -> Univ_Integer is
+      // Recursive factorial, using divide and conquer
+        case N =? Start of
+          [#less] => return 1;
+          [#equal] => return Start;
+          [#greater] =>
+            const Mid := (N + Start) / 2;
+            return Fact(N, Start => Mid+1) * Fact(Mid, Start => Start);
+        end case;
+    end func Fact;
+
+  exports
+    // NOTE: These are accurate to only about 5 digits of precision...
+
+    func Sin(F : Float_Type) -> Float_Type is
+        return F - F**3/Fact(3) + F**5/Fact(5) - F**7/Fact(7) + F**9/Fact(9);
+    end func Sin;
+
+    func Cos(F : Float_Type) -> Float_Type is
+        return 1.0 - F**2/Fact(2) + F**4/Fact(4) - F**6/Fact(6) + F**8/Fact(8);
+    end func Cos;
+end class Uncached_Trig;
+
+interface Trig<Float_Type is Float<>> is
+  // Here is the caching version of the trig-function module
+    func Sin(F : Float_Type) -> Float_Type;
+    func Cos(F : Float_Type) -> Float_Type;
+    // ...
+end interface Trig;
+
+class Trig is
+  // Here is the caching version of the trig-function module
+    const Debug : Boolean := #true;
+
+  // Here we declare support modules for the memoizing mechanism
+    interface Trig_Op<> extends U_Float : Float<Float_Type::Digits> is
+      // Define a module that can implement Memoizable, as extension of Float
+        // would "extends Float_Type" work?  No: "module Float_Type not found"
+        abstract func Compute(Input : Trig_Op) -> Float_Type;
+          // This computes the associated trig function
+
+        abstract func Operation_Id(Input : Trig_Op) -> Univ_Enumeration;
+          // This identifies the particular trig function being computed
+
+        op "from_univ"(X : Univ_Real) -> Trig_Op;  // TBD: Why is this needed?
+    end interface Trig_Op;
+
+    class Trig_Op is
+      exports
+        op "from_univ"(X : Univ_Real) -> Trig_Op is
+            return (U_Float => X);
+        end op "from_univ";
+    end class Trig_Op;
+
+    type Flt is Float<Float_Type::Digits>;
+
+    type U_Trig is Uncached_Trig<Flt>;
+      // Here is an instantiation of our uncached trig module
+
+    interface Sin_Op extends Trig_Op is
+      // Create an extension of Trig_Op than computes the "sin" function
+        func Compute(Input : Sin_Op) -> Float_Type;
+        func Operation_Id(X : Sin_Op) -> Univ_Enumeration;
+
+        func To_Poly(X : Sin_Op) -> Trig_Op+;  // TBD: Convert to polymorphic
+    end interface Sin_Op;
+
+    interface Cos_Op extends Trig_Op is
+      // Create an extension of Trig_Op than computes the "cos" function
+        func Compute(Input : Cos_Op) -> Float_Type;
+        func Operation_Id(X : Cos_Op) -> Univ_Enumeration;
+
+        func To_Poly(Y : Cos_Op) -> Trig_Op+;  // TBD: Convert to polymorphic
+    end interface Cos_Op;
+
+    class Sin_Op is
+      // Create an extension of Trig_Op than computes the "sin" function
+      exports
+        func Compute(Input : Sin_Op) -> Float_Type is
+            return [[U_Trig::Sin(Input.Trig_Op.U_Float)]];
+        end func Compute;
+
+        func Operation_Id(X : Sin_Op) -> Univ_Enumeration is
+            return #sin;
+        end func Operation_Id;
+
+        func To_Poly(X : Sin_Op) -> Trig_Op+ is
+            return X;  // TBD: Should not be necessary
+        end func To_Poly;
+    end class Sin_Op;
+
+    class Cos_Op is
+      // Create an extension of Trig_Op than computes the "cos" function
+      exports
+        func Compute(Input : Cos_Op) -> Float_Type is
+            return [[U_Trig::Cos(Input.Trig_Op.U_Float)]];
+        end func Compute;
+
+        func Operation_Id(X : Cos_Op) -> Univ_Enumeration is
+            return #cos;
+        end func Operation_Id;
+
+        func To_Poly(Y : Cos_Op) -> Trig_Op+ is
+            return Y;
+        end func To_Poly;
+    end class Cos_Op;
+        
+    interface Trig_Op_Poly<> implements Trig_Op, Memoizable<Float_Type> is
+      // Workaround the problem that Trig_Op+ cannot be used directly
+      // where a "Trig_Op"-implementing type is needed
+        const Data : Trig_Op+;
+        func Compute(Input : Trig_Op_Poly) -> Float_Type;
+        func Hash(TOP : Trig_Op_Poly) -> Univ_Integer;
+        op "=?"(Left, Right : Trig_Op_Poly) -> Ordering;
+    end interface Trig_Op_Poly;
+
+    class Trig_Op_Poly is
+      // TBD: Workaround the problem that Trig_Op+ cannot be used directly
+      // where a "Trig_Op"-implementing type is needed
+      // The "Compute" just does a dispatching call to the Compute
+      // function associated with the Data component.
+      exports
+        func Compute(Input : Trig_Op_Poly) -> Float_Type is
+          // Dispatch to Data's Compute function
+            return Compute(Input.Data);
+        end func Compute;
+
+        func Hash(TOP : Trig_Op_Poly) -> Univ_Integer is
+            if Debug then
+               Println(" Hash: using float = " | TOP.Data.U_Float | 
+                 ", operation_id = " |
+                 Operation_Id(TOP.Data));
+            end if;
+            return Hash(TOP.Data.U_Float) + Hash(Operation_Id(TOP.Data));
+        end func Hash;
+
+        op "=?"(Left, Right : Trig_Op_Poly) -> Ordering is
+            if Operation_Id(Left.Data) == Operation_Id(Right.Data) then
+               // Operation ID's match, compare inputs
+               return Left.Data.U_Float =? Right.Data.U_Float;
+            else
+               // Operation ID's don't match
+               return #unordered;
+            end if;
+        end op "=?";
+    end class Trig_Op_Poly;
+        
+    type Cached_Trig is new 
+      Memoized<Trig_Op_Poly, Memo_Cache<Trig_Op_Poly>>;
+      // Here we create the Memoized version of Trig_Op_Poly, which we 
+      // use to implement the caching Sin and Cos functions.
+   
+    const Cache_Id := Cached_Trig::Init_Cache(Create(100));
+
+  exports
+    func Sin(F : Float_Type) -> Float_Type is
+      // Build up an object of type Trig_Op_Poly which will compute
+      // Sin, and then pass it to the caching version of Compute.
+        return Cached_Trig::Compute(Cache_Id, 
+          (Data => Sin_Op::To_Poly([[F]])));
+               // TBD: This should work: (Data => (U_Float => [[F]]))); 
+    end func Sin;
+
+    func Cos(F : Float_Type) -> Float_Type is
+      // Build up an object of type Trig_Op_Poly which will compute
+      // Cos, and then pass it to the caching version of Compute.
+        return Cached_Trig::Compute(Cache_Id, 
+          (Data => Cos_Op::To_Poly([[F]])));
+    end func Cos;
+end class Trig;
+
+func Test_Trig() is
+    type Float32 is Float<Digits => 6>;
+    type Trig32 is Trig<Float32>;
+    const Pi : Float32 := 3.141592653589793;
+    const Pi2 : Float32 := Pi / 2.0;
+    const Sin_Pi_Over_2 : Float32 := Trig32::Sin(Pi2);
+        // Pi2 - Pi2**3/6 + Pi2**5/120 - Pi2**7/(120*42); 
+    Println("Pi = " | Pi | ", Sin(Pi/2) = " | Sin_Pi_Over_2);
+
+    Print("\n");
+    const Cos_Pi_Over_2 : Float32 := Trig32::Cos(Pi2);
+    Println(" Cos(Pi/2) = " | Cos_Pi_Over_2);
+end func Test_Trig;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Trig ();
+end func main;

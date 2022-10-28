@@ -1,0 +1,106 @@
+import PSL::Short_Names::*
+         // String and Char instead of Univ_String and Univ_Characteer
+
+func Green_Yellow() is
+   type Guess is Integer<0 .. 9>
+   type Color is Enum<[#grey, #yellow, #green]>
+
+   //  Unicode for grey, yellow, and green boxes
+   const Colored_Box : Array<Char, Indexed_By => Color> :=
+     [#grey => Char::First() + 0x2B1C,
+      #yellow => Char::First() + 0x1F7E8,
+      #green => Char::First() + 0x1F7E9]
+
+   const Num_Secrets := 4  //  count of secret numbers
+
+   //  Produce a vector of colors representing score for given guesses
+   //  relative to given secret numbers.
+   func Score (Guesses : Vector<Guess>; Secrets : Vector<Guess>)
+    {|Guesses| == |Secrets|}
+     -> Result : Vector<Color>
+         {|Result| == |Secrets|}
+   is
+      var Guesses_Left : Vector<optional Guess> :=
+        [for each G of Guesses => G]; // keep track of used guesses
+
+      var Secrets_Left : Vector<optional Guess> :=
+        [for each S of Secrets => S]; // keep track of matched secrets
+
+      Result := [for I in Bounds(Guesses) => #grey]
+
+      //  Look for exact matches
+      for I in Bounds(Guesses) {Guesses[I] == Secrets[I]}
+        concurrent loop
+         //  Exact match, result is green.
+         Result[I] := #green
+         Guesses_Left[I] := null  //  now used up
+         Secrets_Left[I] := null  //  now matched
+      end loop
+
+      //  Look for inexact matches
+      for (each G of Guesses_Left; each R of Result) {G not null} loop
+
+        *Inner*
+         for each S of Secrets_Left {S not null} forward loop
+            //  Scan the unmatched secrets left-to-right
+            if G == S then
+               //  Guess matches an unmatched secret but in wrong place
+               //  Result is yellow
+               R := #yellow
+               S := null  // This one has now been matched
+               exit loop Inner
+            end if;
+         end loop Inner
+      end loop
+
+      //  Result has vector of colors
+   end func Score
+
+   //  Get a random-number generator randomized by clock
+   var Ran : Random := Random::Start
+                         (Round_To_Int(Clock::Now() - Zero()));
+
+   //  Come up with a random set of secret numbers
+   const Secrets : Vector<Guess> :=
+     [for I in 1 .. Num_Secrets => Next(Ran) mod 10]
+
+  *Outer*
+   loop
+      //  Now play the game
+      Println("Give me your guesses:")
+      const Input : Vector<Char> :=
+        To_Vector(String::Readln())
+      var Guesses : Vector<Guess> := []
+
+      for each C of Input forward loop
+         if C in '0'..'9' then
+            Guesses |= C - '0'
+         elsif C != ' ' then
+            Println("Should be a digit or a space: '`(C)'")
+            continue loop Outer
+         end if
+      end loop
+
+      if |Guesses| != Num_Secrets then
+         Println("Should be exactly `(Num_Secrets) numbers;")
+         Println("you gave me `(|Guesses|)")
+         continue loop Outer
+      end if
+
+      //  Input is OK; score the guesses
+      const Result := Score (Guesses => Guesses, Secrets => Secrets)
+
+      //  Show the results as a concatenation of boxes
+      Println
+        ((for each R of Result forward => <""> | " " | Colored_Box[R]))
+
+      //  Check for all green
+      if (for all R of Result => R == #green) then
+         Println("Splendid!");
+         exit loop Outer
+      end if
+
+      //  Oh well, not there yet...
+   end loop Outer
+end func Green_Yellow
+

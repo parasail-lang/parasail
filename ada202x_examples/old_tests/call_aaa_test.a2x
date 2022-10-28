@@ -1,0 +1,5 @@
+proc main() is
+   A2X.Test.Test_Boolean(#True, #False);
+   A2X.Test.Test_Boolean(#True, #True);
+   A2X.Test.Test_Boolean(#False, #False);
+end proc main;

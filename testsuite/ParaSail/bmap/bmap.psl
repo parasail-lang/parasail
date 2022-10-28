@@ -1,0 +1,166 @@
+// The following is an interface to a basic map module:
+interface TMap<Key_Type is Ordered<>; Element_Type is Assignable<>> is
+    op "[]"() -> TMap;
+
+    func Insert(var TMap; Key : Key_Type; Value : Element_Type);
+    func Find(TMap; Key : Key_Type) -> optional Element_Type;
+    func Delete(var TMap; Key : Key_Type);
+    func Count(TMap) -> Univ_Integer;
+end interface TMap;
+
+// Here is a possible implementation of this TMap module,
+// using a binary tree:
+class TMap is
+    interface Binary_Node<> is
+      // A simple "concrete" binary node module
+        var Left : optional Binary_Node;
+        var Right : optional Binary_Node;
+        const Key : Key_Type;
+        var Value : optional Element_Type;  // null means node was deleted
+    end interface Binary_Node;
+
+    var Root : optional Binary_Node;
+    var Count := 0;
+
+    func Count_Subtree(Subtree : optional Binary_Node)
+      -> Univ_Integer is
+        // illustrate parallel recursive divide-and-conquer
+        if Subtree is null then
+            return 0;
+        else
+            return Count_Subtree(Subtree.Left) + Count_Subtree(Subtree.Right) +
+              (Subtree.Value is null? 0 : 1);
+        end if;
+    end func Count_Subtree;
+
+  exports
+    op "[]"() -> TMap is
+        return (Root => null, Count => 0);
+    end op "[]";
+
+    func Insert(var TMap; Key : Key_Type; Value : Element_Type) is
+        for M => TMap.Root loop
+            if M is null then
+                // Not already in the map; add it
+                M := (Key => Key, Value => Value, Left => null, Right => null);
+                TMap.Count += 1;
+            else
+               case Key =? M.Key of
+                 [#less] =>
+                   continue loop with M.Left; // M => M.Left;
+                 [#greater] =>
+                   continue loop with M.Right; // M => M.Right;
+                 [#equal] =>
+                   // Key already in the map
+                   if M.Value is null then
+                       TMap.Count += 1;  // but had been deleted
+                   end if;
+                   // Overwrite the Value field
+                   M.Value := Value;
+                   return;
+               end case;
+            end if;
+        end loop;
+    end func Insert;
+
+    func Find(TMap; Key : Key_Type) -> optional Element_Type is
+        for M => TMap.Root while M not null loop
+            case Key =? M.Key of
+              [#less] =>
+                continue loop with M.Left; // M => M.Left;
+              [#greater] =>
+                continue loop with M.Right; // M => M.Right;
+              [#equal] =>
+                // Found it; return the value
+                return M.Value;
+            end case;
+        end loop;
+        // Not found in TMap
+        return null;
+    end func Find;
+
+    func Delete(var TMap; Key : Key_Type) is
+        for M => TMap.Root while M not null loop
+            case Key =? M.Key of
+              [#less] =>
+                continue loop with M.Left; // M => M.Left;
+              [#greater] =>
+                continue loop with M.Right; // M => M.Right;
+              [#equal] =>
+                // Found it; if at most one subtree is non-null, overwrite
+                // it; otherwise, set its value field to null
+                // (to avoid a more complex re-balancing).
+                if M.Value not null then
+                    TMap.Count -= 1;  // Decrement unless already deleted
+                end if;
+                if M.Left is null then
+                    // Move right subtree into M
+                    M <== M.Right;
+                elsif M.Right is null then
+                    // Move left subtree into M
+                    M <== M.Left;
+                else
+                    // Cannot immediately reclaim node; 
+                    // set value field to null instead.
+                    M.Value := null;
+                end if;
+            end case;
+        end loop;
+        // Not found in the map
+    end func Delete;
+
+    func Count(TMap) -> Univ_Integer is
+        if Count_Subtree(TMap.Root) != TMap.Count then  // Check invariant
+            Println("Count_Subtree = " | Count_Subtree(TMap.Root) |
+              ", Count = " | TMap.Count);
+        end if;
+        return TMap.Count;
+    end func Count;
+end class TMap;
+
+func Hello_World() is // var IO) is
+    // IO.
+    Println("Hello, World");
+end func Hello_World;
+
+func Test_TMap(Num : Univ_Integer; Seed : Univ_Integer) is
+    var Ran : Random := Start(Seed);
+    var M : TMap<Key_Type => Univ_Integer, Element_Type => Univ_String>;
+
+    M := [];
+
+    for I in 1..Num*2 forward loop
+        const Key := Next(Ran) mod Num + 1;
+        const Val := "Val" | To_String(I);
+        Println("About to insert " | Key | " => " | Val);
+        Insert(M, Key, Val);
+    end loop;
+    Println("Count = " | Count(M));
+
+    for I in 1..Num loop
+        const Key := Next(Ran) mod Num + 1;
+        const Val := Find(M, Key);
+        if Val not null then
+           Println("Looking for " | Key | ", found " | Find(M, Key));
+        end if;
+    end loop;
+
+    for I in 1..Num/3 loop
+        const Key := Next(Ran) mod Num + 1;
+        Println("About to delete " | Key);
+        Delete(M, Key);
+    end loop;
+    Println("Count = " | Count(M));
+
+    for I in 1..Num forward loop
+        const Val := Find(M, I);
+        if Val not null then
+           Println("Looking for " | I | ", found " | Find(M, I));
+        end if
+    end loop;
+
+end func Test_TMap;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_TMap (10, 1);
+end func main;

@@ -1,0 +1,1330 @@
+Here is a sample ParaSail program that will illustrate
+many of the issues associated with generating Ada source
+code from a ParaSail virtual machine routine.
+First we have the source code, both the original source,
+and the un-parsed version of the abstract syntax tree.
+Then we have the individual PSVM routines.
+We will start with the simplest PSVM routine.
+See Current_Column and then Final_Result to start.
+
+Important idea:  "Enclosing type descriptor" becomes
+a tagged object, and all calls on functions declared
+immediately within a module take a type-descriptor object
+as its controlling parameter.  In the generated Ada,
+it would be natural for the type-descriptor object to be
+the prefix parameter.  A type-descriptor object is used
+to represent a type parameter when a module is instantiated.
+Module parameters are components of the type-descriptor
+objects (could be discriminants?).  Question: inherited
+operations when called are passed a type descriptor specific
+to their original module?  Yes, though that may require
+some kind of wrapper.  
+
+What other information is passed as part of a call?  
+We need the region chain.  We need to know the current 
+pico-thread.  The region info could be stored in the 
+pico-thread, conceivably.  Parameters are stored next
+to the pico-thread descriptor in memory.
+An index is probably enough to identify the pico-thread.
+We also need the target region(s) for the output parameter(s).
+These could be simply the appropriate "null" values.
+
+Parallel call probably requires a special operation that
+takes a TCB with a vector of parameters, an operation index,
+and a type descriptor.  The type descriptor would have a
+special dispatching operation which would contain a case
+statement over the operation index and would in each case 
+alternative would call the associated operation with the
+appropriate parameters`
+
+Each PSVM instruction can be augmented with the information
+needed to generate the corresponding Ada code, such as the
+type of the type-descriptor object (i.e. the module?), the name 
+of the operation (though information on the module and an index 
+would seem to be enough), the types of the parameters, etc.
+
+-----------------------
+ 1   // Example ParaSail program -- Parallel, non-recursive N_Queens solver
+ 2   
+ 3   // Copyright (C) 2011-2012, S. Tucker Taft, Lexington MA, USA
+ 4   // To be used only for Personal, Academic, or Evaluation Purposes;
+ 5   // Not for Commercial Production Use.
+ 6   // Report errors at http://groups.google.com/group/parasail-programming-language
+ 7   interface N_Queens <N : Univ_Integer := 8> is
+ 8       // Place N queens on an NxN checkerboard so that none of them can
+ 9       // "take" each other.
+ 10      type Chess_Unit is new Integer< -N*2 .. N*2 >;
+ 11          // An integer type sufficiently big to represent values -N*2 .. +N*2
+ 12      const Rows : Countable_Range<Chess_Unit> := 1..N;
+ 13      const Columns : Countable_Range<Chess_Unit> := 1..N;
+ 14      type Row is Chess_Unit; // {Row in Rows};  // A subrange in 1..N
+ 15      type Column is Chess_Unit; // {Column in Columns};  // A subrange in 1..N
+ 16      type Solution is Array<optional Column, Row>;  
+ 17        // A "solution" is an array of Column's, indexed by "Row."
+ 18        // It indicates in which Column a queen of the given Row is located
+ 19        // An example solution would be:  2 8 6 1 3 5 7 4
+ 20        //   meaning that the queen in row 1 is at column 2,
+ 21        //   the queen in row 2 is at column 8, the queen in
+ 22        //   row 3 is at column 6, and so on.
+ 23       
+ 24      func Place_Queens() -> Vector<Solution> 
+ 25        {for all Sol of Place_Queens => for all Col of Sol => Col not null};
+ 26          // Produce a vector of solutions, with the requirement
+ 27          // that for each solution, there are non-null column numbers
+ 28          // specified for each row of the checkerboard.
+ 29  end interface N_Queens;
+
+interface N_Queens<N : Univ_Integer := 8> 
+is
+    type Chess_Unit is new Integer<-N * 2 .. N * 2>;
+    const Rows : Countable_Range<Chess_Unit> := 1 .. N;
+    const Columns : Countable_Range<Chess_Unit> := 1 .. N;
+    type Row is Chess_Unit;
+    type Column is Chess_Unit;
+    type Solution is Array<optional Column, Row>;
+    func Place_Queens()
+      -> Vector<Solution>
+      {(for all Sol of Place_Queens => (for all Col of Sol => Col not null))};
+end interface N_Queens;
+
+ 30  
+ 31  class N_Queens is
+ 32      type Sum_Range is Chess_Unit; // {Sum_Range in 2..2*N};
+ 33          // Sum_Range is used for diagonals where the row+column is the
+ 34          // same throughout the diagonal.
+ 35      type Diff_Range is Chess_Unit; // {Diff_Range in (1-N) .. (N-1)};
+ 36          // Diff_Range is used for diagonals where row-column is the
+ 37          // same throughout the diagonal.
+ 38      type Sum is Countable_Set<Sum_Range>;
+ 39          // This type of set keeps track of which Sum_Range diagonals
+ 40          // have a queen on them already.
+ 41      type Diff is Countable_Set<Diff_Range>;
+ 42          // This type of set keeps track of which Diff_Range diagonals
+ 43          // have a queen on them already.
+ 44  
+ 45      interface Solution_State<> is
+ 46          // We build up a solution state progressively as we move
+ 47          // across the checkerboard, one column at a time.
+ 48          func Initial_State() -> Solution_State;
+ 49          func Is_Acceptable(S : Solution_State; R : Row) -> Boolean;
+ 50            // Is_Acceptable returns True if the next queen could be
+ 51            // place in row R.
+ 52          func Current_Column(S : Solution_State) -> Column;
+ 53            // Current_Column indicates which column we are working on.
+ 54          func Next_State(S : Solution_State; R : Row) -> Solution_State;
+ 55            // Next_State returns a Solution_State produced by
+ 56            // adding a queen at (Current_Column(S), R).
+ 57          func Final_Result(S : Solution_State; R : Row) -> Solution;
+ 58            // Final_Result returns a result produced by adding a queen
+ 59            // at (Columns.Last, R) to a solution with all other columns
+ 60            // placed.
+ 61      end interface Solution_State;
+ 62  
+ 63      class Solution_State is
+ 64          const C : Column;    // Current column
+ 65          const Trial : Solution;  // Trial solution, some col#s still null
+ 66          const Diag_Sum : Sum;   // Set of "sum" diagonals in use
+ 67          const Diag_Diff : Diff; // Set of "diff" diagnoals in use
+ 68        exports
+ 69          func Initial_State() -> Solution_State is
+ 70              return (C => 1, Trial => Create(Rows, null), 
+ 71                Diag_Sum => [], Diag_Diff => []);
+ 72          end func Initial_State;
+ 73  
+ 74          func Is_Acceptable(S : Solution_State; R : Row) -> Boolean is
+ 75            // Is_Acceptable returns True if the next queen could be
+ 76            // place in row R.
+ 77              return S.Trial[R] is null and then
+ 78                (R+S.C) not in S.Diag_Sum and then 
+ 79                (R-S.C) not in S.Diag_Diff;
+ 80          end func Is_Acceptable;
+ 81          
+ 82          func Current_Column(S : Solution_State) -> Column is
+ 83            // Current_Column indicates which column we are working on.
+ 84              return S.C;
+ 85          end func Current_Column;
+ 86  
+ 87          func Next_State(S : Solution_State; R : Row) -> Solution_State is
+ 88            // Next_State returns a Solution_State produced by
+ 89            // adding a queen at (Current_Column(S), R).
+ 90              return (C => S.C+1, 
+ 91                Trial     => S.Trial | [R => S.C],
+ 92                Diag_Sum  => S.Diag_Sum | (R+S.C),
+ 93                Diag_Diff => S.Diag_Diff | (R-S.C));
+ 94          end func Next_State;
+ 95  
+ 96          func Final_Result(S : Solution_State; R : Row) -> Solution is
+ 97            // Final_Result returns a result produced by adding a queen
+ 98            // at (Columns.Last, R) to a solution with all other columns
+ 99            // placed.
+ 100             return S.Trial | [R => S.C];
+ 101         end func Final_Result;
+ 102 
+ 103     end class Solution_State;
+ 104 
+ 105   exports
+ 106     func Place_Queens() -> Vector<Solution> 
+ 107       {for all Sol of Place_Queens => for all Col of Sol => Col not null}
+ 108         // Produce a vector of solutions, with the requirement
+ 109         // that for each solution, there are non-null column numbers
+ 110         // specified for each row of the checkerboard.
+ 111     is
+ 112       var Solutions : concurrent Vector<Solution> := [];
+ 113       
+ 114      *Outer_Loop*
+ 115       for State : Solution_State := Initial_State() loop
+ 116           // Iterate over the columns
+ 117         
+ 118           for R in Rows concurrent loop
+ 119               // Iterate over the rows
+ 120               if Is_Acceptable(State, R) then
+ 121                   // Found a Row/Column combination that is not on any diagonal
+ 122                   // already occupied.
+ 123                   if Current_Column(State) < N then
+ 124                       // Keep going since haven't reached Nth column.
+ 125                       continue loop Outer_Loop with Next_State(State, R);
+ 126                   else
+ 127                       // All done, remember trial result with last queen placed
+ 128                       Solutions |= Final_Result(State, R); 
+ 129                   end if;
+ 130               end if;
+ 131           end loop;
+ 132       end loop Outer_Loop;
+ 133       return Solutions;
+ 134       
+ 135     end func Place_Queens;
+ 136 end class N_Queens;
+
+class N_Queens
+is
+    type Sum_Range is Chess_Unit;
+    type Diff_Range is Chess_Unit;
+    type Sum is Countable_Set<Sum_Range>;
+    type Diff is Countable_Set<Diff_Range>;
+    interface Solution_State<> 
+    is
+        func Initial_State()
+          -> Solution_State;
+        func Is_Acceptable
+          (S : Solution_State; 
+           R : Row)
+          -> Boolean;
+        func Current_Column
+          (S : Solution_State)
+          -> Column;
+        func Next_State
+          (S : Solution_State; 
+           R : Row)
+          -> Solution_State;
+        func Final_Result
+          (S : Solution_State; 
+           R : Row)
+          -> Solution;
+    end interface Solution_State;
+    class Solution_State
+    is
+        const C : Column;
+        const Trial : Solution;
+        const Diag_Sum : Sum;
+        const Diag_Diff : Diff;
+      exports
+        func Initial_State()
+          -> Solution_State
+         is
+          return
+            with (C => 1, 
+                  Trial => Create(Rows, null), 
+                  Diag_Sum => [], 
+                  Diag_Diff => []);
+        end func Initial_State;
+        func Is_Acceptable
+          (S : Solution_State; 
+           R : Row)
+          -> Boolean
+         is
+          return (S.Trial[R] is null and then (R + S.C) not in S.Diag_Sum) and then (R - S.C) not in S.Diag_Diff;
+        end func Is_Acceptable;
+        func Current_Column
+          (S : Solution_State)
+          -> Column
+         is
+          return S.C;
+        end func Current_Column;
+        func Next_State
+          (S : Solution_State; 
+           R : Row)
+          -> Solution_State
+         is
+          return
+            with (C => S.C + 1, 
+                  Trial => S.Trial | [R => S.C], 
+                  Diag_Sum => S.Diag_Sum | (R + S.C), 
+                  Diag_Diff => S.Diag_Diff | (R - S.C));
+        end func Next_State;
+        func Final_Result
+          (S : Solution_State; 
+           R : Row)
+          -> Solution
+         is
+          return S.Trial | [R => S.C];
+        end func Final_Result;
+    end class Solution_State;
+  exports
+    func Place_Queens()
+      -> Vector<Solution>
+      {(for all Sol of Place_Queens => (for all Col of Sol => Col not null))}
+     is
+      var Solutions : concurrent Vector<Solution> := [];
+
+     *Outer_Loop*
+      for State : Solution_State := Initial_State() loop
+          for R in Rows concurrent loop
+              if Is_Acceptable(State, R) then
+                  if Current_Column(State) < N then
+                      continue loop Outer_Loop
+                        with Next_State(State, R);
+                  else
+                      Solutions |= Final_Result(State, R);
+                  end if;
+              end if
+          end loop
+      end loop Outer_Loop;
+      return Solutions;
+    end func Place_Queens;
+end class N_Queens;
+
+ 137 
+ 138 func Test_N_Queens() is
+ 139 
+ 140     const Do_9_Queens : Boolean := #false;
+ 141 
+ 142     if Do_9_Queens then
+ 143         type Nine_Queens is N_Queens<9>;
+ 144 
+ 145         var Results9 := Nine_Queens::Place_Queens();
+ 146 
+ 147         Println("Number of results with 9 queens = " | Length(Results9));
+ 148         for I in 1..Length(Results9) forward loop
+ 149             const Result := Results9[I];
+ 150             Print("Result #" | I);
+ 151             for J in 1..Length(Result) forward loop
+ 152                 Print(" " | [[Result[J]]]);
+ 153             end loop;
+ 154             Print('\n');
+ 155         end loop;
+ 156     end if;
+ 157 
+ 158     type Eight_Queens is N_Queens<>;
+ 159 
+ 160     var Results8 := Eight_Queens::Place_Queens();
+ 161 
+ 162     Println("Number of results with 8 queens = " | Length(Results8));
+ 163     for I in 1..Length(Results8) forward loop
+ 164         const Result := Results8[I];
+ 165         Print("Result #" | I);
+ 166         for J in 1..Length(Result) forward loop
+ 167             Print(" " | [[Result[J]]]);
+ 168         end loop;
+ 169         Print('\n');
+ 170     end loop;
+ 171 
+ 172     type Six_Queens is N_Queens<6>;
+ 173 
+ 174     var Results6 := Six_Queens::Place_Queens();
+ 175 
+ 176     Println("Number of results with 6 queens = " | Length(Results6));
+ 177     for I in 1..Length(Results6) forward loop
+ 178         const Result := Results6[I];
+ 179         Print("Result #" | I);
+ 180         for J in 1..Length(Result) forward loop
+ 181             Print(" " | [[Result[J]]]);
+ 182         end loop;
+ 183         Print('\n');
+ 184     end loop;
+ 185     type Four_Queens is N_Queens<4>;
+ 186     var Results4 := Four_Queens::Place_Queens();
+ 187     Println("Number of results with 4 queens = " | Length(Results4));
+ 188     for I in 1..Length(Results4) forward loop
+ 189         const Result := Results4[I];
+ 190         Print("Result #" | I);
+ 191         for J in 1..Length(Result) forward loop
+ 192             Print(" " | [[Result[J]]]);
+ 193         end loop;
+ 194         Print('\n');
+ 195     end loop;
+ 196 
+ 197 end func Test_N_Queens;
+
+func Test_N_Queens()
+ is
+  const Do_9_Queens : Boolean := #false;
+  if Do_9_Queens then
+      type Nine_Queens is N_Queens<9>;
+      var Results9 := Nine_Queens::Place_Queens();
+      Println
+        ("Number of results with 9 queens = " | Length(Results9));
+      for I in 1 .. Length(Results9) forward loop
+          const Result := Results9[I];
+          Print
+            ("Result #" | I);
+          for J in 1 .. Length(Result) forward loop
+              Print
+                (" " | [[Result[J]]])
+          end loop;
+          Print
+            ('\n')
+      end loop;
+  end if;
+  type Eight_Queens is N_Queens<>;
+  var Results8 := Eight_Queens::Place_Queens();
+  Println
+    ("Number of results with 8 queens = " | Length(Results8));
+  for I in 1 .. Length(Results8) forward loop
+      const Result := Results8[I];
+      Print
+        ("Result #" | I);
+      for J in 1 .. Length(Result) forward loop
+          Print
+            (" " | [[Result[J]]])
+      end loop;
+      Print
+        ('\n')
+  end loop;
+  type Six_Queens is N_Queens<6>;
+  var Results6 := Six_Queens::Place_Queens();
+  Println
+    ("Number of results with 6 queens = " | Length(Results6));
+  for I in 1 .. Length(Results6) forward loop
+      const Result := Results6[I];
+      Print
+        ("Result #" | I);
+      for J in 1 .. Length(Result) forward loop
+          Print
+            (" " | [[Result[J]]])
+      end loop;
+      Print
+        ('\n')
+  end loop;
+  type Four_Queens is N_Queens<4>;
+  var Results4 := Four_Queens::Place_Queens();
+  Println
+    ("Number of results with 4 queens = " | Length(Results4));
+  for I in 1 .. Length(Results4) forward loop
+      const Result := Results4[I];
+      Print
+        ("Result #" | I);
+      for J in 1 .. Length(Result) forward loop
+          Print
+            (" " | [[Result[J]]])
+      end loop;
+      Print
+        ('\n')
+  end loop;
+end func Test_N_Queens;
+
+ 198 ---- Finished parse ----
+
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Operation # 1 of module Solution_State
+Initial_State: Routine # 512
+() -> Initial_State : (N_Queens<>::)Solution_State<>*
+ Uses_Queuing = FALSE
+ Local_Area_Length = 39
+ Start_Callee_Locals = 29
+ Code_Length = 22
+   71 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 14), Source => (Param_Area, 0), Type_Info => (Enclosing_Type_Areas'First + 1, 2005))
+   71 (START_PARALLEL_CALL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 6), Parallel_Static_Link => (Enclosing_Type_Areas'First + 1, 2005), Parallel_Call_Target => (Type_Area, 10001), Parallel_Locked_Param_Index =>  0)
+   71 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 23), Source => (Param_Area, 0), Type_Info => (Enclosing_Type_Areas'First + 1, 2005))
+   71 (ADD_PARALLEL_CALL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 15), Parallel_Static_Link => (Enclosing_Type_Areas'First + 1, 2005), Parallel_Call_Target => (Type_Area, 10001), Parallel_Locked_Param_Index =>  0)
+   70 (CREATE_OBJ_OP, Destination => (Local_Area, 24), Source => (Param_Area, 0), Type_Info => (Type_Area, 0))
+   70 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 25), Source => (Local_Area, 24), Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   70 (STORE_INT_LIT_OP, Destination => (Local_Area, 26), Int_Value => 1)
+   70 (CALL_OP, Params => (Local_Area, 25), Static_Link => (Enclosing_Type_Areas'First + 1, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   70 (MOVE_WORD_OP, Destination => (Base_Registers'First + 24, 1), Source => (Local_Area, 25))
+   70 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 26), Source => (Local_Area, 24), Type_Info => (Enclosing_Type_Areas'First + 1, 2003))
+   70 (MOVE_WORD_OP, Destination => (Local_Area, 27), Source => (Enclosing_Type_Areas'First + 1, 20001))
+   70 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 28), Null_Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   70 (CALL_OP, Params => (Local_Area, 26), Static_Link => (Enclosing_Type_Areas'First + 1, 2003), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   70 (MOVE_WORD_OP, Destination => (Base_Registers'First + 24, 2), Source => (Local_Area, 26))
+   71 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+   71 (MOVE_WORD_OP, Destination => (Local_Area, 27), Source => (Local_Area, 14))
+   71 (MOVE_WORD_OP, Destination => (Base_Registers'First + 24, 3), Source => (Local_Area, 27))
+   71 (MOVE_WORD_OP, Destination => (Local_Area, 28), Source => (Local_Area, 23))
+   71 (MOVE_WORD_OP, Destination => (Base_Registers'First + 24, 4), Source => (Local_Area, 28))
+   70 (MOVE_WORD_OP, Destination => (Local_Area, 6), Source => (Local_Area, 24))
+   70 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 6))
+   70 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Operation # 2 of module Solution_State
+Is_Acceptable: Routine # 513
+(S : (N_Queens<>::)Solution_State<>*; R : Integer<-N * 2 .. N * 2>) -> Is_Acceptable : Boolean<>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 18
+ Start_Callee_Locals = 8
+ Code_Length = 33
+   77 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 3), Null_Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   77 (MOVE_WORD_OP, Destination => (Local_Area, 4), Source => (Param_Area, 1))
+   77 (STORE_ADDRESS_OP, Destination => (Local_Area, 4), Source => (Base_Registers'First + 4, 2))
+   77 (MOVE_WORD_OP, Destination => (Local_Area, 5), Source => (Param_Area, 2))
+   77 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Enclosing_Type_Areas'First + 1, 2003), Call_Target => (Type_Area, 10004), Locked_Param_Index =>  0)
+   77 (MOVE_WORD_OP, Destination => (Local_Area, 3), Source => (Base_Registers'First + 3, 0))
+   77 (IS_NULL_OP, Destination => (Local_Area, 3), Source => (Local_Area, 3), Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   77 (IF_OP, If_Source => (Local_Area, 3), If_Condition => 2, Skip_If_False => 10)
+   78 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 5), Null_Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   78 (MOVE_WORD_OP, Destination => (Local_Area, 6), Source => (Param_Area, 2))
+   78 (MOVE_WORD_OP, Destination => (Local_Area, 7), Source => (Param_Area, 1))
+   78 (MOVE_WORD_OP, Destination => (Local_Area, 7), Source => (Base_Registers'First + 7, 1))
+   78 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Enclosing_Type_Areas'First + 1, 2001), Call_Target => (Type_Area, 10006), Locked_Param_Index =>  0)
+   78 (MOVE_WORD_OP, Destination => (Local_Area, 6), Source => (Param_Area, 1))
+   78 (MOVE_WORD_OP, Destination => (Local_Area, 6), Source => (Base_Registers'First + 6, 3))
+   78 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Enclosing_Type_Areas'First + 1, 2005), Call_Target => (Type_Area, 10027), Locked_Param_Index =>  0)
+   78 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Zero_Base, 1) = Boolean<> (small), Call_Target => (Type_Area, 10004) = "not", Locked_Param_Index =>  0)
+   77 (SKIP_OP, Skip_Count => 1)
+   77 (STORE_INT_LIT_OP, Destination => (Local_Area, 3), Int_Value => 0)
+   77 (IF_OP, If_Source => (Local_Area, 3), If_Condition => 2, Skip_If_False => 10)
+   79 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 5), Null_Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   79 (MOVE_WORD_OP, Destination => (Local_Area, 6), Source => (Param_Area, 2))
+   79 (MOVE_WORD_OP, Destination => (Local_Area, 7), Source => (Param_Area, 1))
+   79 (MOVE_WORD_OP, Destination => (Local_Area, 7), Source => (Base_Registers'First + 7, 1))
+   79 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Enclosing_Type_Areas'First + 1, 2001), Call_Target => (Type_Area, 10007), Locked_Param_Index =>  0)
+   79 (MOVE_WORD_OP, Destination => (Local_Area, 6), Source => (Param_Area, 1))
+   79 (MOVE_WORD_OP, Destination => (Local_Area, 6), Source => (Base_Registers'First + 6, 4))
+   79 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Enclosing_Type_Areas'First + 1, 2005), Call_Target => (Type_Area, 10027), Locked_Param_Index =>  0)
+   79 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Zero_Base, 1) = Boolean<> (small), Call_Target => (Type_Area, 10004) = "not", Locked_Param_Index =>  0)
+   77 (SKIP_OP, Skip_Count => 1)
+   77 (STORE_INT_LIT_OP, Destination => (Local_Area, 3), Int_Value => 0)
+   77 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   77 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Operation # 3 of module Solution_State
+Current_Column: Routine # 514
+(S : (N_Queens<>::)Solution_State<>*) -> Current_Column : Integer<-N * 2 .. N * 2>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 14
+ Start_Callee_Locals = 4
+ Code_Length = 4
+   84 (MOVE_WORD_OP, Destination => (Local_Area, 3), Source => (Param_Area, 1))
+   84 (MAKE_COPY_IN_REGION_OP, Destination => (Local_Area, 3), Source => (Base_Registers'First + 3, 1), Type_Info => (Enclosing_Type_Areas'First + 1, 2001), Existing_Obj_In_Region => (Param_Area, 0))
+   84 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   84 (RETURN_OP)
+
+Desired Ada code:
+
+     type LObj(Size : Size_Type) is record
+         Lock_Id : Lock_Id_Type;
+         Region_Id : Region_Id_Type;
+         Type_Id : Type_Id_Type;
+         Data : Object_Array(1..Size);
+     end record;
+
+package Solution_State is
+     type Ctx is new Context with record
+          ...  -- Module parameters
+          ...  -- Other type-descriptor info
+     end records;
+
+     type Rec
+         Header : LObj_Header := LObj_Header_Default(Size => 4);
+         C : Column;    -- Current column
+         Trial : Solution;  -- Trial solution, some col#s still null
+         Diag_Sum : Sum;   -- Set of "sum" diagonals in use
+         Diag_Diff : Diff; -- Set of "diff" diagnoals in use
+     end record;
+
+     function Current_Column(Ctx : Solution_State.Ctx; S : LObj) 
+       return Column is
+     begin
+         return S.Data(1);
+     end Current_Column;
+
+  or specialized to:
+
+     function Current_Column(S : Solution_State.Rec) return Column is
+     begin
+         return S.C;
+     end Current_Column;
+     ...
+end Solution_State;
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Operation # 4 of module Solution_State
+Next_State: Routine # 515
+(S : (N_Queens<>::)Solution_State<>*; R : Integer<-N * 2 .. N * 2>) -> Next_State : (N_Queens<>::)Solution_State<>*
+ Uses_Queuing = FALSE
+ Local_Area_Length = 47
+ Start_Callee_Locals = 37
+ Code_Length = 48
+   92 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 14), Source => (Param_Area, 0), Type_Info => (Enclosing_Type_Areas'First + 1, 2005))
+   92 (MOVE_WORD_OP, Destination => (Local_Area, 15), Source => (Param_Area, 1))
+   92 (MOVE_WORD_OP, Destination => (Local_Area, 15), Source => (Base_Registers'First + 15, 3))
+   92 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 16), Null_Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   92 (MOVE_WORD_OP, Destination => (Local_Area, 17), Source => (Param_Area, 2))
+   92 (MOVE_WORD_OP, Destination => (Local_Area, 18), Source => (Param_Area, 1))
+   92 (MOVE_WORD_OP, Destination => (Local_Area, 18), Source => (Base_Registers'First + 18, 1))
+   92 (CALL_OP, Params => (Local_Area, 16), Static_Link => (Enclosing_Type_Areas'First + 1, 2001), Call_Target => (Type_Area, 10006), Locked_Param_Index =>  0)
+   92 (START_PARALLEL_CALL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 6), Parallel_Static_Link => (Enclosing_Type_Areas'First + 1, 2005), Parallel_Call_Target => (Type_Area, 10008), Parallel_Locked_Param_Index =>  0)
+   93 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 25), Source => (Param_Area, 0), Type_Info => (Enclosing_Type_Areas'First + 1, 2005))
+   93 (MOVE_WORD_OP, Destination => (Local_Area, 26), Source => (Param_Area, 1))
+   93 (MOVE_WORD_OP, Destination => (Local_Area, 26), Source => (Base_Registers'First + 26, 4))
+   93 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 27), Null_Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   93 (MOVE_WORD_OP, Destination => (Local_Area, 28), Source => (Param_Area, 2))
+   93 (MOVE_WORD_OP, Destination => (Local_Area, 29), Source => (Param_Area, 1))
+   93 (MOVE_WORD_OP, Destination => (Local_Area, 29), Source => (Base_Registers'First + 29, 1))
+   93 (CALL_OP, Params => (Local_Area, 27), Static_Link => (Enclosing_Type_Areas'First + 1, 2001), Call_Target => (Type_Area, 10007), Locked_Param_Index =>  0)
+   93 (ADD_PARALLEL_CALL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 17), Parallel_Static_Link => (Enclosing_Type_Areas'First + 1, 2005), Parallel_Call_Target => (Type_Area, 10008), Parallel_Locked_Param_Index =>  0)
+   90 (CREATE_OBJ_OP, Destination => (Local_Area, 28), Source => (Param_Area, 0), Type_Info => (Type_Area, 0))
+   90 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 29), Source => (Local_Area, 28), Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   90 (MOVE_WORD_OP, Destination => (Local_Area, 30), Source => (Param_Area, 1))
+   90 (MOVE_WORD_OP, Destination => (Local_Area, 30), Source => (Base_Registers'First + 30, 1))
+   90 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 31), Null_Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   90 (STORE_INT_LIT_OP, Destination => (Local_Area, 32), Int_Value => 1)
+   90 (CALL_OP, Params => (Local_Area, 31), Static_Link => (Enclosing_Type_Areas'First + 1, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   90 (CALL_OP, Params => (Local_Area, 29), Static_Link => (Enclosing_Type_Areas'First + 1, 2001), Call_Target => (Type_Area, 10006), Locked_Param_Index =>  0)
+   90 (MOVE_WORD_OP, Destination => (Base_Registers'First + 28, 1), Source => (Local_Area, 29))
+   91 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 30), Source => (Local_Area, 28), Type_Info => (Enclosing_Type_Areas'First + 1, 2003))
+   91 (MOVE_WORD_OP, Destination => (Local_Area, 31), Source => (Param_Area, 1))
+   91 (MOVE_WORD_OP, Destination => (Local_Area, 31), Source => (Base_Registers'First + 31, 2))
+   91 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 32), Null_Type_Info => (Type_Area, 2002))
+   91 (CALL_OP, Params => (Local_Area, 32), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   91 (STORE_ADDRESS_OP, Destination => (Local_Area, 34), Source => (Local_Area, 32))
+   91 (MOVE_WORD_OP, Destination => (Local_Area, 35), Source => (Param_Area, 2))
+   91 (CALL_OP, Params => (Local_Area, 33), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10002), Locked_Param_Index =>  0)
+   91 (MOVE_WORD_OP, Destination => (Local_Area, 36), Source => (Param_Area, 1))
+   91 (MAKE_COPY_IN_REGION_OP, Destination => (Local_Area, 36), Source => (Base_Registers'First + 36, 1), Type_Info => (Enclosing_Type_Areas'First + 1, 2001), Existing_Obj_In_Region => (Local_Area, 32))
+   91 (ASSIGN_WORD_OP, Destination => (Base_Registers'First + 33, 0), Source => (Local_Area, 36), Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   91 (CALL_OP, Params => (Local_Area, 30), Static_Link => (Enclosing_Type_Areas'First + 1, 2003), Call_Target => (Type_Area, 10007), Locked_Param_Index =>  0)
+   91 (MOVE_WORD_OP, Destination => (Base_Registers'First + 28, 2), Source => (Local_Area, 30))
+   92 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+   92 (MOVE_WORD_OP, Destination => (Local_Area, 31), Source => (Local_Area, 14))
+   92 (MOVE_WORD_OP, Destination => (Base_Registers'First + 28, 3), Source => (Local_Area, 31))
+   93 (MOVE_WORD_OP, Destination => (Local_Area, 32), Source => (Local_Area, 25))
+   93 (MOVE_WORD_OP, Destination => (Base_Registers'First + 28, 4), Source => (Local_Area, 32))
+   90 (MOVE_WORD_OP, Destination => (Local_Area, 6), Source => (Local_Area, 28))
+   90 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 6))
+   90 (RETURN_OP)
+
+package Solution_State is
+     type Rec
+         Header : LObj_Header := LObj_Header_Default(Size => 4);
+         C : Column;    -- Current column
+         Trial : Solution;  -- Trial solution, some col#s still null
+         Diag_Sum : Sum;   -- Set of "sum" diagonals in use
+         Diag_Diff : Diff; -- Set of "diff" diagnoals in use
+     end record;
+
+     function Next_State(Ctx : Solution_State.Ctx; S : Solution_State.Rec;
+       R : Row) return Solution_State.Rec is
+         Loc14 : Solution_State.Ref := Null_For_Region(Ctx.Region_Id)
+         Loc15 : blah := S.Diag_Sum;
+         Loc16 : blurf := Local_Null(Ctx);
+         Loc17 : Row := R;
+         Loc18 : Column := S.C;
+     begin
+        
+     end Next_State;
+      
+   92 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 14), Source => (Param_Area, 0), Type_Info => (Enclosing_Type_Areas'First + 1, 2005))
+   92 (MOVE_WORD_OP, Destination => (Local_Area, 15), Source => (Param_Area, 1))
+   92 (MOVE_WORD_OP, Destination => (Local_Area, 15), Source => (Base_Registers'First + 15, 3))
+   92 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 16), Null_Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   92 (MOVE_WORD_OP, Destination => (Local_Area, 17), Source => (Param_Area, 2))
+   92 (MOVE_WORD_OP, Destination => (Local_Area, 18), Source => (Param_Area, 1))
+   92 (MOVE_WORD_OP, Destination => (Local_Area, 18), Source => (Base_Registers'First + 18, 1))
+   92 (CALL_OP, Params => (Local_Area, 16), Static_Link => (Enclosing_Type_Areas'First + 1, 2001), Call_Target => (Type_Area, 10006), Locked_Param_Index =>  0)
+   92 (START_PARALLEL_CALL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 6), Parallel_Static_Link => (Enclosing_Type_Areas'First + 1, 2005), Parallel_Call_Target => (Type_Area, 10008), Parallel_Locked_Param_Index =>  0)
+   93 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 25), Source => (Param_Area, 0), Type_Info => (Enclosing_Type_Areas'First + 1, 2005))
+   93 (MOVE_WORD_OP, Destination => (Local_Area, 26), Source => (Param_Area, 1))
+   93 (MOVE_WORD_OP, Destination => (Local_Area, 26), Source => (Base_Registers'First + 26, 4))
+   93 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 27), Null_Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   93 (MOVE_WORD_OP, Destination => (Local_Area, 28), Source => (Param_Area, 2))
+   93 (MOVE_WORD_OP, Destination => (Local_Area, 29), Source => (Param_Area, 1))
+   93 (MOVE_WORD_OP, Destination => (Local_Area, 29), Source => (Base_Registers'First + 29, 1))
+   93 (CALL_OP, Params => (Local_Area, 27), Static_Link => (Enclosing_Type_Areas'First + 1, 2001), Call_Target => (Type_Area, 10007), Locked_Param_Index =>  0)
+   93 (ADD_PARALLEL_CALL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 17), Parallel_Static_Link => (Enclosing_Type_Areas'First + 1, 2005), Parallel_Call_Target => (Type_Area, 10008), Parallel_Locked_Param_Index =>  0)
+   90 (CREATE_OBJ_OP, Destination => (Local_Area, 28), Source => (Param_Area, 0), Type_Info => (Type_Area, 0))
+   90 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 29), Source => (Local_Area, 28), Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   90 (MOVE_WORD_OP, Destination => (Local_Area, 30), Source => (Param_Area, 1))
+   90 (MOVE_WORD_OP, Destination => (Local_Area, 30), Source => (Base_Registers'First + 30, 1))
+   90 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 31), Null_Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   90 (STORE_INT_LIT_OP, Destination => (Local_Area, 32), Int_Value => 1)
+   90 (CALL_OP, Params => (Local_Area, 31), Static_Link => (Enclosing_Type_Areas'First + 1, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   90 (CALL_OP, Params => (Local_Area, 29), Static_Link => (Enclosing_Type_Areas'First + 1, 2001), Call_Target => (Type_Area, 10006), Locked_Param_Index =>  0)
+   90 (MOVE_WORD_OP, Destination => (Base_Registers'First + 28, 1), Source => (Local_Area, 29))
+   91 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 30), Source => (Local_Area, 28), Type_Info => (Enclosing_Type_Areas'First + 1, 2003))
+   91 (MOVE_WORD_OP, Destination => (Local_Area, 31), Source => (Param_Area, 1))
+   91 (MOVE_WORD_OP, Destination => (Local_Area, 31), Source => (Base_Registers'First + 31, 2))
+   91 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 32), Null_Type_Info => (Type_Area, 2002))
+   91 (CALL_OP, Params => (Local_Area, 32), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   91 (STORE_ADDRESS_OP, Destination => (Local_Area, 34), Source => (Local_Area, 32))
+   91 (MOVE_WORD_OP, Destination => (Local_Area, 35), Source => (Param_Area, 2))
+   91 (CALL_OP, Params => (Local_Area, 33), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10002), Locked_Param_Index =>  0)
+   91 (MOVE_WORD_OP, Destination => (Local_Area, 36), Source => (Param_Area, 1))
+   91 (MAKE_COPY_IN_REGION_OP, Destination => (Local_Area, 36), Source => (Base_Registers'First + 36, 1), Type_Info => (Enclosing_Type_Areas'First + 1, 2001), Existing_Obj_In_Region => (Local_Area, 32))
+   91 (ASSIGN_WORD_OP, Destination => (Base_Registers'First + 33, 0), Source => (Local_Area, 36), Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+   91 (CALL_OP, Params => (Local_Area, 30), Static_Link => (Enclosing_Type_Areas'First + 1, 2003), Call_Target => (Type_Area, 10007), Locked_Param_Index =>  0)
+   91 (MOVE_WORD_OP, Destination => (Base_Registers'First + 28, 2), Source => (Local_Area, 30))
+   92 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+   92 (MOVE_WORD_OP, Destination => (Local_Area, 31), Source => (Local_Area, 14))
+   92 (MOVE_WORD_OP, Destination => (Base_Registers'First + 28, 3), Source => (Local_Area, 31))
+   93 (MOVE_WORD_OP, Destination => (Local_Area, 32), Source => (Local_Area, 25))
+   93 (MOVE_WORD_OP, Destination => (Base_Registers'First + 28, 4), Source => (Local_Area, 32))
+   90 (MOVE_WORD_OP, Destination => (Local_Area, 6), Source => (Local_Area, 28))
+   90 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 6))
+   90 (RETURN_OP)
+    end Next_State;
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Operation # 5 of module Solution_State
+Final_Result: Routine # 516
+(S : (N_Queens<>::)Solution_State<>*; R : Integer<-N * 2 .. N * 2>) -> Final_Result : Array<optional Column, Row>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 20
+ Start_Callee_Locals = 10
+ Code_Length = 14
+  100 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Enclosing_Type_Areas'First + 1, 2003))
+  100 (MOVE_WORD_OP, Destination => (Local_Area, 4), Source => (Param_Area, 1))
+  100 (MOVE_WORD_OP, Destination => (Local_Area, 4), Source => (Base_Registers'First + 4, 2))
+  100 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 5), Null_Type_Info => (Type_Area, 2002))
+  100 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+  100 (STORE_ADDRESS_OP, Destination => (Local_Area, 7), Source => (Local_Area, 5))
+  100 (MOVE_WORD_OP, Destination => (Local_Area, 8), Source => (Param_Area, 2))
+  100 (CALL_OP, Params => (Local_Area, 6), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10002), Locked_Param_Index =>  0)
+  100 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Param_Area, 1))
+  100 (MAKE_COPY_IN_REGION_OP, Destination => (Local_Area, 9), Source => (Base_Registers'First + 9, 1), Type_Info => (Enclosing_Type_Areas'First + 1, 2001), Existing_Obj_In_Region => (Local_Area, 5))
+  100 (ASSIGN_WORD_OP, Destination => (Base_Registers'First + 6, 0), Source => (Local_Area, 9), Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+  100 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Enclosing_Type_Areas'First + 1, 2003), Call_Target => (Type_Area, 10007), Locked_Param_Index =>  0)
+  100 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+  100 (RETURN_OP)
+
+    function Final_Result(S : Solution_State.Rec; R : Row) return Solution.Rec
+    is
+    begin
+    end Final_Result;
+
+  100 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Enclosing_Type_Areas'First + 1, 2003))
+  100 (MOVE_WORD_OP, Destination => (Local_Area, 4), Source => (Param_Area, 1))
+  100 (MOVE_WORD_OP, Destination => (Local_Area, 4), Source => (Base_Registers'First + 4, 2))
+  100 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 5), Null_Type_Info => (Type_Area, 2002))
+  100 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+  100 (STORE_ADDRESS_OP, Destination => (Local_Area, 7), Source => (Local_Area, 5))
+  100 (MOVE_WORD_OP, Destination => (Local_Area, 8), Source => (Param_Area, 2))
+  100 (CALL_OP, Params => (Local_Area, 6), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10002), Locked_Param_Index =>  0)
+  100 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Param_Area, 1))
+  100 (MAKE_COPY_IN_REGION_OP, Destination => (Local_Area, 9), Source => (Base_Registers'First + 9, 1), Type_Info => (Enclosing_Type_Areas'First + 1, 2001), Existing_Obj_In_Region => (Local_Area, 5))
+  100 (ASSIGN_WORD_OP, Destination => (Base_Registers'First + 6, 0), Source => (Local_Area, 9), Type_Info => (Enclosing_Type_Areas'First + 1, 2001))
+  100 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Enclosing_Type_Areas'First + 1, 2003), Call_Target => (Type_Area, 10007), Locked_Param_Index =>  0)
+  100 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+  100 (RETURN_OP)
+ ----- ParaSail Virtual Machine Instructions ---- 
+Place_Queens: Routine # 517
+() -> Place_Queens : Vector<Solution>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 29
+ Start_Callee_Locals = 19
+ Code_Length = 62
+  112 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 6), Null_Type_Info => (Type_Area, 2004))
+  112 (CALL_OP, Params => (Local_Area, 6), Static_Link => (Type_Area, 2004), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+  112 (CREATE_LOCK_FOR_OBJ_OP, Destination => (Local_Area, 6))
+  115 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 7), Null_Type_Info => (Type_Area, 2006))
+  115 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Type_Area, 2006), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+  115 (MOVE_WORD_OP, Destination => (Local_Area, 17), Source => (Local_Area, 7))
+  115 (START_PARALLEL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 9), Parallel_Static_Link => (Local_Area, 0), Parallel_Code_Block =>(PCO => 4, UQ => F, LAL => 28, SOCL => 18))
+  115 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+  133 (MAKE_COPY_IN_REGION_OP, Destination => (Local_Area, 18), Source => (Local_Area, 6), Type_Info => (Type_Area, 2004), Existing_Obj_In_Region => (Param_Area, 0))
+  133 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 18))
+  133 (RETURN_OP)
+  118 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 6), Null_Type_Info => (Type_Area, 2002))
+  118 (MAKE_COPY_IN_REGION_OP, Destination => (Local_Area, 6), Source => (Type_Area, 20001), Type_Info => (Type_Area, 2002), Existing_Obj_In_Region => (Local_Area, 6))
+  118 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 8), Source => (Local_Area, 6), Type_Info => (Type_Area, 2001))
+  118 (STORE_ADDRESS_OP, Destination => (Local_Area, 9), Source => (Local_Area, 6))
+  118 (CALL_OP, Params => (Local_Area, 8), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10012), Locked_Param_Index =>  0)
+  118 (NOT_NULL_OP, Destination => (Local_Area, 9), Source => (Local_Area, 8), Type_Info => (Type_Area, 2001))
+  118 (IF_OP, If_Source => (Local_Area, 9), If_Condition => 2, Skip_If_False => 3)
+  118 (MOVE_WORD_OP, Destination => (Local_Area, 17), Source => (Local_Area, 8))
+  118 (START_PARALLEL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 9), Parallel_Static_Link => (Local_Area, 0), Parallel_Code_Block =>(PCO => 2, UQ => F, LAL => 30, SOCL => 20))
+  118 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+      (EXIT_OP, Skip_Count => 0, Level_Diff => 1)
+  118 (CREATE_TCB_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Local_Area, 6), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Num_Params => 1)
+  118 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 7), Source => (Enclosing_Local_Areas'First + 1, 6), Type_Info => (Type_Area, 2001))
+  118 (STORE_ADDRESS_OP, Destination => (Local_Area, 8), Source => (Enclosing_Local_Areas'First + 1, 6))
+  118 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10012), Locked_Param_Index =>  0)
+  118 (NOT_NULL_OP, Destination => (Local_Area, 8), Source => (Local_Area, 7), Type_Info => (Type_Area, 2001))
+  118 (IF_OP, If_Source => (Local_Area, 8), If_Condition => 2, Skip_If_False => 2)
+  118 (MOVE_WORD_OP, Destination => (Base_Registers'First + 6, 8), Source => (Local_Area, 7))
+  118 (ADD_PARALLEL_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Base_Registers'First + 6, 0), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Parallel_Code_Block =>(PCO =>-8, UQ => F, LAL => 30, SOCL => 20))
+  120 (MOVE_WORD_OP, Destination => (Local_Area, 7), Source => (Enclosing_Param_Areas'First + 1, 0))
+  120 (MOVE_WORD_OP, Destination => (Local_Area, 8), Source => (Param_Area, 0))
+  120 (CALL_OP, Params => (Local_Area, 6), Static_Link => (Type_Area, 2006), Call_Target => (Type_Area, 10002), Locked_Param_Index =>  0)
+  120 (IF_OP, If_Source => (Local_Area, 6), If_Condition => 2, Skip_If_False => 27)
+  123 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 9), Null_Type_Info => (Type_Area, 2001))
+  123 (MOVE_WORD_OP, Destination => (Local_Area, 10), Source => (Enclosing_Param_Areas'First + 1, 0))
+  123 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Type_Area, 2006), Call_Target => (Type_Area, 10003), Locked_Param_Index =>  0)
+  123 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 10), Null_Type_Info => (Type_Area, 2001))
+  123 (MOVE_WORD_OP, Destination => (Local_Area, 11), Source => (Type_Area, 1))
+  123 (CALL_OP, Params => (Local_Area, 10), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+  123 (CALL_OP, Params => (Local_Area, 8), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10018), Locked_Param_Index =>  0)
+  123 (STORE_INT_LIT_OP, Destination => (Local_Area, 9), Int_Value => 1)
+  123 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 17) = Ordering<> (small), Call_Target => (Type_Area, 10003) = "to_bool", Locked_Param_Index =>  0)
+  123 (IF_OP, If_Source => (Local_Area, 7), If_Condition => 2, Skip_If_False => 10)
+  115 (CREATE_TCB_OP, Parallel_Master => (Enclosing_Local_Areas'First + 2, 3), Parallel_Control => (Local_Area, 8), Parallel_Static_Link => (Enclosing_Local_Areas'First + 2, 0), Num_Params => 1)
+  115 (STORE_ADDRESS_OP, Destination => (Local_Area, 9), Source => (Enclosing_Local_Areas'First + 2, 3))
+  115 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 9), Source => (Local_Area, 9), Type_Info => (Type_Area, 2006))
+  125 (MOVE_WORD_OP, Destination => (Local_Area, 10), Source => (Enclosing_Param_Areas'First + 1, 0))
+  125 (MOVE_WORD_OP, Destination => (Local_Area, 11), Source => (Param_Area, 0))
+  125 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Type_Area, 2006), Call_Target => (Type_Area, 10004), Locked_Param_Index =>  0)
+  115 (MOVE_WORD_OP, Destination => (Base_Registers'First + 8, 8), Source => (Local_Area, 9))
+  115 (ADD_PARALLEL_OP, Parallel_Master => (Enclosing_Local_Areas'First + 2, 3), Parallel_Control => (Base_Registers'First + 8, 0), Parallel_Static_Link => (Enclosing_Local_Areas'First + 2, 0), Parallel_Code_Block =>(PCO =>-41, UQ => F, LAL => 28, SOCL => 18))
+  125 (EXIT_OP, Skip_Count => 0, Level_Diff => 2)
+  128 (SKIP_OP, Skip_Count => 7)
+  128 (STORE_ADDRESS_OP, Destination => (Local_Area, 16), Source => (Enclosing_Local_Areas'First + 2, 6))
+  128 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 17), Null_Type_Info => (Type_Area, 2003))
+  128 (MOVE_WORD_OP, Destination => (Local_Area, 18), Source => (Enclosing_Param_Areas'First + 1, 0))
+  128 (MOVE_WORD_OP, Destination => (Local_Area, 19), Source => (Param_Area, 0))
+  128 (CALL_OP, Params => (Local_Area, 17), Static_Link => (Type_Area, 2006), Call_Target => (Type_Area, 10005), Locked_Param_Index =>  0)
+  128 (START_PARALLEL_CALL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 8), Parallel_Static_Link => (Type_Area, 2004), Parallel_Call_Target => (Type_Area, 10005), Parallel_Locked_Param_Index =>  1)
+  128 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+      (EXIT_OP, Skip_Count => 0, Level_Diff => 1)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Test_N_Queens: Routine # 518
+()
+ Uses_Queuing = FALSE
+ Local_Area_Length = 70
+ Start_Callee_Locals = 60
+ Code_Length = 277
+  140 (STORE_ENUM_LIT_OP, Destination => (Local_Area, 7), Enum_Value => #false)
+  140 (CALL_OP, Params => (Local_Area, 6), Static_Link => (Zero_Base, 1) = Boolean<> (small), Call_Target => (Type_Area, 10001) = "from_univ", Locked_Param_Index =>  0)
+  142 (MOVE_WORD_OP, Destination => (Local_Area, 7), Source => (Local_Area, 6))
+  142 (IF_OP, If_Source => (Local_Area, 7), If_Condition => 2, Skip_If_False => 19)
+  145 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 8), Null_Type_Info => (Zero_Base, 245) = Vector<Array<Integer<".."("*"("-"(9), 2), "*"(9, 2))>, Integer<".."("*"("-"(9), 2), "*"(9, 2))>>>)
+  145 (CALL_OP, Params => (Local_Area, 8), Static_Link => (Zero_Base, 231) = N_Queens<9>, Call_Target => (Zero_Base, 517) = Place_Queens, Locked_Param_Index =>  0)
+  147 (STORE_STR_LIT_OP, Destination => (Local_Area, 10), Str_Value => "Number of results with 9 queens = ")
+  147 (MOVE_WORD_OP, Destination => (Local_Area, 12), Source => (Local_Area, 8))
+  147 (CALL_OP, Params => (Local_Area, 11), Static_Link => (Zero_Base, 245) = Vector<Array<Integer<".."("*"("-"(9), 2), "*"(9, 2))>, Integer<".."("*"("-"(9), 2), "*"(9, 2))>>>, Call_Target => (Type_Area, 10008) = Length, Locked_Param_Index =>  0)
+  147 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 35) = (Univ_String<>::)"|"<Univ_Integer<>>, Call_Target => (Enclosing_Type_Areas'First + 1, 10013), Locked_Param_Index =>  0)
+  147 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 18) = Univ_String<> (univ), Call_Target => (Type_Area, 10002) = Println, Locked_Param_Index =>  0)
+  148 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 9), Null_Type_Info => (Zero_Base, 6) = Countable_Set<Univ_Integer>)
+  148 (STORE_INT_LIT_OP, Destination => (Local_Area, 10), Int_Value => 1)
+  148 (MOVE_WORD_OP, Destination => (Local_Area, 12), Source => (Local_Area, 8))
+  148 (CALL_OP, Params => (Local_Area, 11), Static_Link => (Zero_Base, 245) = Vector<Array<Integer<".."("*"("-"(9), 2), "*"(9, 2))>, Integer<".."("*"("-"(9), 2), "*"(9, 2))>>>, Call_Target => (Type_Area, 10008) = Length, Locked_Param_Index =>  0)
+  148 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10003) = "..", Locked_Param_Index =>  0)
+  148 (STORE_ADDRESS_OP, Destination => (Local_Area, 12), Source => (Local_Area, 9))
+  148 (CALL_OP, Params => (Local_Area, 11), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  148 (NOT_NULL_OP, Destination => (Local_Area, 12), Source => (Local_Area, 11), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  148 (IF_OP, If_Source => (Local_Area, 12), If_Condition => 2, Skip_If_False => 3)
+  148 (MOVE_WORD_OP, Destination => (Local_Area, 20), Source => (Local_Area, 11))
+  148 (START_PARALLEL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 12), Parallel_Static_Link => (Local_Area, 0), Parallel_Code_Block =>(PCO => 59, UQ => F, LAL => 32, SOCL => 22))
+  148 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+  160 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 21), Null_Type_Info => (Zero_Base, 262) = Vector<Array<Integer<".."("*"("-"(8), 2), "*"(8, 2))>, Integer<".."("*"("-"(8), 2), "*"(8, 2))>>>)
+  160 (CALL_OP, Params => (Local_Area, 21), Static_Link => (Zero_Base, 248) = N_Queens<>, Call_Target => (Zero_Base, 517) = Place_Queens, Locked_Param_Index =>  0)
+  162 (STORE_STR_LIT_OP, Destination => (Local_Area, 23), Str_Value => "Number of results with 8 queens = ")
+  162 (MOVE_WORD_OP, Destination => (Local_Area, 25), Source => (Local_Area, 21))
+  162 (CALL_OP, Params => (Local_Area, 24), Static_Link => (Zero_Base, 262) = Vector<Array<Integer<".."("*"("-"(8), 2), "*"(8, 2))>, Integer<".."("*"("-"(8), 2), "*"(8, 2))>>>, Call_Target => (Type_Area, 10008) = Length, Locked_Param_Index =>  0)
+  162 (CALL_OP, Params => (Local_Area, 22), Static_Link => (Zero_Base, 35) = (Univ_String<>::)"|"<Univ_Integer<>>, Call_Target => (Enclosing_Type_Areas'First + 1, 10013), Locked_Param_Index =>  0)
+  162 (CALL_OP, Params => (Local_Area, 22), Static_Link => (Zero_Base, 18) = Univ_String<> (univ), Call_Target => (Type_Area, 10002) = Println, Locked_Param_Index =>  0)
+  163 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 22), Null_Type_Info => (Zero_Base, 6) = Countable_Set<Univ_Integer>)
+  163 (STORE_INT_LIT_OP, Destination => (Local_Area, 23), Int_Value => 1)
+  163 (MOVE_WORD_OP, Destination => (Local_Area, 25), Source => (Local_Area, 21))
+  163 (CALL_OP, Params => (Local_Area, 24), Static_Link => (Zero_Base, 262) = Vector<Array<Integer<".."("*"("-"(8), 2), "*"(8, 2))>, Integer<".."("*"("-"(8), 2), "*"(8, 2))>>>, Call_Target => (Type_Area, 10008) = Length, Locked_Param_Index =>  0)
+  163 (CALL_OP, Params => (Local_Area, 22), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10003) = "..", Locked_Param_Index =>  0)
+  163 (STORE_ADDRESS_OP, Destination => (Local_Area, 25), Source => (Local_Area, 22))
+  163 (CALL_OP, Params => (Local_Area, 24), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  163 (NOT_NULL_OP, Destination => (Local_Area, 25), Source => (Local_Area, 24), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  163 (IF_OP, If_Source => (Local_Area, 25), If_Condition => 2, Skip_If_False => 3)
+  163 (MOVE_WORD_OP, Destination => (Local_Area, 33), Source => (Local_Area, 24))
+  163 (START_PARALLEL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 25), Parallel_Static_Link => (Local_Area, 0), Parallel_Code_Block =>(PCO => 89, UQ => F, LAL => 32, SOCL => 22))
+  163 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+  174 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 34), Null_Type_Info => (Zero_Base, 279) = Vector<Array<Integer<".."("*"("-"(6), 2), "*"(6, 2))>, Integer<".."("*"("-"(6), 2), "*"(6, 2))>>>)
+  174 (CALL_OP, Params => (Local_Area, 34), Static_Link => (Zero_Base, 265) = N_Queens<6>, Call_Target => (Zero_Base, 517) = Place_Queens, Locked_Param_Index =>  0)
+  176 (STORE_STR_LIT_OP, Destination => (Local_Area, 36), Str_Value => "Number of results with 6 queens = ")
+  176 (MOVE_WORD_OP, Destination => (Local_Area, 38), Source => (Local_Area, 34))
+  176 (CALL_OP, Params => (Local_Area, 37), Static_Link => (Zero_Base, 279) = Vector<Array<Integer<".."("*"("-"(6), 2), "*"(6, 2))>, Integer<".."("*"("-"(6), 2), "*"(6, 2))>>>, Call_Target => (Type_Area, 10008) = Length, Locked_Param_Index =>  0)
+  176 (CALL_OP, Params => (Local_Area, 35), Static_Link => (Zero_Base, 35) = (Univ_String<>::)"|"<Univ_Integer<>>, Call_Target => (Enclosing_Type_Areas'First + 1, 10013), Locked_Param_Index =>  0)
+  176 (CALL_OP, Params => (Local_Area, 35), Static_Link => (Zero_Base, 18) = Univ_String<> (univ), Call_Target => (Type_Area, 10002) = Println, Locked_Param_Index =>  0)
+  177 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 35), Null_Type_Info => (Zero_Base, 6) = Countable_Set<Univ_Integer>)
+  177 (STORE_INT_LIT_OP, Destination => (Local_Area, 36), Int_Value => 1)
+  177 (MOVE_WORD_OP, Destination => (Local_Area, 38), Source => (Local_Area, 34))
+  177 (CALL_OP, Params => (Local_Area, 37), Static_Link => (Zero_Base, 279) = Vector<Array<Integer<".."("*"("-"(6), 2), "*"(6, 2))>, Integer<".."("*"("-"(6), 2), "*"(6, 2))>>>, Call_Target => (Type_Area, 10008) = Length, Locked_Param_Index =>  0)
+  177 (CALL_OP, Params => (Local_Area, 35), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10003) = "..", Locked_Param_Index =>  0)
+  177 (STORE_ADDRESS_OP, Destination => (Local_Area, 38), Source => (Local_Area, 35))
+  177 (CALL_OP, Params => (Local_Area, 37), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  177 (NOT_NULL_OP, Destination => (Local_Area, 38), Source => (Local_Area, 37), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  177 (IF_OP, If_Source => (Local_Area, 38), If_Condition => 2, Skip_If_False => 3)
+  177 (MOVE_WORD_OP, Destination => (Local_Area, 46), Source => (Local_Area, 37))
+  177 (START_PARALLEL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 38), Parallel_Static_Link => (Local_Area, 0), Parallel_Code_Block =>(PCO => 119, UQ => F, LAL => 32, SOCL => 22))
+  177 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+  186 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 47), Null_Type_Info => (Zero_Base, 296) = Vector<Array<Integer<".."("*"("-"(4), 2), "*"(4, 2))>, Integer<".."("*"("-"(4), 2), "*"(4, 2))>>>)
+  186 (CALL_OP, Params => (Local_Area, 47), Static_Link => (Zero_Base, 282) = N_Queens<4>, Call_Target => (Zero_Base, 517) = Place_Queens, Locked_Param_Index =>  0)
+  187 (STORE_STR_LIT_OP, Destination => (Local_Area, 49), Str_Value => "Number of results with 4 queens = ")
+  187 (MOVE_WORD_OP, Destination => (Local_Area, 51), Source => (Local_Area, 47))
+  187 (CALL_OP, Params => (Local_Area, 50), Static_Link => (Zero_Base, 296) = Vector<Array<Integer<".."("*"("-"(4), 2), "*"(4, 2))>, Integer<".."("*"("-"(4), 2), "*"(4, 2))>>>, Call_Target => (Type_Area, 10008) = Length, Locked_Param_Index =>  0)
+  187 (CALL_OP, Params => (Local_Area, 48), Static_Link => (Zero_Base, 35) = (Univ_String<>::)"|"<Univ_Integer<>>, Call_Target => (Enclosing_Type_Areas'First + 1, 10013), Locked_Param_Index =>  0)
+  187 (CALL_OP, Params => (Local_Area, 48), Static_Link => (Zero_Base, 18) = Univ_String<> (univ), Call_Target => (Type_Area, 10002) = Println, Locked_Param_Index =>  0)
+  188 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 48), Null_Type_Info => (Zero_Base, 6) = Countable_Set<Univ_Integer>)
+  188 (STORE_INT_LIT_OP, Destination => (Local_Area, 49), Int_Value => 1)
+  188 (MOVE_WORD_OP, Destination => (Local_Area, 51), Source => (Local_Area, 47))
+  188 (CALL_OP, Params => (Local_Area, 50), Static_Link => (Zero_Base, 296) = Vector<Array<Integer<".."("*"("-"(4), 2), "*"(4, 2))>, Integer<".."("*"("-"(4), 2), "*"(4, 2))>>>, Call_Target => (Type_Area, 10008) = Length, Locked_Param_Index =>  0)
+  188 (CALL_OP, Params => (Local_Area, 48), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10003) = "..", Locked_Param_Index =>  0)
+  188 (STORE_ADDRESS_OP, Destination => (Local_Area, 51), Source => (Local_Area, 48))
+  188 (CALL_OP, Params => (Local_Area, 50), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  188 (NOT_NULL_OP, Destination => (Local_Area, 51), Source => (Local_Area, 50), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  188 (IF_OP, If_Source => (Local_Area, 51), If_Condition => 2, Skip_If_False => 3)
+  188 (MOVE_WORD_OP, Destination => (Local_Area, 59), Source => (Local_Area, 50))
+  188 (START_PARALLEL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 51), Parallel_Static_Link => (Local_Area, 0), Parallel_Code_Block =>(PCO => 149, UQ => F, LAL => 32, SOCL => 22))
+  188 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+      (RETURN_OP)
+  149 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 6), Null_Type_Info => (Zero_Base, 241) = Array<Integer<".."("*"("-"(9), 2), "*"(9, 2))>, Integer<".."("*"("-"(9), 2), "*"(9, 2))>>)
+  149 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 7), Source => (Local_Area, 6), Type_Info => (Zero_Base, 241) = Array<Integer<".."("*"("-"(9), 2), "*"(9, 2))>, Integer<".."("*"("-"(9), 2), "*"(9, 2))>>)
+  149 (STORE_ADDRESS_OP, Destination => (Local_Area, 8), Source => (Enclosing_Local_Areas'First + 1, 8))
+  149 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Param_Area, 0))
+  149 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 245) = Vector<Array<Integer<".."("*"("-"(9), 2), "*"(9, 2))>, Integer<".."("*"("-"(9), 2), "*"(9, 2))>>>, Call_Target => (Type_Area, 10002) = "indexing", Locked_Param_Index =>  0)
+  149 (MAKE_COPY_IN_REGION_OP, Destination => (Local_Area, 6), Source => (Base_Registers'First + 7, 0), Type_Info => (Zero_Base, 241) = Array<Integer<".."("*"("-"(9), 2), "*"(9, 2))>, Integer<".."("*"("-"(9), 2), "*"(9, 2))>>, Existing_Obj_In_Region => (Local_Area, 6))
+  150 (STORE_STR_LIT_OP, Destination => (Local_Area, 8), Str_Value => "Result #")
+  150 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Param_Area, 0))
+  150 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 35) = (Univ_String<>::)"|"<Univ_Integer<>>, Call_Target => (Enclosing_Type_Areas'First + 1, 10013), Locked_Param_Index =>  0)
+  150 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 18) = Univ_String<> (univ), Call_Target => (Type_Area, 10001) = Print, Locked_Param_Index =>  0)
+  151 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 7), Null_Type_Info => (Zero_Base, 6) = Countable_Set<Univ_Integer>)
+  151 (STORE_INT_LIT_OP, Destination => (Local_Area, 8), Int_Value => 1)
+  151 (MOVE_WORD_OP, Destination => (Local_Area, 10), Source => (Local_Area, 6))
+  151 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 241) = Array<Integer<".."("*"("-"(9), 2), "*"(9, 2))>, Integer<".."("*"("-"(9), 2), "*"(9, 2))>>, Call_Target => (Type_Area, 10002) = Length, Locked_Param_Index =>  0)
+  151 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10003) = "..", Locked_Param_Index =>  0)
+  151 (STORE_ADDRESS_OP, Destination => (Local_Area, 10), Source => (Local_Area, 7))
+  151 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  151 (NOT_NULL_OP, Destination => (Local_Area, 10), Source => (Local_Area, 9), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  151 (IF_OP, If_Source => (Local_Area, 10), If_Condition => 2, Skip_If_False => 3)
+  151 (MOVE_WORD_OP, Destination => (Local_Area, 18), Source => (Local_Area, 9))
+  151 (START_PARALLEL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 10), Parallel_Static_Link => (Local_Area, 0), Parallel_Code_Block =>(PCO => 11, UQ => F, LAL => 23, SOCL => 13))
+  151 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+  154 (STORE_CHAR_LIT_OP, Destination => (Local_Area, 19), Char_Value => '\n')
+  154 (CALL_OP, Params => (Local_Area, 19), Static_Link => (Zero_Base, 25) = Univ_Character<> (univ), Call_Target => (Type_Area, 10001) = Print, Locked_Param_Index =>  0)
+  148 (CREATE_TCB_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Local_Area, 19), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Num_Params => 1)
+  148 (STORE_ADDRESS_OP, Destination => (Local_Area, 21), Source => (Enclosing_Local_Areas'First + 1, 9))
+  148 (CALL_OP, Params => (Local_Area, 20), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  148 (NOT_NULL_OP, Destination => (Local_Area, 21), Source => (Local_Area, 20), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  148 (IF_OP, If_Source => (Local_Area, 21), If_Condition => 2, Skip_If_False => 2)
+  148 (MOVE_WORD_OP, Destination => (Base_Registers'First + 19, 8), Source => (Local_Area, 20))
+  148 (ADD_PARALLEL_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Base_Registers'First + 19, 0), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Parallel_Code_Block =>(PCO =>-31, UQ => F, LAL => 32, SOCL => 22))
+      (EXIT_OP, Skip_Count => 0, Level_Diff => 1)
+  152 (STORE_STR_LIT_OP, Destination => (Local_Area, 7), Str_Value => " ")
+  152 (STORE_ADDRESS_OP, Destination => (Local_Area, 10), Source => (Enclosing_Local_Areas'First + 1, 6))
+  152 (MOVE_WORD_OP, Destination => (Local_Area, 12), Source => (Param_Area, 0))
+  152 (CALL_OP, Params => (Local_Area, 11), Static_Link => (Zero_Base, 232) = Integer<".."("*"("-"(9), 2), "*"(9, 2))> (small), Call_Target => (Type_Area, 10001) = "from_univ", Locked_Param_Index =>  0)
+  152 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 241) = Array<Integer<".."("*"("-"(9), 2), "*"(9, 2))>, Integer<".."("*"("-"(9), 2), "*"(9, 2))>>, Call_Target => (Type_Area, 10004) = "indexing", Locked_Param_Index =>  0)
+  152 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Base_Registers'First + 9, 0))
+  152 (CALL_OP, Params => (Local_Area, 8), Static_Link => (Zero_Base, 232) = Integer<".."("*"("-"(9), 2), "*"(9, 2))> (small), Call_Target => (Type_Area, 10002) = "to_univ", Locked_Param_Index =>  0)
+  152 (CALL_OP, Params => (Local_Area, 6), Static_Link => (Zero_Base, 35) = (Univ_String<>::)"|"<Univ_Integer<>>, Call_Target => (Enclosing_Type_Areas'First + 1, 10013), Locked_Param_Index =>  0)
+  152 (CALL_OP, Params => (Local_Area, 6), Static_Link => (Zero_Base, 18) = Univ_String<> (univ), Call_Target => (Type_Area, 10001) = Print, Locked_Param_Index =>  0)
+  151 (CREATE_TCB_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Local_Area, 6), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Num_Params => 1)
+  151 (STORE_ADDRESS_OP, Destination => (Local_Area, 8), Source => (Enclosing_Local_Areas'First + 1, 7))
+  151 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  151 (NOT_NULL_OP, Destination => (Local_Area, 8), Source => (Local_Area, 7), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  151 (IF_OP, If_Source => (Local_Area, 8), If_Condition => 2, Skip_If_False => 2)
+  151 (MOVE_WORD_OP, Destination => (Base_Registers'First + 6, 8), Source => (Local_Area, 7))
+  151 (ADD_PARALLEL_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Base_Registers'First + 6, 0), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Parallel_Code_Block =>(PCO =>-16, UQ => F, LAL => 23, SOCL => 13))
+      (EXIT_OP, Skip_Count => 0, Level_Diff => 1)
+  164 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 6), Null_Type_Info => (Zero_Base, 258) = Array<Integer<".."("*"("-"(8), 2), "*"(8, 2))>, Integer<".."("*"("-"(8), 2), "*"(8, 2))>>)
+  164 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 7), Source => (Local_Area, 6), Type_Info => (Zero_Base, 258) = Array<Integer<".."("*"("-"(8), 2), "*"(8, 2))>, Integer<".."("*"("-"(8), 2), "*"(8, 2))>>)
+  164 (STORE_ADDRESS_OP, Destination => (Local_Area, 8), Source => (Enclosing_Local_Areas'First + 1, 21))
+  164 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Param_Area, 0))
+  164 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 262) = Vector<Array<Integer<".."("*"("-"(8), 2), "*"(8, 2))>, Integer<".."("*"("-"(8), 2), "*"(8, 2))>>>, Call_Target => (Type_Area, 10002) = "indexing", Locked_Param_Index =>  0)
+  164 (MAKE_COPY_IN_REGION_OP, Destination => (Local_Area, 6), Source => (Base_Registers'First + 7, 0), Type_Info => (Zero_Base, 258) = Array<Integer<".."("*"("-"(8), 2), "*"(8, 2))>, Integer<".."("*"("-"(8), 2), "*"(8, 2))>>, Existing_Obj_In_Region => (Local_Area, 6))
+  165 (STORE_STR_LIT_OP, Destination => (Local_Area, 8), Str_Value => "Result #")
+  165 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Param_Area, 0))
+  165 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 35) = (Univ_String<>::)"|"<Univ_Integer<>>, Call_Target => (Enclosing_Type_Areas'First + 1, 10013), Locked_Param_Index =>  0)
+  165 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 18) = Univ_String<> (univ), Call_Target => (Type_Area, 10001) = Print, Locked_Param_Index =>  0)
+  166 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 7), Null_Type_Info => (Zero_Base, 6) = Countable_Set<Univ_Integer>)
+  166 (STORE_INT_LIT_OP, Destination => (Local_Area, 8), Int_Value => 1)
+  166 (MOVE_WORD_OP, Destination => (Local_Area, 10), Source => (Local_Area, 6))
+  166 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 258) = Array<Integer<".."("*"("-"(8), 2), "*"(8, 2))>, Integer<".."("*"("-"(8), 2), "*"(8, 2))>>, Call_Target => (Type_Area, 10002) = Length, Locked_Param_Index =>  0)
+  166 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10003) = "..", Locked_Param_Index =>  0)
+  166 (STORE_ADDRESS_OP, Destination => (Local_Area, 10), Source => (Local_Area, 7))
+  166 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  166 (NOT_NULL_OP, Destination => (Local_Area, 10), Source => (Local_Area, 9), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  166 (IF_OP, If_Source => (Local_Area, 10), If_Condition => 2, Skip_If_False => 3)
+  166 (MOVE_WORD_OP, Destination => (Local_Area, 18), Source => (Local_Area, 9))
+  166 (START_PARALLEL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 10), Parallel_Static_Link => (Local_Area, 0), Parallel_Code_Block =>(PCO => 11, UQ => F, LAL => 23, SOCL => 13))
+  166 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+  169 (STORE_CHAR_LIT_OP, Destination => (Local_Area, 19), Char_Value => '\n')
+  169 (CALL_OP, Params => (Local_Area, 19), Static_Link => (Zero_Base, 25) = Univ_Character<> (univ), Call_Target => (Type_Area, 10001) = Print, Locked_Param_Index =>  0)
+  163 (CREATE_TCB_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Local_Area, 19), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Num_Params => 1)
+  163 (STORE_ADDRESS_OP, Destination => (Local_Area, 21), Source => (Enclosing_Local_Areas'First + 1, 22))
+  163 (CALL_OP, Params => (Local_Area, 20), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  163 (NOT_NULL_OP, Destination => (Local_Area, 21), Source => (Local_Area, 20), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  163 (IF_OP, If_Source => (Local_Area, 21), If_Condition => 2, Skip_If_False => 2)
+  163 (MOVE_WORD_OP, Destination => (Base_Registers'First + 19, 8), Source => (Local_Area, 20))
+  163 (ADD_PARALLEL_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Base_Registers'First + 19, 0), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Parallel_Code_Block =>(PCO =>-31, UQ => F, LAL => 32, SOCL => 22))
+      (EXIT_OP, Skip_Count => 0, Level_Diff => 1)
+  167 (STORE_STR_LIT_OP, Destination => (Local_Area, 7), Str_Value => " ")
+  167 (STORE_ADDRESS_OP, Destination => (Local_Area, 10), Source => (Enclosing_Local_Areas'First + 1, 6))
+  167 (MOVE_WORD_OP, Destination => (Local_Area, 12), Source => (Param_Area, 0))
+  167 (CALL_OP, Params => (Local_Area, 11), Static_Link => (Zero_Base, 249) = Integer<".."("*"("-"(8), 2), "*"(8, 2))> (small), Call_Target => (Type_Area, 10001) = "from_univ", Locked_Param_Index =>  0)
+  167 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 258) = Array<Integer<".."("*"("-"(8), 2), "*"(8, 2))>, Integer<".."("*"("-"(8), 2), "*"(8, 2))>>, Call_Target => (Type_Area, 10004) = "indexing", Locked_Param_Index =>  0)
+  167 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Base_Registers'First + 9, 0))
+  167 (CALL_OP, Params => (Local_Area, 8), Static_Link => (Zero_Base, 249) = Integer<".."("*"("-"(8), 2), "*"(8, 2))> (small), Call_Target => (Type_Area, 10002) = "to_univ", Locked_Param_Index =>  0)
+  167 (CALL_OP, Params => (Local_Area, 6), Static_Link => (Zero_Base, 35) = (Univ_String<>::)"|"<Univ_Integer<>>, Call_Target => (Enclosing_Type_Areas'First + 1, 10013), Locked_Param_Index =>  0)
+  167 (CALL_OP, Params => (Local_Area, 6), Static_Link => (Zero_Base, 18) = Univ_String<> (univ), Call_Target => (Type_Area, 10001) = Print, Locked_Param_Index =>  0)
+  166 (CREATE_TCB_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Local_Area, 6), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Num_Params => 1)
+  166 (STORE_ADDRESS_OP, Destination => (Local_Area, 8), Source => (Enclosing_Local_Areas'First + 1, 7))
+  166 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  166 (NOT_NULL_OP, Destination => (Local_Area, 8), Source => (Local_Area, 7), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  166 (IF_OP, If_Source => (Local_Area, 8), If_Condition => 2, Skip_If_False => 2)
+  166 (MOVE_WORD_OP, Destination => (Base_Registers'First + 6, 8), Source => (Local_Area, 7))
+  166 (ADD_PARALLEL_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Base_Registers'First + 6, 0), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Parallel_Code_Block =>(PCO =>-16, UQ => F, LAL => 23, SOCL => 13))
+      (EXIT_OP, Skip_Count => 0, Level_Diff => 1)
+  178 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 6), Null_Type_Info => (Zero_Base, 275) = Array<Integer<".."("*"("-"(6), 2), "*"(6, 2))>, Integer<".."("*"("-"(6), 2), "*"(6, 2))>>)
+  178 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 7), Source => (Local_Area, 6), Type_Info => (Zero_Base, 275) = Array<Integer<".."("*"("-"(6), 2), "*"(6, 2))>, Integer<".."("*"("-"(6), 2), "*"(6, 2))>>)
+  178 (STORE_ADDRESS_OP, Destination => (Local_Area, 8), Source => (Enclosing_Local_Areas'First + 1, 34))
+  178 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Param_Area, 0))
+  178 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 279) = Vector<Array<Integer<".."("*"("-"(6), 2), "*"(6, 2))>, Integer<".."("*"("-"(6), 2), "*"(6, 2))>>>, Call_Target => (Type_Area, 10002) = "indexing", Locked_Param_Index =>  0)
+  178 (MAKE_COPY_IN_REGION_OP, Destination => (Local_Area, 6), Source => (Base_Registers'First + 7, 0), Type_Info => (Zero_Base, 275) = Array<Integer<".."("*"("-"(6), 2), "*"(6, 2))>, Integer<".."("*"("-"(6), 2), "*"(6, 2))>>, Existing_Obj_In_Region => (Local_Area, 6))
+  179 (STORE_STR_LIT_OP, Destination => (Local_Area, 8), Str_Value => "Result #")
+  179 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Param_Area, 0))
+  179 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 35) = (Univ_String<>::)"|"<Univ_Integer<>>, Call_Target => (Enclosing_Type_Areas'First + 1, 10013), Locked_Param_Index =>  0)
+  179 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 18) = Univ_String<> (univ), Call_Target => (Type_Area, 10001) = Print, Locked_Param_Index =>  0)
+  180 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 7), Null_Type_Info => (Zero_Base, 6) = Countable_Set<Univ_Integer>)
+  180 (STORE_INT_LIT_OP, Destination => (Local_Area, 8), Int_Value => 1)
+  180 (MOVE_WORD_OP, Destination => (Local_Area, 10), Source => (Local_Area, 6))
+  180 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 275) = Array<Integer<".."("*"("-"(6), 2), "*"(6, 2))>, Integer<".."("*"("-"(6), 2), "*"(6, 2))>>, Call_Target => (Type_Area, 10002) = Length, Locked_Param_Index =>  0)
+  180 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10003) = "..", Locked_Param_Index =>  0)
+  180 (STORE_ADDRESS_OP, Destination => (Local_Area, 10), Source => (Local_Area, 7))
+  180 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  180 (NOT_NULL_OP, Destination => (Local_Area, 10), Source => (Local_Area, 9), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  180 (IF_OP, If_Source => (Local_Area, 10), If_Condition => 2, Skip_If_False => 3)
+  180 (MOVE_WORD_OP, Destination => (Local_Area, 18), Source => (Local_Area, 9))
+  180 (START_PARALLEL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 10), Parallel_Static_Link => (Local_Area, 0), Parallel_Code_Block =>(PCO => 11, UQ => F, LAL => 23, SOCL => 13))
+  180 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+  183 (STORE_CHAR_LIT_OP, Destination => (Local_Area, 19), Char_Value => '\n')
+  183 (CALL_OP, Params => (Local_Area, 19), Static_Link => (Zero_Base, 25) = Univ_Character<> (univ), Call_Target => (Type_Area, 10001) = Print, Locked_Param_Index =>  0)
+  177 (CREATE_TCB_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Local_Area, 19), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Num_Params => 1)
+  177 (STORE_ADDRESS_OP, Destination => (Local_Area, 21), Source => (Enclosing_Local_Areas'First + 1, 35))
+  177 (CALL_OP, Params => (Local_Area, 20), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  177 (NOT_NULL_OP, Destination => (Local_Area, 21), Source => (Local_Area, 20), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  177 (IF_OP, If_Source => (Local_Area, 21), If_Condition => 2, Skip_If_False => 2)
+  177 (MOVE_WORD_OP, Destination => (Base_Registers'First + 19, 8), Source => (Local_Area, 20))
+  177 (ADD_PARALLEL_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Base_Registers'First + 19, 0), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Parallel_Code_Block =>(PCO =>-31, UQ => F, LAL => 32, SOCL => 22))
+      (EXIT_OP, Skip_Count => 0, Level_Diff => 1)
+  181 (STORE_STR_LIT_OP, Destination => (Local_Area, 7), Str_Value => " ")
+  181 (STORE_ADDRESS_OP, Destination => (Local_Area, 10), Source => (Enclosing_Local_Areas'First + 1, 6))
+  181 (MOVE_WORD_OP, Destination => (Local_Area, 12), Source => (Param_Area, 0))
+  181 (CALL_OP, Params => (Local_Area, 11), Static_Link => (Zero_Base, 266) = Integer<".."("*"("-"(6), 2), "*"(6, 2))> (small), Call_Target => (Type_Area, 10001) = "from_univ", Locked_Param_Index =>  0)
+  181 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 275) = Array<Integer<".."("*"("-"(6), 2), "*"(6, 2))>, Integer<".."("*"("-"(6), 2), "*"(6, 2))>>, Call_Target => (Type_Area, 10004) = "indexing", Locked_Param_Index =>  0)
+  181 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Base_Registers'First + 9, 0))
+  181 (CALL_OP, Params => (Local_Area, 8), Static_Link => (Zero_Base, 266) = Integer<".."("*"("-"(6), 2), "*"(6, 2))> (small), Call_Target => (Type_Area, 10002) = "to_univ", Locked_Param_Index =>  0)
+  181 (CALL_OP, Params => (Local_Area, 6), Static_Link => (Zero_Base, 35) = (Univ_String<>::)"|"<Univ_Integer<>>, Call_Target => (Enclosing_Type_Areas'First + 1, 10013), Locked_Param_Index =>  0)
+  181 (CALL_OP, Params => (Local_Area, 6), Static_Link => (Zero_Base, 18) = Univ_String<> (univ), Call_Target => (Type_Area, 10001) = Print, Locked_Param_Index =>  0)
+  180 (CREATE_TCB_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Local_Area, 6), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Num_Params => 1)
+  180 (STORE_ADDRESS_OP, Destination => (Local_Area, 8), Source => (Enclosing_Local_Areas'First + 1, 7))
+  180 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  180 (NOT_NULL_OP, Destination => (Local_Area, 8), Source => (Local_Area, 7), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  180 (IF_OP, If_Source => (Local_Area, 8), If_Condition => 2, Skip_If_False => 2)
+  180 (MOVE_WORD_OP, Destination => (Base_Registers'First + 6, 8), Source => (Local_Area, 7))
+  180 (ADD_PARALLEL_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Base_Registers'First + 6, 0), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Parallel_Code_Block =>(PCO =>-16, UQ => F, LAL => 23, SOCL => 13))
+      (EXIT_OP, Skip_Count => 0, Level_Diff => 1)
+  189 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 6), Null_Type_Info => (Zero_Base, 292) = Array<Integer<".."("*"("-"(4), 2), "*"(4, 2))>, Integer<".."("*"("-"(4), 2), "*"(4, 2))>>)
+  189 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 7), Source => (Local_Area, 6), Type_Info => (Zero_Base, 292) = Array<Integer<".."("*"("-"(4), 2), "*"(4, 2))>, Integer<".."("*"("-"(4), 2), "*"(4, 2))>>)
+  189 (STORE_ADDRESS_OP, Destination => (Local_Area, 8), Source => (Enclosing_Local_Areas'First + 1, 47))
+  189 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Param_Area, 0))
+  189 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 296) = Vector<Array<Integer<".."("*"("-"(4), 2), "*"(4, 2))>, Integer<".."("*"("-"(4), 2), "*"(4, 2))>>>, Call_Target => (Type_Area, 10002) = "indexing", Locked_Param_Index =>  0)
+  189 (MAKE_COPY_IN_REGION_OP, Destination => (Local_Area, 6), Source => (Base_Registers'First + 7, 0), Type_Info => (Zero_Base, 292) = Array<Integer<".."("*"("-"(4), 2), "*"(4, 2))>, Integer<".."("*"("-"(4), 2), "*"(4, 2))>>, Existing_Obj_In_Region => (Local_Area, 6))
+  190 (STORE_STR_LIT_OP, Destination => (Local_Area, 8), Str_Value => "Result #")
+  190 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Param_Area, 0))
+  190 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 35) = (Univ_String<>::)"|"<Univ_Integer<>>, Call_Target => (Enclosing_Type_Areas'First + 1, 10013), Locked_Param_Index =>  0)
+  190 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 18) = Univ_String<> (univ), Call_Target => (Type_Area, 10001) = Print, Locked_Param_Index =>  0)
+  191 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 7), Null_Type_Info => (Zero_Base, 6) = Countable_Set<Univ_Integer>)
+  191 (STORE_INT_LIT_OP, Destination => (Local_Area, 8), Int_Value => 1)
+  191 (MOVE_WORD_OP, Destination => (Local_Area, 10), Source => (Local_Area, 6))
+  191 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 292) = Array<Integer<".."("*"("-"(4), 2), "*"(4, 2))>, Integer<".."("*"("-"(4), 2), "*"(4, 2))>>, Call_Target => (Type_Area, 10002) = Length, Locked_Param_Index =>  0)
+  191 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10003) = "..", Locked_Param_Index =>  0)
+  191 (STORE_ADDRESS_OP, Destination => (Local_Area, 10), Source => (Local_Area, 7))
+  191 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  191 (NOT_NULL_OP, Destination => (Local_Area, 10), Source => (Local_Area, 9), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  191 (IF_OP, If_Source => (Local_Area, 10), If_Condition => 2, Skip_If_False => 3)
+  191 (MOVE_WORD_OP, Destination => (Local_Area, 18), Source => (Local_Area, 9))
+  191 (START_PARALLEL_OP, Parallel_Master => (Local_Area, 3), Parallel_Control => (Local_Area, 10), Parallel_Static_Link => (Local_Area, 0), Parallel_Code_Block =>(PCO => 11, UQ => F, LAL => 23, SOCL => 13))
+  191 (WAIT_FOR_PARALLEL_OP, Parallel_Master => (Local_Area, 3))
+  194 (STORE_CHAR_LIT_OP, Destination => (Local_Area, 19), Char_Value => '\n')
+  194 (CALL_OP, Params => (Local_Area, 19), Static_Link => (Zero_Base, 25) = Univ_Character<> (univ), Call_Target => (Type_Area, 10001) = Print, Locked_Param_Index =>  0)
+  188 (CREATE_TCB_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Local_Area, 19), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Num_Params => 1)
+  188 (STORE_ADDRESS_OP, Destination => (Local_Area, 21), Source => (Enclosing_Local_Areas'First + 1, 48))
+  188 (CALL_OP, Params => (Local_Area, 20), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  188 (NOT_NULL_OP, Destination => (Local_Area, 21), Source => (Local_Area, 20), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  188 (IF_OP, If_Source => (Local_Area, 21), If_Condition => 2, Skip_If_False => 2)
+  188 (MOVE_WORD_OP, Destination => (Base_Registers'First + 19, 8), Source => (Local_Area, 20))
+  188 (ADD_PARALLEL_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Base_Registers'First + 19, 0), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Parallel_Code_Block =>(PCO =>-31, UQ => F, LAL => 32, SOCL => 22))
+      (EXIT_OP, Skip_Count => 0, Level_Diff => 1)
+  192 (STORE_STR_LIT_OP, Destination => (Local_Area, 7), Str_Value => " ")
+  192 (STORE_ADDRESS_OP, Destination => (Local_Area, 10), Source => (Enclosing_Local_Areas'First + 1, 6))
+  192 (MOVE_WORD_OP, Destination => (Local_Area, 12), Source => (Param_Area, 0))
+  192 (CALL_OP, Params => (Local_Area, 11), Static_Link => (Zero_Base, 283) = Integer<".."("*"("-"(4), 2), "*"(4, 2))> (small), Call_Target => (Type_Area, 10001) = "from_univ", Locked_Param_Index =>  0)
+  192 (CALL_OP, Params => (Local_Area, 9), Static_Link => (Zero_Base, 292) = Array<Integer<".."("*"("-"(4), 2), "*"(4, 2))>, Integer<".."("*"("-"(4), 2), "*"(4, 2))>>, Call_Target => (Type_Area, 10004) = "indexing", Locked_Param_Index =>  0)
+  192 (MOVE_WORD_OP, Destination => (Local_Area, 9), Source => (Base_Registers'First + 9, 0))
+  192 (CALL_OP, Params => (Local_Area, 8), Static_Link => (Zero_Base, 283) = Integer<".."("*"("-"(4), 2), "*"(4, 2))> (small), Call_Target => (Type_Area, 10002) = "to_univ", Locked_Param_Index =>  0)
+  192 (CALL_OP, Params => (Local_Area, 6), Static_Link => (Zero_Base, 35) = (Univ_String<>::)"|"<Univ_Integer<>>, Call_Target => (Enclosing_Type_Areas'First + 1, 10013), Locked_Param_Index =>  0)
+  192 (CALL_OP, Params => (Local_Area, 6), Static_Link => (Zero_Base, 18) = Univ_String<> (univ), Call_Target => (Type_Area, 10001) = Print, Locked_Param_Index =>  0)
+  191 (CREATE_TCB_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Local_Area, 6), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Num_Params => 1)
+  191 (STORE_ADDRESS_OP, Destination => (Local_Area, 8), Source => (Enclosing_Local_Areas'First + 1, 7))
+  191 (CALL_OP, Params => (Local_Area, 7), Static_Link => (Zero_Base, 6) = Countable_Set<Univ_Integer>, Call_Target => (Type_Area, 10033) = Remove_First, Locked_Param_Index =>  0)
+  191 (NOT_NULL_OP, Destination => (Local_Area, 8), Source => (Local_Area, 7), Type_Info => (Zero_Base, 5) = Univ_Integer<> (univ))
+  191 (IF_OP, If_Source => (Local_Area, 8), If_Condition => 2, Skip_If_False => 2)
+  191 (MOVE_WORD_OP, Destination => (Base_Registers'First + 6, 8), Source => (Local_Area, 7))
+  191 (ADD_PARALLEL_OP, Parallel_Master => (Enclosing_Local_Areas'First + 1, 3), Parallel_Control => (Base_Registers'First + 6, 0), Parallel_Static_Link => (Enclosing_Local_Areas'First + 1, 0), Parallel_Code_Block =>(PCO =>-16, UQ => F, LAL => 23, SOCL => 13))
+      (EXIT_OP, Skip_Count => 0, Level_Diff => 1)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 541
+() -> Countable_Range<Univ_Integer>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 18
+ Start_Callee_Locals = 8
+ Code_Length = 11
+   10 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Zero_Base, 32) = Countable_Range<Univ_Integer>)
+  143 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 9)
+   10 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Zero_Base, 5) = Univ_Integer<> (univ), Call_Target => (Type_Area, 10002) = "-", Locked_Param_Index =>  0)
+   10 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 2)
+   10 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Zero_Base, 5) = Univ_Integer<> (univ), Call_Target => (Type_Area, 10006) = "*", Locked_Param_Index =>  0)
+  143 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 9)
+   10 (STORE_INT_LIT_OP, Destination => (Local_Area, 7), Int_Value => 2)
+   10 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Zero_Base, 5) = Univ_Integer<> (univ), Call_Target => (Type_Area, 10006) = "*", Locked_Param_Index =>  0)
+   10 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Zero_Base, 32) = Countable_Range<Univ_Integer>, Call_Target => (Type_Area, 10001) = "..", Locked_Param_Index =>  0)
+   10 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   10 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 542
+() -> Univ_Integer<>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 13
+ Start_Callee_Locals = 3
+ Code_Length = 3
+  143 (STORE_INT_LIT_OP, Destination => (Local_Area, 3), Int_Value => 9)
+  143 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+  143 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 543
+() -> Countable_Range<Integer<".."("*"("-"(9), 2), "*"(9, 2))>>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 17
+ Start_Callee_Locals = 7
+ Code_Length = 9
+   12 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Zero_Base, 233) = Countable_Range<Integer<".."("*"("-"(9), 2), "*"(9, 2))>>)
+   12 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 4), Null_Type_Info => (Type_Area, 2001))
+   12 (STORE_INT_LIT_OP, Destination => (Local_Area, 5), Int_Value => 1)
+   12 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+  143 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 9)
+   12 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   12 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   12 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   12 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 544
+() -> Countable_Range<Integer<".."("*"("-"(9), 2), "*"(9, 2))>>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 17
+ Start_Callee_Locals = 7
+ Code_Length = 9
+   13 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Zero_Base, 233) = Countable_Range<Integer<".."("*"("-"(9), 2), "*"(9, 2))>>)
+   13 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 4), Null_Type_Info => (Type_Area, 2001))
+   13 (STORE_INT_LIT_OP, Destination => (Local_Area, 5), Int_Value => 1)
+   13 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+  143 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 9)
+   13 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   13 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   13 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   13 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 545
+() -> Countable_Range<Univ_Integer>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 18
+ Start_Callee_Locals = 8
+ Code_Length = 11
+   10 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Zero_Base, 32) = Countable_Range<Univ_Integer>)
+    7 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 8)
+   10 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Zero_Base, 5) = Univ_Integer<> (univ), Call_Target => (Type_Area, 10002) = "-", Locked_Param_Index =>  0)
+   10 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 2)
+   10 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Zero_Base, 5) = Univ_Integer<> (univ), Call_Target => (Type_Area, 10006) = "*", Locked_Param_Index =>  0)
+    7 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 8)
+   10 (STORE_INT_LIT_OP, Destination => (Local_Area, 7), Int_Value => 2)
+   10 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Zero_Base, 5) = Univ_Integer<> (univ), Call_Target => (Type_Area, 10006) = "*", Locked_Param_Index =>  0)
+   10 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Zero_Base, 32) = Countable_Range<Univ_Integer>, Call_Target => (Type_Area, 10001) = "..", Locked_Param_Index =>  0)
+   10 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   10 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 546
+() -> Univ_Integer<>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 13
+ Start_Callee_Locals = 3
+ Code_Length = 3
+    7 (STORE_INT_LIT_OP, Destination => (Local_Area, 3), Int_Value => 8)
+    7 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+    7 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 547
+() -> Countable_Range<Integer<".."("*"("-"(8), 2), "*"(8, 2))>>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 17
+ Start_Callee_Locals = 7
+ Code_Length = 9
+   12 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Zero_Base, 250) = Countable_Range<Integer<".."("*"("-"(8), 2), "*"(8, 2))>>)
+   12 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 4), Null_Type_Info => (Type_Area, 2001))
+   12 (STORE_INT_LIT_OP, Destination => (Local_Area, 5), Int_Value => 1)
+   12 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+    7 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 8)
+   12 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   12 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   12 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   12 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 548
+() -> Countable_Range<Integer<".."("*"("-"(8), 2), "*"(8, 2))>>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 17
+ Start_Callee_Locals = 7
+ Code_Length = 9
+   13 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Zero_Base, 250) = Countable_Range<Integer<".."("*"("-"(8), 2), "*"(8, 2))>>)
+   13 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 4), Null_Type_Info => (Type_Area, 2001))
+   13 (STORE_INT_LIT_OP, Destination => (Local_Area, 5), Int_Value => 1)
+   13 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+    7 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 8)
+   13 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   13 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   13 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   13 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 549
+() -> Countable_Range<Univ_Integer>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 18
+ Start_Callee_Locals = 8
+ Code_Length = 11
+   10 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Zero_Base, 32) = Countable_Range<Univ_Integer>)
+  172 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 6)
+   10 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Zero_Base, 5) = Univ_Integer<> (univ), Call_Target => (Type_Area, 10002) = "-", Locked_Param_Index =>  0)
+   10 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 2)
+   10 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Zero_Base, 5) = Univ_Integer<> (univ), Call_Target => (Type_Area, 10006) = "*", Locked_Param_Index =>  0)
+  172 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 6)
+   10 (STORE_INT_LIT_OP, Destination => (Local_Area, 7), Int_Value => 2)
+   10 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Zero_Base, 5) = Univ_Integer<> (univ), Call_Target => (Type_Area, 10006) = "*", Locked_Param_Index =>  0)
+   10 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Zero_Base, 32) = Countable_Range<Univ_Integer>, Call_Target => (Type_Area, 10001) = "..", Locked_Param_Index =>  0)
+   10 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   10 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 550
+() -> Univ_Integer<>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 13
+ Start_Callee_Locals = 3
+ Code_Length = 3
+  172 (STORE_INT_LIT_OP, Destination => (Local_Area, 3), Int_Value => 6)
+  172 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+  172 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 551
+() -> Countable_Range<Integer<".."("*"("-"(6), 2), "*"(6, 2))>>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 17
+ Start_Callee_Locals = 7
+ Code_Length = 9
+   12 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Zero_Base, 267) = Countable_Range<Integer<".."("*"("-"(6), 2), "*"(6, 2))>>)
+   12 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 4), Null_Type_Info => (Type_Area, 2001))
+   12 (STORE_INT_LIT_OP, Destination => (Local_Area, 5), Int_Value => 1)
+   12 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+  172 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 6)
+   12 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   12 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   12 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   12 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 552
+() -> Countable_Range<Integer<".."("*"("-"(6), 2), "*"(6, 2))>>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 17
+ Start_Callee_Locals = 7
+ Code_Length = 9
+   13 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Zero_Base, 267) = Countable_Range<Integer<".."("*"("-"(6), 2), "*"(6, 2))>>)
+   13 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 4), Null_Type_Info => (Type_Area, 2001))
+   13 (STORE_INT_LIT_OP, Destination => (Local_Area, 5), Int_Value => 1)
+   13 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+  172 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 6)
+   13 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   13 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   13 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   13 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 553
+() -> Countable_Range<Univ_Integer>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 18
+ Start_Callee_Locals = 8
+ Code_Length = 11
+   10 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Zero_Base, 32) = Countable_Range<Univ_Integer>)
+  185 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 4)
+   10 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Zero_Base, 5) = Univ_Integer<> (univ), Call_Target => (Type_Area, 10002) = "-", Locked_Param_Index =>  0)
+   10 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 2)
+   10 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Zero_Base, 5) = Univ_Integer<> (univ), Call_Target => (Type_Area, 10006) = "*", Locked_Param_Index =>  0)
+  185 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 4)
+   10 (STORE_INT_LIT_OP, Destination => (Local_Area, 7), Int_Value => 2)
+   10 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Zero_Base, 5) = Univ_Integer<> (univ), Call_Target => (Type_Area, 10006) = "*", Locked_Param_Index =>  0)
+   10 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Zero_Base, 32) = Countable_Range<Univ_Integer>, Call_Target => (Type_Area, 10001) = "..", Locked_Param_Index =>  0)
+   10 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   10 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 554
+() -> Univ_Integer<>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 13
+ Start_Callee_Locals = 3
+ Code_Length = 3
+  185 (STORE_INT_LIT_OP, Destination => (Local_Area, 3), Int_Value => 4)
+  185 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+  185 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 555
+() -> Countable_Range<Integer<".."("*"("-"(4), 2), "*"(4, 2))>>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 17
+ Start_Callee_Locals = 7
+ Code_Length = 9
+   12 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Zero_Base, 284) = Countable_Range<Integer<".."("*"("-"(4), 2), "*"(4, 2))>>)
+   12 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 4), Null_Type_Info => (Type_Area, 2001))
+   12 (STORE_INT_LIT_OP, Destination => (Local_Area, 5), Int_Value => 1)
+   12 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+  185 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 4)
+   12 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   12 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   12 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   12 (RETURN_OP)
+
+ ----- ParaSail Virtual Machine Instructions ---- 
+Routine # 556
+() -> Countable_Range<Integer<".."("*"("-"(4), 2), "*"(4, 2))>>
+ Uses_Queuing = FALSE
+ Local_Area_Length = 17
+ Start_Callee_Locals = 7
+ Code_Length = 9
+   13 (STORE_NULL_OF_SAME_REGION_OP, Destination => (Local_Area, 3), Source => (Param_Area, 0), Type_Info => (Zero_Base, 284) = Countable_Range<Integer<".."("*"("-"(4), 2), "*"(4, 2))>>)
+   13 (STORE_LOCAL_NULL_OP, Destination => (Local_Area, 4), Null_Type_Info => (Type_Area, 2001))
+   13 (STORE_INT_LIT_OP, Destination => (Local_Area, 5), Int_Value => 1)
+   13 (CALL_OP, Params => (Local_Area, 4), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+  185 (STORE_INT_LIT_OP, Destination => (Local_Area, 6), Int_Value => 4)
+   13 (CALL_OP, Params => (Local_Area, 5), Static_Link => (Type_Area, 2001), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   13 (CALL_OP, Params => (Local_Area, 3), Static_Link => (Type_Area, 2002), Call_Target => (Type_Area, 10001), Locked_Param_Index =>  0)
+   13 (MOVE_WORD_OP, Destination => (Param_Area, 0), Source => (Local_Area, 3))
+   13 (RETURN_OP)

@@ -1,0 +1,144 @@
+interface Ordered_List<Element_Type is Ordered<>> is
+    // Partially_Ordered allows #unordered, Ordered does not
+    // Ordered list of elements, smallest first, biggest last
+
+    const Max : Univ_Integer {Max >= 0};
+
+    func Create(Max : Univ_Integer {Max > 0}) -> Ordered_List
+      {Create.Max == Max; Count(Create) == 0};
+
+    func Count(L : Ordered_List) -> Univ_Integer
+      {Count >= 0; Count <= L.Max};
+
+    op "in"(Elem : Element_Type; L : Ordered_List) -> Boolean;
+
+    func Insert(var L : Ordered_List; Elem : Element_Type
+      {Count(L) < L.Max})
+      {Count(L') in Count(L) .. Count(L)+1};
+
+    func Delete(var L : Ordered_List; Elem : Element_Type)
+      {Count(L') in Count(L)-1 .. Count(L)};
+
+    func Nth_Element(L : Ordered_List; 
+      Index : Univ_Integer {Index in 1..Count(L)}) -> Element_Type;
+      
+
+end interface Ordered_List;
+
+// Frame problem: if writable not mentioned => arbitrary effect
+//                if writable is mentioned => *only* specified effects
+//                (does that work? Nth_Element(L) changed by Insert/Delete)
+
+class Ordered_List is
+    // Ordered list of elements
+
+    interface Node<> is
+	const Data : Element_Type;
+	var Next : optional Node;
+    end interface Node;
+
+    var Head : optional Node := null;
+    var Count : Univ_Integer {Count in 0..Max};
+
+  exports
+
+    func Create(Max : Univ_Integer {Max > 0}) -> Ordered_List is
+	return (Max => Max, Head => null, Count => 0);
+    end func Create;
+
+    func Count(L : Ordered_List) -> Univ_Integer is
+	return L.Count;
+    end func Count;
+
+    op "in"(Elem : Element_Type; L : Ordered_List) -> Boolean is
+	// Scan list for matching element
+	for N => L.Head then N.Next while N not null loop
+	    case Elem =? N.Data of
+	      [#greater]    => continue loop; // Keep looking
+	      [#equal]   => return #true;   // Found it
+	      [#less] => return #false;  // Not there
+	    end case;
+        end loop;
+    end op "in";
+
+    func Insert(var L : Ordered_List; Elem : Element_Type) is
+	// Scan to find where to insert new element
+	for N => L.Head then N.Next loop
+	    if N is null then
+		// Reached end of list; add new element here
+		N := (Data => Elem, Next => null);
+		L.Count += 1;
+		return;
+	    end if;
+
+	    case Elem =? N.Data of
+	      [#greater] => 
+		// Keep looking
+		continue loop;
+	      [#equal] => 
+		// Already there
+		return;
+	      [#less] => 
+		// Not there; Insert element and bump the count
+		N := (Data => Elem, Next <== N);
+		L.Count += 1;
+		return;
+	    end case;
+        end loop;
+	{#false}
+    end func Insert;
+
+    func Delete(var L : Ordered_List; Elem : Element_Type) is
+	// Scan list for node that has a matching value
+	for N => L.Head then N.Next while N not null loop
+	    case Elem =? N.Data of
+	      [#greater] => 
+		// Keep looking
+		continue loop;
+	      [#equal] => 
+		// Found it; delete it
+		N <== N.Next; 
+		L.Count -= 1;
+		return;
+	      [#less] => 
+		// Not there
+		return;
+	    end case;
+        end loop;
+    end func Delete;
+
+    func Nth_Element(L : Ordered_List; 
+      Index : Univ_Integer) -> Element_Type is
+	for (I in 1..Index forward; N => L.Head then N.Next while N not null) 
+	  loop
+	    if I == Index then
+		return N.Data;
+	    end if;
+	end loop;
+	{#false}
+    end func Nth_Element;
+      
+end class Ordered_List;
+
+func Test_Ordered_List(X, Y, Z : Univ_Integer) is
+    var L : Ordered_List<Univ_Integer> := Create(Max => 10);
+    Insert(L, X);
+    Println("List is now length = " | Count(L));
+    Insert(L, Y);
+    Println("List is now length = " | Count(L));
+    Insert(L, Z);
+    Println("List is now length = " | Count(L));
+    for I in 1..Count(L) forward loop
+	Println("Element " | I | " = " | Nth_Element(L, I));
+    end loop;
+
+    // Check that we can have opposite iteration directions for two
+    // iterators in a single loop.
+    for (I in 1..10 forward; J in 1..10 reverse) loop
+	Println("I = " | I | ", J = " | J);
+    end loop;
+end func Test_Ordered_List;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Ordered_List (10, 20, 30);
+end func main;

@@ -1,0 +1,3 @@
+func True() -> Boolean is
+   return #true;
+end func True;

@@ -1,0 +1,26 @@
+func Test_String_Case(S : Univ_String) is
+    case S of
+       ["abc"] => Println("Found \"abc\"");
+       ["def"] => Println("Found \"def\"");
+       ["xx"] => Println("Found \"xx\"");
+       ["yy"|"zz"] => Println("Found \"yy\" or \"zz\"");
+       ["f"..<"h"] => Println("Found word starting with \"f\" or \"g\"");
+       ["abc"] => Println("Found \"abc\" again");  // TBD: Should be illegal
+       [..] => Println("No special string");
+    end case;
+end func Test_String_Case;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_String_Case ("abc");
+   Test_String_Case ("abcdef");
+   Test_String_Case ("def");
+   Test_String_Case ("xx");
+   Test_String_Case ("yy");
+   Test_String_Case ("zz");
+
+   Test_String_Case ("f");
+   Test_String_Case ("g");
+   Test_String_Case ("h");
+
+   Test_String_Case ("frank");
+end func main;

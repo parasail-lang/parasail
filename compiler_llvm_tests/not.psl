@@ -1,0 +1,3 @@
+func Not(B : Boolean) -> Boolean is
+   return not B;
+end func Not;

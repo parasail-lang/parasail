@@ -1,0 +1,29 @@
+interface List<Elem_Type is Assignable<>> is
+    var C : optional Elem_Type;
+end interface List;
+
+concurrent interface Con<> is
+end interface Con;
+
+interface Has_Ref<> is
+    ref R : Univ_Integer;
+end interface Has_Ref;
+
+func Update(var X : Univ_Integer) is
+    X += 1;
+end func Update;
+
+func Test_Assignability() is
+    type Ref_List is List<Has_Ref<>>;
+    const X : List<Con<>> := (C => null);
+    const Y : Univ_Integer := 7;
+    type Univ_List is List<Univ_Integer>;
+    var R : Has_Ref := (R => Y);
+    var RL : Ref_List := (C => R);
+    var UL : Univ_List := (C => 3);
+    Update(3);
+    RL.C := null;
+    Update(Y);
+    UL.C := 42;
+end func Test_Assignability;
+    

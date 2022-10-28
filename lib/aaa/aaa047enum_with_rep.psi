@@ -1,0 +1,173 @@
+interface PSL::Core::Enum_With_Rep
+  <Rep_Type is Imageable<>;
+   Rep_Map : Two_Way_Map<Univ_Enumeration, Rep_Type>> is
+  // An enumeration type specified using a map from literal to value
+  // of an underlying representation type.
+    op "from_univ"(Univ : Univ_Enumeration) 
+      {(for some [Lit => Val] of Rep_Map => Lit == Univ)}
+      -> Enum_With_Rep
+    op "to_univ"(Val : optional Enum_With_Rep)
+      -> Result : optional Univ_Enumeration
+      {Result is null or else
+        (for some [Lit => V] of Rep_Map => Lit == Result)}
+
+    // Functions to convert from/to rep
+    func From_Rep (Rep : optional Rep_Type) -> optional Enum_With_Rep
+    func To_Rep (Val : optional Enum_With_Rep) -> optional Rep_Type
+
+    op "[..]"() -> Ordered_Set<Enum_With_Rep>
+
+    op "=?"(Left, Right : Enum_With_Rep) -> Ordering
+
+    // Functions for Imageable
+    func To_String(Val : optional Enum_With_Rep) -> Univ_String
+    func From_String(Str : Univ_String) -> optional Enum_With_Rep
+
+    func Hash(Val : Enum_With_Rep) -> Univ_Integer
+
+    func Min(Left, Right : optional Enum_With_Rep) -> optional Enum_With_Rep
+    func Max(Left, Right : optional Enum_With_Rep) -> optional Enum_With_Rep
+
+    func Dump_Rev_Map()
+end interface PSL::Core::Enum_With_Rep
+
+class PSL::Core::Enum_With_Rep is
+    const Rep : Rep_Type
+  exports
+    op "from_univ"(Univ : Univ_Enumeration) 
+      -> Enum_With_Rep is
+        return (Rep => Rep_Map[Univ]);
+    end op "from_univ"
+
+    op "to_univ"(Val : optional Enum_With_Rep) 
+      -> Result : optional Univ_Enumeration is
+        if Val is null then
+            return null
+        else
+            return Key_Of (Rep_Map, Val.Rep)
+        end if
+    end op "to_univ"
+
+    func From_Rep (Rep : optional Rep_Type) -> optional Enum_With_Rep is
+        if Rep is null then
+            return null
+        else
+            return (Rep => Rep)
+        end if
+    end func From_Rep
+
+    func To_Rep (Val : optional Enum_With_Rep) -> optional Rep_Type is
+        if Val is null then
+            return null
+        else
+            return Val.Rep
+        end if
+    end func To_Rep
+
+    // Functions for Imageable
+    func To_String(Val : optional Enum_With_Rep) -> Univ_String is
+        const Enum : optional Univ_Enumeration := [[Val]];
+        if Enum not null then
+            // use enum image
+            return Univ_Enumeration::To_String(Enum);
+        else
+            // use rep-type To_String
+            return Rep_Type::To_String(Val.Rep)
+        end if
+    end func To_String
+
+    func From_String(Str : Univ_String) -> optional Enum_With_Rep is
+        if Str[1] == '#' then
+            // Presume is an enum
+            return Univ_Enumeration::From_String(Str)
+        else
+            // Use rep-type From_String
+            return (Rep => Rep_Type::From_String(Str))
+        end if
+    end func From_String
+
+    op "[..]"() -> Ordered_Set<Enum_With_Rep> is
+        return [for each Rep of Rep_Map => From_Rep(Rep)]
+    end op "[..]";
+
+    op "=?"(Left, Right : Enum_With_Rep) -> Ordering is
+        return Left.Rep =? Right.Rep
+    end op "=?"
+
+    func Hash(Val : Enum_With_Rep) -> Univ_Integer is
+        return Hash (Val.Rep)
+    end func Hash
+
+    func Min(Left, Right : optional Enum_With_Rep) -> optional Enum_With_Rep
+    is
+        if Left is null then
+            return Right
+        elsif Right is null or else Right.Rep > Left.Rep then
+            return Left
+        else
+            return Right
+        end if
+    end func Min
+
+    func Max(Left, Right : optional Enum_With_Rep) -> optional Enum_With_Rep
+    is
+        if Left is null then
+            return Right
+        elsif Right is null or else Right.Rep < Left.Rep then
+            return Left
+        else
+            return Right
+        end if
+    end func Max
+
+    func Dump_Rev_Map() is
+        const Rev := Rev_Map (Rep_Map)
+
+        for KV in Rev loop
+            Println ("[" | KV.Key | " => " | KV.Value | "]")
+        end loop
+    end func Dump_Rev_Map
+
+end class PSL::Core::Enum_With_Rep
+
+func PSL::Test::Test_Enum_With_Rep() is
+    type Color is Enum_With_Rep<Univ_Integer,
+               [#red => 1, #green => 3, #blue => 5]>;
+
+    type Day_Of_Week is 
+       Enum_With_Rep<Modular<2**7>,
+          [#Monday => 1<<0, #Tuesday => 1<<1, #Wednesday => 1<<2,
+           #Thursday => 1<<3, #Friday => 1<<4,
+            #Saturday => 1<<5, #Sunday => 1<<6]>
+
+    Println ("Dump_Rev_Map():")
+    Day_Of_Week::Dump_Rev_Map()
+
+    for C in Color forward loop
+        Println("Next color = " | C)
+    end loop
+
+    for C2 in Color reverse loop
+        Println("Prev color = " | C2)
+    end loop
+
+    for D3 in Day_Of_Week loop
+        Println("Random day of week = " | D3)
+    end loop
+
+    {#Monday in Day_Of_Week}
+
+    for D4 in Day_Of_Week reverse loop
+        Println("Prev day of week = " | D4)
+    end loop
+
+    for D5 in Day_Of_Week forward loop
+        Println("To_Rep(" | D5 | ") = " | To_Rep(D5))
+    end loop
+
+    for I in 1..10 forward loop
+        Println("Day_Of_Week::From_Rep(" | I | ") = " |
+          Day_Of_Week::From_Rep(I))
+    end loop
+
+end func PSL::Test::Test_Enum_With_Rep

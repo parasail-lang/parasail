@@ -1,0 +1,13 @@
+class interface Simple_Fib<> :
+    def Fib(N : Integer<>) -> Result : Integer<>;
+
+class Simple_Fib :
+  exports :
+    def Fib(N : Integer<>) -> Result : Integer<> :
+	if N <= 1 :
+	    return N;
+	else :
+	    return Fib(N-1) + Fib(N-2);
+
+def Test_Fib(N : Integer<>) :
+   Println("Fib of " | N | " = " | Simple_Fib.Fib(N));

@@ -1,0 +1,44 @@
+We want to catch reads of objects which are null but
+which are not declared "optional."  We associate
+it with the "read" rather than the "write" so we
+can allow "moves" from a non-optional object so long
+as it is its last use.
+
+We want to do some of the checking early in the
+compiler, do more in the static-checking pass, and
+if all else fails, leave behind a run-time null-check.
+Given how prevalent these will be, it may be best
+to have a "disallow null" flag in various instructions
+rather than having separate null-check instructions.
+We will also want to have a "proved non-null" flag,
+like the (TBD) "proved true" flag for check statements,
+call statements (preconditions), and return statements
+(postconditions).
+
+If we have "disallow null"/"proved non-null" flags, in
+which instructions should we have them?  Move_Object,
+Copy_Object, Assign_Word seem relevant.  "Copy_Word"
+is only used for known-small objects, or for simply
+moving things around on the stack, but still might benefit
+from these flags.  There are also some implicit checks
+involved in selecting a component (generally identified
+by a Base_Registers area-base indicator) or an ancestor part.
+Note that selecting a component of a wrapper does not involve
+a use of a base-register, but the component must be non-optional
+or else it couldn't use a wrapper.  (TBD: What if wrapper has
+different representation for null -- not likely any time soon.)
+Hence, the use of the component would trigger the null check,
+even if the selection operation from the wrapper was a no-op.
+
+To do some simple checking in the early phases of the compiler,
+we need to keep an "optional" flag (or a known-non-null flag)
+on expressions, and propagate it as far as we can.
+If we want to propagate it in straight-line code, that would
+require noticing assignments/updates on any path and "unioning"
+their effects into a local-variable "nullness-state" table.
+It seems conceivable that this could somehow be integrated with
+the race-condition checking.  Look at PSC.Object_Access.
+
+ASIDE: We might also emit run-time checks for non-aliasing of 
+indexed components.
+

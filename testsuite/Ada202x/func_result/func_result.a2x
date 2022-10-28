@@ -1,0 +1,8 @@
+func Func_Result(X : Integer) return Integer is
+    if X < 0 then
+	Func_Result := Func_Result(-X)*3;
+    else
+	Func_Result := X*2;
+    end if;
+end func Func_Result;
+

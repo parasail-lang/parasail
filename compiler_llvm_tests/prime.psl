@@ -1,0 +1,10 @@
+func Prime(N : Univ_Integer) -> Univ_Integer is
+   var I := 2;
+   while I ** 2 <= N loop
+      if N mod I == 0 then
+         return 0;
+      end if;
+      I += 1;
+   end loop;
+   return 1;
+end func Prime;

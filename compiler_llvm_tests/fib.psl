@@ -1,0 +1,9 @@
+func Fib(N : Univ_Integer) -> Result : Univ_Integer is
+    // Classic recursive Fibonacci
+    if N <= 1 then
+        Result := N;
+    else
+        Result := Fib(N-1);
+        Result += Fib(N-2);
+    end if;
+end func Fib;

@@ -1,0 +1,164 @@
+package Games is
+
+    type Length is new Integer<2..5>  -- post lengths and hole depths
+
+    type Hole is record     -- info on one hole
+        const Depth : Length
+        const Id : Univ_String
+    end record Hole
+
+    type Hippo_Graph is new DGraph<Hole>  -- Graph of holes
+
+    type Hippo_Piece is record -- info on one hippo
+        const Long : Length
+        const Short : Length
+    end record Hippo_Piece
+
+    type Hippo_Location is record    -- Location of a placed hippo in graph
+        const Long_Loc : Hippo_Graph.Node_Id
+        const Short_Loc : Hippo_Graph.Node_Id
+    end record Hippo_Location
+
+    type Piece_Index is new Integer<1..6>  -- index into vector of pieces
+
+    type Hippo_Solution is new Map  -- Solution, giving location for each hippo
+      <Key_Type => Piece_Index, Value_Type => Hippo_Location>
+
+    func Hippo_Game(Graph : Hippo_Graph; Pieces : Vector<Hippo_Piece>)
+      return Hippo_Solution
+        -- Find a solution with given graph and set of pieces
+
+end package Games
+
+package body Games is
+  exports
+    func Hippo_Game(Graph : Hippo_Graph; Pieces : Vector<Hippo_Piece>)
+      return Hippo_Solution is
+        -- Solve by "multiply" and conquer:
+        -- Progress through the hippo pieces, and with each hippo piece,
+        -- create a separate thread for each open hole that is 
+        -- deep enough for the long post of the hippo.  For each such hole,
+        -- create a separate thread for each adjacent open hole
+        -- that is deep enough for the short post of the hippo, with
+        -- each thread "carrying" its own partially-completed game board.
+        -- If a thread finds space for the piece, it places the hippo and 
+        -- progresses onto the next piece.
+
+        Outer:
+        for (Index := 1;   -- Index into Pieces vector
+             Open_Holes : Hippo_Graph.Node_Set := All_Nodes(Graph);
+             Partial_Solution : Hippo_Solution := []) loop
+
+            if Index > |Pieces| then
+                -- Found a complete solution,
+                -- terminate other threads and return
+                return Partial_Solution
+
+            const Piece := Pieces[Index]
+
+            -- Try every sufficiently deep, open hole
+            for Long_Loc in Open_Holes 
+              {Graph[Long_Loc].Depth >= Piece.Long} parallel loop
+
+                -- Try every sufficiently deep, open, adjacent hole
+                for Short_Loc in Successors(Graph, Long_Loc)
+                  {Short_Loc in Open_Holes 
+                    and then Graph[Short_Loc].Depth >= Piece.Short}
+                  parallel loop
+
+                    --  Found a pair of adjacent open holes that work
+                    --  Add them into the solution we are building.
+                    const Next_Solution : Hippo_Solution :=
+                      Partial_Solution | [Index => (Long_Loc, Short_Loc)]
+
+                    -- Continue the outer iteration with the next piece
+                    continue loop Outer with
+                      (Index => Index + 1,
+                       Open_Holes => Open_Holes - [Long_Loc, Short_Loc],
+                       Partial_Solution => Next_Solution)
+                end loop
+            end loop
+        end loop Outer
+
+    end func Hippo_Game
+
+end package Games
+                
+proc Place_Hippos() is
+    func Build_Graph() return Graph : Games.Hippo_Graph is
+      -- Build up a graph representing the Hippo game
+        subtype Hole_Id is Games.Hippo_Graph.Node_Id
+        subtype Game_Row is Vector<Hole_Id>
+
+        func Build_Row(V : Vector<Games.Length>; Name : Univ_String)
+          return Row : Game_Row is
+          -- Build row given vector of depths and name for row
+            Row := [for I in 1..|V| forward =>
+              Graph.Add_Node((Depth => V[I], Id => Name | I))]
+
+        proc Connect(H1, H2 : Hole_Id) is
+          -- Create an edge with deeper hole as "from" and shallower as "to"
+            if Graph[H1].Depth >= Graph[H2].Depth then
+                Graph.Add_Edge(From => H1, To => H2)
+            else
+                Graph.Add_Edge(From => H2, To => H1)
+            end if
+        end proc Connect
+
+        proc Connect_Row(R : Game_Row) is
+          -- Create edges between each pair of adjacent holes in row
+            for I in 1..<|R| loop
+                Connect(R[I], R[I+1])
+            end loop
+        end proc Connect_Row
+
+        proc Create_Diagonals(L_Row : Game_Row; R_Row : Game_Row) is
+          -- Create diagonal edges, presuming L_Row is to left of R_Row
+            for I in 1..|L_Row| loop
+                Connect(L_Row[I], R_Row[I])
+                if I > 1 then
+                    Connect(L_Row[I], R_Row[I-1])
+                end if
+            end loop
+        end proc Create_Diagonals
+                
+        Graph := []
+
+        -- Create the holes, in three rows
+        const R1 : Game_Row := Build_Row([4,5,2,5], "1")
+    
+        const R2 : Game_Row := Build_Row([3,2,5,4], "2")
+    
+        const R3 : Game_Row := Build_Row([2,3,4,3], "3")
+    
+        -- Connect adjacent holes in each row
+        Connect_Row(R1); Connect_Row(R2); Connect_Row(R3)
+
+        -- Connect along the diagonals between rows
+        Create_Diagonals(L_Row => R1, R_Row => R2)
+        Create_Diagonals(L_Row => R3, R_Row => R2)
+
+    end func Build_Graph
+
+    -- Build the graph of holes
+    var Graph : Games.Hippo_Graph := Build_Graph()
+
+    -- Create the hippo pieces
+    const Pieces : Vector<Games.Hippo_Piece> :=
+      [(5,4), (5,3), (5,2), (4,3), (4,2), (3,2)];
+
+    -- Find a solution
+    const Solution := Games.Hippo_Game(Graph, Pieces)
+
+    if |Solution| = 0 then
+        Println("No solution to game")
+    end if
+
+    for each [Index => Location] of Solution loop
+        const Piece := Pieces[Index]
+
+        Println("Piece " | Piece.Long | "," | Piece.Short | " is at " |
+          Graph[Location.Long_Loc].Id | "," | Graph[Location.Short_Loc].Id)
+    end loop
+
+end proc Place_Hippos

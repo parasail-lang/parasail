@@ -1,0 +1,27 @@
+4 in 7|11..2=#false
+ [X, Y, Z] =? (Y | Z | X) --> #equal
+Remove_Any(S) = 7
+Adding 1 to S, Count = 1
+Adding 2 to S, Count = 2
+Adding 3 to S, Count = 3
+Adding 4 to S, Count = 4
+Adding 5 to S, Count = 5
+Adding 6 to S, Count = 6
+Adding 7 to S, Count = 7
+Adding 8 to S, Count = 8
+Adding 9 to S, Count = 9
+Adding 10 to S, Count = 10
+Remove_Any(S) = 4
+Remove_Any(S) = 3
+Remove_Any(S) = 6
+Remove_Any(S) = 5
+Remove_Any(S) = 2
+Remove_Any(S) = 7
+Remove_Any(S) = 8
+Remove_Any(S) = 9
+Remove_Any(S) = 1
+Remove_Any(S) = 10
+Count(S) = 10
+After S -= 7, Count(S) = 9
+S xor [2, 5, 12, 15] = 1 3 4 6 8 9 10 12 15 
+

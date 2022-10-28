@@ -1,0 +1,62 @@
+interface Gauss_Jordan<Flt is Float<>> is
+    func GJ(X : Array2D<Flt, Univ_Integer, Univ_Integer>;
+            Y : Array<Flt, Univ_Integer>) -> Array<Flt, Univ_Integer>
+end interface Gauss_Jordan
+
+class Gauss_Jordan<Flt is Float<>> is
+  exports
+    func GJ(X : Array2D<Flt, Univ_Integer, Univ_Integer>;
+            Y : Array<Flt, Univ_Integer>) -> Array<Flt, Univ_Integer> is
+        {> Y.Bounds().Last == X.Bounds2().Last <}
+        const Rows := X.Bounds1()
+        const Cols : Countable_Range<Univ_Integer> :=
+          X.Bounds2().First .. X.Bounds2().Last + 1
+        var A : Array2D<Flt, Univ_Integer, Univ_Integer> :=
+              Create(Rows, Cols, Initial_Value => 0.0)
+
+        for I in Rows loop
+            for J in X.Bounds2() loop
+                A[I,J] := X[I,J]
+            end loop
+            A[I, Cols.Last] := Y[I]
+        end loop
+
+        return [for I in Rows => A[I, Cols.Last]]
+
+    end func GJ
+end class Gauss_Jordan
+
+func Test_GJ(N : Univ_Integer) is
+    func Rnd(V : Univ_Real; Places : Univ_Integer := 3) -> Univ_Real is
+        //  Round the specified number of decimal places
+        const Mult := 10.0 ** Places
+        return Int_To_Real(Round_To_Int(V * Mult))/Mult
+    end func Rnd
+
+    type GJF is Gauss_Jordan<Float>
+    var Ran := Random::Start()
+    var X : Array2D<Float, Univ_Integer, Univ_Integer> :=
+       Create(1..N, 1..N, 0.0);
+    var Y : Array<Float, Univ_Integer> := Create(1..N, 0.0)
+
+    for I in 1..N forward loop
+        for J in 1..N forward loop
+            X[I, J] := Ran.Next_Real() * 100.0
+        end loop
+        Y[I] := Ran.Next_Real() * 100.0
+    end loop
+
+    Println ("Calling Gauss-Jordan")
+
+    const Result := GJF::GJ(X, Y)
+
+    Print("Result = ")
+    for I in 1..N forward loop
+        Print(Rnd(Result[I]) | " ")
+    end loop
+    Print('\n')
+end func Test_GJ
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_GJ (9);
+end func main;

@@ -1,0 +1,139 @@
+We are considering making indenting significant in ParaSail, similar to
+Python.  Initially we would only do it if the filename ended in ".psn"
+for "ParaSail, iNdented".  It seems important that it is somehow evident
+whether or not indenting is significant, and having some kind of
+indication using a pragma or equivalent at the beginning seems weird.
+It really wants to be a per-file decision.
+
+So the basic idea would be that ";"s could be omitted at the end of
+statements, and "end XXX" could be omitted at the end of composite
+constructs.  Clearly if you wanted to write "end loop with Result => blah"
+then you would need the "end" construct.
+
+So how could this be implemented?  It seems that the combination of
+a newline and some particular indent should become a separate token.
+One idea is to make a newline followed by a matching indent to be
+one token, a newline followed by an outdent to be one or more tokens,
+one for each level of outdent, and a newline followed by an indent
+to be a different token.  It is conceivable that a newline followed
+by an indent could be essentially ignored, and just treated like
+whitespace.  That works for continuation lines, but what happens when
+the statement is complete?  That would require an outdent.  But then
+how do you distinguish that from the end of the enclosing composite
+construct?  It sounds like we need that newline&indent so that we know
+the newline & outdent finishes the statement, while a newline & samedent
+or another newline & indent is ignored (or counted).  Here is where LL(1)
+might be easier, presuming it can use parser context in the lexer.
+
+Having looked at the source code for Python, I see they rely on "\" to
+indicate a continuation line.  Friendlier would be to use indenting for
+that, or the use of a trailing symbol or reserved word which requires 
+a following token, such as, ",", "(", "and", etc.
+
+One argument against requiring a trailing symbol/reserved word, is it
+would be nice to simply erase all terminating semicolons from a "normal"
+ParaSail program (meaning one that uses reasonable indenting) you
+get a legal ParaSail indented program.
+
+We could provide a flag to impose an arbitrary restriction if desired,
+but we should bite the bullet and implement the parsing cleverness
+to allow newlines anywhere.  Newlines after the following are special:
+
+  then, else, is, loop, of, exports, new, implements, ||.
+
+Separators like "||", "exports", "new", "then", "implements" are the 
+biggest challenge.
+
+Perhaps make ";" optional in general, and ".psn" is only about the "end XXX"
+omission?  This requires that continuation lines be indented relative to the
+first line, which I suppose isn't so bad.  But what about tabs?  We are
+outlawing them in ".psn" mode.  Hmmm...
+
+------------- New thoughts, starting 10/26/2012
+
+Perhaps eliminate the ".psn" and allow ":" to signify significant
+indenting, and no "end blah".  What about "then"
+Do you write
+
+   if A > B then :
+
+or
+
+   if A > B :
+
+   else:
+
+
+In Python, you don't write the "then" so this means the
+":" substitutes for "then" and "is"
+
+The "queued until/while ...." is interesting because it
+could presumably have a ":" instead of its "then"
+What if the "is" is replaced by ":" but the "then" isn't?
+Or vice-versa?  Should we require that either both or
+neither is a ":"?  That would seem to be consistent.
+Should we require that ":" is used everywhere or nowhere within
+a given source file?  That would also seem to be consistent.
+
+The ":" will help to distinguish a func declaration from a func
+definition, though of course following it with an indentation
+should be sufficient.
+
+Indenting can be significant only if two lines have identical 
+white-space characters (tabs or spaces) up to the length of the 
+one with fewer white-space characters.
+
+If we eliminate ';', how do we recognize continuation lines?
+Actually, if we invert the question, it might make more sense.
+If we don't require ';' then how do we know it is being assumed?
+The next line has the same or less of an indent, and the first
+
+Note: We presume a unary operator must have an output type.
+This means that we can always disambiguate syntactically
+whether the next line is a continuation (I think!).
+
+{global#tab == 8}
+if,else,or,and,then,interface,class,import,exports,all,some,for,
+each,end,loop,while,until,block,func,op,is,not,abs,mod,rem,xor,global
+
+Back to continuation lines:
+
+How does the "lexer" know whether a ':' is substituting for "then"
+or "is", or just a part of a declaration?  It doesn't.
+Should the lexer always send the '\n' and some kind of indent/outdent
+indication?
+
+Lets try the "smart lexer" option first:
+
+    - An "outdent" is significant, when it is relative to the
+      *first* line of a multi-line statement.
+    - After a line ending with ':' presume an indent is significant.
+    - After a line *not* ending with ':', indents are ignored until
+      the next line that starts at the same or an outdent relative 
+      to this first line.  Intermediate lines are presumed to be 
+      continuation lines, which may be indented or outdented.
+
+To reiterate, a multi-line statement is recognized by a line *not*
+ending with a ':' is/then/loop followed by an indent.  The start of this
+multi-line statement is recorded, and the state is set to indicate
+we are in the middle of a multi-line statement.  When we match or are
+outdented relative to such a multi-line statement, we generate a newline
+and then, if appropriate, one or more outdents.
+
+We would need to recognize outdented lines *starting* with "then",
+"implements", "new", "exports"  -- these count as newlines, but not
+as outdents.
+      
+Basic "smart lexer" algorithm:
+
+   On white space at start of line:
+      - determine indent (expanding tabs appropriately)
+      - compare to top of indent "stack"
+      - if less, emit one or more OUTDENTs, and pop from stack until find match
+          (except ignore such a line if it starts with 
+            "then"/"new"/"implements"/"exports"/"||")
+          * complain if new level does not match one already on stack
+      - if same, emit NEWLINE; leave stack as is.
+      - if indent is more than top of stack:
+          * if prior line ends with ":", push indent on stack and emit INDENT
+          * if prior line does *not* end with ":" do not push indent on stack

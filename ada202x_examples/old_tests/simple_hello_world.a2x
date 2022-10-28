@@ -1,0 +1,12 @@
+procedure Hello_World () is
+    Z : Integer := 42;
+
+    Put_Line("Hello world!");
+
+    for I in reverse 1..10 loop
+	 Put_Line(I'Image & " ** 3 = " & Integer'Image(I**3));
+         X : constant := I*I / (8 - I);
+    end loop
+
+end Hello_World;
+

@@ -1,0 +1,288 @@
+---  Jan 2015  ---
+
+The IO variable seems the best example of a global.  Currently we
+create a new one as needed locally, but this seems to be a clear kludge.
+Better would be to require a "global <module_name>" declaration in a
+stand-alone operation, where the variable is then referred to by its simple
+name.  Probably should allow "global X : <module_name>" to provide a chosen
+name.  Module operations could also have a "global [X :] <module_name>,"
+and could only be called by other operations that have a corresponding
+global declared.
+
+As discussed below, the module_name must name a concurrent, parameterless
+(or at least all-defaulted) module, with exactly one parameterless
+(or all defaulted) constructor.  Conceivably we could allow a stand-alone
+operation to specify the default initial value for the global in the form
+of " := <constructor>(...)," but we should only allow this for
+stand-alone operations, and it would only be relevant if this is the
+entry point.  There would be at most one global of a given module
+per operation.
+
+Might have "begin" and/or "end" operators.
+
+---  from Feb 2013 and before  ---
+
+Philosophical discussion on "why globals?":
+
+We seem to need globals for the GTK interface.  Why exactly is that?
+Also, we seem to need globals for Univ_Integer/Univ_String, and
+for other memo-izing operations.
+
+Globals are useful because the caller need not "provide" all of
+the data for an operation.
+
+Globals are bad because the operations are no longer side-effect
+free.  Globals are good because the operation can have a side-effect
+on an object that the caller knows nothing about.
+
+The IO monad in Haskell adds in a "world" input and output operand
+to every operation, and shuttles it along.
+
+One issue is we would like the caller to know whether or not
+the operation is idempotent.  I suppose we could add an
+"idempotent" attribute, similar to "associative" or "commutative."
+
+When an operation is *not* idempotent, what does the caller need
+to know about it?  Does order matter?  If it is concurrent, we
+generally presume order is irrelevant.  But suppose you want to
+perform a series of operations that should be treated as a "transaction"
+or equivalent?  One way to do this is to "ask" the concurrent
+object for a reference to a non-concurrent object, apply a bunch
+of operations to that, and then "give it back" to the concurrent
+object.  For example, suppose we have a logging function.  We
+might want to build up a long message, or a sequence of messages,
+and we need to use several operations in a row to do that.
+We could create a temporary (non-concurrent) message or sequence of messages, 
+write to that, and then send the temporary message (sequence) to 
+the concurrent logger.
+
+Back to our issue of globals.  We want to allow one subsystem to
+trigger something in another subsystem, without either subsystem
+knowing much about the details of the other.  Globals don't suddenly
+"go away" so in that sense we presume their storage management
+is relatively trivial.  Now suppose we are in some local scope
+with two relatively unrelated objects, but which are both of
+the same scope.  We want to create some connections between the
+two.  How do we do that safely?  We have sub-objects that can
+come and go, so creating a reference to a sub-object would be
+dangerous.  We could set the whole object to null, for that
+matter.  What we want is some way to ensure that an object
+(and all of its enclosing objects) can't go away.  Reference-counting
+is meant to accomplish that, as is garbage collection.
+
+Taking a "ref" to something would have the same effect, if
+it is concurrent.  The ref would ensure it couldn't disappear,
+but wouldn't prevent other kinds of operations.
+
+Refs are immutable in the sense that they alway refer to the same object,
+and can't be reassigned directly or as part of reassigning the enclosing
+object.  Are there "secondary" refs?  Can you assign to secondary refs?
+Only if they are certain to remain more local than the original ref.
+
+Types live forever as well, but they can only refer to level-0 things
+(as currently defined in ParaSail).
+
+Alternative approaches for connecting relatively unrelated subsystems together:
+* we use a shared queue or two and each of them look only at their "end"
+  of the shared queue(s)
+* the "controller" in the middle knows all, and they each have their own "view"
+  of the controller object
+* we can create a loosely-coupled link-time-ish structure where both can
+  get access to their own "global" data, with all GUI operations getting
+  GTK-instance parameters, and all "model" operations getting a model
+  parameter.  The GTK constructor takes a model, and the model constructor
+  takes a GTK object?  That doesn't quite work!  Both constructors take a 
+  ref to a "controller" object, and the controller object can return
+  "refs" to either?  Controller implements two different interfaces?
+
+
+  abstract interface Model_Access<Model_Type is Any<>> is
+    -- View of controller which gives the GUI access to the Model
+       func Get_Model(ref Model_Access) -> ref Model_Type;
+  end interface Model_Access;
+
+  abstract interface GUI_Access<GUI_Type is Any<>> is
+    -- View of controller which gives the Model access to the GUI
+       func Get_GUI(ref GUI_Access) -> ref GUI_Type;
+  end interface GUI_Access;
+
+  interface GTK<Controller_Type is Model_Access<>> is
+    -- A particular GUI, which takes a controller with an associated model
+      func Create_GTK(ref Controller_Type) -> ref GTK;
+
+      abstract interface Handler<> is
+          func Handle(var Handler; var Widget; Signal_Id;
+            Controller_Type::Model_Type);
+      end interface Handler
+
+      func Connect(var GTK; var Widget; Signal_Id; var Handler+);
+  end interface GTK;
+
+  interface My_Model<Controller_Type is GUI_Access<>> is
+      func Create_My_Model(ref Controller_Type) -> ref My_Model;
+      func Make_Some_Change(var My_Model; Other_Params);
+  end interfade My_Model;
+
+  interface My_Controller<>
+     implements Model_Access<My_Model<My_Controller>>,
+                GUI_Access<GTK<My_Controller>> is
+       ...
+  end interface My_Controller
+
+  class My_Controller is
+       ref My_GTK_Inst : GTK<My_Controller>
+       ref My_Model_Inst : My_Model<My_Controller>
+       interface Sig_Handler_1<> 
+  exports
+       func Create_My_Controller() -> ref Result: My_Controller is
+          return (My_GTK_Inst => GTK(Result),
+                  My_Model_Inst => My_Model(Result));
+       end func Create_My_Controller
+       
+  end class My_Controller;
+
+----------
+
+Here is a version where the model is only known to the controller:
+
+  abstract interface GUI_Access<GUI_Type is Any<>> is
+    -- View of controller which gives the Model access to the GUI
+       func Get_GUI(ref GUI_Access) -> ref GUI_Type;
+  end interface GUI_Access;
+
+  interface GTK<Controller_Type is Any<>> is 
+    -- A particular GUI, which takes a controller which is passed to handlers
+      func Create_GTK(ref Controller_Type) -> ref GTK;
+
+      interface Widget<> is
+          abstract interface Handler<> is
+              func Handle_Signal(var Handler; var Widget; Signal_Id;
+                 Controller_Type);
+          end interface Handler
+          func Connect(var GTK; var Widget; Signal_Id; var Handler+);
+      end interface Widget
+
+      interface Button<> extends Widget<> is
+          abstract interface Handler<> is
+              func Handle_Signal(var Handler; var Button; Signal_Id;
+                Controller_Type);
+          end interface Handler
+          func Connect(var GTK; var Button; Signal_Id; var Handler+);
+      end interface Button
+
+  end interface GTK;
+
+  interface My_Controller<> is
+       ...
+  end interface My_Controller
+
+  class My_Controller is
+       ref My_GTK_Inst : GTK<My_Controller>
+       var My_Model_Inst : My_Model_Type<...>
+
+       interface Sig_Handler_1<> implements My_GTK_Inst::Widget::Handler<> is
+          func Handle_Signal(var Sig_Handler_1; var Widget; Signal_Id;
+            My_Controller);
+       end interface Sig_Hanlder_1<>
+
+  exports
+       func Create_My_Controller() -> ref Result: My_Controller is
+          return (My_GTK_Inst => GTK(Result),
+                  My_Model_Inst => My_Model(Result));
+       end func Create_My_Controller
+       
+  end class My_Controller;
+
+----------
+
+Global variables are a challenge.  Most important uses
+are for a memoizing cache, and for an "intern"ing cache (for
+Univ_Integer and Univ_String/Enumeration).  Might also
+be useful for assigning unique Ids using a simple counter.
+
+Here is a proposal:
+
+Allow "var" parameters to modules, so long as the type
+is a concurrent type.  These may have a default expression.
+Allow "concurrent" explicitly?
+
+These "var" parameters are handled at module instantiation
+time, and if the initializing expression is the same,
+[or... if defaulted or specified to share an existing variable? 
+and don't allow non-var expressions except as a default]
+[or... allow arbitrary expressions, which must be evaluable
+at the "top" level?]
+and all of the other instantiation parameters are the same, then
+the two types will be the same, and will share the same global variable.
+Two instantiations of different modules, or instantiations that
+produce different types, will never share the same global variable.
+
+There is some chance that two types are identical, but end up
+with different global variables.  We would like to detect that
+possibility and disallow the instantiation.  If there is a "new"
+then do we want a different global variable?  I would think so!
+Or is the model of "new" of a wrapper that implements the same
+interface, and allows conversion.  This is a second-level decision.
+The important test cases are Univ_Integer and Univ_String which
+have a global variable, but no other parameters, and the global
+variable is initialized by a parameterless Create() function.
+
+OK, so now we have our module with a global variable.  The variable
+effectively "lives" in the type descriptor; it should be possible
+to share global variables between different type descriptors if
+passed in explicitly, so there is a level of indirection here.
+
+If an operation wants to refer to such a variable, they need
+to include a "global var X" or "global X" parameter.  Do we
+want only one "global" and then a list of variables, separated
+by commas, or one "global" or one for global var and one for non-var
+global?  Perhaps we don't have to make a special case out of this,
+since multiple "regular" parameters can have the same type.
+
+    func F (var M : T; N : T2; global X, Y; global var Z, M) -> Boolean;
+
+Should we call these "var" parameters to modules a "cache" instead
+of a "var"?  These aren't always "caches" -- for Univ_Integer/String
+they are more like a dictionary.
+
+You *must* mention a global *non-concurrent* variable in the parameter profile,
+and you are *allowed* to mention a global *concurrent* variable.
+
+For an abstract func or a func-as-parameter, you can just say 
+"global" or "global var" to indicate that the function 
+references/updates some global non-concurrent variable.  
+This restricts whether it can be used in parallel with some
+other call.  For a func-as-parameter, we could treat it as
+like a reference to the global, and restrict passing two
+separate parameters, so the only issue is whether it conflicts
+with itself.  But it might conflict with other explicit function 
+calls that update globals.  Essentially equivalent to "global *"
+or "global var *".
+
+--------
+
+Alternative proposals:
+
+We had originally conceived of the idea of the 
+pseudo-object Context which was an instance
+of a pseudo-module Context which contained one instance of each
+concurrent module that had defaults for all parameters, and that had
+a parameterless constructor.  That is essentially
+equivalent to global variables.  The other option we considered
+was to allow a module to have a (concurrent) variable-object as a module 
+parameter, with a default expression defining how to construct the
+variable at program start-up.  This eliminates the need to have a
+"Context" parameter, but saddles a *type* with some global variable state.
+
+Alternatively we allow a function to declare a "global" parameter where
+the type can be any concurrent type, again with a parameterless constructor.
+If the type's module has parameters, we get back into the problem with 
+type equivalence being highly significant, so probably want to limit
+it to modules with any parameters defaulted.  The constructor needs
+a standard name, or we need to have only one constructor, or we have *no*
+constructors and require that all variable components have default 
+initial values (perhaps by being declared "optional").
+By having no constructors, but having operations that take an instance
+of the module, this would make it pretty clear that this is a special
+case, perhaps a singleton object (back to Scala model, gack).
+

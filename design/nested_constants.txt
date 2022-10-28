@@ -1,0 +1,71 @@
+Nested constants, i.e. constants declared with "const X := F(Param)" inside
+a module where F(Param) is a function of parameters to the module, are
+somewhat tricky.  Each instance of the module needs a separate copy
+of the constant, and we give it a type-relative address in the
+nested-const sub-area.
+
+Unfortunately, there is no PSVM instruction for referring to type-relative
+objects when *outside* the associated module.  The only type-relative
+"locators" are (Type_Area, <offset>) and (Enclosing_Type_Areas+X, <Offset>).
+What we really want is (<some type>, <offset>) and we don't have such a
+thing.  What I think we want to do is create a special
+"Store_Type_Related_Const_Op" op-code which takes a Type_Info and then a
+type-relative locator and a destination, and copies the const-info into the
+destination.  We could try to bury a type-desc index into the locator, in the
+way that we bury a local-area offset into Base_Register locators, but I think
+we might be sorry, as that will add complexity everywhere we use locators.  If
+we instead limit this to a single op-code, namely Store_Type_Related_Const_Op,
+then hopefully the complexity will also be limited.  Note that this does not
+need to be a "deep" copy, more of a "Copy_Word" kind of copy.  If we need to
+pass such a thing by reference (Ref Const), we would still (shallow) copy
+it into a local, then do a store_address for that local.  This should *not*
+be used as the right hand side of a Move_Obj or Swap_Obj, any more than
+a "global" const should be.
+
+Now we have a different problem.  The base type is itself a type parameter,
+but the parameter is inherited from an ancestor of the actual type.  What we
+want to do is store the corresponding ancestor as a nested type, and then
+refer to that when selecting components.  Alternatively we could have
+numbered the parameters so they include room for all of the
+ancestor parameters, but this doesn't handle parameters associated
+with "implemented" interfaces.  Alternatively we could put something
+in the "op map" descriptors.
+
+This only comes up with parameters, because everything else we inherit
+as is?  But what about constants of interfaces, which are a function
+of their parameters?
+
+Generally if we have an interface as a formal module parameter, and we refer to
+a constant or val parameter of the interface, we should presume the interface is
+implemented by a distinct type which doesn't have exactly the same set of
+parameters or constants, and save the appropriate ancestor type which matches
+the formal type parameter.  So how do we accomplish this?  We probably
+don't want to wait until we have a reference.  The reference might occur
+from outside.  We need to add something to the nested_types of the
+module, which will result in a corresponding type stored in each instance.
+And we have to make sure that each reference to a constant or val parameter
+of a formal interface uses the corresponding nested type.  Effectively
+every type parameter needs two "actuals" -- one for the operations and
+one for the constants/val-parameters.  This probably applies to actuals-of-
+formals as well.  The places where Store_Type_Releated_Const_Op is used
+seem to be the places where we need to fetch the appropriate nested type.
+We need a mapping from each type parameter and each actual-of-formal
+to a nested-type index.
+
+Start from the Store_Type_Related_Const_Op and work backwards...
+This calls Run_Time_Type_Info to return a locator for the type.  We would like
+to return the matching nested type if the type is a parameter, and we indicate
+(somehow?) that we want the corresponding type to use for consts/val-params.
+Run_Time_Type_Info is already pretty complicated, but it has the module info
+ready to use, whereas some other routine would not.  On the other hand,
+perhaps we can call something before or after.  If we called something before,
+what would it do?  What we really want is a routine that works
+for Store_Type_Related_Const_Op.  It has an Obj_Location and an Obj_Ref,
+where the Obj_Ref has a Prefix_Type_Region from a Qualified_Name usage.
+It finds the module in which the object is declared, and unless that is
+an enclosing module, and the prefix type denotes the current instance
+of that module, we create a Store_Type_Related_Const_Op instruction.
+The issue is the Obj_Location.  If the obj-location implies it is a
+val-parameter or a nested const, and the Prefix_Type is a parameter,
+we need to get the nested type corresponding to Prefix_Type.  We can't
+easily come up with a *type* for Prefix_Type, but only a locator.

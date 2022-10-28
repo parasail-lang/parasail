@@ -1,0 +1,23 @@
+interface Box<Element_Type is Any<>> is
+    // type Element_Type is Integer<>;
+    func Create(Elem : Element_Type) -> Box;
+    func Value(B : Box) -> Element_Type;
+end interface Box;
+
+class Box is
+    const Contents : Element_Type;
+  exports
+    func Create(Elem : Element_Type) -> Box is
+        return with (Contents => Elem);
+    end func Create;
+
+    func Value(B : Box) -> Element_Type is
+        return B.Contents;
+    end func Value;
+end class Box;
+
+func Test_Box()->Integer<> is
+    const B : Box<Integer<>> := Create(1);
+    const C : Box<Integer<>> := Create(Value(B) + 2);
+    return Value(B) + Value(C);
+end func Test_Box;

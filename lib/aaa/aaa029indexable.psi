@@ -1,0 +1,9 @@
+abstract interface PSL::Core::Indexable
+  <Elem_Type is Assignable<>; Index_Type is Countable<>> is
+    // An indexable container
+    op "indexing"(ref A : Indexable; Index : Index_Type) -> ref Elem_Type
+    func Length(A : Indexable) -> Univ_Integer
+    op "magnitude"(Indexable) -> Univ_Integer is Length
+    op "index_set"(A : Indexable) -> Countable_Range<Index_Type>
+    func Bounds(A : Indexable) -> Countable_Range<Index_Type> is "index_set"
+end interface PSL::Core::Indexable

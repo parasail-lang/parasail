@@ -1,0 +1,4 @@
+
+# pslc ../aaa.psi race_cond.psl -command Test_Race_Cond
+echo | pslc ../aaa.psi race_cond.psl | grep warning
+

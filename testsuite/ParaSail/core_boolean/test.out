@@ -1,0 +1,22 @@
+not #true = #false
+not #false = #true
+#true and #false = #false
+#true or #false = #true
+#true xor #false = #true
+#true and= #false = #false
+#true or= #false = #true
+#true xor= #false = #true
+not #true = #false
+#true and #true = #true
+#true or #true = #true
+#true xor #true = #false
+#true and= #true = #true
+#true or= #true = #true
+#true xor= #true = #false
+not #false = #true
+#false and #false = #false
+#false or #false = #false
+#false xor #false = #false
+#false and= #false = #false
+#false or= #false = #false
+#false xor= #false = #false

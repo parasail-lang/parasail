@@ -1,0 +1,124 @@
+interface PSL::Core::Enum<Literals : Vector<Univ_Enumeration>> is
+    op "from_univ"(Univ : Univ_Enumeration) 
+      {(for some Lit of Literals => Lit == Univ)}
+      -> Enum
+    op "to_univ"(Val : optional Enum) -> Result : optional Univ_Enumeration
+      {Result is null or else (for some Lit of Literals => Lit == Result)}
+
+    op "=?"(Left, Right : Enum) -> Ordering
+      is import("=?")
+
+    // Functions for Imageable
+    func To_String(Val : optional Enum) -> Univ_String
+    func From_String(Str : Univ_String) -> optional Enum
+
+    // Operators for Countable
+    op "+"(Left : Univ_Integer; Right : Enum) -> Enum 
+      is import("+")
+    op "+"(Left : Enum; Right : Univ_Integer) -> Enum 
+      is import("+")
+    op "-"(Left, Right : Enum) -> Univ_Integer 
+      is import("-")
+    op "-"(Left : Enum; Right : Univ_Integer) -> Enum 
+      is import("-")
+
+    // TBD: These should be properties some day (e.g. Color#first).
+    func First()->Enum
+    func Last()->Enum
+    func Range()->Countable_Range<Enum> is "[..]" in Countable_Range<Enum>
+
+    op "[..]"() -> Countable_Range<Enum> is in Countable_Range<Enum>
+
+    func Hash(Val : Enum) -> Univ_Integer
+      is import(#identity)
+
+    op ".."(Left, Right : Enum) -> Countable_Set<Enum>
+      is in Countable_Set<Enum>
+    op "<.."(Left, Right : Enum) -> Countable_Set<Enum>
+      is in Countable_Set<Enum>
+    op "..<"(Left, Right : Enum) -> Countable_Set<Enum>
+      is in Countable_Set<Enum>
+    op "<..<"(Left, Right : Enum) -> Countable_Set<Enum>
+      is in Countable_Set<Enum>
+    op "|"(Left, Right : Enum) -> Countable_Set<Enum>
+      is in Countable_Set<Enum>
+    op "in"(Left : Enum; Right : Countable_Set<Enum>) -> Boolean
+      is in Countable_Set<Enum>
+
+    func Min(Left, Right : optional Enum) -> optional Enum
+      is import(#min)
+    func Max(Left, Right : optional Enum) -> optional Enum
+      is import(#max)
+end interface PSL::Core::Enum
+
+class PSL::Core::Enum is
+    const Value : Univ_Integer
+  exports
+    op "from_univ"(Univ : Univ_Enumeration) 
+      {(for some Lit of Literals => Lit == Univ)}
+      -> Enum is
+        for I in 1 .. |Literals| loop
+            if Literals[I] == Univ then
+                return (Value => I-1)
+            end if
+        end loop
+        var IO := IO::Get_IO()
+        IO.Stderr.Println("Error: Bad enum literal: " | Univ)
+        IO.Stderr.Println("Info: Should be one of: " |
+          (for each Lit of Literals forward => <""> | " " | Lit))
+        {*bad_enum_literal* #false}
+        return (Value => 0)
+    end op "from_univ"
+
+    op "to_univ"(Val : optional Enum) -> Result : optional Univ_Enumeration
+      {Result is null or else (for some Lit of Literals => Lit == Result)} is
+        if Val is null then
+            return null
+        else
+            return Literals[Val.Value+1]
+        end if
+    end op "to_univ"
+
+    // Functions for Imageable
+    func To_String(Val : optional Enum) -> Univ_String is
+        return Univ_Enumeration::To_String([[Val]])
+    end func To_String
+
+    func From_String(Str : Univ_String) -> optional Enum is
+        return Univ_Enumeration::From_String(Str)
+    end func From_String
+
+    func First()->Enum is
+        return (Value => 0)
+    end func First
+
+    func Last()->Enum is
+        return (Value => |Literals| - 1)
+    end func Last
+
+end class PSL::Core::Enum
+
+func PSL::Test::Test_Enum() is
+    type Color is Enum< [#red, #green, #blue] >
+    type Day_Of_Week is 
+       Enum< [#Monday, #Tuesday, #Wednesday, #Thursday, 
+        #Friday, #Saturday, #Sunday] >
+
+    for C : Color in Color::First() .. Color::Last() forward loop
+        Println("Next color = " | C)
+    end loop
+
+    for C2 in Color reverse loop
+        Println("Prev color = " | C2)
+    end loop
+
+    for D3 in Day_Of_Week loop
+        Println("Random day of week = " | D3)
+    end loop
+
+    {#Monday in Day_Of_Week}
+
+end func PSL::Test::Test_Enum
+func Test_Enum() is
+    PSL::Test::Test_Enum()
+end func Test_Enum

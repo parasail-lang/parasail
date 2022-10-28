@@ -1,0 +1,430 @@
+proc Invert_Result(In_File_Name : Univ_String) is
+    --  Procedure to read a javallel program and move the
+    --  result type to the front, or insert "void" if no result.
+    --  Looking for [op|func] desig(......) [-> [name:] type]
+    --  to be changed into [type|void] desig(.....) [as name]
+    --  Rationale: why do we use "as name" instead of "-> name"?
+    --  Answer: because making "->" optional is too weird.
+
+    --  NOTE: Need to worry about annotations preceding the ->, as
+    --        identified by "{> ... <}", as well as comments
+
+    --  Can stop scanning for "->" when reach a line that has the same
+    --  or smaller indent as line with "func" or "op", or when reaching
+    --  a "{" (that is not followed by ">").
+
+    const Debug : Boolean := #True
+
+    const Space_Or_Tab : Set<Univ_Character> := ' ' | '\t'
+    const White_Space : Set<Univ_Character> := ' ' | '\t' | '\n'
+    const Ident_Chars : Countable_Set<Univ_Character> :=
+      'a'..'z' | 'A'..'Z' | '0'..'9' | '_'
+    var Line_Num := 0
+    
+    func Sep_By_Space(S1, S2 : Univ_String) return Result : Univ_String is
+        --  Return S1 and S2 with exactly one space between them, including
+        --  any spaces at end of S1 or beginning of S2.
+        --  As a special case, if S1 is the empty string, treat it as though
+        --  it ended in a space, and if S2 is the empty string, treat it
+        --  as though it starts with a space.
+
+        const S2_Needs_Space := (|S2| > 0 and then S2[1] /= ' ')
+
+        if |S1| > 0 and then S1[|S1|] /= ' ' then
+            --  Need to add a space
+            if S2_Needs_Space then
+                Result := S1 & ' ' & S2
+            else
+                Result := S1 & S2
+            end if
+        else
+            -- Already have a space, or S1 is the empty string
+            if S2_Needs_Space then
+                Result := S1 & S2
+            elsif |S2| > 0 then
+                --  Extra space, remove it from head of S2
+                Result := S1 & S2[1 <.. |S2|]
+            elsif |S1| > 0 then
+                --  Extra space, remove it from end of S1
+                Result := S1[1 ..< |S1|]
+            else
+                --  Both S1 and S2 are the empty string
+                Result := ""
+            end if
+        end if
+    end func Sep_By_Space
+
+    func Trim(Str : Univ_String) return Univ_String is
+        --  Trim off white space on either end of Str
+        var Left := 1
+        var Right := |Str|
+        while Left <= Right loop
+            if Str[Left] in White_Space then
+                Left += 1
+            elsif Str[Right] in White_Space then
+                Right -= 1
+            else
+                exit loop
+            end if
+        end loop
+        --  Got it down to minimum
+        return Str[Left .. Right]
+    end func Trim
+
+    var Line : optional Univ_String
+    var Len : Univ_Integer := 0
+
+    proc Skip_To_Char
+      (var Index : Univ_Integer; End_Char : Univ_Character) is
+      --  Advance "Index" up to a a character matching End_Char
+      --  Start by incrementing Index.
+      --  When all done, either Index > Len or Line[Index] = End_Char
+        const Orig_Index := Index
+
+        Index += 1
+        while Index <= Len and then Line[Index] /= End_Char loop
+            if Line[Index] = '\\' then
+                --  Skip over the next char, even if it matches End_Char
+                Index += 1
+            end if
+            Index += 1
+        end loop
+
+        if Index <= Len then
+            if Debug then
+                Put_Line ("Just skipped >>" & Line[Orig_Index .. Index] & "<<")
+            end if
+        else
+            Put_Line ("Unterminated string >>" & Line[Orig_Index .. Len] & "<<")
+        end if
+    end proc Skip_To_Char
+
+    var IO := A2X.Core.IO.Get_IO()
+    var In_File := File_Input_Stream.Open(IO, In_File_Name);
+    if In_File is null then
+        Put_Line(In_File_Name & " not found")
+        return
+    end if
+    var Out_File := File_Output_Stream.Create(IO, In_File_Name &
+      ".result_moved")
+
+    Put_Line ("Inverting result in '" & In_File_Name & "' to produce '" &
+      In_File_Name & ".result_moved'");
+
+    --  Do the following transformations:
+    --  [abstract] (func | op) X::Y::designator (...)
+    --    -> [name : ] blah [{ ... }]
+    --     to
+    --  [abstract] blah X::Y::designator (...) [as name] [{ ... }]
+    --       and
+    --  [abstract] (func | op) X::Y::designator (...) [{ ... }]
+    --     to
+    --  [abstract] void X::Y::designator (...) [{ ... }]
+    --
+    --  We need to ignore internal string and character literals,
+    --  and nested {> ... <}, ( ... ), and [ ... ]
+
+    var First_Line_Start := 1
+    var First_Column := 1
+
+    Handle_One_Operation:
+    loop
+        --  We are looking for an opening "[abstract] (func|op)"
+        --  At this point, Len is length of Line.
+        --  Line is line to be analyzed, Len is length of Line.
+        --  First_Line_Start is where we start in Line
+        --  First_Column is index of first column of current line
+
+        var Start_Operation : optional Univ_Integer
+        var Start_Abstract : optional Univ_Integer
+        var Initial_Line : optional Univ_Integer
+        var Initial_Indent : optional Univ_Integer
+        var Start_Op_Name : optional Univ_Integer
+        var Start_Result : optional Univ_Integer
+        var Start_Result_Type : optional Univ_Integer
+        var End_Result_Name : optional Univ_Integer
+        var At_Start : Boolean := #True
+        var Nesting_Count : Univ_Integer := 0
+        var After_Param_Part : Boolean := #False
+        var End_Param_Part : optional Univ_Integer
+        var Indent : optional Univ_Integer
+        var I := First_Line_Start
+        var Comment_Start : optional Univ_Integer
+
+        Scan_For_Operation:
+        loop
+            while I > Len loop
+                --  Read in another line
+                Line_Num += 1
+                const Next_Line := In_File.Get_Line()
+                if Next_Line is null then
+                    --  All done; put out the current line
+                    Out_File.Put_Line (Line)
+                    Put_Line("All done");
+                    Out_File.Close()
+
+                    return  --  Return now
+                end if
+
+                if Len = 0 or else
+                  (Start_Abstract is null and then Start_Operation is null)
+                then
+                    --  Start fresh with the new line
+                    if Line not null then
+                        --  Put out prior line(s)
+                        Out_File.Put_Line (Line[First_Line_Start .. Len])
+                    end if
+                    Line := Next_Line
+                    First_Line_Start := 1
+                    I := 1
+                    At_Start := (Nesting_Count = 0)
+                    if Debug then
+                        Put_Line("Just read '" & Line & "'")
+                    end if
+                else
+                    --  Extend "Line" to include the new one,
+                    --  Append a newline and Next_Line
+                    Line &= '\n' & Next_Line
+                    I := Len + 2  --  Skip over the newline
+                    if Debug then
+                        Put_Line("Just appended '" & Next_Line & "'")
+                    end if
+                end if
+                First_Column := I
+                Indent := null
+                Len := |Line|
+            end loop
+                
+            if Line[I] not in White_Space then
+                if Indent is null then
+                    --  Record indent to first non-space
+                    Indent := I - First_Column
+                end if;
+                --  Look for "abstract", "func", or "op"
+                case Line[I] is
+                  when '\n' =>
+                    assert #False
+                  when 'a' =>
+                    if At_Start
+                      and then I+7 <= Len and then Line[I .. I+7] = "abstract"
+                      and then Start_Abstract is null
+                      and then (I+8 > Len or else Line[I+8] = ' ')
+                    then
+                        Start_Abstract := I
+                        Initial_Line := Line_Num
+                        Initial_Indent := Indent
+                        I += 8
+                        if Debug then
+                            Put_Line("Found 'abstract'")
+                        end if
+                        continue loop Scan_For_Operation
+                    end if
+                  when 'f' =>
+                    if At_Start
+                      and then I+3 <= Len and then Line[I .. I+3] = "func"
+                      and then (I+4 > Len or else Line[I+4] in ' '|'(')
+                    then
+                        Start_Operation := I
+                        if Initial_Indent is null then
+                            Initial_Line := Line_Num
+                            Initial_Indent := Indent
+                        end if
+                        I += 3
+                        Start_Op_Name := I+1
+                    end if
+                  when 'o' =>
+                    if At_Start
+                      and then I+1 <= Len and then Line[I+1] = 'p'
+                      and then (I+2 > Len or else Line[I+2] in ' '|'(')
+                    then
+                        Start_Operation := I
+                        if Initial_Indent is null then
+                            Initial_Line := Line_Num
+                            Initial_Indent := Indent
+                        end if
+                        I += 1
+                        Start_Op_Name := I+1
+                    end if
+                  when '/' =>
+                    if I+1 <= Len and then Line[I+1] = '/' then
+                        --  We have a comment
+                        if After_Param_Part and then Comment_Start is null then
+                            --  Remember where comments started
+                            Comment_Start := I
+                        end if
+                        I := Len+1
+                        --  Loop around to read in another line
+                        continue loop Scan_For_Operation
+                    end if
+                  when '(' | '[' =>
+                    Nesting_Count += 1
+                  when ']' =>
+                    Nesting_Count -= 1
+                  when ')' =>
+                    Nesting_Count -= 1
+                    if Nesting_Count = 0 and then Start_Operation not null then
+                        --  Finished the parameter part
+                        After_Param_Part := #True
+                        End_Param_Part := I
+                    end if
+                  when ';' =>
+                    exit loop Scan_For_Operation when After_Param_Part
+                  when '{' =>
+                    if I+1 <= Len and then Line[I+1] = '>' then
+                        Nesting_Count += 1
+                        I += 1
+                    elsif After_Param_Part then
+                        --  After return type, if any
+                        exit loop Scan_For_Operation
+                    end if
+                  when 'i' =>
+                    if I+1 <= Len and then Line[I+1] = 's'
+                      and then After_Param_Part
+                      and then Nesting_Count = 0
+                      and then (I <= 1 or else Line[I-1] not in Ident_Chars)
+                      and then (I+2 > Len or else Line[I+2] not in Ident_Chars)
+                    then
+                      --  "is"
+                      exit loop Scan_For_Operation
+                    end if
+                  when '<' =>
+                    if I+1 <= Len and then Line[I+1] = '}' then
+                        Nesting_Count -= 1
+                        I += 1
+                    end if
+                  when '"' | ''' =>
+                    const Start_Ch := Line[I]
+                    I += 1
+                    while I <= Len loop
+                        if Line[I] = '\\' then
+                            I += 1
+                        elsif Line[I] = Start_Ch then
+                            exit loop
+                        end if
+                        I += 1
+                    end loop
+                  when '-' =>
+                    if After_Param_Part
+                      and then I+1 <= Len and then Line[I+1] = '>'
+                      and then Start_Result is null
+                    then
+                        Start_Result := I+2
+                        Start_Result_Type := I+2
+                    end if
+                  when ':' =>
+                    if Start_Result not null and then Nesting_Count = 0 then
+                        End_Result_Name := I-1
+                        Start_Result_Type := I+1
+                    end if
+                  when others =>
+                    null;
+                end case
+                At_Start := #False
+                if After_Param_Part and then Indent <= Initial_Indent
+                  and then Nesting_Count = 0
+                  and then Line_Num > Initial_Line
+                then
+                    --  End of return type, if any
+                    --  Set I back to beginning of line
+                    if Debug then
+                        Put_Line ("Indent of " & Indent & " on line " &
+                          Line_Num & " terminates decl from line " &
+                          Initial_Line)
+                    end if
+                    I := First_Column
+                    exit loop Scan_For_Operation
+                end if
+                --  Set comment-start back to null since we encountered
+                --  something after the comment
+                Comment_Start := null
+            end if
+            I += 1
+        end loop Scan_For_Operation
+
+        --  We have found the declaration of an operation and the param part
+        assert Start_Operation not null
+        assert Start_Op_Name not null
+        assert After_Param_Part
+        assert End_Param_Part not null
+        assert Nesting_Count = 0
+        --  Start_Abstract is non-null if the word "abstract" appeared first
+        --  Start_Result is non-null if a result specification is present
+        --  End_Result_Name is non-null if the result had a name
+        --  Start_Result_Type is where result type starts
+        --  Line[I] is first character after result type
+
+        --  Back up I to first white space 
+        while I > 1 and then Line[I-1] in Space_Or_Tab loop
+            I -= 1
+        end loop
+
+        --  Find where result ended
+        var End_Result := I-1
+
+        if Comment_Start not null and then Comment_Start < End_Result then
+            -- Skip back to before the comments
+            End_Result := Comment_Start-1
+        end if
+
+        while End_Result >= 1 and then Line[End_Result] in White_Space loop
+            End_Result -= 1
+        end loop
+
+        if Start_Result not null then
+            Start_Result := Min(I, Start_Result)
+            Start_Result_Type := Min(I, Start_Result_Type)
+        end if
+
+        if Debug then
+            Put_Line("Found operation: " & Line[Start_Op_Name .. I-1]);
+            if Len > I-1 then
+                Put_Line("I = " & I & ", rest of Line is: '" & Line[I .. Len] &
+                  "'")
+            end if
+            if Comment_Start not null then
+                Put_Line("Comment_Start = " & Comment_Start)
+            end if
+        end if
+
+        --  Emit Line up to Start_Operation (includes word "abstract" if any)
+        Out_File.Put(Line[First_Line_Start .. Start_Operation-1])
+        
+        if Start_Result_Type is null then
+            --  No result type, put out "void" and operation
+            Out_File.Put(Sep_By_Space("void", Line[Start_Op_Name .. I-1]))
+
+        elsif End_Result_Name not null then
+            --  Named result, put out <type>, operation, "as" <name>
+            Out_File.Put(Sep_By_Space
+              (Trim(Line[Start_Result_Type .. End_Result]),
+               Sep_By_Space(Line[Start_Op_Name .. End_Param_Part],
+                 Sep_By_Space("as", 
+                   Trim(Line[Start_Result .. End_Result_Name])))))
+
+            --  Put out characters, if any, following result
+            Out_File.Put(Line[End_Result+1 .. I-1])
+        else
+            --  Unnamed result, put out <type> and operation
+            assert Start_Op_Name not null
+            assert Start_Result not null
+            assert Start_Op_Name in 1..Len
+            assert Start_Result in 1..Len
+
+            Out_File.Put(Sep_By_Space(Trim(Line[Start_Result .. End_Result]),
+                Trim(Line[Start_Op_Name .. End_Param_Part])))
+
+            --  Put out characters, if any, following result
+            Out_File.Put(Line[End_Result+1 .. I-1])
+        end if
+
+
+        if Debug then
+            Out_File.Flush()
+        end if
+
+        First_Line_Start := I
+    end loop Handle_One_Operation
+
+    Put_Line ("All done.")
+    Out_File.Close()
+end proc Invert_Result

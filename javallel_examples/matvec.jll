@@ -1,0 +1,467 @@
+// Example Javallel modules for matrix/vector manipulation -- matvec.jl{i,l}
+
+// Copyright (C) 2012-2013, Ada Core Technologies, New York, NY
+// To be used only for Personal, Academic, or Evaluation Purposes;
+// Not for Commercial Production Use.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+// See matvec.psi for interfaces
+
+class Matrix {
+  // Define a 2-dimensional (Row x Cols) matrix of UnivReals, 
+    var BasicArray<Scalar> Data;
+  public
+
+    class RowCol {
+      // A "countable" type used to provide sequential iteration
+      // over a 2-dimensional matrix; column varies fastest.
+      public
+	RowCol first() {
+	    return (1,1);
+	}
+	RowCol last() {
+	    return (Rows, Cols);
+	}
+
+        optional RowCol min(optional RowCol Left, optional RowCol Right) {
+            if Left is null {
+                return Right;
+            } else if Right is null {
+                return Left;
+            } else if Left < Right {
+                return Left;
+            } else {
+                return Right;
+            }
+        }
+
+        optional RowCol max(optional RowCol Left, optional RowCol Right) {
+            if Left is null {
+                return Right;
+            } else if Right is null {
+                return Left;
+            } else if Left > Right {
+                return Left;
+            } else {
+                return Right;
+            }
+        }
+
+	Ordering "=?"(RowCol Left, RowCol Right) {
+	    switch Left.R =? Right.R {
+	      case #less :
+		return #less;
+	      case #greater :
+		return #greater;
+	      case #equal :
+		return Left.C =? Right.C;
+	    }
+	}
+
+	RowCol "+"(RowCol Left, UnivInteger Right) as Result {
+	  // Advance to "Right"th subsequent cell, varying column fastest.
+	    if Right < 0 {
+		return Left - (-Right);
+	    }
+	    Result = Left;
+	    for I in 1..Right {
+		if Result.C == Cols {
+		    Result.R++;
+		    Result.C = 1;
+		} else {
+		    Result.C++;
+		}
+	    }
+	}
+
+	RowCol "+"(UnivInteger Left, RowCol Right) {
+	    return Right + Left;
+	}
+
+	RowCol "-"(RowCol Left, UnivInteger Right) as Result {
+	  // Go back to "Right"th prior cell, varying column fastest.
+	    if Right < 0 {
+		return Left + (-Right);
+	    }
+	    Result = Left;
+	    for I in 1..Right {
+		if Result.C == 1 {
+		    Result.R--;
+		    Result.C = Cols;
+		} else {
+		    Result.C--;
+		}
+	    }
+	}
+
+	UnivInteger "-"(RowCol Left, RowCol Right) as Result {
+	  // Number of cells separating two locations in matrix
+	    Result = 0;
+	    switch Left =? Right {
+	      case #less :
+		var RowCol RC = Left;
+		while RC < Right {
+		    Result--;
+		    RC++;
+		}
+		return Result;
+	      case #greater :
+		var RowCol RC = Left;
+		while RC > Right {
+		    Result++;
+		    RC--;
+		}
+		return Result;
+	      case #equal :
+		return 0;
+	    }
+	}
+
+	UnivInteger hash(RowCol Val) {
+	    return [[Val.R-1]] * Cols + [[Val.C]];
+	}
+
+        void "+=" (var RowCol Left, UnivInteger Right) {
+            Left = Left + Right
+        }
+
+        void "-=" (var RowCol Left, UnivInteger Right) {
+            Left = Left - Right
+        }
+    }
+
+    Matrix create(optional Scalar Default) {
+      // create a Rows x Cols matrix, all initialized to "Default"
+	return (Data => create(Rows * Cols, Default));
+    }
+
+    Matrix "[]"(Vector<Scalar> Elems) as Result {
+      // create a Matrix given an appropriately sized vector
+	{> length(Elems) == Rows * Cols <}
+	Result = create(0.0);
+	for each [RC => E] of Result parallel {
+	    E = Elems[ [[RC.R-1]] * Cols + [[RC.C]] ];
+	}
+    }
+
+    Matrix "+"(Matrix Left, Matrix Right) as Result {
+      // Element-wise addition
+	Result = create(0.0);
+	for each [RC => E] of Result parallel {
+	    E = Left[RC] + Right[RC];
+	}
+    }
+
+    Matrix "-"(Matrix Left, Matrix Right) as Result {
+      // Element-wise subtraction
+	Result = create(0.0);
+	for each [RC => E] of Result parallel {
+	    E = Left[RC] - Right[RC];
+	}
+    }
+
+    Matrix "+"(Matrix Right) {
+	return Right;
+    }
+
+    Matrix "-"(Matrix Right) {
+	return -1.0 * Right;
+    }
+
+    Matrix "*"(Matrix Left, Scalar Right) as Result {
+      // Scalar multiplication
+	Result = Left;
+	for each [RC => E] of Result parallel {
+	    E *= Right;
+	}
+    }
+
+    Matrix "*"(Scalar Left, Matrix Right) {
+	// Just pass the buck to the other one
+	return Right * Left;
+    }
+
+    Matrix "/"(Matrix Left, Scalar Right) as Result {
+      // Scalar division
+	Result = Left;
+	for each [RC => E] of Result parallel {
+	    E /= Right;
+	}
+    }
+        
+    Matrix<Rows => Rows, Cols => RightType.Cols> "*"
+      (Matrix Left, Matrix<> as RightType Right) as ResultType Result {
+        // Matrix multiplication
+
+	{> Cols == RightType.Rows <}
+	{> Rows == ResultType.Rows <}
+	{> ResultType.Cols == RightType.Cols <}
+
+	Result = ResultType.create(0.0);
+	for I in 1..ResultType.Rows parallel {
+	    for J in 1..ResultType.Cols parallel {
+		var Scalar Mac = 0.0;
+		for K in Col {
+		    Mac += Left[I, [[K]]] * Right[ [[K]], J];
+		}
+		Result[I, J] = Mac;
+	    }
+	}
+
+    }
+
+    Matrix zeroes() { // All zeroes
+	return create(0.0);
+    }
+
+    Matrix ones() { // All ones
+	return create(1.0);
+    }
+
+    Matrix<Rows => Cols, Cols => Rows> T(Matrix M) as ResultType Result {
+      // Transpose
+	{> ResultType.Rows == Cols; ResultType.Cols == Rows <}
+	Result = ResultType.create(0.0);
+	for I in 1..Rows parallel {
+	    for J in 1..Cols parallel {
+		Result[J, I] = M[I, J];
+	    }
+	}
+
+	// for each [RC => E] of Result parallel loop  // TBD: Should work
+	    // E = M[ [[RC.C]], [[RC.R]] ];
+	// end loop;
+    }
+
+    ref Scalar "indexing"(ref Matrix M, Row R, Col C) {
+	final Index = [[R-1]] * Cols + [[C]];
+	return M.Data[ Index-1 ];
+    }
+
+    ref Scalar "indexing"(ref Matrix M, RowCol RC) {
+	return M[RC.R, RC.C];
+    }
+
+    ref var Scalar "var_indexing"(ref var Matrix M, Row R, Col C) {
+	return M.Data[ [[R-1]] * Cols + [[C]] - 1];
+    }
+
+    ref var Scalar "var_indexing"(ref var Matrix M, RowCol RC) {
+	return M[RC.R, RC.C];
+    }
+
+    CountableSet<RowCol> "index_set"(Matrix M) {
+	return (1,1) .. (Rows, Cols);
+    }
+    
+    Ordering "=?"(Matrix Left, Matrix Right) {
+        for I in 1..Rows {
+            for J in 1..Cols {
+                if Left[I, J] != Right[I, J] {
+                    return #unordered;
+                }
+            }
+        }
+        return #equal;
+    }
+
+    UnivInteger hash(Matrix M) {
+        return hash(M[1,1]) + hash(M[Rows, Cols]);
+    }
+
+    UnivString toString(Matrix M) as Result {
+	// Convert matrix into string with line breaks
+	var Array<UnivString, IndexedBy => RowCol> Images = 
+	  create([..], "");
+
+	var MaxLen = 0;
+	for I in 1..Rows {
+	    for J in 1..Cols {
+		final UnivString Image = toString(M[I, J]);
+		Images[(I, J)] = Image;
+		MaxLen = max(MaxLen, length(Image));
+	    }
+	}
+
+	Result = "\n";
+	for I in 1..Rows forward {
+	    for J in 1..Cols forward {
+		final UnivString Image = Images[(I, J)];
+		final UnivString Pad = (MaxLen - length(Image) + 1) * ' ';
+		
+		Result += Pad + Image;
+	    }
+	    Result += '\n';
+	}
+	
+    }
+
+    Matrix fromString(UnivString Str) as Result {
+	Result = create(0.0);
+	// Rest is TBD
+    }
+	
+    Matrix "[]"() {
+	// create a matrix of nulls
+	return create(null);
+    }
+
+    void "<|="(var Matrix M, var optional UnivReal Val) {
+	// Fill in next null element
+	for each E of M forward {
+	    if E is null {
+		E <== Val;
+		return;
+	    }
+	}
+    }
+
+}
+
+class ColVec {
+  // A column vector, of length Elems
+  public
+
+    ref Scalar "indexing"(ref ColVec CV, Index I) {
+	return CV[ [[I]], 1];
+    }
+
+    UnivInteger length(ColVec CV) {
+	return Elems;
+    }
+
+    Scalar "abs"(ColVec CV) {
+	final Prod = T(CV) * CV;
+	return sqrt(Prod[1,1]); 
+    }
+
+}
+
+class RowVec {
+  // A row vector of length Elems
+  public
+
+    ref Scalar "indexing"(ref RowVec RV, Index I) {
+	return RV[ 1, [[I]] ];
+    }
+
+    UnivInteger length(RowVec RV) {
+	return Elems;
+    }
+
+}
+
+class SquareMatrix {
+  // An Elems x Elems square matrix
+  public
+
+    SquareMatrix identity() as Result { // identity matrix
+	Result = create(+0.0);
+	for I in 1..Elems {
+	    Result[I, I] = 1.0;
+	}
+	return Result;
+    }
+	
+    optional SquareMatrix inverse(SquareMatrix SM) {
+	return SM; // TBD
+    }
+
+    optional Scalar determinant(SquareMatrix SM) {
+	return SM[1, 1]; // TBD
+    }
+
+    optional Scalar eigenvalue(SquareMatrix SM) as Result {
+	Result = SM[1, 1];  // TBD
+    }
+
+    optional ColVec<Elems> eigenvector(SquareMatrix SM) as Result {
+	Result = create(1.0);  // TBD
+    }
+
+}
+
+void testMatVec() {
+  // Test some of the matrix operations
+    type TwoByTwo is SquareMatrix<2>;
+    type TwoByThree is Matrix<2, 3>;
+    var TwoByTwo I = ident();
+    var Y = I * 2.0;
+    var TwoByTwo One = ones();
+
+    println("ident =");
+    println(toString(TwoByTwo.ident()));
+
+    println("ones = ");
+    println(toString(One));
+
+    println("Matrix Y = 2.0 * ident():\n" + toString(Y));
+    println("ones() + Y =\n" + toString(ones() + Y));
+
+    Y[1, 2] += 5.5;
+    println("Y[1,2] += 5.5; Y:\n" + toString(Y));
+
+    final TwoByThree M = [1.1, 2.2, 3.3, 4.4, 5.5, 6.6];
+
+    println("Matrix M = [1.1, 2.2, 3.3, 4.4, 5.5, 6.6] = ");
+    println(toString(M));
+
+    println("M*2.0 =" + M * 2.0);
+
+    println("M/2.0 =" + M / 2.0);
+
+    println("T(Y):" + T(Y));
+
+    println("Y * T(Y):" + Y * T(Y));
+
+    for each [RC => E] of Y {
+	println("R: " + RC.R + ", C: " + RC.C + ", val = " + E);
+    }
+
+    final MT = T(M); 
+
+    println("M:" + M + "\nT(M):" + T(M));
+
+    println("M * T(M):" + M * T(M));
+
+    var ColVec<4> V = [1.1, 3.3, 5.5, 7.7];
+    V[1] += 0.01;
+    println("V:" + V);
+
+    for J in 1..length(V) forward {
+	println("V[" + J + "] = " + V[J]);
+    }
+
+    final TV = T(V);
+    println("T(V):" + TV);
+
+    final RowVec<4> RV = [2.2, 4.4, 6.6, 8.8];
+    println("RV:" + RV);
+
+    final TRV = T(RV);
+    println("TRV:" + TRV);
+
+    final ColVec<4> TTV = T(TV);
+    println("TTV:" + TTV);
+
+    final ColVec<4> TRVC = T(RV);
+    println("TRVC:" + TRVC);
+
+    final Mag = abs(TRVC);
+    println("abs(TRVC) = " + Mag);
+
+    type CV4 is ColVec<4>;
+
+    // final Mag2 = abs(CV4.T(RV));   // Should work
+    // println("abs(CV4.T(RV)) = " + Mag2);
+
+    final Mag3 = CV4."abs"(T(RV));
+
+    final SquareMatrix<2> SM2 = [1.1, 3.3, 2.2, 4.4];
+    println("\nSM2: " + SM2);
+
+    final SquareMatrix<2> TSM2 = T(SM2);
+    println("TSM2: " + TSM2);
+
+}
+

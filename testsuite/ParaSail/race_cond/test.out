@@ -1,0 +1,6 @@
+race_cond.psl:41:8: Warning: Data Race in loop updating A
+race_cond.psl:42:8: Warning: Data Race in loop updating B
+race_cond.psl:64:31: Warning: W/W Data Race on A at race_cond.psl:64:28:
+race_cond.psl:68:30: Warning: W/R Data Race on A at race_cond.psl:68:27:
+race_cond.psl:88:75: Warning: W/R Data Race on A at race_cond.psl:88:49:
+race_cond.psl:92:52: Warning: W/R Data Race on A at race_cond.psl:92:27:

@@ -1,0 +1,49 @@
+// 99 bottles of beer on the wall, written in ParaSail.
+// See http://parasail-programming-language.blogspot.com for more info.
+
+interface Bottles<Bottle_Index is Integer<>> is
+
+    func Bottle_Lyrics(Initially : Bottle_Index := 99) -> Vector<Univ_String>
+      // Return vector of lyrics, where Initially is initial number of bottles
+
+end interface Bottles
+
+class Bottles is
+    func Bottle_Count(B : Bottle_Index) -> Univ_String is
+      // Return phrase to use to refer to "B" bottles
+        case B of
+          [0] => return "No bottles"
+	  [1] => return "One bottle"
+	  [..] => return B | " bottles"
+	end case
+    end func Bottle_Count
+
+  exports
+    func Bottle_Lyrics(Initially : Bottle_Index := 99) -> Vector<Univ_String> is
+      // Return vector of lyrics, where Initially is initial number of bottles
+
+        return
+          [for I in 1 .. Initially reverse =>
+            Bottle_Count(I) | " of beer on the wall.\n" | 
+            Bottle_Count(I) | " of beer.\n" |
+	    "Take one down, pass it around.\n" |
+            Bottle_Count(I-1) | " of beer on the wall.\n\n"]
+
+    end func Bottle_Lyrics
+end class Bottles
+
+func Drink(Num_Bottles : Univ_Integer) is
+
+    type My_Bottles is Bottles<Integer<0..1000>>
+
+    const Lyrics := My_Bottles::Bottle_Lyrics (Num_Bottles)
+
+    for I in 1..Length(Lyrics) forward loop
+        Print(Lyrics[I])
+    end loop
+    Println("\n That's all she wrote...")
+end func Drink
+
+func main(Args : Basic_Array<Univ_String>) is
+   Drink (5);
+end func main;

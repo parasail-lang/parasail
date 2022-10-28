@@ -1,0 +1,246 @@
+It is time to create some sort of ParaSail debugger.  Initially it
+should support the interpreter, but eventually it would be nice
+if a failure in compiled code could also drop the user into the
+debugger, at least under some conditions.
+
+The debugger needs to be able to display the status of things, 
+for each server/picothread, be able to go up and down the stack,
+show the set of local variables, show the contents of local variables
+in any stack frame, single step, stop at a breakpoint.
+
+For compiled code, single stepping seems less critical, but being able
+to take control on a failure, and walk up and down the stack, displaying
+local and global variables seems very useful.
+
+All of this implies having some sort of symbol table associated with a
+routine, so we know what is where on the stack (or in an LLVM register?).
+We probably want to know which local addresses are always "stored through"
+if it is too hard to keep track of registers.  In "debug mode" we would
+store through all stack slots associated with named variables, during
+their lifetime.
+
+The debugger and the read/eval/print interpreter should share as much
+as possible, including a history, etc.
+
+The "program" being written in the read/eval/print interpreter should itself
+be compiled to PSVM, and potentially be saved into a file (or always be
+written into a temp file?).
+
+When we enter the debugger, we should "quiesce" all of the other servers.
+This might be done by adding a special picothread onto all of the servers
+queue, which will wait until the debugger allows them to proceed again.
+
+---  13-Sep-2015
+
+To get started, we want to be able to stop at assertion failures
+or other failures and look around.  It would also be nice to have
+some kind of trace buffer so we could see what happened just before
+the failure.  A decent trace-back would be very nice, and we could
+produce that even if we don't stop at an assertion failure.
+
+---  29-Jan-2019
+
+The interactive debugger is now working, at least when in the interpreter.
+
+It would be nice to be able to show sets and maps in a more natural
+format.  We know something is a "map"-like thing if it has an "index_set"
+and an "indexing" operation.  We know something is a "set"-like thing
+if it has a "Remove_XXX" operation (First, Any).  We should use "Remove_First"
+if available for both maps and sets; otherwise use Remove_Any.
+If there is a "Remove_First" then we should be looking for consecutive
+values when displaying a set, so long as the element type supports
+"=?" and "+"(Univ_Integer, element_type) -> element_type.
+
+We should look for a "To_String" first.  This implies invoking
+an operation given its declaration.  We need the enclosing type
+somehow.  That could be provided by a generic, except we don't have
+a type.  And how do we know what to call?  Some kind of special import?
+
+    func To_String(Val : optional Univ_Integer) -> Univ_String
+      is import(type => type_desc, routine => routine_desc);
+
+We should define a type for an unsigned 64-bit word with no "null" value,
+and use if for these cases.  E.g. Modular_64 or Modular_Word.
+
+We still need to implement the "locals" command, and then eventually
+some kind of "print" command for an arbitrary name or expression.
+
+----- 2-Feb-2019
+
+It would be nice to be able to show parameters of nested block, e.g. the
+loop parameters, when requesting locals.  We could use a Declare_Obj_Op
+for such parameters, conceivably, though their location would be the
+block parameter area.
+
+Need to worry about local "ref"s -- need to know they have a level
+of indirection.
+
+-------- 6-Feb-2019
+
+Should detect case where nothing is assigned to the return value, and you fall
+off the end.
+How to do this?  We could keep track of the number of assignments to the result object.  Even better would be to do some modicum of control flow.  Could do
+this for all local variables.  Could also identify unused constants, and
+variables that are only initialized once.
+
+-------  12-Feb-2019
+
+Having a more complete parser for the debugger, and for the normal
+command line, would be nice.
+
+Also now trying to figure out how to make the Nth_Stack_Frame actually
+deal properly with crossing servers.  Also will want to be able to specify
+the server index, probably, and find out how many servers there are, and what
+is the current server.
+
+What do we know about this?  We rely on the Server_Info_Array to provide
+info on the current instruction being executed by a given server.  The
+challenge is when a Start_Parallel or Add_Parallel instruction is executed,
+we should save away the state somewhere, so that when that TCB is picked up,
+that is seen as the predecessor state, rather than the prior state.
+Execute_For_Thread is where execution starts when picking up a TCB
+off a server queue, so that might imply that we can simply add a new
+entry on the server info array copied from a state saved when the TCB
+was created.   We only need to do this when the debugger is loaded,
+so perhaps we can make it conditional on that, and use some kind of
+less efficient data structure, rather than bulking up the TCB.  We have code
+that "knows" the size of a TCB, so we need to be careful here.
+
+We don't actually have to store the whole server state.  We just need to
+know the frame and the instruction Pc.
+
+Note that sometimes we do an Add_Parallel from inside a nested block (e.g.
+when doing a concurrent loop).  We don't want to save the state then,
+since the nested block that executed it will generally be long gone.
+In fact, it is the *master* that is the right place for this information.
+And masters are recycled, rather than being stored directly on the stack,
+so we should be able to extend the master without impacting generated code.
+So when we initialize a master, we could record the server state.
+
+Actually, masters have a "Master_Extra_Rec" which is held within the
+interpreter, and that seems like the logical place to add a copy of
+the Server_State when the Master is created.  A Server_State has a
+pointer to an Exec_Context, which has a Server_Index and a Control_Area.
+If the Control_Area (TCB) is changing, then we want to go to the master
+of the "current" TCB, and retrieve the server state from there.
+Unfortunately, when a TCB is waiting for subthreads (in state
+Waiting_For_Master), this points to the master it is awaiting.  But the
+master has a pointer to the Enclosing_Master, so that makes it easy to
+find it.
+
+It would be nice to show what threads exist, and which one is running on
+which server.  We will want routines to take a server index,
+such as num_stack_frames, nth_stack_frame*, etc.  We want a new
+one to indicate how many servers there are.  Also, some way of 
+showing how many pico-threads there are, and what they are doing.
+Presumably there will be a bunch that are on a queue.  We would like to
+know the master that spawned them, or wherever they are currently idling,
+and in what state.  They don't really have meaningful ids, except perhaps
+by where they were spawned, and where they last executed.  A thread doesn't
+get preempted, but it does wait for other threads and at that point might
+start serving some other thread.  We could iterate through the masters
+and make certain we reach them all.
+
+For each server, we could look on their queue for waiting threads.
+
+First step -- number of servers, current server,
+and ability to get stack frames for each.
+
+Find masters, and then work down from those.
+
+And what about delay queue and other concurrent-object queues?
+Tcbs on these always hang directly off of a master, and the master must be
+on *some* server's queue, though might not be reachable from any
+running thread's stack.  We might like to examine state of every
+locked object with any queued callers, as well as values of the parameters.
+Something which provides params of a tcb would be nice.
+
+Add an interface for Tcb<> and Thread_Master<>
+A tcb-info request should return state, server if running,
+master, both the one being awaited and the enclosing one, params if queued.
+A master-info request should return the enclosing master, the server
+that is waiting on the master, and the number of Tcbs.
+Some way to retrieve the nth Tcb on the master as well.
+
+Stack frame info should include a non-null Thread_Master when it represents a
+wait-for-master level.  Stack frame should have a server index.
+And stack frame info should include a Tcb.
+Num/Nth_stack_frame(s) should take an optional server index.
+We need a Num_servers function, or Server_Index_Range
+(seems more complicated than needed, and a pain to create)?
+
+Params of Tcb<> can be provided, but what does it mean?
+Params are not particularly interesting for most Tcb's, but for those
+waiting on a queue, they are vital, as they determine whether it
+will be accepted, together with the state of the locked object.
+So for those on a lock-queue we want the locked object and the params
+For those on the delay-queue, we want the param (i.e. the delay amount).
+
+-------- 13-Feb-2019
+
+Want to be able to list a source file, even if not currently stopped there,
+so can set a breakpoint.  Given a source file name or pattern, we can
+scan through all items in the environment to find an item with a matching
+file name, and get the full file name that way.
+
+Want to be able to set a breakpoint.  To do so, we need to go from a
+line number to a PSVM instruction.  Again we can walk the environment
+to find an item in the right source file, and then recurse down
+looking for the operation that starts closest to the desired line, and then
+walk the instructions of that operation until we find it, taking
+nested blocks into account properly.
+
+Once we find the instruction for the breakpoint, we need to mark it somehow.
+We could have a table associated with each routine.  Probably want to
+distinguish temporary and persistent breakpoints.
+
+For single stepping, we just need a "current line" number, and we stop as
+soon as we don't match that anymore.  For a "step over" we probably need
+to set a temporary breakpoint.
+
+We might also want a "watchpoint" to stop when an object is altered.
+
+------ 14-Feb-2019
+
+For a persistent breakpoint, we are setting the line# of the instruction's
+source_pos to zero, after saving the value in the End_Line field (which
+is essentially never used for individual instructions).
+
+To do a "single step" we should probably add a field to the server
+state, or to the context.  If we want to step over, we can associate
+the state with a particular frame.  We could put it into the Server_Info,
+in which case it automatically crosses all boundaries.
+
+So which is the best place for a "single-step" flag?  We will set it prior
+to return from "invoke_debug_console," as either a "step-over" (aka "next")
+or a step into (aka simply "step").  It would also be nice to have the
+equivalent of "fin" aka "step out."  Within the "Execute" procedure,
+"Info" is the Server_Info for the current server.  It contains Current_State
+and Last_State.  Cur_State is restored from Prev_State on leaving a
+subprogram, which implies that Cur_State is a good place for a step-over flag.
+If we want to step in, we need to preserve the flag on entering
+a new subprogram.  This implies that if Cur_State has a "step-into" flag,
+we want to preserve it, otherwise we want to turn it off.  For step-out,
+we could set the flag in the prev_state.  Actually, if we are going to
+clear it as soon as we see it, it is just a question whether we obey (and
+clear) the flag on entry to Execute, or ignore it and don't preserve it
+in the new Cur_State (while leaving it set in the Prev_State).  We clearly
+don't want to check the flag immediately after returning from Invoke_Debug...
+but rather we want to execute at least one instruction (and perhaps
+execute until the line# changes).  We could use the End_Line here again,
+in conjunction with some kind of flag, perhaps.  Presumably we cancel a
+single-step upon a break point.  On a single-step, we need to specify a
+frame number to avoid setting it in the debugging console itself.
+To set a step-out, we would specify an outer stack frame.
+If single step is on when we are about to return, we want to set it
+in the enclosing stack frame, presumably.
+
+ASIDE: Last_State is just used to communicate the source-position
+of the particular part of an assertion expression that fails.  Current_State
+is updated after each instruction with an updated program counter and
+an updated source position.  END OF ASIDE.
+
+NOTE: We have a problem in parascope.psl, at lines 7337 and 7379, where
+we try to show the locals, and we inadvertantly try to show VNs_To_Recompute
+even though it is no longer in scope.  It would be more robust if we
+included an end_line for the src pos for a declare_obj.

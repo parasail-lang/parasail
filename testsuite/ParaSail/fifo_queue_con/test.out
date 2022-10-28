@@ -1,0 +1,22 @@
+Adding 1 .. 10 to queue and removing elements concurrently
+Adding back another 20
+Got 1
+Got 10
+Got 2
+Got 3
+Got 4
+Got 5
+Got 6
+Got 7
+Got 8
+Got 9
+Queue now: [10, 30]
+Queue now: [20]
+Queue now: [30, 20]
+Queue now: [30]
+Queue now: []
+Removed 10
+Removed 20
+Removed 20
+Removed 30
+Removed null

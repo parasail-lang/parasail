@@ -1,0 +1,138 @@
+interface PSL::Core::Time<> is
+  // Time in nanoseconds since Jan 1, 1970
+
+    type Time_Interval is new
+      Fixed<Delta => 1.0E-9>
+
+    const Second : Time_Interval := 1.0
+    const Millisecond : Time_Interval := 1.0/1000
+    const Microsecond : Time_Interval := 1.0/10**6
+    const Nanosecond : Time_Interval := 1.0/10**9
+
+    const Minute : Time_Interval := 60.0
+    const Hour : Time_Interval := 60 * Minute
+    const Day : Time_Interval := 24 * Hour
+
+    type Month_Enum is Enum< 
+       [#Jan, #Feb, #Mar, #Apr, #May, #Jun,
+        #Jul, #Aug, #Sep, #Oct, #Nov, #Dec] >
+
+    func Create(Year : Univ_Integer; Month : Month_Enum;
+      Day_Of_Month : Univ_Integer;
+      Time_Of_Day : Time_Interval := 0.0;
+      Time_Zone : Time_Interval := 0.0)
+      {Year in 1970 .. 2399; Day_Of_Month in 1..31}
+      {Time_Zone in -12.0*Hour .. +12.0*Hour; Time_Of_Day in 0.0 .. 86400.0}
+      -> Time
+
+    func Zero() -> Time
+
+    op "+"(Left : Time; Right : Time_Interval) -> Time
+      is import("+")
+    op "+"(Left : Time_Interval; Right : Time) -> Time
+      is import("+")
+    op "-"(Left : Time; Right : Time_Interval) -> Time
+      is import("-")
+    op "-"(Left, Right : Time) -> Time_Interval
+      is import("-")
+
+    op "=?"(Left, Right : Time) -> Ordering
+      is import("=?")
+
+    func Min(Left, Right : optional Time) -> optional Time
+      is import(#min)
+    func Max(Left, Right : optional Time) -> optional Time
+      is import(#max)
+
+    func Seconds_Since_1970(Time) -> Time_Interval
+      is import(#identity)
+
+end interface PSL::Core::Time
+
+class PSL::Core::Time is
+    const Since_1970 : Time_Interval
+
+    type Year_Kind is Enum< [#normal, #leap] >
+
+    const Month_Base : Array<Array<Univ_Integer, Indexed_By => Year_Kind>,
+      Indexed_By => Month_Enum> := 
+        [#Jan => [0, 0], #Feb => [31, 31], #Mar => [59, 60], #Apr => [90, 91],
+         #May => [120, 121], #Jun => [151, 152], #Jul => [181, 182],
+         #Aug => [212, 213], #Sep => [243, 244], #Oct => [273, 274],
+         #Nov => [304, 305], #Dec => [334, 335]]
+
+    func Kind_Of_Year(Year : Univ_Integer) -> Year_Kind is
+        if Year mod 4 == 0 and then
+          (Year mod 100 != 0 or else Year mod 400 == 0) then
+            // Every 100 years leap year is omitted, 
+            // except for multiples of 400 which *are* leap years.
+            return #leap
+        else
+            return #normal
+        end if
+    end func Kind_Of_Year
+
+    func Leaps_Before(Year : Univ_Integer) -> Univ_Integer is
+        // Number of leap years before this year, starting from 1970
+        if Year < 2101 then
+            return (Year-1969)/4
+        else
+            // Every 100 years leap year is omitted, 
+            // except for multiples of 400 which *are* leap years.
+            return (Year-1969)/4 - (Year-2001)/100
+        end if
+    end func Leaps_Before
+
+  exports
+    func Create(Year : Univ_Integer; Month : Month_Enum;
+      Day_Of_Month : Univ_Integer;
+      Time_Of_Day : Time_Interval := 0.0;
+      Time_Zone : Time_Interval := 0.0)
+      {Year in 1970 .. 2399; Day_Of_Month in 1..31}
+      {Time_Zone in -12.0*Hour .. +12.0*Hour; Time_Of_Day in 0.0 .. 86400.0}
+      -> Time is
+        // Determine number of nanos since Jan 1, 1970
+        const Kind := Kind_Of_Year(1970)
+        const Base := Month_Base[Month][Kind]
+
+        return (Since_1970 => 
+          (Year-1970) * (365*Day) + 
+          (Leaps_Before(Year) + Base + Day_Of_Month)*Day +
+          Time_Of_Day - Time_Zone)
+    end func Create
+
+    func Zero() -> Time is
+        return (Since_1970 => 0.0)
+    end func Zero
+
+end class PSL::Core::Time
+
+func PSL::Test::Test_Time(X : Univ_Real) is
+    var XTI : Time::Time_Interval := X
+    const Local_Minute : Time::Time_Interval := 60.0
+    Println("X = " | XTI)
+    Println("X * 2 = " | XTI*2)
+    Println("X + X = " | (XTI + XTI))
+    Println("X - X = " | (XTI - XTI))
+    Println("X / 2 = " | (XTI / 2))
+    Println("X / 2.0 = " | (XTI / 2.0))
+    Println("X * 3.0 = " | (XTI * 3.0))
+    Println("5.0 * X = " | (5.0 * XTI))
+    Println("-5.0 * X = " | (-5.0 * XTI))
+    Println("-5.0 = " | -5.0)
+    Println("Local_Minute = " | Local_Minute)
+    Println("-5.0*Local_Minute = " | (-5.0*Local_Minute))
+    Println("Time::Minute = " | Time::Minute)
+    Println("-5.0*Time::Minute = " | (-5.0*Time::Minute))
+    Println("Time::Hour = " | Time::Hour )
+    Println("-5.0*Time::Hour = " | (-5.0*Time::Hour))
+
+    var T : Time := Create(Year => 2011, Month => #Oct, Day_Of_Month => 18,
+      Time_Of_Day => 10*Time::Hour + 5*Time::Minute,
+      Time_Zone => -5.0*Time::Hour)
+
+    Println("18-Oct-2011 = " | ( T - Zero() ))
+    Println("X = " | XTI )
+    Println("18-Oct-2011 - X = " | ( (T - XTI) - Zero() ) )
+
+end func PSL::Test::Test_Time

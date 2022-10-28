@@ -1,0 +1,927 @@
+interface PSVM<> is
+    type Opcode_Enum is new Enum<[#Skip_Op, #Call_Op, #Return_Op,
+      #Move_Word_Op, #Store_Address_Op,
+      #Create_Obj_Op, #Assign_Word_Op, #Swap_Obj_Op, 
+      #Move_Obj_Op, #Make_Copy_In_Region_Op,
+      #Store_Local_Null_Op, #Store_Null_Of_Same_Region_Op,
+      #Is_Null_Op, #Not_Null_Op,
+      #Store_Int_Lit_Op, #Store_Real_Lit_Op, #Store_Char_Lit_Op,
+      #Store_Enum_Lit_Op, #Store_Str_Lit_Op,
+      #Start_Parallel_Op, #Add_Parallel_Op, 
+      #Prepare_To_Exit_Parallel_Op, #Wait_For_Parallel_Op,
+      #Start_Parallel_Call_Op, #Add_Parallel_Call_Op,
+      #Create_Lock_For_Obj_Op, #Create_TCB_Op,
+      #Create_Polymorphic_Obj_Op, #Select_Polymorphic_Ancestor_Part_Op,
+      #Select_Ancestor_Part_Op,
+      #If_Op, #Call_Block_Op, #Check_Block_Op, #Exit_Op, 
+      #End_Op, #Case_Op, #Loop_Op]>; // TBD: These three are not used yet
+	// The various op codes in the instruction set
+
+    type Area_Base_Indicator is new Integer<0..255>;
+	// Indicator of which base register to use
+
+    type Area_Base_Range is Countable_Range<Area_Base_Indicator>;
+
+    const Zero_Base : Area_Base_Indicator := 0;
+    const Local_Area : Area_Base_Indicator := 1;
+      // Relative to current local area
+    const Param_Area : Area_Base_Indicator := 2;
+      // Relative to param area of current operation
+    const Type_Area : Area_Base_Indicator := 3;
+      // Relative to enclosing type for current operation;
+      // This is equivalent to the outermost enclosing local area.
+    const Const_Area : Area_Base_Indicator := 4;
+      // This is a compile-time-known constant.
+      // The offset is an index into a Const_Info_Array.
+
+    const Base_Registers : Area_Base_Range := 32..255;
+      // Relative to some temp base register kept in the current Local_Area
+
+    const Enclosing_Param_Areas : Area_Base_Range := 8..15;
+      // Relative to a param area of an enclosing operation
+      // The second word of a local area points at its param area
+      // if it has nested operations.  This walks up through the
+      // static links in the local areas, and then when it reaches
+      // the right local area, it gets the param area from there.
+
+    const Enclosing_Local_Areas : Area_Base_Range := 16..23;
+      // Relative to a local area of an enclosing block or operation
+      // The first word of a local area points at its enclosing
+      // block, or at the outermost level, the enclosing type area.  
+      // The type area has a null in its first word.
+
+    const Enclosing_Type_Areas : Area_Base_Range := 24..31;
+      // Relative to a type area for an enclosing module
+      // Type areas are linked together via the Enclosing_Type link.
+
+    // Make sure that we can use "mod" to extract the up-level count, 
+    // from both Enclosing_Param_Areas and Enclosing_Local_Areas
+    const Max_Up_Levels := Length(Enclosing_Param_Areas);
+
+    {Max_Up_Levels == Length(Enclosing_Local_Areas)};
+    {Enclosing_Param_Areas.First mod Max_Up_Levels == 0}
+    {Enclosing_Local_Areas.First mod Max_Up_Levels == 0};
+    {Enclosing_Type_Areas.First mod Max_Up_Levels == 0};
+
+    type Non_Null_Value is new Integer<-(2**62-1)*2-1 .. +(2**62-1)*2+1>;
+      // Memory is organized as an array of 64-bit "words"
+    type Word_Type is optional Non_Null_Value;
+
+    const Word_Size := 64;  // Word_Type#size
+
+    const Null_Value : Word_Type := null;
+	// Most negative value used to represent "null" int and null pointer
+
+    const Null_Float_Value : Word_Type := -1;  // all ones is an IEEE NaN
+
+    type Object_Virtual_Address is Word_Type;
+      // Virtual addresses are 64-bits, with high 16-bits (or so)
+      // identifying the chunk.  Actually, to avoid signed-ness issues,
+      // we presume virtual addresses are non-negative, as are chunk
+      // indices, so we only allow for 2**15 chunks.  This can easily
+      // be expanded as needed.
+
+    const Null_Virtual_Address : Object_Virtual_Address := 0;
+
+    type Chunk_Index is new Integer <0..1_000_000>;
+      // Index of chunk in global region-chunk table.
+
+    const Large_Null_Chunk : Object_Virtual_Address := -2**17;
+      // Chunk index used in virtual addresses to represent "large" nulls.
+      // NOTE: We purposely make this more negative than the maximum
+      //       type index to avoid collisions with type-relative addressing.
+
+    const Chunk_Divisor := 2**32;
+    {([[Chunk_Index::Last()]]+1) * Chunk_Divisor <= 
+      [[Word_Type::Last()]]+1};
+	// We divide by the chunk divisor to convert a virtual address
+	// into a chunk index.
+        // We use Chunk_Divisor as a modulus to extract
+        // offset within chunk from a virtual address.
+	// Or equivalently, we subtract Chunk.Starting_Virtual_Address
+        // (see below) from the virtual address to produce the offset.
+
+    type Offset_Within_Chunk is 
+      Integer<0..2**31-1>;
+    {Offset_Within_Chunk::Last() < Chunk_Divisor};
+      // We are limited to the overall number of bits given to the chunk.
+
+    type Offset_Within_Area is 
+      Offset_Within_Chunk {Offset_Within_Area in 0..2**16-1};
+	// Offset within area identified by base register
+
+    type Word_Array is Array<Word_Type, Indexed_By => Offset_Within_Chunk>;
+
+    const Local_Area_Local_Data_Offset : Offset_Within_Area := 3;
+      // Offset to where local data starts in local area
+
+    const Max_Offset_For_Base_Register : Offset_Within_Area :=
+      [[Base_Registers.Last - Base_Registers.First]];
+	// Limit on local-area offset that can be turned into a base register
+
+    interface Object_Locator<> is
+	// Combination of base register identifier and offset, this
+	// kind of locator can appear within an instruction.
+	// These are used both for identifying code and for identifying data.
+	// When used for identifying code, the locator is pointing
+	// at something which contains the "address" of the code.
+	const Base : Area_Base_Indicator;
+        const Offset : Offset_Within_Area;
+    end interface Object_Locator;
+
+    const Null_Object_Locator : Object_Locator := (Zero_Base, 0);
+
+    type Obj_Locator_Array is Vector<Object_Locator>;
+
+    type Region_Index is new Integer<0..2**16-1>;
+      // Every region is assigned a unique region index.  
+
+    type Type_Index is new Integer<0..2**16-1>;
+      // Every type descriptor is assigned a unique index.
+
+    type Lock_Obj_Index is new Integer<0..2**16-1>;
+      // Concurrent objects have an index of a lock object
+
+    const Large_Obj_Header_Size : Offset_Within_Area := 1;
+	// Size of "header" of a large object, and also
+	// the offset of first component within a "large" object.
+	// Header components are the region ptr, size, type info, and lock.
+
+    // Sizes of control blocks used in Parallel_Ops
+    const Thread_Master_Size : Offset_Within_Area := 3;
+    const Thread_Control_Block_Size : Offset_Within_Area := 11;
+
+    interface Object_Address<> is
+      // This identifies a chunk and an offset within it.
+      // This is the kind of value that a base register holds.
+      // This is the kind of "address" we use at run-time.
+      // These don't appear in instructions, since we don't
+      // have any statically-allocated chunks to point at.
+	const Enclosing_Chunk : optional Chunk_Index;
+	const Offset : Offset_Within_Chunk;
+    end interface Object_Address;
+    
+    const Null_Object_Address : Object_Address :=
+      (Enclosing_Chunk => null, Offset => 0);
+
+    interface Region<> is
+      // A region is made up of a set of region "chunks" each of
+      // which is a contiguous chunk of storage.  When a region
+      // is reclaimed, all of the chunks get reclaimed as well.
+      // Most chunks are a standard size (e.g. 4096 bytes, 512 64-bit words).
+      // Larger chunks are allocated if a given object needs to have
+      // a larger contiguous piece.
+      // Allocation within a chunk is always (?) single-threaded.
+      // Multiple threads may allocate from a single region, 
+      // but not from a single chunk (at least not at the same time).
+      // Multiple threads can be referencing parameter lists that
+      // reside in a single chunk.  It is the allocation which we (may?) want
+      // to be single-threaded within a chunk.
+	const Index : Region_Index;
+	const Null_Value : Word_Type;
+	const Enclosing_Region : Region_Index;
+	  // Also used to point to next free region if on Free_Regions chain.
+	var First_Chunk : optional Chunk_Index;
+	var Last_Chunk : optional Chunk_Index;
+	// TBD: var Reclamation : Reclamation_Info_Vector;
+	  // Table of storage from deallocated objects, available for re-use
+	const Associated_Local_Area : Object_Address;
+	  // Local area associated with region.
+	  // NOTE: This is primarily for debugging
+    end interface Region;
+
+    interface Region_Chunk<> is
+        const Chunk_Length : Offset_Within_Chunk;
+      // We pass around references to region-chunks and starting
+      // offsets within them.  This is instead of passing around
+      // "bare" addresses.  A "base" register contains a reference
+      // to a chunk and an offset.  We then add in the offset appearing
+      // in the base/offset pair, to produce the total offset within
+      // the chunk.
+      // The Starting_Virtual_Address is the virtual address of the
+      // first word of the chunk.  This is added into the offset
+      // to produce a virtual address of any word within the chunk.
+      // Virtual addresses are what we store in "memory".  Chunk pointers
+      // only exist in "registers."
+	var Associated_Region : Region_Index;
+	var Prev_Chunk : Chunk_Index;
+	var Next_Chunk : Chunk_Index;
+	const Starting_Virtual_Address : Object_Virtual_Address;
+	var Last_In_Use : Offset_Within_Chunk := 0;
+	  // Last item of chunk now in use
+	var Mark : Offset_Within_Chunk := 0;
+	  // Value of "Last_In_Use" when Associated_Region started using chunk.
+	  // At Mark is the old value for Mark.
+	  // At Mark-1 is the old value for "Depth_Of_Mark"
+	var Depth_Of_Mark : Univ_Integer := 0;
+	  // The number of levels the mark remained the same as chunk was
+	  // "borrowed" from enclosing regions.
+	  // On a release back to enclosing region: 
+	  //   if Depth_Of_Mark > 0, then we merely decrement
+	  //   Depth of Mark and reset Last_In_Use to Mark.
+	  //   If Depth_Of_Mark = 0, then we restore Last_In_Use to Mark-2,
+	  //   and restore Mark and Depth_Of_Mark from Mark/Mark-1.
+          // When "borrowing" a chunk from an enclosing region:
+          //   if Last_In_Use matches Mark, then just increment Depth_Of_Mark
+	  //   and change Associated_Region.
+	  //   if Last_In_Use > Mark, then save Depth_Of_Mark and Mark at
+	  //   Last_In_Use+1,+2 and set Mark:=Last_In_Use:=Last_In_Use+2,
+	  //   and set Depth_Of_Mark to zero.
+	var Data : Word_Array;
+    end interface Region_Chunk;
+
+    type Type_Id is new Integer<0..2**16-1>;
+
+    interface Exec_Context<> is
+      // This encapsulates the information needed
+      // to convert an Object_Locator into an Object_Address,
+      // by providing the "base registers," directly or indirectly.
+	const Enclosing_Type : Type_Id;
+	const Local_Region : Region_Index;  // Local region
+	const Params : Object_Address;
+	const Local_Area : Object_Address;
+	const Local_Area_Length : Offset_Within_Area;
+	const Start_Callee_Locals : Offset_Within_Area;
+	const Control_Area : Object_Virtual_Address;
+    end interface Exec_Context;
+
+    var Global_Data_Region : Region_Index;
+      // Region where compile-time computations are stored.
+
+    var Global_Stack_Chunk : Chunk_Index;
+      // Region chunk used for primary stack
+
+    type Code_Offset is Integer<-2**15 .. +2**15 - 1>;
+
+    type Code_Length_Type is 
+      Code_Offset {Code_Length_Type in 0..Code_Offset::Last()};
+    type Code_Index is 
+      Code_Offset {Code_Index in 1..Code_Offset::Last()};
+
+    interface Code_Block_Descriptor<> is
+	const PC_Offset : Code_Offset;
+	  // This is an offset relative to the instruction with the reference, 
+	  // or relative to the start of the routine for boundary conditions.
+	const Uses_Queuing : Boolean;
+	  // This indicates whether code block has any calls on
+	  // operations that might use queuing.
+	const Local_Area_Length : Offset_Within_Area;
+	  // How big a local area to pre-allocate
+	const Start_Callee_Locals : Offset_Within_Area;
+	  // How much of local area is devoted to current procedure,
+	  // and hence at what offset callee locals begin.
+    end interface Code_Block_Descriptor;
+
+    const Null_Code_Block_Descriptor : Code_Block_Descriptor := 
+      (PC_Offset => 0, Uses_Queuing => #false, Local_Area_Length => 0,
+        Start_Callee_Locals => 0);
+
+    type Condition_Bit_Mask is Modular<2**16>;
+      // Type used in conditionals to indicate when comparison is "True"
+
+    // If condition returns a value of type Ordering
+    const Compare_Less : Condition_Bit_Mask := 2**0;
+    const Compare_Equal : Condition_Bit_Mask := 2**1;
+    const Compare_Greater : Condition_Bit_Mask := 2**2;
+    const Compare_Unordered : Condition_Bit_Mask := 2**3;
+
+    const Compare_Not_Equal : Condition_Bit_Mask := 
+      Compare_Less or Compare_Greater or Compare_Unordered;
+
+    const Ordering_Mask : Array<Condition_Bit_Mask, Indexed_By => Ordering> :=
+      [#less => Compare_Less, #equal => Compare_Equal, 
+       #greater => Compare_Greater, #unordered => Compare_Unordered];
+
+    // If condition returns a value of type Boolean
+    const Boolean_Is_False : Condition_Bit_Mask := 2**0;
+    const Boolean_Is_True : Condition_Bit_Mask := 2**1;
+
+    type Direction is 
+      Enum<[#Unordered_Dir, #Forward_Dir, #Reverse_Dir, #Concurrent_Dir]>;
+      // Used to indicate direction of iteration
+
+    interface Source_Position<> is
+	const File : Univ_String;
+	const Line : Univ_Integer;
+	const Col : Univ_Integer;
+    end interface Source_Position;
+
+    abstract interface Instruction<> is
+        const Op : Opcode_Enum;
+	// A single (virtual) machine instruction
+	const Source_Pos : Source_Position;
+    end interface Instruction;
+
+    interface Skip_Op extends Instruction is
+	const Skip_Count : Code_Offset;
+	  // Number of instructions to skip.  Is a No_Op if 0.
+    end interface Skip_Op;
+
+    interface Exit_Op extends Skip_Op is
+	const Level_Diff : Univ_Integer;
+	  // This indicates how many nested block levels 
+	  // the exit statement is exiting from.
+    end interface Exit_Op;
+
+    abstract interface Instr_With_Params extends Instruction is
+	const Params : Object_Locator;
+	const Static_Link : Object_Locator;
+	  // Points to enclosing local area or type area
+    end interface Instr_With_Params;
+
+    interface Call_Op extends Instr_With_Params is
+	const Call_Target : Object_Locator;
+	const Locked_Param_Index : Univ_Integer;
+	  // If greater than zero, indicates which parameter
+	  // is locked during the execution of the call.
+	  // If zero, then there is no lock acquired, though it 
+	  // might be a lock-free operation on a concurrent object.
+    end interface Call_Op;
+	
+    interface Call_Block_Op extends Instr_With_Params is
+	const Code_Block : Code_Block_Descriptor;
+	  // This describes the nested block of code 
+    end interface Call_Block_Op;
+
+    interface Check_Block_Op extends Call_Block_Op is
+	const Assertion_Str : Univ_String;
+	  // A string representation of assertion being checked
+    end interface Check_Block_Op;
+	
+    interface Return_Op extends Instruction is
+    end interface Return_Op;
+
+    abstract interface Instr_With_Dest extends Instruction is
+        const Destination : Object_Locator;
+          // For Assign_Word_Op, existing object is freed if Type_Info
+          // implies is large
+          // For Swap_Obj_Op, existing object is copied and then freed
+          // if Type_Info implies is large and objects not in same region.
+          // For Create_Polymorphic_Obj_Op, identifies object to be
+          // replaced with a polymorphic object which wraps it.
+    end interface Instr_With_Dest;
+
+    interface Store_Local_Null_Op extends Instr_With_Dest is
+        const Null_Type_Info : Object_Locator;
+          // Type of object determines whether or not object is small,
+          // and specific kind of null if small.
+          // Region is the current local region.
+    end interface Store_Local_Null_Op;
+
+
+    interface Store_Int_Lit_Op extends Instr_With_Dest is
+        const Int_Value : Word_Type;  
+    end interface Store_Int_Lit_Op;
+
+    interface Store_Char_Lit_Op extends Instr_With_Dest is
+        const Char_Value : Word_Type;  
+    end interface Store_Char_Lit_Op;
+
+    interface Store_Real_Lit_Op extends Instr_With_Dest is
+        const Real_Value : Univ_Real;
+    end interface Store_Real_Lit_Op;
+
+    interface Store_Str_Lit_Op extends Instr_With_Dest is
+        const Str_Value : Univ_String;
+    end interface Store_Str_Lit_Op;
+
+    interface Store_Enum_Lit_Op extends Instr_With_Dest is
+        const Enum_Value : Univ_Enumeration;
+    end interface Store_Enum_Lit_Op;
+
+    abstract interface Instr_With_Source extends Instr_With_Dest is
+        const Source : Object_Locator;
+          // For Store_Null and Create_Obj, 
+          // determines region if non-null
+          // For Assign and Make_Copy, is object to be copied.
+          // For Select_*Ancestor_Part_Op, is object
+          // whose ancestor part is to be extracted.
+          //
+          //  Used for:  Move_Word_Op, Store_Address_Op
+    end interface Instr_With_Source;
+
+    interface Instr_With_Type_Info extends Instr_With_Source is
+        const Type_Info : Object_Locator;
+          // Determines whether small or large.
+          // For Store_Null, determines kind of null if small.
+          // For Create_Obj_Op determines type of obj to create
+          //   if large, and kind of null if small.
+          // For Select_*Ancestor_Part_Op, determines type of
+          // ancestor part to be extracted.  This becomes a simple
+          // Move_Word_Op if the component-extension levels are
+          // the same between the object's type-id 
+          // and the ancestor type.
+          //
+          // Used for:
+          //    Assign_Word_Op, Swap_Obj_Op, Move_Obj_Op,
+          //    Store_Null_Of_Same_Region_Op,
+          //    Create_Obj_Op, Create_Polymorphic_Obj_Op,
+          //    Select_Polymorphic_Ancestor_Part_Op,
+          //    Is_Null_Op, Not_Null_Op
+    end interface Instr_With_Type_Info;
+
+    interface Make_Copy_In_Region_Op extends Instr_With_Type_Info is
+        const Existing_Obj_In_Region : Object_Locator;
+          // Determines region for Make_Copy
+    end interface Make_Copy_In_Region_Op;
+
+    interface Select_Ancestor_Part_Op extends Instr_With_Type_Info is
+        const Source_Type_Info : Object_Locator;
+          // Determines type of Source object
+    end interface Select_Ancestor_Part_Op;
+
+    interface If_Op extends Instruction is
+        const If_Source : Object_Locator;
+        const If_Condition : Condition_Bit_Mask;
+        const Skip_If_False : Code_Offset;  
+          // Number of instructions to skip
+          // if condition not satisfied.
+          // Negative for loop back.
+    end interface If_Op;
+ 
+    interface Parallel_Instr extends Instruction is
+        const Parallel_Master : Object_Locator;
+          // This is where the count/list of subthreads hangs
+          // Used for: Wait_For_Parallel_Op
+    end interface Parallel_Instr;
+
+    interface Parallel_Instr_With_TCB extends Parallel_Instr is
+        const Parallel_Control : Object_Locator;
+          // This is where the control block is stored,
+          // followed by the parameters, if any.
+        const Parallel_Static_Link : Object_Locator;
+          // Location of enclosing local area/type area
+    end interface Parallel_Instr_With_TCB;
+
+    interface Parallel_Block_Op extends Parallel_Instr_With_TCB is
+        const Parallel_Code_Block : Code_Block_Descriptor;
+          // This describes the nested block of code 
+          //
+          // Used for: Start_Parallel_Op, Add_Parallel_Op
+    end interface Parallel_Block_Op;
+
+    interface Parallel_Call_Op extends Parallel_Instr_With_TCB is
+        const Parallel_Call_Target : Object_Locator;
+          // This identifies the operation to be called
+        const Parallel_Locked_Param_Index : Univ_Integer;
+          // Indicates which param, if any, is locked
+          // during the execution of the call.
+          //
+          // Used for: Start_Parallel_Call_Op, Add_Parallel_Call_Op
+    end interface Parallel_Call_Op;
+
+    interface Create_TCB_Op extends Parallel_Instr_With_TCB is
+        const Num_Params : Univ_Integer;
+          // The total number of parameters (inputs and outputs)
+          // in the parallel call
+    end interface Create_TCB_Op;
+
+    interface Case_Op extends Instruction is
+      // TBD: Not used currently
+        const Case_Selector : Object_Locator;
+        const Case_First : Non_Null_Value;
+        const Case_Last : Non_Null_Value;
+          // Skips number of instructions determined by
+          //    Case_Selector - Case_First
+          //      if Case_Selector in Case_First .. Case_Last.
+        const Case_Default_Skip : Code_Offset;  
+          // Number of instructions to skip 
+          // if Case_Selector not in Case_First .. Case_Last.
+          // Negative for loop back.
+    end interface Case_Op;
+
+--     type Instruction_Sequence is array(Code_Index range <>) of Instruction;
+-- 	// A sequence of machine instrucions.
+-- 
+--     type Code_Type(Code_Length : Code_Length_Type) is record
+-- 	Instrs : aliased Instruction_Sequence(1..Code_Length);
+--     end record;
+-- 
+--     type Code_Ptr is access all Code_Type;
+-- 
+--     function Code_Block(Code : Code_Ptr; Index : Code_Index) 
+--       return Code_Block_Ptr;
+-- 	// Return pointer into Code_Block_Descriptor in specified instruction
+-- 	// Requires: Instructions is Call_Block_Op, Check_Block_Op,
+-- 	//           Start_Parallel_Block_Op, or Add_Parallel_Block_Op.
+-- 
+--     type Routine;
+--     type Routine_Ptr is access constant Routine;
+--     type Routine_RW_Ptr is access all Routine;
+-- 
+--     type Routine_Index is 
+--       range 0..2**16-1;
+--       // Every routine is assigned a unique index.
+-- 
+--     type Parameter_Kind_Enum is (Formal_Type, Formal_Object, Formal_Operation);
+--       // Kind of formal parameter of routine or module
+-- 
+--     type Routine_Param_Info is record
+-- 	// Descriptor of parameter to routine.
+-- 	Kind : Parameter_Kind_Enum := Formal_Object;
+-- 	Type_Info : Object_Locator := Null_Object_Locator;
+-- 	Is_Operation_Output : Boolean := False;
+-- 	Is_Var : Boolean := False;
+-- 	Is_Passed_By_Ref : Boolean := False;
+-- 	Is_Optional : Boolean := False;
+-- 	Is_Of_Current_Inst_Type : Boolean := False;
+-- 	  // If true, then this parameter is of the "current-instance" type,
+-- 	  // and if this routine is inherited into a type extension,
+--           // some number of levels of indirection may need to be
+-- 	  // applied to this parameter.
+-- 
+-- 	// for debugging only:
+-- 	Name : Strings.U_String := Strings.Null_U_String;
+-- 	Type_Name : Strings.U_String := Strings.Null_U_String;
+-- 	Decl : Trees.Optional_Tree := Trees.Null_Optional_Tree;  
+--     end record;
+-- 
+--     type Routine_Param_Info_Array is array(Positive range <>) 
+--       of Routine_Param_Info;
+--     type Routine_Param_Info_Array_Ptr is access all Routine_Param_Info_Array;
+-- 
+--     type Boundary_Condition_Enum is (
+--       External_Precondition, Internal_Precondition,
+--       Internal_Postcondition, External_Postcondition);
+-- 
+--     type Boundary_Condition_Array is array(Boundary_Condition_Enum) 
+--       of aliased Code_Block_Descriptor;
+-- 	  // These are descriptors of local boolean functions
+-- 	  // which represent pre- and postconditions.
+-- 	  // An "external" pre/postcondition is independent of any
+-- 	  // "affiliated" operands.  An "internal" pre/postcondition
+-- 	  // depends on "affiliated" operands.  The distinction is
+-- 	  // only important for concurrent objects.  The internal precondition
+-- 	  // becomes a "dequeue" condition if the call has a locked parameter.
+-- 	  // The internal postcondition is checked before returning,
+-- 	  // and might no longer be true by the time the caller resumes
+-- 	  // execution, because the concurrent parameter might be updated
+-- 	  // in the interim.  
+-- 	  // NOTE: We make this separation to support passing individual
+-- 	  //       objects marked "concurrent," where the external
+-- 	  //       precondition is checked before the call, and the
+-- 	  //       internal precondition becomes the dequeue condition.
+-- 	  //       In general it is illegal to refer to a concurrent object
+-- 	  //       in a precondition, since their values aren't stable, so
+-- 	  //       for a concurrent module, there should be no mention of
+-- 	  //       "affiliated" parameters in preconditions (since they
+-- 	  //       are always concurrent), and the dequeue condition *must*
+-- 	  //       refer to a concurrent object or else it would never
+-- 	  //       change.
+-- 
+--     type Built_In_Ptr is access procedure(Code : Routine_Ptr;
+--       Context : Exec_Context);
+-- 	// These are used to point to a built-in procedure
+-- 
+--     type Routine(Is_Import : Boolean) is record
+-- 	// This is a sequence of instructions which represents
+-- 	// the code for an operation plus the code for any nested
+-- 	// blocks that are to be run in parallel with other code chunks.
+-- 	Index : Routine_Index := 0;
+-- 	Name : Strings.U_String := Strings.Null_U_String;
+-- 	Uses_Queuing : Boolean := False;
+-- 	  // This indicates whether routine uses queuing (or might).
+-- 	Local_Area_Length : Offset_Within_Area := 0;
+-- 	Start_Callee_Locals : Offset_Within_Area := 0;
+-- 	Boundary_Conditions : Boundary_Condition_Array := 
+-- 	  (others => Null_Code_Block_Descriptor);
+-- 	Parameters : Routine_Param_Info_Array_Ptr := null;
+-- 
+-- 	case Is_Import is
+-- 	  when True =>
+-- 	    Built_In_Operation : Built_In_Ptr;
+-- 	      // Built-ins are represented by a pointer to an Ada procedure.
+-- 	  when False =>
+-- 	    Local_Master : Offset_Within_Area := 0;
+-- 	      // Offset in local area where thread master, if any, is located.
+-- 	    Code : Code_Ptr;
+-- 	end case;
+--     end record;
+-- 
+--     procedure Install_Code(Code : Routine_RW_Ptr);
+--       // Install some code in Routine table.
+--       // Requires: Code.Index is 0 or Routine with Code.Index 
+--       //           doesn't already exist in table.
+--       // Effects: If Code.Index is 0, will be set to unique Routine_Index.
+-- 
+--     procedure Dump_Routine(Code : Routine_Ptr);
+--       // Display instructions of routine for debugging purposes.
+--     pragma Export(Ada, Dump_Routine, "dump_routine");
+-- 
+--     procedure Dump_Type_Desc(Type_Desc : Type_Descriptor_Ptr);
+--       // Produce a human-readable display of the contents of a type descriptor
+--     pragma Export(Ada, Dump_Type_Desc, "dump_type_desc");
+-- 
+--     type Element_Info is record
+-- 	// Info shared between Parameter_Info and Constant_Info
+-- 	Type_Desc : Type_Descriptor_Ptr := null;
+-- 	Addr : Object_Address := Null_Object_Address;
+-- 	Value : Word_Type := Null_Value;
+-- 	  // Used if is a formal object or formal operation
+--     end record;
+-- 
+--     // Info on parameters of type
+--     type Parameter_Info is record
+-- 	Kind : Parameter_Kind_Enum := Formal_Type;
+-- 	Data : Element_Info;
+-- 	  // Used if is a formal object or formal operation
+--     end record;
+--     type Parameter_Info_Array is array(Positive range <>) of Parameter_Info;
+--     type Parameter_Info_Array_Ptr is access all Parameter_Info_Array;
+-- 
+--     // Info on components of type
+--     type Component_Info is record
+-- 	Type_Desc : Type_Descriptor_Ptr;
+-- 	Is_By_Ref : Boolean := False;
+--     end record;
+--     type Component_Info_Array is array(Positive range <>) of Component_Info;
+--     type Component_Info_Array_Ptr is access all Component_Info_Array;
+-- 
+--     // Info on nested types 
+--     type Type_Desc_Array is array(Positive range <>) of Type_Descriptor_Ptr;
+--     type Type_Desc_Array_Ptr is access all Type_Desc_Array;
+-- 
+--     // Info on instantiation-time-known constants
+--     type Const_Info is record
+-- 	Name : Strings.U_String := Strings.Null_U_String;  // for debugging
+-- 	Data : Element_Info;
+--     end record;
+--     type Const_Info_Array is 
+--       array(Positive range <>) of Const_Info;
+--     type Const_Info_Array_Ptr is 
+--       access all Const_Info_Array;
+-- 
+--     Compile_Time_Known_Consts : Const_Info_Array_Ptr := null;
+-- 	// The table of compile-time-known constants
+-- 
+--     type Operation_Index is range 0..9_999;
+-- 	// Index into operation table associated with a type.
+-- 
+--     type Wrapper_Action_Enum is (No_Action, Component_Extension_Action,
+--       Polymorphic_Type_Action);
+-- 	// These identify the kind of wrapper action needed before
+-- 	// or after calling the identified underlying operation.
+-- 
+--     type Routine_Info is record
+--       // Info on a particular operation
+-- 	Index : Routine_Index;
+-- 	Type_Desc : Type_Descriptor_Ptr;  
+-- 	  // Normally will be enclosing type desc
+-- 	Action : Wrapper_Action_Enum := No_Action;
+--     end record;
+-- 
+--     Null_Routine_Info : constant Routine_Info := 
+--       (Index => 0, Type_Desc => null, Action => No_Action);
+-- 	
+--     type Routine_Info_Array is
+--       array(Operation_Index range <>) of Routine_Info;
+--     type Routine_Info_Array_Ptr is 
+--       access all Routine_Info_Array;
+-- 
+--     type Routine_Index_Array is
+--       array(Operation_Index range <>) of Routine_Index;
+--     type Routine_Index_Array_Ptr is 
+--       access all Routine_Index_Array;
+-- 
+--     type Operation_Index_Array is
+--       array(Operation_Index range <>) of Operation_Index;
+--     type Operation_Index_Array_Ptr is
+--       access all Operation_Index_Array;
+-- 	// Type used for operation maps
+-- 	
+--     subtype Type_Operation_Offsets is Offset_Within_Area range
+--       10_000 .. 10_000 + Offset_Within_Area(Operation_Index'Last);
+-- 	// Range of offsets within a type area devoted to
+-- 	// operations.
+-- 
+--     subtype Type_Nested_Const_Offsets is Offset_Within_Area range
+--       20_000 .. 29_999;
+-- 	// Range of offsets within a type area devoted to
+-- 	// nested constants
+-- 
+--     pragma Assert(Type_Operation_Offsets'Last < 
+--       Type_Nested_Const_Offsets'First);
+-- 
+--     type Type_Kind_Enum is (Normal_Kind,
+--       Basic_Array_Kind, Integer_Kind, Float_Kind);
+-- 
+--     type Type_Descriptor(Has_Op_Map : Boolean) is record
+--       // Run-time type information
+--       // If Has_Op_Map is True, then there is an extra level of
+--       // indirection, with an Op_Map to map from the interface op index
+--       // to the actual type's op index.
+-- 	Index : Type_Index := 0;
+-- 	  // Index into global table of type descriptors
+-- 
+-- 	Location : Object_Locator := Null_Object_Locator;
+-- 	  // Location used to identify type descriptor
+-- 
+-- 	Corresponding_Polymorphic_Type_Desc : Type_Descriptor_Ptr := null;
+-- 	  // If non-null, then this points to the result of 
+-- 	  // calling Build_Polymorphic_Type_Desc on this type-desc or type-map.
+-- 
+-- 	Is_Finished : Boolean := False;
+-- 	  // Set True after all of the fields have been initialized,
+-- 	  // including formal objects and nested constants, which
+-- 	  // need to be evaluated.
+-- 
+-- 	Next_Unfinished : Type_Descriptor_Ptr := null;
+-- 	Prev_Unfinished : Type_Descriptor_Ptr := null;
+-- 	  // Links on the doubly-linked list of unfinished type descriptors
+-- 
+-- 	Num_Operations : Operation_Index := 0;
+-- 	  // Number of interface operations
+-- 
+-- 	Name : Strings.U_String := Strings.Null_U_String;
+-- 	  // For debugging
+-- 
+-- 	Type_Sem : Trees.Root_Sem_Ptr := null;  // For debugging
+-- 
+-- 	case Has_Op_Map is
+-- 	  when False =>
+-- 	    Type_Kind : Type_Kind_Enum := Normal_Kind;
+-- 	    Is_Small : Boolean := False;
+-- 	    Is_Wrapper : Boolean := False;
+-- 	    Null_Value : Word_Type := Null_Virtual_Address;
+-- 	      // Null value if Is_Small.  
+-- 	      // (If large, must use region-specific null.)
+-- 
+-- 	    Parent_Type : Type_Descriptor_Ptr;
+-- 	      // If non-null, then this type is an extension of
+-- 	      // the specified Parent type.
+-- 
+-- 	    Component_Extension_Level : Natural := 0;
+-- 	      // If non-zero, then this type is an extension
+-- 	      // of another type, and the specified number of
+-- 	      // indirections through component #1 would be necessary
+-- 	      // to extract its ultimate ancestor's value.
+-- 	      // NOTE: This level can be zero even if the type is
+-- 	      //       an extension of another type, so long as no
+--               //       components were added.  The level will be
+-- 	      //       the same as that of its immediate parent if no 
+-- 	      //       components were added when extending that type.
+-- 	
+-- 
+-- 	    Is_Abstract : Boolean := False;
+-- 	    Is_Partially_Abstract : Boolean := False;
+-- 	    Is_Concurrent : Boolean := False;
+-- 	    Is_Polymorphic : Boolean := False;
+-- 
+-- 	    Enclosing_Type : Type_Descriptor_Ptr;
+-- 	      // If this type is from a nested module, this is
+-- 	      // the type descriptor for the type representing the
+-- 	      // enclosing module.
+-- 
+-- 	    Num_Parameters : Natural := 0;
+-- 	    Parameters : Parameter_Info_Array_Ptr;
+-- 
+-- 	    Num_Actuals_Of_Formals : Natural := 0;
+-- 	    Actuals_Of_Formals : Parameter_Info_Array_Ptr;
+-- 
+-- 	    Num_Components : Natural := 0;
+-- 	    Components : Component_Info_Array_Ptr;
+-- 
+-- 	    Num_Nested_Types : Natural := 0;
+-- 	    Nested_Types : Type_Desc_Array_Ptr;
+-- 
+-- 	    Num_Nested_Consts : Natural := 0;
+-- 	    Nested_Consts : Const_Info_Array_Ptr;
+-- 
+-- 	    Operations : Routine_Info_Array_Ptr;
+-- 
+-- 	  when True =>
+-- 	    Op_Map : Operation_Index_Array_Ptr;
+-- 		// Map from interface operation index to actual operation index
+-- 	    Actual_Type : Type_Descriptor_Ptr;
+-- 		// Actual type descriptor
+-- 	    Formal_Type_Sem : Trees.Root_Sem_Ptr := null;  // For debugging
+-- 	end case;
+--     end record;
+-- 
+--     procedure Install_Type_Info(Type_Desc : Type_Descriptor_Ptr);
+--       // Install a type descriptor in the global type table.
+--       // Type_Info.Index and Type_Info.Location will be filled in 
+--       // as a side effect.
+-- 
+--     function Known_Type_Desc(Location : Object_Locator;
+--       Now_Building : Type_Descriptor_Ptr := null) 
+--       return Type_Descriptor_Ptr;
+--       // Return type descriptor given its "locator"
+--       // If Now_Building is non-null, then return that value
+--       // if Location is (Type_Area, 0) implying a self-reference.
+-- 	
+--     function Nth_Type_Area_Element(Type_Desc : Type_Descriptor_Ptr;
+--       Item_Index : Natural; Type_Base : Area_Base_Indicator := Type_Area) 
+--         return Element_Info;
+-- 	// Return the Element_Info for the Nth item in the type area that 
+-- 	// represents the given type, presuming Nth item is an object,
+-- 	// type, or operation.
+-- 
+--     function Copy_Large_Obj(Type_Desc : Type_Descriptor_Ptr;
+--       Value_To_Copy : Word_Type; 
+--       Region : Region_Ptr; 
+--       Old_Region : Region_Ptr := null) return Word_Type;
+-- 	// Return copy of (large) object created in specified region
+-- 	// NOTE: Object might be null.
+-- 	//       Old_Region is used for debugging, to verify that all
+-- 	//       subcomponents come from the same region.
+-- 
+--     procedure Create_Lock_For_Obj(Dest_Obj : Object_Virtual_Address);
+-- 	// Create a lock for object if it doesn't
+-- 	// already have one.
+-- 
+--     function Is_Small(Type_Desc : Type_Descriptor_Ptr) return Boolean;
+--       // Return True if type is "small", or a wrapper of a "small" type.
+-- 
+--     function Is_Large_Null(Value : Word_Type) return Boolean;
+-- 	// Return True if Value is a large null value
+-- 
+--     function Is_Null_Value(Word : Word_Type;
+--       Type_Desc : Type_Descriptor_Ptr := null) return Boolean;
+-- 	// Return True if Word is a null int/ptr value
+-- 	// or is a pointer to an object with a null/optional type.
+-- 
+--     function Region_Of_Large_Obj(Existing_Obj : Word_Type) return Region_Ptr;
+--       // Return the region of the given (large) object
+-- 
+--     function Allocate_From_Region(Region : Region_Ptr;
+--         Size_In_Words: Offset_Within_Area) return Word_Type;
+--       // This attempts to reuse storage freed by Deallocate_From_Region.
+--       // Initialize allocated space with region/size/null-type.
+-- 
+--     procedure Deallocate_From_Region(
+--       Region: Region_Ptr; Storage_Address: Word_Type);
+--       // This adds the given storage to a list indexed by the size.
+--       // Requires: Object has size embedded in it at Large_Obj_Size_Offset.
+-- 
+--     function Null_For_Type_Or_Region(Type_Desc : Type_Descriptor_Ptr;
+--       Region : Region_Ptr; Is_By_Ref : Boolean := False) return Word_Type;
+-- 	// Return a null appropriate for the type and region
+-- 	// and whether is a "ref"
+-- 
+--     procedure Dump_Obj_With_Type(Value : Word_Type;
+--       Type_Desc : Type_Descriptor_Ptr);
+-- 	// Dump contents of obj given type descriptor
+-- 
+--     procedure Dump_Obj(Value : Word_Type);
+-- 	// Attempt to dump contents of object, guessing whether big or small
+--     pragma Export(Ada, Dump_Obj, "dump_obj");  // For debugging
+-- 
+--     //---------------------------------------------------------
+-- 
+--     Max_Thread_Servers : constant := 100;
+-- 
+--     type Thread_Server_Index is range 1..Max_Thread_Servers;
+-- 	// Unique index to identify a thread server
+-- 	// Each thread server has its own "local" thread queue
+-- 	// but can steal from other thread queues.
+-- 
+--     Main_Thread_Server_Index : constant Thread_Server_Index :=
+--       Thread_Server_Index'First;
+-- 	// This server index is used by the "main" thread,
+-- 	// invoked from the command line.
+-- 
+--     procedure Execute(Instructions : Routine_Ptr; 
+--       Start_PC : Code_Index;
+--       Context : Exec_Context;
+--       Thread_Was_Queued : out Boolean;
+--       Server_Index : Thread_Server_Index := Main_Thread_Server_Index);
+-- 	// This executes the instructions 
+-- 	// starting at Start_PC in the given routine,
+--         // with the given Exec_Context.
+-- 	// Note that the caller must pre-allocate a Local_Area of size
+-- 	// indicated in the header of the Routine.  Forcing the caller
+-- 	// to pre-allocate this area can potentially minimize
+-- 	// the number of allocations/deallocations required.
+-- 	// Results are returned in the Params area, or in
+-- 	// objects pointed-to from the Params area.
+--  	// Up-level references to an enclosing block, operation, or type area 
+-- 	// are done through static link stored in the pre-allocated local area.
+-- 	// If Thread_Was_Queued is True upon return, then thread did *not*
+-- 	// complete, but instead was queued waiting for a dequeue
+-- 	// condition to be true.
+-- 
+--     function Current_Server_Index return Thread_Server_Index;
+--       // Return server index for current Ada task
+-- 
+--     function Execution_Source_Pos(
+--       Server_Index : Thread_Server_Index := Current_Server_Index) 
+--       return Source_Positions.Source_Position;
+-- 	// Return source position associated with currently executing
+-- 	// instruction for given server.
+-- 
+--     procedure Shut_Down_Thread_Servers;
+-- 	// Shut down all the thread servers so program can
+-- 	// end normally.
+-- 
+--     Debug_Threading : Boolean := False;
+-- 	// If true, then interpreter is verbose
+--     Debug_Regions : Boolean := False;
+-- 	// If true, then interpreter indicates how regions are being used
+--     Debug_Calls : Boolean := False;
+-- 	// If true, gives a simple call trace
+--     Debug_Statistics : Boolean := True;
+-- 	// If true, then threading statistics are produced at end
+-- 
+-- 
+end interface PSVM;

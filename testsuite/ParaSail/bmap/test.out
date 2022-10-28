@@ -1,0 +1,40 @@
+About to insert 8 => Val1
+About to insert 10 => Val2
+About to insert 4 => Val3
+About to insert 9 => Val4
+About to insert 1 => Val5
+About to insert 3 => Val6
+About to insert 5 => Val7
+About to insert 9 => Val8
+About to insert 4 => Val9
+About to insert 10 => Val10
+About to insert 1 => Val11
+About to insert 6 => Val12
+About to insert 3 => Val13
+About to insert 3 => Val14
+About to insert 8 => Val15
+About to insert 4 => Val16
+About to insert 8 => Val17
+About to insert 10 => Val18
+About to insert 1 => Val19
+About to insert 3 => Val20
+Count = 8
+Looking for 4, found Val16
+Looking for 10, found Val18
+Looking for 10, found Val18
+Looking for 8, found Val17
+Looking for 1, found Val19
+Looking for 4, found Val16
+Looking for 10, found Val18
+Looking for 9, found Val8
+Looking for 6, found Val12
+About to delete 8
+About to delete 7
+About to delete 3
+Count = 6
+Looking for 1, found Val19
+Looking for 4, found Val16
+Looking for 5, found Val7
+Looking for 6, found Val12
+Looking for 9, found Val8
+Looking for 10, found Val18

@@ -1,0 +1,1334 @@
+To execute ParaSail, we need to have run-time representations
+for everything of interest.  At compile-time we have modules,
+types, objects, and operations.  Presumably we have run-time
+representations of these as well.
+
+We talked about the primitive "Basic_Array" type.  We also have
+all of the universal types.  We presumably need a representation
+for "Any" and "Assignable" and "optional" and "concurrent"
+and "queued" and "locked".
+
+---- Thoughts about a "small" representation of large null 1/11/2012 ----
+
+Thus far we have represented a large "null" by allocating space for
+an actual object in the appropriate region.  This seems like unnecessary
+overhead.  Simpler would be to devote part of the address "space"
+to null, with the actual "address" indicating the region with which
+the "null" is associated.  To make this all work, we will need to
+update the following operations, at a minimum:
+
+    Large_Obj_Region_Index -- will need to recognize a null-ish address
+    Is_Large_Null  -- will check the address, rather than the type in header
+    Check_Is_Large -- will need to recognize a large null
+    Null_For_Region -- will return appropriate null-ish address
+    Is_Null_Value -- remove fall-back check against Null_Value.
+
+Ideally a large null will not be equal to the typical
+value used for small null, namely -2**63 (or -1 for reals),
+nor Null_Virtual_Address (namely 0).  It should be easy
+to check for in Check_Is_Large and Is_Large_Null.
+A reasonable value seems to be one which is negative, but
+between -2**63 and -1.  Perhaps it will have a high word of -2,
+and a low word being the region index.  Note that Is_Large_Null
+should only be called if the object is known to be large.
+
+---------------- Thoughts about regions and region chunks starting 6/17/2011 --
+
+Regions need to be connected together, meaning that when you
+create a new region, it is always taking storage from some
+enclosing region.  If you return from an operation or exit a construct
+and release up to a region, it should automatically release all
+of the storage for any nested regions.  When items are individually
+freed back to a region, they are put into a list local to that region.
+
+When a new region is created from an existing region, nothing much
+should happen.  On first allocation from the region, some space
+would be allocated from the enclosing region, and then that space
+could be carved up.  It would probably come out of some existing
+region chunk, rather than always starting a new region chunk.
+The critical thing is when the region as a whole is released,
+all such space gets returned to its rightful owner.  If possible
+it gets "merged" into the space of the enclosing region.  If
+not, it gets added into a local list of free blocks.
+
+Each region keeps track of all space it "owns" including that
+of all sub-regions, and separately keeps track of free space
+it has.  If it runs out of free space, it requests more from
+its enclosing region.
+
+When a subregion asks for space, it is given a region chunk
+for its sole use.  The chunk may already have some space carved
+out of it.  The enclosing region keeps track of the chunks it
+has "handed off" to subregions.  A chunk could be handed down
+many levels.  Every chunk ultimately came from the primordial
+region, so how do we keep all of this manageable?  What sort
+of structure can we use?  Let's presume stack chunks represent
+a separate problem, and they are managed by the server process.
+
+Here we are worried about "large-object" chunks.  Maybe we do
+want to have a tree of regions, and each region has its own
+list of chunks that it owns.  Somehow we will make sure that
+if a thread is killed, first we harvest all of its region chunks.
+The whole list of chunks associated with a given region should be
+appended to the list of the encloser upon return from a call.
+We also need to restore the chunks to the state they had when
+acquired from the encloser.  How do we keep track of that?
+When we get a chunk, we need to record something in the header
+of the chunk which is the "mark" and we also allocate some
+space from the chunk to record the old value of the mark.
+So we go through the list of chunks and reset the current
+end from the mark, and reset the mark from the value saved
+at the current end+1.  We then attach the whole list to the
+caller's list.
+
+As far as "abrupt" multi-thread exit, let us presume that
+with normal calls we can unwind from the innermost region
+(there is only one per thread), while when there are multiple
+subthreads, the master keeps track of them and can find the
+innermost region of each.
+
+The local list of free parts can be discarded.
+as those could disappear
+
+---------------- Thoughts about regions and region chunks starting 6/6/2011 --
+
+New instructions:
+  a) Target already initialized, to be freed/reused;
+     target determines region:
+    Assign_Null_Value(Target_To_Replace, Type);
+      (equiv to Release_Object(Location, Type));
+	-- Releases old value, ends up with null of same region.
+
+  Not fundamental:
+    Assign_Value(Target_To_Replace, Type, Value_To_Store);
+      -- Value guaranteed to be in right region,
+      -- e.g. because it is an output of a copy or an operation call
+      -- which was initialized to be in the right region.
+      -- Equiv to Assign_Null_Value followed by Init_From_Value.
+    Assign_Copy(Target_To_Replace, Type, Object_To_Copy);
+	-- Release old value after copying object into proper region.
+	-- Equiv to Make_Copy_In_Region followed by Assign_Value.
+
+  b) Target not initialized, e.g. output of operation call, a temp,
+       or a local variable
+    Init_Local_To_Null(New_Location, Type);
+       -- Init local (or output of an operation call)
+       -- to a "local region" null.
+    Init_With_Null_In_Region(New_Location, Type, Region/Existing Object);
+       -- Init output of an operation call with a null in region 
+       -- determined by existing object.
+    Make_Copy_In_Region(Temp_Location, Type, Object_To_Copy, 
+      Region/Existing Object)
+       -- Init a temp by copying the specified object into the
+       -- region of the existing object.
+    Init_From_Value(New_Location, Type, Value_For_Init);
+      -- Value guaranteed to be in right region,
+      -- e.g. because it is a copy or an output of an operation
+      -- which was initialized to be in the right region.
+      -- This is a simple 64-bit move.
+
+   Not fundamental:
+    Init_Local_From_Copy(New_Location, Type, Object_To_Copy);
+       -- Init local to a "local region" copy of given object
+       -- Equiv to Init_Local_To_Null and then Make_Copy_In_Region.
+       -- followed by Init_From_Value.
+    Init_Obj_By_Moving(New_Location, Type, Location_To_Move);
+       -- Init New_Location to contents of Location_To_Move, and 
+       -- and set Location_To_Move to an appropriate null.  
+       -- No copying performed.
+       -- Equiv to Init_From_Value followed by Init_With_Null_In_Region.
+
+How would these be used?
+
+   Assignment statement
+      1) If RHS is existing object, copy into proper region based on LHS
+	    and type of RHS.
+         If RHS is computation, evaluate result into proper region based 
+            on LHS.
+      2) Release LHS (set to null) based on type of LHS.
+      3) Move new value into LHS.
+    --> This could be implemented by passing LHS to Copy or as
+        output of computation, with it freed as a side-effect.
+        Could leave a "null" behind (or a zero).
+	Issue: If you pass a component of an object as an input,
+          and then you pass the enclosing object as an output.
+	Solution: Release LHS as part of moving in the new value.
+	  If possible, we can pass the LHS and leave behind a null,
+	  if we know that is safe; this would be a "move" as opposed to
+	  "copy" operation.
+	  Use assignment semantics for return, by assigning into output,
+	  releasing the old value.
+          
+
+---------------- Thoughts about regions and region chunks starting 5/30/2011 --
+
+A type_sem should indicate large vs. small (propagated from component type)
+  (and component types and parameter types) and type-id, 
+  is-optional, constraint.
+A module_sem should indicate known-large vs. known-small 
+  vs. wrapper of X (# of components).
+"Known-Small" would only be used for built-in modules/types of some sort.
+Should have hash table of type instances/type-ids, keyed by type-ids and
+values of formals.
+
+Type-ids are useful at run-time, and indicate things like large-vs-small
+types, and allow testing for membership of a polymorphic object in some
+specific or polymorphic type.
+
+We are not currently using regions in the interpreter.  We are using 
+region chunks in a pretty simple-minded way.  A virtual address is
+made up of a chunk id and a chunk offset.  An "object address" is
+similar, except it is a pointer to a chunk descriptor and a chunk offset.
+An object locator is a reference to some particular base register
+and an area offset.  The base register contains an object address.
+We allocate one region chunk per server process, and use it as a stack.
+Clearly we should be prepared to allocate a new chunk when we run out
+of stack space, though I don't believe we are prepared to do that yet.
+There is no requirement that the parameter area and the local area
+be contiguous, so it is straightforward to allocate a new chunk as
+part of a call, or for a (parallel) called routine to be executing 
+on a different server process.
+
+So how should regions fit in?  The key thing about a region is
+that it is easy to allocate individual items and easy to reclaim
+the whole region.  In some ways the region chunks are "too big" and
+we want to allow a "subregion" to share a region chunk with an
+enclosing region.  Every large object needs to identify its
+region so it can be reclaimed, and so when assigned the new value
+can be copied into the appropriate region if necessary.  Regions
+and region chunks seem relatively unconnected at the moment.
+
+How much region mechanism should be built into the interpreter and how
+much implemented as a separate abstraction?  In the long run, users will
+want complete control over storage management, so there needs to be a user-
+replaceable abstraction.
+
+So when will the code generator need to use regions?
+Presumably each local area can have a region.  A return
+statement needs to reclaim the stack and the local region.
+We also need to worry about multi-thread terminating exits and
+return statements.  This implies some kind of tree of regions/
+masters so we can clean up.
+
+We want to initialize "large" outputs before calling an operation
+with an appropriate null.  We want an operation that takes an
+existing large object and produces a null of the same region.
+This would be used when the output of an operation is immediately
+assigned into an existing object.  If a large object is initialized
+with a call on an operation, then we would need to conjure up the
+null for the local region.  It seems simplest to always initialize
+a large object to the appropriate null, since on assignment we
+will want to know that it doesn't need to be reclaimed.  Seems like
+some kind of "large_assignment" primitive is needed.  This might 
+indirectly invoke a deallocate-tree operation on the region.
+
+What about operations like:
+
+    X := X.Left;
+
+We want those to work.   Initially this will involve a copy
+of X.Left, prior to freeing X.  Clearly we can optimize this
+by knowing that the old value of X.Left is dead after this
+assignment.
+
+It appears that offset 2 into the local area could be used
+to identify the local region, since we initialize target_local_offset
+to 3 when starting a new local area.  We could have an 
+instruction which would take the region and generate a 
+null for that region.  At compile time we generally know the number
+of words needed for an object, though we also have a type-id
+presumably which would allow something to be done at
+run-time.  
+
+So how do type-ids get created?  They are similar to routine indices,
+in that they live at run-time.  They must identify information
+somewhere.  In general the compiler can create these and assign
+them unique indices.  When exactly does it do this, and how do
+they get assigned?  Think of them like routines, I guess.
+
+There are probably two kinds of type-ids.  There are the purely
+"structural" ones, where a wrapper can use the same type-id
+as its enclosed object.  And then there are the ones useful
+for testing whether a polymorphic object is a member of a given
+(polymorphic) type.  Why would we want these to be different?
+The issue is whether each instance needs its own type-id.
+How will we know the type-id at compile-time in that case, if
+the instantiation has a formal type as one of its actual types?
+
+The other issue is type-views.  Each time we use a type 
+it may have a different type "view", since the particular 
+operations needed in a given context may vary.  Similarly,
+the type-ids (if these just provide info on copy/deletion) to use 
+may differ.
+
+So we perhaps now conclude that a large object carries
+around its own type-id, but there is also a type view, which
+is more efficient for use in dispatching calls.  And the type-id
+of an object might not be known at compile time -- it might be
+selected from some kind of descriptor associated with an instantiation.
+Ideally all type-ids are created at compile time, but the one
+actually used might not be known statically.  In particular, a wrapper
+generic clearly wants to inherit a lot of information from its
+wrapped type.
+
+Back to basics:
+
+Allocate an object in a region (as determined by an object), 
+returns a pointer, initializes the region field and perhaps the type-id
+field.    Type-id determines size of object, and which
+components are "large" and hence should be initialized
+with large nulls.
+
+Declared objects are allocated locally (in general), 
+but if an object is created just so it can be returned
+from a function, then it makes sense to allocate it
+in the region associated with the output it will
+be initializing.  Perhaps we always have an object
+rather than a region, but the object might be the
+null object (and perhaps that is what is in offset 2
+of the local area -- a local large "null" object, if 
+it is needed anywhere in the scope).
+
+A wrapper can't really have its own type-id, since it
+doesn't really exist as a separate object.  It has
+different operations, as determined by the type view,
+and a polymorphic object would need an extra level of
+indirection, just like a "simple" object.
+
+We should have an operation, or perhaps better a flag in the 
+routine header, to cause a local region to be created
+with a null pointing to it.
+
+So how do type-ids work, vs. Type_Sem_Ptrs?  Type_Sem_Ptrs
+exist at compile time.  Type-ids are created by the compiler,
+when operating in an "unparameterized" environment, e.g. in
+a module with no parameters ("<>").  A module instantiation
+in such an environment can get a type-id.  Each module would
+have a hash table with the key being the type-ids (and perhaps values?)
+of the module parameters.  
+
+What about "new"?  Do we care about that at run-time?  
+"new" doesn't really affect representation.  Does 
+it affect membership?  Yes, it seems like it should in
+some cases.  So let's for now presume it is relevant (it is easier
+to ignore extra information than conjure it out of whole cloth).
+This is somewhat like adding another parameter that is a unique
+id associated with the point of the instantiation.
+
+So given a type-id, you can determine large vs. small, the type-id
+to use except when initializing a polymorphic object, which 
+might be different if we have one or more layers of wrapper types,
+the type-ids of each of the components, the type-id of each
+nested type.  Each parameter and each locally-defined type of
+a module is assigned an index, and that index is used to select
+a type-id from the vector associated with the "current instance" type-id.
+This is very reminiscent of the "ili vector" and the "llst vector" 
+used in AdaMagic for generics (hopefully not as torturously complex!).
+
+A module needs to keep track of what type parameters it has and what
+nested types it declares.
+
+A Type_Sem_Ptr is created at compile-time and records the actual
+parameters used to instantiate a module, along with the constraints applied
+and whether "optional" or "new" are specified.  It also provides
+sufficient information to know how to get the type-id to use
+for creating a "normal" object (if any) and a "polymorphic" object.
+The actual parameters used will often be formals of an enclosing
+module.  Similarly, the base type for a constraint may be a formal
+of an enclosing module.  Each formal type is also represented by
+a Type_Sem_Ptr, presumably.  At run-time, the "current" type-id is
+presumably available as an up-level reference.
+
+Back to regions: Regions come from existing objects (including
+large nulls) or from the local area.  We need an operation to
+get a null given an existing object.  We need to check some
+flag to know whether a given object is large.
+We can initialize an output with the value of the target object
+if there is any possibility that it might be large.  Similarly
+we can initialize it with a large local null if it is
+a local variable.
+
+Create an object of a given type-id.
+From_univ(literal) needs to have its output initialized.
+Alternatively, we need to know how to copy a parameter
+into a new object.  We can fetch the type-id from the
+instance descriptor.  Type_Area is available in the
+context.  We need to initialize it on each call.
+
+
+----------------  Thoughts on storage management starting 5/24/2011 --------
+(Happy b-day, Cindy!)
+
+Ok, we have a very simple case of "return X.Y" or "return (Y => 7)".
+How do we implement these?    The caller of the constructor that
+returns a new object needs to specify where the object should be
+created.  Should this be something special in the PSVM, or should
+all of this be implemented on top of the PSVM?  Let's first decide
+what should happen, and then figure out whether we need new
+PSVM instructions.
+
+Create an object in a region. -- Region vs. region chunk?
+A region needs to support allocation and release.
+
+An object needs to have a way of being walked so all of its
+subcomponents can be freed.  (Also copied!) That sounds
+like an implicitly generated operation for every type.
+We might want to do it incrementally in some cases, or
+perhaps in a separate thread using lock-free primitives.
+Alternatively it could be a more data-driven process,
+where a reclamation process is specified by a sequence of 
+offsets to the next composite components, and then a count of
+sequential composite components.  By some reorganizing so that
+the composite components are grouped together, this could be
+a very short descriptor.  We would also need a way to identify
+the type of each composite components, so perhaps we would want
+a way of skipping one or more non-composite components, a repeat
+count if there are multiple components that can share a descriptor,
+some way of determining the length of an array at run-time.
+
+The allocation process could also be data driven conceivably,
+though generating code seems reasonable enough.  However, we
+will need operations to allocate space.  Perhaps that is best
+done by simply defining a storage allocation module which is
+built-in to the PSVM.  Yes, that makes it easier for the user
+to replace.  There probably still need to be some low-level
+primitives:  
+
+  Allocate(Region, Size) -> 64-bit value/virtual address.
+  Deallocate(Region, Address, Size?)
+  Deallocate_Tree(In_Region, Address, Descriptor);
+  Copy_Tree(To_Region, Address, Descriptor) -> 64-bit val/virtual-addr
+    -- This always allocates a new object even if in same region,
+    -- since one or the other is a variable and both might be referenced again.
+  Optional_Copy_Tree(To_Region, Address, Descriptor) -> 64-bit val/virtual addr
+    -- This only allocates a new object if the To_Region is different
+    -- from the original region, presuming both objects are constants,
+    -- or the original object is not referenced again.
+  Swap_Trees(Ref-to-Address1, Region1, Descriptor1, 
+    Ref-to-Address2, Region2, Descriptor2)
+    -- This swaps contents of Address1 and Address2 if regions
+    -- are the same, otherwise it does two copies and then two deallocates.
+    
+
+  How is a region represented?  A ParaSail object,
+  presumably, with various operations in addition
+  to those above.
+
+  Create_Region() -> Region
+  Reclaim_Region(Region)
+  
+For an optional object passed as a "ref var",
+we need a representation of "null" that includes
+information about the region.  If we assume every
+"large" object includes information about its region,
+then a null for a large object also needs such a thing.
+This implies the test for null might require more than
+just a zero check; that is probably OK since presumably
+most checks for null are done at compile-time.  So either
+null is really a special object that is part of every
+region, or there is some way to both point at a region
+and have a flag to indicate is null.  For now, it seems
+simpler for each region to have its own null object,
+rather than fiddling with the representation of addresses.
+If we have a run-time representation of types, then
+the "type-id" part of the object could indicate that the value is of
+type "null".  Note that the "type-id" part would also indicate
+how to reclaim the object, e.g. would have its size and the location
+of its "large" components, or the address of a routine that can walk 
+and free all of its subcomponents.  The representation of null would
+then be an object with a null type-id and a region pointer.
+
+"Large" operation outputs would be initialized with the appropriate "null"
+which would encode the region information.
+
+Can single-component objects avoid a level of indirection?
+The problem is if the single component can be null, and the object
+as a whole can be null, it would be hard to distinguish the two.
+So single-component objects need only have a level of indirection
+if the component can be null.  What about the type-id field?
+Single-component objects don't need type-ids unless they are
+used in a polymorphic context, in which case the extra level
+of indirection is just used to accommodate the type-id.  This is
+essentially exactly the same rule as for Integers, enumerations, etc.
+
+Single-component objects "flow through" the null check, the region,
+the reclaim-subcomponents, the size, etc., from the single component.
+These are "pure" wrappers, and induce no overhead of their own.
+This seems important because any kind of integer type that is represented
+with a single component doesn't want the data overhead.
+
+---------
+
+DONE: Aside: We should create a more general mechanism for built-in
+routines.  Probably based on a table indexed by ParaSail enumeration
+literals, or perhaps easier, U_Strings, each table entry containing
+the address of a routine that executes the code.  Alternatively,
+the entry identifies the PSVM "routine," and then the routine has a direct
+pointer to the compiled code.
+End of Aside.
+
+----------------- Thoughts on generating code starting 10/25/2010: ---------
+
+Let's talk about local area layout.  Or layout in general.
+We need to lay out the parameters for every operation.  
+Output parameters and then input parameters.
+Most things will be one 64-bit word.  Something that is
+mutable or optional var needs a region as well.  Or a region
+chunk.  (We need to get more specific about allocation.)
+
+Local variables are generally one 64-bit word.  Each thread
+starts in its own chunk, and makes up-level references to the
+enclosing param area/local area as needed.  Each master needs 
+a couple of words, and each subthread needs a TCB
+plus a parameter stack.  Do we ever need
+more than one master?  Yes, because we do one slow operand on
+the current thread, and that operand might benefit from being
+split into multiple threads.
+
+So we have local variables, we have masters and TCBs, each
+with a parameter stack (if initiated via a parallel call), and 
+then we have the "main" parameter stack.
+
+While we are generating code, what should we carry around?
+The depth of the main parameter stack.  The depth of the
+master/TCB "stack."   The size of the local variables.
+Should each statement start a new parameter stack?  
+Parallel statements need longer-lived
+masters/TCBs, but there is no need to carry anything on the
+parameter stack.  If we have a short-circuit in the middle
+of a larger expression, we may need to hoist it or we need
+to be able to keep a parameter stack across statements.
+Whichever is simpler.  We might as well allow for the
+possibility that we carry some parameter stack across
+conditionals.  We could have several some complex subexpressions,
+such as quantified expressions, if/case expressions, etc.,
+and it would be painful if we need to treat the intermediate
+values as locals rather than as stack elements.
+
+Let's presume we do two passes over each statement, the first
+to determine the amount of space to set aside for masters
+and TCBs, the second to actually generate the code with
+correct "parameter" stack offsets as well.
+and it would be annoying to 
+
+----------------- Thoughts on generating code starting 10/24/2010: ---------
+
+If we are generating code for an operation, we need to create
+a "Routine" and put it into the Routine_Table.  The Routine_Index
+can then be stored anywhere else as a level of indirection.
+We will also generally need a static link and a type.
+Let's presume we have some relatively simple function that takes
+and returns integers.  The semantic information would include the
+Routine_Index, and other information needed by callers or
+nested routines, such as parameter layout.
+
+At some point we might have type-specific code, in which case
+the Routine_Index would be stored with the type rather than
+with the operation in the module.  The operation would be
+assigned an index into the type (which we want to do anyway), 
+and the routine index would be stored there.
+
+At run-time, types are represented as something in a chunk
+somewhere.  For now, these could also be the representation
+used at compile-time.  However, the operation or object parameters
+to a module can't really be represented until run-time, so they
+would be presumably stored separately, perhaps putting the vector
+of "local operations" at an extra level of indirection.
+operation or object parameters The operation index would be stored
+on the semantic information of the operation in the interface/class.
+The "generic" routine index would be stored on the operation
+(or more precisely, in the symbol table for the operation).
+When we instantiate a type, we could choose to use the generic
+routine, or generate a new one.
+
+So back to generating a routine from an operation.  We have
+parameters.  In the symbol table we store their object "locators."
+We have local variables. They also get locators.  What about
+levels of indirection?  Should we have special locators for
+that?  Probably, since we can't really use "Base-Register" 
+locators.  We could have a sequence of offsets, with each
+element of the sequence another level of indirection.
+
+Now we want to generate code for a "return" statement.
+We decide on the target (generally (Param_Area, 0)),
+and then generate code for the tree with that target
+in mind.  Perhaps the target is a waste of time.
+We can defer the target until we have done the
+computation for "simple" values.  For more complex
+values, we will need to pass in the various references
+that are needed for allocating a new object, including
+the region information.
+
+Generating code for a tree involves a sequence of
+instructions that try to use the local area efficiently
+for parameters to be passed to operations.    Generally
+we are told an offset where we want the result, and we
+assume that all offsets above that may be used as needed.
+Presuming we know how big each operand is, we go left
+to right generating code for each operand passing it
+the appropriate local-area offset.  Now when we come
+to something that we want to compute in parallel, we
+need room for a master and for the thread control blocks
+(with following parameters, if any).  These need space which 
+is *not* clobbered by the "next" operand.  The space for these
+need to be allocated out of a longer-lived area.  We will
+want to recurse to evaluate the parameters to the
+parallel call.  We presumably would want to do these
+efficiently with minimal moves.  Each "parallel" operand
+needs 
+
+The general "rule" would be that calls on built-in routines would
+be executed on the current thread, whereas calls on non-built-in
+routines would be done in parallel if there are two or more
+of them that could be done at the same time.  But we don't want to wait
+to start different threads going.  We want everything going in
+parallel that we can.  This means that if we have "slow"
+calls in two or more operands of the same operation,
+we should start them all going before waiting for any of
+them.  If we have a slow call that needs the result of another
+slow call, then we should create a parallel block for the
+evaluation of the slow operations and then the call.
+
+A parallel call only helps if there is something slow going
+to be done in parallel with it.  So we really need two or
+more slow calls that don't depend on each others result, 
+and we would then start the parallel one(s) first
+before we did the in-current-thread one.  The parameter evaluation
+would be included with the parallel slow call if it involves
+slow calls.  
+
+We would pre-walk a tree to decide whether it has any slow calls. 
+If two different operands have slow calls, then we would invoke
+the evaluation of all but one of the operands in parallel.
+The entire operand evaluation would be performed in parallel
+unless the operand itself is a slow call and none of its parameters
+involve slow calls.  Otherwise, we would evaluate the parameters 
+in the current thread and invoke the slow call in parallel.
+The result in the parallel call ends up following the thread
+control block.  We might as well have the parallel operand
+evaluation put the result the same place.
+
+After evaluating the "fast" operands and the one non-parallel 
+"slow" operand, it waits for the parallel slow operands to finish.
+The caller would then move the results of the parallel slow
+operand(s) into the desired spot(s), and then it would
+perform the operation that uses the results.
+
+What about short-circuit operations?  In that case, we may not
+know what will be the first slow operation to be invoked.
+We have to be sure the master gets initialized before we
+start adding more slow calls.  So we may want a separate 
+Create_Parallel_Master instruction for a case like this,
+or move the entire short-circuit eval into a parallel thread
+(though that could just push the bump around under the rug).
+Or alternatively, break it up into separate statements, but
+that might result in less parallelism.  But you really can't
+do anything with a side-effect until the LHS returns True,
+and you probably wouldn't want to waste time doing an unneeded
+RHS, so there really isn't much parallelism possible.
+
+For the cases where we evaluate the operands in the caller
+thread and then use a parallel call, we will need a full
+parameter "stack" area following the thread control block.
+For the cases where we evaluate the operands and do the
+call in a parallel tread, we will only need room for the
+result of the evaluation in the parameter stack area.
+
+So in the local area, we will need room for local variables, room 
+for masters, room for thread control blocks each with their
+own parameter stack, and then the main thread's parameter
+stack area.  We will also want to include sufficient space
+for (some of) the called routines' local areas.  Parallel
+calls/threads will always get their own chunk, so we don't
+need to worry about them.  When we make a call, we must 
+be sure that we have at least room up to the "caller local area."
+Beyond that is an optimization, and normally we would provide
+that as well, but conceivably if we were in a stack space "crunch,"
+we could postpone allocating a new chunk, but it seems likely
+to be a false economy if there are several unconditional calls.
+In fact, that would be a good rule of thumb.  The local area
+would include space for the local area of all operations called 
+unconditionally (presuming each loop executes at least once if 
+it executes at all).  That would automatically leave out
+recursive calls (an unconditional recursive call should probably
+generate a severe warning).  It would include the "min" of
+space needed by the "arms" of an if or case statement.
+
+What more is there to say?  Essentially everything is a call
+(on a built-in or a user-defined routine), a load, a store, or a literal.
+We move things around to get them into the proper location.
+We generally try to evaluate things directly in the spot
+they are needed.  After a parallel computation, we need to move
+the result.  And on a store or a return statement, we need to move
+the result.  On a load we need to move the value to the parameter
+stack.
+
+Storage allocation seems like the big hole at the moment.
+We have talked about regions, region-chunks, mark/release,
+etc.  We presumably have to build-in knowledge of a basic
+array.  Allocating an instance of a class seems pretty straightforward.
+
+----------------- Thoughts on locked/queued starting 10/24/2010: ---------
+
+OK, we have an interpreter now.  We haven't implemented
+locked/queued objects yet.  That will probably be handled
+with more information in the Routine header, at least
+indicating which parameters are locked (initially might
+only support one at a time).  If the call is to be queued,
+we need the code which produces a boolean result.  That
+presumably would be treated like an additional output parameter.
+Ideally it would be the zeroth parameter, so we could easily
+check its value after executing the instructions associated
+with the queue condition.  
+
+We will want to evaluate the condition without having 
+to actually start the thread.
+In fact, based on the protected object model, the code
+for a queued call is not necessarily ever executed by the 
+calling thread.  It is not clear that we want to leave
+room in the parameter block for the result of evaluating
+the queue condition.  We should probably find a different
+place for it.  We could treat it like a nested block,
+so it would get its own param area, and refer to the original
+params through a level of indirection.
+
+The queue condition instructions would probably
+best be placed at some positive offset relative to the beginning
+of the code, so the "normal" process for evaluating the body
+of an operation would work.
+
+The queue condition would be evaluated without sub-threading
+presumably.  It shouldn't be that complicated!  On the other hand,
+if we presume it is read-only, we can evaluate all of the
+queue conditions in parallel (under the lock) and semi-arbitrarily 
+pick one which is true, in which case, we might as well let the
+individual ones use sub-threading.  This is a case where the
+first one wins and returns to kill off the other evaluations.
+We would want all of these evaluations done under relatively
+high priority to avoid priority inversion.
+
+-------- Thoughts on multi-threaded exit/return starting 10/24/2010: ---------
+
+Side note on multi-threaded exit/return: We may want to
+run everything on a sub-thread in this case, rather than
+doing one of the threads on the "master" thread, since
+killing a whole thread is much simpler than doing the
+setjmp/longjmp kind of thing.  The master thread
+would then simply wait for the multi-thread exiter
+or for all of the sub-threads to complete.
+
+All the multi-thread exiters would attempt to gain exclusive
+control of the master.  Only one would succeed.  The others
+would get the "abort-thread" indicator.  The basic Execute
+procedure of the ParaSail VM (PSVM) interpreter will need
+to check for an "abort-thread" indicator.  We would like this
+check to be efficient.  The multi-threaded exit would need
+to propagate the exit down the sub-thread tree.  It is OK if
+it takes a little while, though we don't want to throw away
+the enclosing scope until all of the threads have stopped.
+So the master thread could notify the winning thread so it
+can proceed to do its thing while it goes about killing
+of all of the other threads.  It would then come around
+and wait for the threads to finish up, including the "winning"
+thread.  
+
+Threads could be given the job of killing other
+threads.  A thread whose immediate master is killing off
+all other threads should notice that, and if it itself has
+one or more masters inside itself, it should go about 
+killing off each of them bottom up, waiting for each one
+on the way up.  It sounds like each chunk used to contain local
+areas will need a pointer to a master/thread-control-block.
+If an additional chunk is allocated for local areas, it should 
+point back to the original master/thread-control-block
+
+----------------- Thoughts starting 10/18/2010: ---------
+
+Presume we are going to create some kind of canonicalized
+representation of the program.  This could be a tree.
+For a call, we would want any default parameters filled in,
+and implicit conversions or other operations inserted, etc.
+This might best be done by creating a sequence of instructions,
+analogous to a byte code.  
+
+Let's start from a single call.  Presume we are passing it some
+local variables, and putting the result back in some local variables.
+What would the actual "call" instruction look like?  If we presume
+we have a stack-like thing for placing parameters, and then we pass 
+a pointer to the parameters on the stack, the call "instruction"
+would identify what is being called (as offset into some table),
+and where the parameters are located.  We probably don't want to
+presume some kind of implicit stack pointer because many calls will
+involve spawning a separate thread.  So we will have multiple calls
+proceeding in parallel.  For the general case of multiple "output"
+parameters, the information needed for the output parameters, such
+as the region in which to allocate the result, would have to be
+passed in.  Even if there is only one output, we might still have
+to pass in the region.  The result(s) will either be passed directly
+to another call, or assigned to an existing object, or used
+to initialize a new object.  So here is the call instruction:
+
+  [Call] [Target_Base] [Target_Offset] [Param_Stack_Offset]
+
+Target_Base and Target_Offset identify the operation being called.
+Param_Stack_Offset indicates where the parameters have been placed.
+
+Now how about an assignment statement?  We need to be able to
+place information onto the stack for parameters, and to take
+it off the stack or other data areas.  We also need to be able
+to assign into other data areas.  So perhaps the general operation
+is "Move" which moves information from one data area to another.
+How much data is moved?  Most things are passed by reference
+in ParaSail. They actually live in regions associated with stack
+frames.  We need an ability to move from one region to another.
+We should distinguish move (which removes from the old place)
+from copy (which leaves original where it is) from create-ref
+(which leaves original where it is but creates another reference
+to it).  Mutable/optional references may need additional levels
+of indirection as well as information about a region.  So here goes:
+
+  [Move] [Source_Base] [Source_Offset] [Target_Base] [Target_Offset]
+  [Swap]
+  [Create-Ref]
+  [Copy]
+  [Set_To_Null] [Target_Base][Target_Offset]
+  [Create_Literal] [Kind][String][Target_Base][Target_Offset]
+    (Why can't compiler create literals? -- They need to end
+     up in the instruction stream somewhere, and be referencable
+     as parameters. In general there is some amount of computation
+     that can be done "statically" to create constants, before
+     program actually begins.)
+
+What kinds of "bases" are there?
+
+  - Actual param stack 
+	(used for actual parameters being passed as part of a call)
+  - Operation Formal Param area
+        (this is the same as the actual param stack created by the caller,
+         but its offset always starts at zero)
+  - Local variable area
+        (this is the most-local variable area.  There may be several of
+         these if we have nested blocks which cross thread boundaries.)
+         Each of these has a static link to the enclosing local area.
+  - Uplevel reference to an enclosing operation's local area.
+        This would use a static link that is part of the formal param area.
+  - Module formal param area
+        (these can be types, operations, and objects)
+        We need to think about nested modules.
+  - Literals, constants, etc. for a given module.
+  - Code for operations of a given moduile.
+  - An object's set of components (this doesn't work with a simple
+        enumeration, and could involve multiple levels of indirection
+        in the presence of references).
+        We might have a finite number of "base registers" which can
+        be loaded from an object or a component of an object.
+  - Base registers (there could be a finite number of these in the
+    "stack" area).
+
+So let us assume the base is identified by a number, in the
+range say 0-255, with different subranges for things like nested
+local variable areas, base registers, etc.
+
+How big an offset needs to be supported?  In what unit is the
+offset?  (64-bit chunkie?)  Clearly arrays can be arbitrarily
+large, but how many components or local variables would there
+be in a single scope?  We could probably survive with 256, but
+65536 would seem to be extremely safe.  2**12 might be a good
+intermediate value (4096), presuming we are talking 64-bit chunkies.
+
+OK, so now we have call, move, copy, create-ref, and swap.
+What else do we need?  One base might be for "built-ins", so
+conceivably a call on a built-in could directly do something
+useful like add or subtract.
+
+To create an interpreter for this instruction set, we would load
+an instruction, decode it, and then execute it, and then go get
+the next one.  I guess we need flow of control!
+
+Basic flow of control:
+
+if, case, loop, block, continue with, exit with, return with, end with.
+forced sequential, optional sequential, forced parallel.
+Simplest is typically labels and conditional gotos.
+We could use basic blocks like the SCIL.
+
+How is parallel execution represented?  We have a sequence
+of instructions, or more interestingly, the next loop iteration,
+run in parallel.  How do we get them all back together?
+We want to support both exit with and end with.
+Exit terminates all of the threads associated with a given
+construct.  It is a race to see who gets there first.
+So we need an instruction for starting a composite construct and
+creating a local object of an appropriate type.
+
+   [Start_New_Local_Area][Size needed]
+      [Offset_For_Thread_Master_In_Enclosing_Frame]
+   [Start_New_Thread][code to execute](header determines size needed)
+      [Thread_Master_base/offset]
+
+   [Parallel_Call] -- this is not really needed, and adds complexity.
+     It is easy enough to have a short sequence that has a regular
+     call, invoked as a separate thread.  This way the parameter
+     evaluation can be performed on this same separate thread,
+     as well as any copy-back at the end.  This avoids confusion
+     with the thread master that is inside each operation, that
+     a return-with statement races to finish first, and is related
+     to the region mark/release associated with the operation.
+
+These guys need to share the thread master, but they presumably need
+their own local variable area and stack.  Each thread gets its own
+subregion, but it is carved out of thread master region, and it can
+get more blocks from there.
+
+Storage allocation.  Need a region.
+Need a way to create an object of a given type in a given
+region.  We may
+want it to be polymorphic, meaning we want the type
+view represented in the stack as well.  Or we may be
+happy with monomorphic, so all we need is the data.
+
+   [Create] [Type_Base][Type_Offset] [Target_Base][Target_Offset] [region?]
+   [Set_Null] [Target_Base][Target_Offset] [region?]
+      (Would it help to know the type of the object being set to null?
+       Yes, probably, if it is monomorphic.)
+
+What about our built-in extensible array type?
+
+The interpreter is handed what?  A reference to an instruction
+sequence, perhaps with some kind of header (e.g. size of stack),
+plus a parameter list, and other pre-initialized base registers
+which aren't reached via a static link or other indirection.
+A new thread is (often/always) spawned to execute the sequence.
+There is presumably some scheduler which responds to thread activation.
+There must be a "current" construct to which the threads
+are connected, so they can be killed off as necessary.  The construct
+is linked to the enclosing construct(s).  First thread to return
+is a race, just like first to exit, so every operation invocation
+needs to support threading and the thread-return race.
+
+Current (sub)region
+Current thread master (related to current region?)
+Current stack
+Current local variable area  (how different from current stack?)
+--
+Current parameter list
+Current type (this is the static link for calls on top-level operations?)
+Current module (related to current type)
+
+Perhaps really only need two -- current parameter list
+and current local variable area.
+
+Caller creates parameter list in their local variable area,
+and then makes the call.  (Sub)region is used for allocating local
+variable area and individual local variables.
+
+----------------- Thoughts starting 10/12/2010: ---------
+
+When we evaluate a tree node, we can presume the tree has
+been marked with some semantic information.  If it is an 
+operation, we would want to know the slot number of the
+operation in some interface or class.  The actual type
+from which the operation is selected either comes from
+a polymorphic operand (with an implicit assertion that
+all poly-operands have the same type view) or from a formal
+of an enclosing module.
+
+If the tree node is an object, we will want to know whether
+it is a parameter or a local variable of the current operation,
+or a formal of an enclosing module (requires a "global" declaration
+in the parameter list), or an uplevel reference to an enclosing
+operation (also requires a "global" declaration).
+
+If the tree node is a type, we will want to know whether it
+is the "current" type, a local type, a formal of an enclosing module,
+or a global type (if there are such things).
+
+If the tree node is a module, we will want to know the id of the module.
+
+If the tree node is the result of calling an operation, it will
+have a value number (named objects probably also need value numbers),
+and an indication of whether it is to be computed, or simply reused.
+It should always be safe to recompute it rather than reuse it --
+reusing the value is strictly an optimization.
+This will also have a normalized parameter list, with defaults (and globals?)
+filled in.  A normalized parameter list could be just a list of
+value numbers, one for each parameter, but it probably wants to
+have the trees to be evaluated as well, though those could
+be associated with the value number in a separate table.
+
+While evaluating a tree node, we will have the "current" type or
+the "current" enclosing operation (essentially the static link),
+a vector for the parameters, and a vector for the local variables and temps
+(indexed by value number?).
+
+----------------- Thoughts starting 8/26/2010: ---------
+
+We have types and type views.  A type view is a reference to
+a type and a slot mapping table, mapping the view slots to
+the type slots.  A type consists of information on the
+module actuals, and a vector of operation slots, each
+slot consisting of a reference to the type from which the
+operation originated and a reference to the
+actual code for the operation.  This allows the code for an
+operation to be specialized to a particular type if desired.
+The originating type is passed as an implicit parameter to
+the operation.  (It might not use it if all of the information
+of the originating type is compiled into the code itself.)
+
+We need to worry about one or more constraints (annotations)
+that apply to a type.  Is this just a bit more information
+in the view?  Preconditions that check against the constraints
+of an object seem pretty important.
+
+An object is essentially just an address, and if optional,
+a potentially null address.  A ref-const, ref-optional-const,
+and ref-var can all use just a simple address.
+A ref-optional-var needs a level of indirection as well as
+the region from which to allocate space if the value goes
+from null to non-null.  A ref-mutable-var or ref-optional-mutable-var
+also needs a level of indirection, and a region from which to allocate
+and deallocate space if the size of the object changes significantly.
+
+An object of a polymorphic type must carry along with it a type view.
+This can change if the object is optional or mutable.
+Similarly, an operation parameter which has an instantiatable type
+is pretty much like a parameter of a polymorphic type.
+We will need a type view, or we will need the parameter converted
+to some common type (that might be specified by some kind of
+"{Param#conversion == Type}" annotation).
+
+An array of objects need only have one region, since everything
+by definition lives in the same region.
+
+A class with multiple components only need have one region for the
+mutable/optional var components.  If there are some refs, then
+they each need their own region (as explained above), just like
+parameters.  
+
+When passing a reference to a component, we have to live
+with the fact that each component is probably just an address,
+or conceivably inline if it is non-optional, non-mutable.
+That means we need to pass the address of the address if
+it is mutable/optional, along with the region.
+
+For now let us presume there is an Ada package which manages
+all the "built-in"/"import"ed code/types.  Or perhaps one for
+built-ins, and one for import'ed, so users can easily add their
+own imports without conflicting with one another.  Perhaps the
+imports should be broken down by the naming hierarchy.  We could
+use a "registration" trick to decentralize this.  That is probably
+the best approach.
+
+What sort of built-ins do we need to get started?
+
+We need a built-in expandable array of Any type,
+expandable only by whole-array assignment.
+Should we assume the elements are polymorphic?
+That seems like a lot of space overhead.  Perhaps all polymorphic
+objects involve a level of indirection, so we can stick
+with a single address per array element.
+
+We need a built-in bag-of-bits.  Perhaps we need an array-of-bits
+as well, for things like strings, bit vectors, etc.  And probably
+such an array should be expandable.
+
+Do we need a module to be declared "mutable" to indicate that
+some component is mutable?  Otherwise, how do we know?
+I guess we know by whether any of the operations require
+a ref-mutable.  This presumes that to get a ref-mutable for
+a component, you need a ref-mutable to the enclosing object.
+
+We need some way to check whether a given assignment will
+safely "mutate" the target object.  Can membership be used for
+that?  In general, can we use "X in Target" to verify that
+"Target := X" will be allowed?  Can this also check for
+any constraints on the object?  Or do we need to write "X in Target#type"?
+But "mutatability" is not really part of the type, so
+"X in Target" seems somewhat more appropriate.  Unfortunately,
+it is potentially a bit confusing.  "in" doesn't quite convey
+the correct information.  "X assignable to Target" is really
+what we want to ask.  Perhaps "X in Target#domain"?
+Yes, that seems about right.  Really what we want is
+the domain of the operation that assigns a new value to Target, but
+this is pretty close.  One could also imagine checking
+whether a parameter or set of parameters is acceptable
+to a function, hence "(X, Y) in Foo#domain" means that
+one can safely call "Foo(X, Y)" and pass all of the
+preconditions.
+
+"Range" is somewhat more correct than "domain" when applied
+to a variable, but "domain" seems a bit more abstract, I guess
+based on my experience with Ada, range tends to mean "interval",
+that is, a contiguous sequence of values.  
+
+-------------- getting the ball rolling; stacks and such 8/29/2010 -------
+
+We don't really need a stack for local variables, etc.
+We will be using regions for that.  We will evaluate each
+parameter in a call in parallel, and get back hopefully the
+address of a value stored somewhere.  We may need to call
+the "copy" operator if there is aliasing, either on one or
+more of the parameters, or on the result.  "Copy" can be
+used to break aliasing if there is a ref-var parameter
+and a by-copy parameter that might alias.  We need a vector
+of actual parameters in a call.  Where does that reside?  It
+doesn't need to reside in "program" space, but instead can
+reside in the interpreter itself, since you can't take the
+address of the vector or of any part of it.
+
+-------------- older stuff from 8/2/2010 and before: --------
+
+A type is a module with some parameters.  An operation is
+always passed the enclosing type as an implicit parameter,
+which provides access to the module and its parameters,
+which themselves are types and values and possibly operations.
+When an operation is passed, the enclosing type is also
+presumably passed.
+
+Presumably a nested operation (if we have such things) is
+passed the enclosing scope rather than the enclosing type.
+
+An object does *not* normally need to carry along its
+type, except when passed as an object of a polymorphic type.
+An operation "knows" the types of its parameters by
+looking at the enclosing type information.
+
+Generally we will try to avoid using pointers, and use
+indices instead.  Presumably we have a table of modules,
+and some kind of unique key into that table.
+
+A module has a set of components.  Can these be
+shared across different types (i.e. different module
+instances)?  It would seem so.  In other words, at
+run-time a type is merely the actual module parameters
+and an identification of the module.  But if a type
+is defined in a module as a subtype of one of the 
+module's type parameters, then who "assembles" the
+type?  And what about the constraints on the type?
+A constraint is essentially an operation that returns
+true or false.  But these can be layered, so a list
+of these is needed.  So although we are syntactically
+not distinguishing a subtype from a type, in fact
+at run-time we do distinguish them.  A subtype identifies
+its underlying type, and its extra constraint if any.
+
+Note that two types that are instances of the same module
+with the same parameters are effectively the same type,
+except perhaps for the constraints.
+
+So how does a subtype identify its underlying type?
+Some kind of level and index?  And perhaps the index
+is negative for a parameter and positive for a component?
+The enclosing module is often known from context.
+But a subtype could refer to a type in some external module, so the
+"whole" access path is (module_id, index, index, index, ...) 
+Note that module parameters of a type are accessible
+from outside the module, so it is not possible to collapse
+the sequence of indices into a single index.
+Actually, that still isn't right...   Stored in the definition
+of a subtype, or in a reference inside an operation, is an
+access path.  That access path is *relative* to where the
+subtype or operation resides, and if it starts referring
+to parameters, those must be coming from context, and can
+presumably be "resolved" from earlier parts of the
+access path if that is known.  
+
+For example, if inside the Vector module we have a subtype
+of the Component type, say "Subcomp", then when given
+a Vector<My_Int> we know that Vector<Component=>My_Int>::Subcomp is
+a subtype of My_Int.  So Subcomp identifies its underlying type as level X,
+index -1.  Level X (TBD) tells us that it is referring to the parameter
+of its immediately enclosing module, and the -1 tells us it is
+referring to the "Component" parameter.  Now suppose instead Subcomp
+is defined in terms of some earlier (sub)type defined in the Vector
+module, say Comp, then it would identify its underlying type with
+level X, index +2, presuming "Comp" is component 2 of the Vector
+module.  That might in turn identify its underlying type as being
+level X, -1.
+
+You can't really refer directly to the contents of a module.  You
+must refer to a type that is an instance of the module.  There
+are no global types (except perhaps Univ_*, but those might better
+be thought of as components of an implicit instance of some global
+module).  And we only can refer to top-level modules, because
+to refer to nested modules, we need to instantiate the outer
+module.  ("Top-level" is perhaps a misnomer.  What we mean are
+"library" modules that can be instantiated directly, even if 
+their name is hierarchical.)
+
+[ASIDE:
+Note that we do hope to have a hierarchical namespace
+of modules, so a module with a name "XX::YY" is *not* the same 
+thing as a nested module "XX<>::YY".  Is that a good thing?
+Or do we want to go the Ada route, where a module named XX::YY
+creates a nested module inside every instance of XX, but only
+within the scope of an "import" for XX::YY?  Tough decision.
+The Ada route is horribly confusing!  Perhaps the alternative
+is to give visibility on the private interface to XX if your
+name is XX::YY, but nothing more than that.  And perhaps the
+"XX::" is implicit in some contexts.  And perhaps some kind
+of "use" or "using" clause would make things easier.  Since
+there is no private "part" and the actual parameters are
+always available from "outside" a type, it doesn't seem to
+be a big problem having to get an instance of the parent
+module explicitly.  Also, we don't really want to take an
+instance of the parent module implicitly.
+
+Perhaps we can get both -- T::Y<> means instantiate X::Y
+with same-named parameters?  Hmmmm...  This can perhaps
+wait.  It seems that by default X::Y should have no visibility
+on the components of X without instantiating.  Perhaps there
+could be some way to get that by having a parameter of simply
+X<>, that is "interface X::Y< X<>, Other_Param is Z<>> is ..."
+or perhaps "interface X<>::Y Other_Param is Z<>> is ..."
+might be a way to get the ability to treat X as
+a type rather than a module.
+END OF ASIDE.]
+
+So back to modules.  We will create "anonymous" types
+as necessary for occurrences of "M<Par>" that occur not
+as part of a type definition.  So it is really only
+in a type definition where we need to refer to a module.
+Everything else needs a type, and can refer to the
+Nth component, where <0 means parameter, and >0 means
+component, and perhaps 0 means type itself?
+
+---------
+
+Calling an operation:
+
+Operations are called by starting from a "view" of a type
+and selecting the Nth operation to call.  All parameters
+are passed by reference, or by reference-to-a-reference
+for (mutable/optional?) VAR/OUT parameters.  
+
+Reference-to-a-reference -- This provides the region for 
+allocation/deallocation and the address of the pointer
+to be updated upon assignment.  Regions are hierarchical,
+so that it is possible to release a whole tree of regions.
+
+The operation takes an implicit parameter which is the
+type, but all that is really needed is the module parameters.
+The module itself is "known".  "Inheritance" of implementation
+doesn't really happen in the sense provided by most OO languages.
+An operation isn't really inherited, but rather the operation 
+for the child type does an implicit call on the corresponding 
+operation of the parent type, passing in the underlying object(s)
+for each of the parameters of the child type.
+
+How do operations with polymorphic parameters work?  Do these
+get "inherited" in this same sense?  When you call an operation
+of some type with polymorphic objects, when the formal parameter
+is *not* polymorphic, you end up in the operation based on 
+the particular run-time type of the object.  That operation might
+be inherited, meaning that it only operates on the "parent" object,
+not on any of the additional state beyond that.  
+
+Do we allow non-polymorphic objects to be converted back to polymorphic
+type?  That would presumably happen automatically in some
+cases, when you pass an object to an operation that takes a
+polymorphic parameter.  Do we want it to preserve the "black box"
+model even then?  That is what the model would imply.  You are really
+passing X.Parent to the parent operation.  Answer: Yes
+
+On the other hand, if the parameter type is itself polymorphic, then there 
+is no dispatch (or is there?).  If we allow them to be overridden, then
+do we want to dispatch?  If there are multiple polymorphic parameters,
+do we require them to have the same run-time type?  If we are
+dispatching, that would seem necessary.  Perhaps if you override
+in an extension (or when implementing an interface?), if there
+are no non-polymorphic parameters of the type, and at least one
+polymorphic parameter, the first polymorphic parameter is
+the one that is used for the dispatch.  Must it be the very
+first parameter?  This would relate to the "object.operation" syntax.
+The key thing is that a polymorphic parameter retains its original 
+type information.  Does this also imply that you can only manipulate
+a polymorphic parameter by its interface properties?  You *cannot*
+presume it has the same (private) data components.
+
+As a general rule, object.operation() where object is of a
+polymorphic type would presumably invoke the operation based
+on its run-time type.  The availability of the operation is
+determined by its compile-time (polymorphic) type.  
+All operations of an interface are necessarily implementable/overridable.  
+If an interface specifies an operation with a polymorphic parameter based 
+on the interface itself, then when you implement that interface
+you need to support that operation, because some other
+code that manipulates a polymorphic object of that interface
+will want to be able to call the operation.  If you extend that
+interface, then you can inherit or override the operation.
+
+What about operations of an interface that don't take any
+parameters of the interface type?  Should these also allow
+a call using the "object.operation" syntax?  What might
+be an example?  It could be some attribute of the type, such
+as #first/#last.  So perhaps "object.operation" swallows up
+the first parameter if it is of the same type as the
+interface, or a polymorphic version thereof, but otherwise
+is equivalent to <run_time_type>::operation.
+
+If we override some operation that takes a polymorphic
+parameter in every extension and no non-polymorphic
+operation, then there are a lot of operations out there.  
+This implies a lot of ambiguity.  Do we want to just complain,
+or resolve in favor of something?  Should "object.operation(X)"
+be equivalent to operation(object, X) in all cases?  That
+would seem desirable.  That implies that first parameter has
+special significance if it is of a polymorphic type.
+If the first parameter is polymorphic, it's run-time type must match
+the other non-polymorphic formals that are also passed polymorphic
+actuals.  On inheritance, you can get a difference, because
+the polymorphic parameter retains its original run-time type,
+while the non-polymorphic formals are "truncated".
+
+Anyway, back to "normal" operations.  These are always implicitly
+passed the module parameters, i.e. the enclosing type.  Since
+operations aren't inherited but rather are effectively called,
+the module parameters will need to be morphed somehow by the
+wrapper.  So perhaps the type has for each operation the
+module parameters to be passed in case the operation is
+inherited.  Essentially this is the ancestor type from
+which the operation was inherited.  So a type is more than
+just module parameters.  It has its own module parameters,
+plus the ancestor types from which each of its operations
+is inherited (which is necessarily up the "Extends" chain).
+Don't forget that the actual parent type is also effectively
+a module parameter, so the type from which the operation
+is inherited isn't known at compile-time.
+
+So a type that extends another type needs to keep track
+of the type from which each operation is inherited, and
+that is a function of the actual type being extended.
+So for each inherited operation, we need to know the
+type from which it is inherited.  Actually, "we" don't
+need to know it, but when we finally get to the inherited
+operation's code, it will want to know it, and if we don't
+actually want to have a wrapper, then the original caller
+needs to be able to find the type to pass as the implicit
+parameter.  That means that each "view" of the type needs,
+for each operation in the view, the operation's origin type 
+and a reference to the operation's actual code.  The module 
+"view" can provide a reference to the actual code.
+A "view" could really just be a mapping from an operation's 
+within-view index to the operation's within-type index.  
+Not clear that that really saves much space...  In any case,
+given the operation's within-type index, we can find
+the origin type (which implies the origin module) and the
+index in the origin-type's module to find the actual code.
+We don't want to go through the "view" process more than
+once, so when a type is created, we should resolve the
+pointers all the way to the module and origin type.
+
+What happens if there are conflicts?  What sort of conflicts
+are possible?  We can only inherit code from one type.  The operations
+we implement we don't need to worry about.  Explicit calls on the
+parent's operations are nothing special.  Caller's don't know that
+we extended a different type than we claimed, so we don't need
+to support all the operations of the actual type extended, 
+only the type that is declared as the extended type.  If that
+type is abstract, then does that mean we don't inherit anything
+and have to override it all, or does that mean we require
+the actual extension base to be a full implementation of the interface?
+Or does extending an interface have some special meaning?
+For now, let's disallow it.  You can extend a partial type,
+but not an abstract type.

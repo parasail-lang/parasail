@@ -1,0 +1,37 @@
+with "../../ada2020_library/runtime";
+
+project Distrib_Example is
+
+   for Object_Dir use "obj";
+   for Exec_Dir use "bin";
+   for Source_Dirs use (".",
+      "../../ada2020_library/examples",
+      "../../ada2020_library/examples/sort",
+      "../zyre/gen",
+      "../zyre",
+      "../zeromq-Ada",
+      "../zeromq-Ada/gen",
+      "..");
+   -- "../../ada2020_library/work_stealing",
+   -- "../../ada2020_library/work_in_progress",
+   --   "/homes/taft/_distrib/include/zmq",
+   --   "/homes/taft/_distrib/zeromq-Ada/src/gen");
+   for Main use
+     ("n_queens_distrib.adb",
+      "n_queens_distrib_ws.adb"
+     );
+
+   package Builder is
+      for Switches ("Ada") use ("-s", "-g");
+   end Builder;
+
+   package Compiler is
+      for Switches ("Ada") use ("-g", "-gnata", "-gnatg", "-gnatyN",
+        "-gnat2020", "-I/homes/taft/_distrib/include/zmq",
+        "-I/homes/taft/_distrib/zeromq-Ada/src/gen");
+   end Compiler;
+
+   package Linker is
+      for Switches ("Ada") use ("-L/usr/local/lib","-lgcc_eh");
+   end Linker;
+end Distrib_Example;

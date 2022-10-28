@@ -1,0 +1,6 @@
+proc Multi_Assign(X : Univ_Integer) is
+    var Y : Univ_Integer := 55;
+    var Z : Univ_Integer := 44;
+
+    (Y, Z) := (X, Y);
+end proc Multi_Assign;

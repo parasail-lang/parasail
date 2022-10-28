@@ -1,0 +1,383 @@
+
+// Example ParaSail program -- Hyper_QuickSort
+
+// Copyright (C) 2011-2020, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at:
+//    http://groups.google.com/group/parasail-programming-language
+
+interface Hyper_Sorting
+  <Elem_Type is Float<>; Index_Type is Countable<>;
+   Array_Type is Indexable<Elem_Type, Index_Type>> is
+    func Quicksort(var A : Slice<Array_Type>);
+          // Sort Arr according to the sorting op "<" which returns
+          // True if Left must appear before Right in the sorted order.
+          // "<" returns False if Left need not appear before Right.
+    func Hyper_Qsort (var A : Array_Type; Num_Chunks : Integer);
+          //  Partition array into chunks; sort each chunk
+          //  Come up with multiple pivots, and partition into a new
+          //  set of chunks using these pivots
+          //  Shuffle data into new partitioning (probably using a temp array).
+          //  Sort each new chunk.
+end interface Hyper_Sorting;
+
+class Hyper_Sorting is
+    const Debug : Boolean := #false;
+
+    interface Per_Chunk<> is
+       var Min : Elem_Type := 0.0;
+       var Max : Elem_Type := 0.0;
+       var Sum : Elem_Type := 0.0;
+       var Sum_Sq : Elem_Type := 0.0;
+       var Avg : Elem_Type := 0.0;
+       var Std_Dev : Elem_Type := 0.0;
+
+       var Old_Chunk_First : Index_Type := Index_Type::First();
+       var Old_Chunk_Last : Index_Type := Index_Type::First();
+
+       var New_Chunk_Start_Value : Elem_Type := 0.0;
+       var New_Chunk_End_Value : Elem_Type := 0.0;
+
+       var New_Chunk_First_Index : Index_Type := Index_Type::First();
+       var New_Chunk_Size : Univ_Integer := 0;
+    end interface Per_Chunk;
+
+    interface Transfer_Vector<> is
+       var Amount_To_Send : Vector<Univ_Integer> := [];
+       var Starting_Index : Vector<Index_Type> := [];
+    end interface Transfer_Vector;
+
+  exports
+    func Quicksort(var A : Slice<Array_Type>) is
+        // Handle short arrays directly.  Partition longer arrays.
+        for Arr : Slice<Array_Type> => A while Length(Arr) > 1 loop
+            if Length(Arr) == 2 then
+               if Arr[Arr.Last] < Arr[Arr.First] then
+                   // Swap elements
+                   Arr[Arr.First] <=> Arr[Arr.Last];
+               end if;
+            else
+               // Partition array
+               const Mid := Arr[Arr.First + Length(Arr)/2];
+               var Left := Arr.First;
+               var Right := Arr.Last;
+               until Left > Right loop
+                   var New_Left := Right+1;
+                   var New_Right := Left-1;
+
+                 then 
+
+                   // Find item in left half to swap
+                   for I in Left .. Right forward loop
+                       if not (Arr[I] < Mid) then
+                           // Found an item that can go into right partitition
+                           New_Left := I;
+                           if Mid < Arr[I] then
+                               // Found an item that *must* go into right part
+                               exit loop;
+                           end if;
+                       end if;
+                   end loop;
+
+                 ||    --  TBD: Do we need this parallelism?
+
+                   // Find item in right half to swap
+                   for J in Left .. Right reverse loop
+                       if not (Mid < Arr[J]) then
+                           // Found an item that can go into left partitition
+                           New_Right := J;
+                           if Arr[J] < Mid then
+                               // Found an item that *must* go into left part
+                               exit loop;
+                           end if;
+                       end if;
+                   end loop;
+
+                 then 
+                 
+                   if New_Left > New_Right then
+                       // Nothing more to swap
+                       // Exit loop and recurse on two partitions
+                       Left := New_Left;
+                       Right := New_Right;
+                       exit loop;
+                   end if;
+                 
+                   // Swap items
+                   Arr[New_Left] <=> Arr[New_Right];
+                 
+                   // continue looking for items to swap
+                   Left := New_Left + 1;
+                   Right := New_Right - 1;
+               end loop;
+               
+               // At this point, "Right" is right end of left partition
+               // and "Left" is left end of right partition
+               // and the partitions don't overlap
+               // and neither is the whole array
+               // and everything in the left partition can precede Mid
+               // and everything in the right partition can follow Mid
+               // and everything between the partitions is equal to Mid.
+               {Left > Right;
+                Right < Arr.Last;
+                Left > Arr.First}
+
+                {(for all I in Arr.First .. Right => not (Mid < Arr[I]));
+                (for all J in Left .. Arr.Last => not (Arr[J] < Mid));
+                (for all K in Right+1 .. Left-1 => 
+                  not (Mid < Arr[K]) and not (Arr[K] < Mid))}
+               
+             then
+               // continue with two halves in parallel
+               continue loop with Arr => Arr[Arr.First .. Right];
+             ||
+               continue loop with Arr => Arr[Left .. Arr.Last];
+            end if;
+        end loop;
+    end func Quicksort;
+
+    func Hyper_Qsort(var A : Array_Type; Num_Chunks : Integer) is
+        const Bounds := A.Bounds();
+        const Bound_Vec := Bounds / Num_Chunks;
+        var Per_Chunk_Info : Array<Per_Chunk, Indexed_By => Integer> :=
+          Create(1 .. Num_Chunks, ());
+        var Transfer_Matrix : Array<Transfer_Vector, Indexed_By => Integer> :=
+          Create(1 .. Num_Chunks, ());
+
+        if Debug then
+           Println ("Orig chunks:\n" |
+             (for each BV of Bound_Vec forward => 
+               <""> | "[`(BV.First) .. `(BV.Last)]\n"));
+        end if;
+
+        --  Sort each chunk and gather statistics
+        for (each BV of Bound_Vec; each PC of Per_Chunk_Info) concurrent loop
+           const First := BV.First;
+           const Last := BV.Last;
+           const Num := Last - First + 1;
+
+           PC.Old_Chunk_First := First;
+           PC.Old_Chunk_Last := Last;
+
+           Quicksort ("slicing"(A, First .. Last));
+           --  Quicksort (A [First .. Last]);
+
+           --  Gather per-chunk statistics
+           PC.Min := A[First];
+           PC.Max := A[Last];
+           const Sum := (for I in First .. Last => <0.0> + A[I]);
+           const Sum_Sq := (for I in First .. Last => <0.0> + A[I] ** 2);
+
+           PC.Sum := Sum;
+           PC.Sum_Sq := Sum_Sq;
+        end loop;
+
+        --  Gather overall statistics
+        const Total_Sum :=
+          (for each PC of Per_Chunk_Info => <0.0> + PC.Sum);
+        const Total_SSq :=
+          (for each PC of Per_Chunk_Info => <0.0> + PC.Sum_Sq);
+        const Overall_Min :=
+          (for each PC of Per_Chunk_Info => Min (<null>, PC.Min));
+        const Overall_Max :=
+          (for each PC of Per_Chunk_Info => Max (<null>, PC.Max));
+
+        if Debug then
+           Println ("Sum = `(Total_Sum), Sum_Sq = `(Total_SSq)");
+        end if;
+
+        const Total_Num := |A|;
+        const Avg := Total_Sum / Total_Num;
+        const Variance := Total_SSq / Total_Num - (Avg) ** 2;
+        const Std_Dev := Sqrt (Variance);
+
+        if Debug then
+           Println ("Avg = `(Avg), Std_Dev = `(Std_Dev), " |
+                 "Min = `(Overall_Min), Max = `(Overall_Max)");
+        end if;
+
+        --  Choose pivots so that new chunks are of nearly equal size
+        --  TBD: Current algorithm is the simplest possible; presumes
+        --       flat distribution.
+        var Next_Pivot := Overall_Min;
+        const Increment := (Overall_Max - Overall_Min) / Num_Chunks;
+
+        for each PC of Per_Chunk_Info forward loop
+           PC.New_Chunk_Start_Value := Next_Pivot;
+           Next_Pivot += Increment;
+           PC.New_Chunk_End_Value := Next_Pivot;
+        end loop;
+
+        Per_Chunk_Info[Num_Chunks].New_Chunk_End_Value := Overall_Max + 1.0;
+          --  Make sure we put the highest values into the last chunk.
+
+        --  Compute amount going to new chunk from each old chunk
+        for Source_Chunk_Index in 1 .. Num_Chunks concurrent loop
+           ref Source_PC => Per_Chunk_Info[Source_Chunk_Index]
+           ref Source_TM => Transfer_Matrix[Source_Chunk_Index]
+
+           Source_TM.Starting_Index :=
+             Create (Num_Chunks, Index_Type::First());
+           Source_TM.Amount_To_Send := Create (Num_Chunks, 0);
+           
+           --  Look at each target chunk
+           var Source_Index := Source_PC.Old_Chunk_First;
+           const Source_Last := Source_PC.Old_Chunk_Last;
+           for Target_Index in 1 .. Num_Chunks forward loop
+              ref Target_PC => Per_Chunk_Info[Target_Index];
+              const New_Chunk_End_Value :=
+                Target_PC.New_Chunk_End_Value;
+
+              --  Figure out which range of values to send to target chunk
+              Source_TM.Starting_Index[Target_Index] := Source_Index;
+              const Starting_Index := Source_Index;
+              while Source_Index <= Source_Last
+                and then A[Source_Index] < New_Chunk_End_Value
+              loop
+                 Source_Index += 1;
+              end loop;
+              Source_TM.Amount_To_Send[Target_Index] :=
+                Source_Index - Starting_Index;
+           end loop;
+        end loop;
+
+        --  Compute sizes of new chunks
+        for Target_Index in 1 .. Num_Chunks concurrent loop
+           ref Target_PC => Per_Chunk_Info[Target_Index];
+           Target_PC.New_Chunk_Size :=
+             (for each Source_TM of Transfer_Matrix => <0> +
+                Source_TM.Amount_To_Send[Target_Index]);
+        end loop;
+
+        if Debug then
+           const Min_Chunk_Size :=
+             (for each PC of Per_Chunk_Info =>
+               Min (<null>, PC.New_Chunk_Size));
+           const Max_Chunk_Size :=
+             (for each PC of Per_Chunk_Info =>
+               Max (<null>, PC.New_Chunk_Size));
+
+           Println
+              ("\nNew chunk sizes: `(Min_Chunk_Size) .. `(Max_Chunk_Size)");
+        end if;
+
+        --  Compute offsets of new chunks (sequentially)
+        var First_Index := Bounds.First;
+        for each Target_PC of Per_Chunk_Info forward loop
+           Target_PC.New_Chunk_First_Index := First_Index;
+           First_Index += Target_PC.New_Chunk_Size;
+        end loop;
+        
+        if Debug then
+           Println ("New chunks:\n" |
+             (for each PC of Per_Chunk_Info forward => 
+               <""> | "[`(PC.New_Chunk_First_Index) .." |
+               " `(PC.New_Chunk_First_Index + PC.New_Chunk_Size - 1)]"|
+               ", values: `(PC.New_Chunk_Start_Value) ..< " |
+               "`(PC.New_Chunk_End_Value)\n"));
+        end if;
+
+        --  Copy data to final resting place and sort
+        var Temp := A;  --  First copy whole array
+
+        --  Now copy data from source chunks into target chunk
+        for Target_Chunk_Index in 1 .. Num_Chunks concurrent loop
+           ref Target_PC => Per_Chunk_Info[Target_Chunk_Index];
+           var Target_Index := Target_PC.New_Chunk_First_Index;
+
+           --  Copy from source (now in Temp) into target (back into A)
+           for Source_Chunk_Index in 1 .. Num_Chunks loop
+              ref Source_PC => Per_Chunk_Info[Source_Chunk_Index];
+              ref Source_TM => Transfer_Matrix[Source_Chunk_Index];
+              const Amount_To_Send :=
+                Source_TM.Amount_To_Send[Target_Chunk_Index];
+              const Starting_Index :=
+                Source_TM.Starting_Index[Target_Chunk_Index];
+              
+              if Debug and then Amount_To_Send > 0 then
+                 Println ("Copying from `(Starting_Index) .. " |
+                   "`(Starting_Index + Amount_To_Send - 1) to " |
+                   "`(Target_Index) .. `(Target_Index + Amount_To_Send - 1)" |
+                   ", values: `(Temp[Starting_Index]) .. " |
+                   "`(Temp[Starting_Index + Amount_To_Send - 1])");
+              end if;
+
+              for I in Starting_Index ..
+                Starting_Index + Amount_To_Send - 1
+              loop
+                 A[Target_Index] := Temp[I];
+                 Target_Index += 1;
+              end loop;
+           end loop;
+
+           --  Now sort the "new" chunk
+           Quicksort ("slicing"
+             (A, Target_PC.New_Chunk_First_Index ..
+                   Target_PC.New_Chunk_First_Index +
+                     Target_PC.New_Chunk_Size - 1));
+        end loop;
+    end func Hyper_Qsort;
+end class Hyper_Sorting;
+
+func Test_HQSort(Len : Univ_Integer) is
+    // For Random
+    const Mult := 7**5;
+    const Mod := 2**31 - 1;
+    var Ran := Random::Start(Len, Mult, Mod);
+    const Max_Plus_One := Len * 2;
+
+    func Print_Vec (Vec : Vector<Float>) is
+       for I in 1 .. Length(Vec) forward loop
+           if I in 51 .. Length(Vec) - 50 then
+              continue loop;
+           end if;
+           Print(" " | Vec[I]);
+           if I < Length(Vec) then
+               Print(",");
+               if I mod 5 == 0 then
+                   Print('\n');
+               end if;
+               if I == 50 and then Length(Vec) > 100 then
+                  Println (" ...");
+               end if;
+           end if;
+       end loop;
+       Print("\n");
+    end func Print_Vec;
+
+    Println("Seed = " | Len | ", Mult = " | Mult | ", Mod = " | Mod);
+
+    type My_Sorter is Hyper_Sorting<Float, Univ_Integer, Vector<Float>>;
+    var Vec : Vector<Float> := [];
+
+    for I in 1..Len loop
+        Vec |= (Next(Ran) mod Max_Plus_One) * 1.0;
+    end loop;
+
+    var Vec2 := Vec;
+
+    Println("\nBefore sort, Vec = ");
+    Print_Vec (Vec);
+
+    My_Sorter::Hyper_Qsort(Vec, Num_Chunks => 10);
+
+    Println("\nAfter HQ sort, Vec = ");
+    Print_Vec (Vec);
+
+    My_Sorter::Hyper_Qsort(Vec2, Num_Chunks => 5);
+
+    Println("\nAfter 2nd HQ sort, Vec2 = ");
+    Print_Vec (Vec2);
+
+    Println("\nChecking if sorts worked:");
+
+    Println("Comparing Vec and Vec2 => " |
+      (for all I in Vec.Bounds() => Vec[I] == Vec2[I]));
+
+    Println("\nAsserting Vec is sorted:");
+    {(for all I in 1 ..< Length(Vec) => Vec[I] <= Vec[I+1])}
+
+    Println("\nAsserting Vec2 is sorted:");
+    {(for all I in 1 ..< Length(Vec2) => Vec2[I] <= Vec2[I+1])}
+
+end func Test_HQSort;

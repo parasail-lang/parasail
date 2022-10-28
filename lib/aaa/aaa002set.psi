@@ -1,0 +1,71 @@
+interface PSL::Containers::Set<Element_Type is Hashable<>> is
+  // A hashed-set module
+    op "[]"() -> Set
+
+    func Singleton(Elem : Element_Type) -> Set
+
+    op "|"(Left, Right : Element_Type) -> Set
+    op "|"(Left : Set; Right : Element_Type) -> Set
+    op "|"(Left : Element_Type; Right : Set) -> Set
+    op "|"(Left : Set; Right : Set) -> Set
+
+    op "|="(var Left : Set; Right : Set)
+
+    op "|="(var Left : Set; Right : Element_Type)
+        // Add element to Set.
+
+    op "<|="(var Left : Set; var Right : optional Element_Type)
+        // Move element into Set.
+
+    op "<|="(var Left : Set; var Right : Set)
+        // Move all elements of Right into Left, leaving Right empty.
+
+    op "in"(Left : Element_Type; Right : Set) -> Boolean<>
+
+    op "=?"(Left, Right : Set) -> Ordering
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left is a proper subset of Right
+        // Return #greater if Left is a proper superset of Right
+        // Return #unordered otherwise
+
+    op "or"(Left, Right : Set) -> Set is "|"  // Union
+    op "or="(var Left : Set; Right : Set) is "|="
+
+    op "+"(Left, Right : Set) -> Set is "|"   // Union
+    op "+="(var Left : Set; Right : Set) is "|="
+    op "+="(var Left : Set; Right : Element_Type) is "|="   // aka Include
+
+    op "and"(Left, Right : Set) -> Set
+        // Intersection
+    op "and="(var Left : Set; Right : Set)
+
+    op "xor"(Left, Right : Set) -> Set
+        // Symmetric difference
+    op "xor="(var Left : Set; Right : Set)
+
+    op "-"(Left, Right : Set) -> Set
+        // Set difference
+
+    op "-="(var Left : Set; Right : Set)
+        // Compute Set difference
+
+    op "-="(var S : Set; Elem : Element_Type)   // aka Exclude
+        // Remove one element, if present
+
+    func Count(S : Set) -> Univ_Integer
+
+    op "magnitude"(Set) -> Univ_Integer is Count
+
+    func Is_Empty(S : Set) -> Boolean<>
+
+    func Remove_Any(var S : Set) -> optional Element_Type
+      // Remove and return an arbitrary element of the Set S
+
+    func Any_Element(S : Set) -> optional Element_Type
+      // Return an arbitrary element of the Set S;
+      // return null if S is empty.
+
+    optional func Dump_Statistics(S : Set)
+      // A debugging routine to show bucket sizes of Set
+
+end interface PSL::Containers::Set

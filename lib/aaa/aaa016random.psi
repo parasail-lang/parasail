@@ -1,0 +1,59 @@
+interface PSL::Core::Random<> is
+    func Start(Seed : Univ_Integer := 1) -> Random
+      // Start a new random number sequence with a standard multiplier/modulus
+
+    func Start(Seed : Univ_Integer;
+       Mult, Mod : Univ_Integer) -> Random
+      // Start a new random number sequence with given multiplier and modulus
+
+    func Next(var Seq : Random) -> Univ_Integer
+      // Get next value in random number sequence
+
+    func Next_Real(var Seq : Random) -> Univ_Real
+      // Get next Univ_Real value in random number sequence,
+      // in range 0.0 ..< 1.0
+end interface PSL::Core::Random
+
+class PSL::Core::Random is
+    var Last_Value : Univ_Integer
+    const Mult : Univ_Integer
+    const Mod : Univ_Integer
+    const Debugging : Boolean := #false
+exports  // check that indent of 0 works
+    func Start(Seed : Univ_Integer) -> Random is
+      // Start a new random number sequence with a standard multiplier/modulus
+        return (Last_Value => Seed,
+          Mult => 7**5, Mod => 2**31 - 1)
+    end func Start
+
+    func Start(Seed : Univ_Integer;
+      Mult, Mod : Univ_Integer) -> Random is
+      // Start a new random number sequence with given multiplier and modulus
+        if Debugging then
+            Println("Random: Seed = " | Seed | ", Mult = " | Mult | 
+              ", Mod = " | Mod)
+        end if
+
+        //  We want the multiplier to be less than the Modulus,
+        //  and no less than 2
+        {> Mult in 2 ..< Mod <}
+
+        return (Last_Value => Seed, Mult => Mult, Mod => Mod)
+    end func Start
+
+    func Next(var Seq : Random) -> Result : Univ_Integer is
+      // Get next value in random number sequence
+        Result := Seq.Last_Value * Seq.Mult mod Seq.Mod
+        if Result == 0 then
+            //  Oh dear, we hit zero, return one instead
+            Result := 1
+        end if
+        Seq.Last_Value := Result;
+    end func Next
+
+    func Next_Real(var Seq : Random) -> Univ_Real is
+      // Get next Univ_Real value in random number sequence,
+      // in range 0.0 ..< 1.0
+        return (Int_To_Real (Next(Seq)) - 1.0) / Int_To_Real (Seq.Mod - 1)
+    end func Next_Real
+end class PSL::Core::Random

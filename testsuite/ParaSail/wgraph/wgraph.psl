@@ -1,0 +1,293 @@
+// Example ParaSail program -- Weighted Directed Graph module
+
+// Copyright (C) 2011-2014, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+interface WGraph<Element is Assignable<>; Weight is Assignable<>> is
+  // Interface to a Weighted Directed-Graph module
+
+    type Node_Id is new Integer<1..10**6>;
+      // A unique id for each node in the graph
+
+    type Node_Set is Countable_Set<Node_Id>;
+      // A set of nodes
+
+    func Create() -> WGraph;
+      // Create an empty graph
+
+    op "[]"() -> WGraph is Create;
+
+    func Add_Node(var WGraph; Element) -> Node_Id;
+      // Add a node to a graph, and return its node id
+
+    op "in"(Node_Id; WGraph) -> Boolean;
+      // Return #true if Node_Id is in WGraph
+
+    op "indexing"(ref WGraph; Node_Id) 
+      {Node_Id in WGraph}
+      -> ref Element;
+      // Return a reference to an element of the graph
+
+    func Add_Edge(var WGraph; From, To : Node_Id; Weight)
+      {From in WGraph; To in WGraph}
+      {Has_Edge(WGraph', From, To)};
+      // Add an edge in the graph
+
+    func Has_Edge(WGraph; From, To : Node_Id) -> Boolean;
+      // Returns #true if Edge exists in graph going From to To
+
+    func Edge_Weight(WGraph; From, To : Node_Id)
+      {Has_Edge(WGraph, From, To)}
+      -> Weight;
+      // The weight along the given edge
+
+    func Successors(ref const WGraph; Node_Id)
+      {Node_Id in WGraph}
+      -> ref const Node_Set;
+      // The set of successors of a given node
+
+    func Predecessors(WGraph; Node_Id)
+      {Node_Id in WGraph}
+      -> Node_Set;
+      // The set of predecessors of a given node
+
+    func All_Nodes(WGraph) -> Node_Set;
+      // The set of all nodes
+
+    func Node_Range(WGraph) -> Countable_Range<Node_Id>;
+      // The range of node-ids in use in graph
+
+    func Roots(WGraph) -> Node_Set;
+      // The set of all nodes with no predecessor
+
+    func Leaves(WGraph) -> Node_Set;
+      // The set of all nodes with no successor
+
+    func BFS(WGraph; Start : Node_Set;
+      Is_Target : func(WGraph; Node_Id) -> Boolean)
+      -> optional Node_Id;
+      // Do a breadth-first search on graph for node that satisfies Is_Target.
+      // Start is set of nodes to start from.
+      // Return Node_Id for first node that satisfies Is_Target.  
+      // Return null if no such node.
+end interface WGraph;
+
+class WGraph is
+  // Class defining the Directed-Graph module
+
+    type Back_Edge_Map is Map<Key_Type => Node_Id, Value_Type => Weight>;
+
+    interface Node<> is
+      // Local definition of Node structure
+        var Elem : Element;
+        var Succs : Node_Set;
+        var Back_Edges : Back_Edge_Map;  // We keep weights here
+    end interface Node;
+
+    var G : Vector<Node>;
+      // The vector of nodes, indexed by Node_Id
+
+    const Debug : Boolean := #false;
+
+    func Boundary_Set(WGraph; Nodes : Countable_Range<Node_Id>;
+      Want_Roots : Boolean) -> Node_Set is
+      // Recursive helper for exported Roots and Leaves functions
+        if Debug then
+            Println("Boundary_Set for " | Nodes.First | ".." | Nodes.Last);
+        end if;
+        const Len := Length(Nodes);
+        case Len of
+          [0] =>
+            return [];
+          [1] =>
+            if Want_Roots?
+                Is_Empty(WGraph.G[Nodes.First].Back_Edges):
+                Is_Empty(WGraph.G[Nodes.First].Succs)
+            then
+                // This is on the desired boundary
+                return [Nodes.First];
+            else
+                // This is not on the desired boundary
+                return [];
+            end if;
+          [..] =>
+            // Divide and conquer
+            const Half_Way := Nodes.First + Len / 2;
+            return 
+              Boundary_Set(WGraph, 
+                Nodes.First ..< Half_Way, Want_Roots) |
+              Boundary_Set(WGraph,
+                Half_Way .. Nodes.Last, Want_Roots);
+        end case;
+    end func Boundary_Set;
+
+  exports
+
+    func Create() -> WGraph is
+      // Create an empty graph
+        return (G => []);
+    end func Create;
+
+    func Add_Node(var WGraph; Element) -> Node_Id is
+      // Add a node to a graph, and return its node id
+        WGraph.G |= (Elem => Element, Succs => [], Back_Edges => []);
+        return Length(WGraph.G);
+    end func Add_Node;
+
+    op "in"(Node_Id; WGraph) -> Boolean is
+      // Return #true if Node_Id is in WGraph
+        return Node_Id <= Length(WGraph.G);
+    end op "in";
+
+    op "indexing"(ref WGraph; Node_Id) -> ref Element is
+      // Return a reference to an element of the graph
+        return WGraph.G[ Node_Id ].Elem; 
+    end op "indexing";
+
+    func Add_Edge(var WGraph; From, To : Node_Id; Weight) is
+      // Add an edge in the graph
+        WGraph.G[ From ].Succs |= To;
+        WGraph.G[ To ].Back_Edges |= [From => Weight];
+    end func Add_Edge;
+
+    func Has_Edge(WGraph; From, To : Node_Id) -> Boolean is
+      // Returns #true if Edge exists in graph going From to To
+        return From <= Length(WGraph.G) and then To in WGraph.G[From].Succs;
+    end func Has_Edge;
+
+    func Edge_Weight(WGraph; From, To : Node_Id)
+      -> Weight is
+        return WGraph.G[To].Back_Edges[From];
+    end func Edge_Weight;
+      // The weight along the given edge
+
+    func Successors(ref const WGraph; Node_Id) -> ref const Node_Set is
+      // The set of successors of a given node
+        return WGraph.G[ Node_Id ].Succs;
+    end func Successors;
+
+    func Predecessors(WGraph; Node_Id) -> Node_Set is
+      // The set of predecessors of a given node
+        return [for each [N => W] of WGraph.G[ Node_Id ].Back_Edges => N];
+    end func Predecessors;
+
+    func All_Nodes(WGraph) -> Node_Set is
+      // The set of all nodes
+        return 1 .. Length(WGraph.G);
+    end func All_Nodes;
+
+    func Node_Range(WGraph) -> Countable_Range<Node_Id> is
+      // The range of node-ids in use in graph
+        return 1 .. Length(WGraph.G);
+    end func Node_Range;
+
+    func Roots(WGraph) -> Node_Set is
+      // The set of all nodes with no predecessor
+        return Boundary_Set
+          (WGraph, 1 .. Length(WGraph.G), Want_Roots => #true);
+    end func Roots;
+
+    func Leaves(WGraph) -> Node_Set is
+      // The set of all nodes with no successor
+        return Boundary_Set
+          (WGraph, 1 .. Length(WGraph.G), Want_Roots => #false);
+    end func Leaves;
+
+    func BFS(WGraph; Start : Node_Set;
+      Is_Target : func(WGraph; Node_Id) -> Boolean)
+      -> optional Node_Id is
+      // Do a breadth-first search on graph for node that satisfies Is_Target.
+      // Start is set of nodes to start from.
+      // Return Node_Id for first node that satisfies Is_Target.  
+      // Return null if no such node.
+        var Seen : Array<Atomic<Boolean>, Indexed_By => Node_Id> :=
+          Create(1..Length(WGraph.G), Initial_Value => Create(#false));
+
+        // NOTE: This is only an approximate breadth-first search.
+        //       It is possible for some parts of the search to get "ahead"
+        //       of other parts in terms of depth.  A barrier would need
+        //       to be created if it was important that the result returned
+        //       represented the shallowest node that satisfied Is_Target.
+       *Outer*
+        for Next_Set => Start loop  // Start with the initial set of roots
+            for N in Next_Set concurrent loop  // Look at each node in set
+                if not Value(Seen[N]) then
+                    // Not yet seen; mark it to prevent re-checking this node.
+                    // NOTE: Race condition here, but we want to avoid overhead
+                    //       of comp-and-swap, and race condition is "benign"
+                    Set_Value(Seen[N], #true);
+                    if Is_Target(WGraph, N) then
+                        // Found a node that satisfies Is_Target
+                        // This "return" will cancel other concurrent threads
+                        return N;
+                    end if;
+                    // Continue with successors of this node
+                    continue loop Outer with Next_Set => WGraph.G[N].Succs;
+                end if;
+            end loop;
+        end loop Outer;
+        // No node found
+        return null;
+    end func BFS;
+end class WGraph;
+
+func Test_WGraph() is
+  // A test program that manipulates a weighted directed graph of univ-enums
+
+    type DGE is WGraph<Univ_Enumeration, Univ_Real>;
+
+    func Build_Graph() -> New_G : DGE is
+      // A function that builds up a graph of Univ_Enumerations
+        New_G := Create();  // Create the empty graph
+
+        const Hello := New_G.Add_Node(#hello);
+        const There := New_G.Add_Node(#there);
+        const Stranger := New_G.Add_Node(#stranger);
+
+        New_G.Add_Edge(Hello, There, 3.5);
+        New_G.Add_Edge(There, Stranger, 2.2);
+        New_G.Add_Edge(Hello, Stranger, 1.1);
+
+    end func Build_Graph;
+       
+    func Print_Nodes(DGE; Nodes : DGE::Node_Set; Indent : Univ_String := " ")
+      // Display the elements of a node set, with the given indent
+      is
+        for S in Nodes loop
+            Println(Indent | DGE[S]);
+        end loop;
+    end func Print_Nodes;
+
+    func Print_Succs(DGE; N : DGE::Node_Id) is
+      // Display the successors of a given node
+        Println("Successors of " | DGE[N] | " (node " | N | ")");
+        for S in DGE.Successors(N) loop
+            Println(" " | DGE[S] | ", weight = " | DGE.Edge_Weight(N, S));
+        end loop;
+    end func Print_Succs;
+
+    // Now build the graph and display some info on the graph
+
+    var Gr : DGE := Build_Graph();
+
+    Println("Roots of graph:");
+    Gr.Print_Nodes(Gr.Roots());
+
+    Println("Leaves of graph:");
+    Gr.Print_Nodes(Gr.Leaves());
+    
+    Println("All nodes, and their successors:");
+    for N in All_Nodes(Gr) forward loop
+        Gr.Print_Succs(N);
+    end loop;
+
+    Println("BFS(Gr, [1], lambda (G, N) -> Boolean is (G[N] == #stranger)) = "
+      | BFS(Gr, [1],
+        lambda (DGE, Node_Id) -> (DGE[Node_Id] == #stranger)));
+end func Test_WGraph;
+
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_WGraph ();
+end func main;

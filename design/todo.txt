@@ -1,0 +1,305 @@
+ParaSail to-dos, as of 1/1/2018.
+
+Reference manual:
+  - Add Syntactic Equivalences sections; merge with Sparkel manual
+Overall Priorities:
+  - Provide binary stream input/output
+  - performance enhancements; fixes for recent TN
+  - pre-compute more expressions that appear in certain places (e.g. as actuals to instantiations)
+  - when computing nested constants of a type, the parameters of the module are substituted in and
+     re-evaluated, even though they have already been evaluated once.  I suppose one fix for this is to
+     recognize constants wherever they are used, and use the corresponding global.  This might be the
+     way to get started on this (see packed_word.psl)
+  - possible bug: parascope.psl has nested block (dump graph) created to do a call, but it has no parallel calls inside it
+  - "index_set" should be checked to be sure it has appropriate Remove_* operations
+     (problem showed up when Ordered_Set was used as index_set for Ordered_Map).
+  - unable to resolve certain map/reduce expressions -- see "kmeans" example
+  - exitable parallel constructs should allow only local updates to non-concurrent objects, just like
+    concurrent loop bodies
+  - DONE: expression function should allow ")" at same indentation as "func"
+  - polymorphic "var" parameters don't work inside indexed_set because Emit_Code_For_Resolved_Tree
+     ignores polymorphic wrapping when Lvalue_Context is True.
+  - DONE: (concurrent obis are now passed by ref just like non-conc obis)
+        [X, Y, Z] when container is locked should *not* pass by reference, or we should pass conc objs by ref
+  - DONE: combine parascope.psl and compiler.psl
+
+Enhancements:
+  - zero as null means no null; used for null-free modular type; bits_64, provides indexing and slicing,
+    "from_univ" for Univ_String and Univ_Integer; everything needed for Modular and for packing
+  - "for each" should be allowed for iterating over a set, though no [Key => xx] version
+  - "for X := Init repeated while/until ... loop"  -- "repeatedt" instead of saying "then Init"
+     ("repeat" is more useful than "repeated"?)
+  - Parameterless lambdas as simple expressions
+  - allow direction (forward/reverse/concurrent) immediately after a NEWLINE
+  - Find constants as though they are parameterless functions. Allow set objects in case choices ("in" needed and intersect to check for overlaps and is-empty or overlaps op). Find set constants based on component type. 
+  - implement and use Case_Op; handle in compiler as well
+  - Allow returning functions that make certain kinds of up-level references; disallow others
+  - Replace "var_indexing" operator with something that works for Two_Way_Map (isn't "<|=" adequate?). Something that doesn't need a k/v type, like insert or put. 
+  - Provide "to_univ" for univ types so [[...]] can be used uniformly
+  - implement pre/post; add label if is to be inherited? Use a wrapper to do/skip precond in compiled code
+  - Allow a "tuple type" to be created simply via (X : Int, Y : Boolean) analogous to func result
+  - DONE: add flag to check ops and create check non null op
+  - DONE: Switch from virtual addrs to physical addresses
+  - Deal better with iterators over maps that might be altered in the loop, e.g. in parascope.psl freezing OIDs
+         //  NOTE: We do this in two steps, because freezing one OID can
+         //       have a ripple effect and freeze others, causing the
+         //       iterator to fail trying to produce a mapping to "UV".
+         //  TBD: Eventually we should detect this problem statically, though
+         //       it is not easy to do that without a lot of false positives...
+         //       We could skip items that are no longer in the map, but
+         //       that adds overhead.  We could do a more "careful" iteration
+         //       only if the map is potentially updated in the loop body;
+         //       perhaps we need an "indexing" that returns null if the element
+         //       is not present.  This would allow the caller to decide
+         //       how to handle the error, rather than always raising an
+         //       exception.  We need a way to test if a reference is null
+         //       before dereferencing it.
+ 
+  - Create stubs for code *not* compiled
+  - Provide "system" function
+  - Provide "execute" function which takes string name for operation and strings for parameters
+  - Implement conversion using Type::[[...]]?  Or Type::[) ... (]?  Or [>...<]
+  - NOT DONE: Continue of outer loop should also have an implicit "continue" of inner non-concurrent loop(s).
+  - Implement Univ_String as a large object (leave Univ_Enum as is?) with efficient "|" and "|=" like Vector
+     Make it a vector of known/short strings?  Support large slice of large const efficiently as well?
+  - Special values of large object need region (16 bits) + kind (8 bits) + value (32 bit) -- uses 1/256th of
+     64-bit space.  At least one kind is a special chunk of read-only large objects; global consts could go here,
+     or anything marked as "immortal const", as well as all CTK expressions.  Can suppress copy if
+     target is const?  How do we know?
+  - OBE: type desc on all ops so type desc is known before reconstructing value?  Not needed because reconstruct value only called where declared 
+  - DONE: routine table has local index of string name, address, and global index
+  - blog about contravariance
+  - DONE: overloading "index" to produce unique routine name
+  - DONE: local table for routine and global constants, then add to LLVM_Printer object
+  - stand-alone and local operations should be allowed to be generic
+  - "Concurrent" should work on small types, with, e.g., "+=" being locked
+  - Disallow aggregate using private components
+  - Allow use of all top-level functions defined in the current file, without "import" (see below)
+  - Continue loop which is concurrent without a new value means terminate this iteration
+  - Concurrent obj should be a wrapper, similar to polymorphic obj. -- think about poly-concurrent
+  - Complain if body of exported func is not after "exports"
+  - SAT engine in ParaSail
+  - DONE: Release GTK-compatible version with some non-trivial program (e.g NQueens)
+  - Faster region/scheduling; Generating LLVM, C#, Ada, C
+  - Come up with road map
+  - Implicit import of everything in the current file
+  - Implicit imports for stand-alone funcs even when explicit import
+  - Should constructors be inherited at all? cf. Init in GTK Controller; yes -- needed when generic formal type
+  - Race condition detection should allow a var param if other params
+     are used read-only inside nested calls, since var param is logically copy in/copy out.
+     Should only conflict with other var params after the call.  See gtk.psl as example.
+  - Integrating with GPS
+  - DONE: Finish "import" and hierarchical modules for PSL and I/O/Sockets -- blog entry?
+     import creates shorthand alias?  import X.Y as Y? what does C# do?
+  - Functional subset w. 2-line qsort -- get Map to work -- DONE: get filters to work
+  - DONE Python syntax (use ":"?)
+  - Integrate with GTK
+  - Integrating with Dafny/Boogie
+  - Add (concurrent) globals for funcs and initialized vars for modules
+  - Research projects; collaborate with grad students at Harvard, UMass, Northeastern, ...
+  - Get "units" example from Dean Sutherland to work
+  - Blog on ParaSail, Go, Rust comparison -- "implements" optional except for generics with >0 params
+  - "implements" or equivalent to specify "Algebra::Ring" or "Algebra::Group" or similar
+     most interesting would be Algebra::Commutative and Algebra::Associative.
+     Would simple procedures be better, e.g.:  func Commutative(Op : func(T;T)->T) is null;
+                                                                      {for all A:T => for all B:T => Op(A,B) == Op(B,A)}
+ -  Create more efficient "and" and "or" for countable sets (use ordered sets version?)
+  - op "filter"(set, func Filt(elem)->Boolean) -> set, possibly lazily.     for I in set {filt(I)}
+     type T1 is T{filter(T1)}
+     type Positive is Integer {Positive > 0};
+     for I in Positive::[..]  === for I in Integer::[..] {I > 0}
+
+Passing var IO
+
+ Color::#red -- does this work?
+
+[DONE] Polymorphic types as type parameters!
+
+[DONE] Container comprehension should use "<|=" if available, so "reverse" means something.
+"reverse/forward" should be allowed only if we are using "<|="
+
+Inheritance and overriding of polymorphic operations with first parameter
+being polymorphic (not just any parameter).  These preserve
+polymorphism, allow re-dispatching, and mimic "typical" OO
+semantics.
+
+Abstract interface should inherit from implemented interfaces.  But what exactly?  Inherit them all and rely on disambiguation but don't complain if only competing with equiv (probably better)? Cannot call operation through interface unless something is inherited, so what is that exactly?  
+
+Graphics
+
+Python/indent-based syntax flag (*.psn for ParaSail, iNdented)
+
+Functional subset of ParaSail -functional; -check flag; X | [key => val] for updating container; allow some statements but not assign/move/swap, loop (except in quantified expr and container comprehension).
+
+Separate(ref,ref2,...) says no overlap
+Separate(ref,...,(ro_ref1,...)) allows read only refs to overlap each other but not any of the rw refs.
+Use "separate" to define result of a function that returns a "slice" comprising a particular component of each element of an array of composite objects.   E.g. "separate(A_Part(arr), B_Part(arr))" or use syntax "arr[..].A", automatically creates an "indexing" op which takes "arr" and index and returns ref to arr[I].A?
+Use "<*>" operator to indicate no overlap? ("separate" is more flexible and intuitive).
+
+ref X => Y.Z.F;  "Y.Z" path has been handed off to X (read-only) for its entire lifetime.
+Y.Z := null; -- disallowed
+Y.Q := null; -- OK
+
+Binary operator ">|<" for move and combine left and right into result.
+  (N) vs. N --> (N) preserves value of N; "N" by itself is destroyed
+
+Allow "X for T" as r/o param that is a "source" for T, set to null. Var X for T can have some ending value other than null (e.g. Empty set). 
+For all X:T allowed w/o iteration but with filter
+For all T:T assumed at beginning of invariants
+
+op "null" as a way to specify null value for an imported "small" type.
+Do we properly handle case of module with a single *optional* component -- can't use wrapper!
+
+ParaSail on top of JavaScript
+PSL namespace built in, with IO passed as a parameter to program; PSL::JavaScript::; PSL::Java
+Named result not defined if parenthesized and not present on spec (see mat_vec "*").
+Need way to refer to declarations of parent type after instantiation
+  (allow "Parent_Type is"? Or just make them visible if not hidden, with appropriate substitutions?)
+ Aliasing checks
+optionality/nullness checks
+
+(for all/some ...) should use concurrent loop and exit loop with ...
+
+[DONE] (if xxx then yyy) == (if xxx then yyy else null)
+
+[DONE] For x in S, x*2 => y (comma allows specifying key)
+
+"var_indexing" is a bit weird, since it requires exclusive access to the entire container.
+Perhaps should have special syntax for that, e.g. A[|3|] := 5;  or  A[+3+] := 5;  or  A+[3] := 5; or A[<3>] := 5 or A[>3<] := 5 (this latter seems less ambiguous, but not exactly intuitive).
+Note that we already have "A |= [3 => 5]" but that is a bit verbose, and is more of an idiom than something someone would come up with on their own.  
+Perhaps we want to have a way of *preventing* the use of "var_indexing," as that will be relatively unusual (e.g. (A)[3] to imply that A should not be extended).
+==> Or use static analysis to determine that we *know* index is already defined, so no need to use "var_indexing."  That seems like the safest.
+
+[DONE] Should allow implicit convertion *to* univ_* in most contexts (except when calling an operation defined in the univ_* module).   Iterators-in-aggregates should allow for this as well.
+--
+Passing var IO
+
+ Color::#red -- does this work?
+
+[DONE] Polymorphic types as type parameters!
+
+[DONE] Container comprehension should use "<|=" if available, so "reverse" means something.
+"reverse/forward" should be allowed only if we are using "<|="
+
+Inheritance and overriding of polymorphic operations with first parameter
+being polymorphic (not just any parameter).  These preserve
+polymorphism, allow re-dispatching, and mimic "typical" OO
+semantics.
+
+Abstract interface should inherit from implemented interfaces.  But what exactly?  Are parameter names and defaults inherited?  Only if identical?  Only if unique (better for maintenance)?  Cannot call operation through interface unless something inherited.
+
+Graphics
+
+Python/indent-based syntax flag (*.psn for ParaSail, iNdented)
+
+Functional subset of ParaSail -functional; -check flag; X | [key => val] for updating container; include some statements, in particular type, const, func declarations, and if, loop, block, case, and return statement; no concurrent objects, no parallel, but [A, B] and (A, B) are parallel 
+
+Separate(ref,ref2,...) says no overlap
+Separate(ref,...,(ro_ref1,...)) allows read only refs to overlap each other but not any of the rw refs.
+Use "separate" to define result of a function that returns a "slice" comprising a particular component of each element of an array of composite objects.   E.g. "separate(A_Part(arr), B_Part(arr))" or use syntax "arr[..].A", automatically creates an "indexing" op which takes "arr" and index and returns ref to arr[I].A?
+Use "<*>" operator to indicate no overlap? ("separate" is more flexible and intuitive).
+
+ref X => Y.Z.F;  "Y.Z" path has been handed off to X (read-only) for its entire lifetime.
+Y.Z := null; -- disallowed
+Y.Q := null; -- OK
+
+Binary operator ">|<" for move and combine left and right into result.
+  (N) vs. N --> (N) preserves value of N; "N" by itself is destroyed
+
+Allow "X for T" as r/o param that is a "source" for T, set to null. Var X for T can have some ending value other than null (e.g. Empty set). 
+For all X:T allowed w/o iteration but with filter
+For all T:T assumed at beginning of invariants
+
+op "null" as a way to specify null value for an imported "small" type.
+Do we properly handle case of module with a single *optional* component -- can't use wrapper!
+
+ParaSail on top of JavaScript
+PSL namespace built in, with IO passed as a parameter to program; PSL::JavaScript::; PSL::Java
+Named result not defined if parenthesized and not present on spec (see mat_vec "*").
+Need way to refer to declarations of parent type after instantiation
+  (allow "Parent_Type is"? Or just make them visible if not hidden, with appropriate substitutions?)
+ Aliasing checks
+optionality/nullness checks
+
+(for all/some ...) should use concurrent loop and exit loop with ...
+
+[DONE] (if xxx then yyy) == (if xxx then yyy else null)
+
+[DONE] For x in S, x*2 => y (comma allows specifying key)
+
+"var_indexing" is a bit weird, since it requires exclusive access to the entire container.
+Perhaps should have special syntax for that, e.g. A[|3|] := 5;  or  A[+3+] := 5;  or  A+[3] := 5; or A[<3>] := 5 or A[>3<] := 5 (this latter seems less ambiguous, but not exactly intuitive).
+Note that we already have "A |= [3 => 5]" but that is a bit verbose, and is more of an idiom than something someone would come up with on their own.  
+Perhaps we want to have a way of *preventing* the use of "var_indexing," as that will be relatively unusual (e.g. (A)[3] to imply that A should not be extended).
+==> Or use static analysis to determine that we *know* index is already defined, so no need to use "var_indexing."  That seems like the safest.
+
+[DONE] Should allow implicit convertion *to* univ_* in most contexts (except when calling an operation defined in the univ_* module).   Iterators-in-aggregates should allow for this as well.
+--
+Passing var IO
+
+ Color::#red -- does this work?
+
+[DONE] Polymorphic types as type parameters!
+
+[DONE] Container comprehension should use "<|=" if available, so "reverse" means something.
+"reverse/forward" should be allowed only if we are using "<|="
+
+Inheritance and overriding of polymorphic operations with first parameter being polymorphic (not just any parameter).  These preserve polymorphism, allow re-dispatching, and mimic "typical" OO semantics.
+
+Abstract interface should inherit from implemented interfaces.  But what exactly?  Are parameter names and defaults inherited?  Only if identical?  Only if unique (better for maintenance)?  Cannot call operation through interface unless something inherited.
+
+Graphics
+
+Python/indent-based syntax flag (*.psn for ParaSail, iNdented)
+
+Functional subset of ParaSail -functional; -check flag; X | [key => val] for updating container; include most statements except var declarations, assign/move/swap, func call, then/||, loop (but allow quantified exprs and container comprehensions)
+
+Separate(ref,ref2,...) says no overlap
+Separate(ref,...,(ro_ref1,...)) allows read only refs to overlap each other but not any of the rw refs.
+Use "separate" to define result of a function that returns a "slice" comprising a particular component of each element of an array of composite objects.   E.g. "separate(A_Part(arr), B_Part(arr))" or use syntax "arr[..].A", automatically creates an "indexing" op which takes "arr" and index and returns ref to arr[I].A?
+Use "<*>" operator to indicate no overlap? ("separate" is more flexible and intuitive).
+
+ref X => Y.Z.F;  "Y.Z" path has been handed off to X (read-only) for its entire lifetime.
+Y.Z := null; -- disallowed
+Y.Q := null; -- OK
+
+Binary operator ">|<" for move and combine left and right into result.
+  (N) vs. N --> (N) preserves value of N; "N" by itself is destroyed
+
+Allow "X for T" as r/o param that is a "source" for T, set to null. Var X for T can have some ending value other than null (e.g. Empty set). 
+For all X:T allowed w/o iteration but with filter
+For all T:T assumed at beginning of invariants
+
+op "null" as a way to specify null value for an imported "small" type.
+Do we properly handle case of module with a single *optional* component -- can't use wrapper!
+
+ParaSail on top of JavaScript
+PSL namespace built in, with IO passed as a parameter to program; PSL::JavaScript::; PSL::Java
+Named result not defined if parenthesized and not present on spec (see mat_vec "*").
+Need way to refer to declarations of parent type after instantiation
+  (allow "Parent_Type is"? Or just make them visible if not hidden, with appropriate substitutions?)
+ Aliasing checks
+optionality/nullness checks
+
+(for all/some ...) should use concurrent loop and exit loop with ...
+
+[DONE] (if xxx then yyy) == (if xxx then yyy else null)
+
+[DONE] For x in S, x*2 => y (comma allows specifying key)
+
+"var_indexing" is a bit weird, since it requires exclusive access to the entire container.
+Perhaps should have special syntax for that, e.g. A[|3|] := 5;  or  A[+3+] := 5;  or  A+[3] := 5; or A[<3>] := 5 or A[>3<] := 5 (this latter seems less ambiguous, but not exactly intuitive).
+Note that we already have "A |= [3 => 5]" but that is a bit verbose, and is more of an idiom than something someone would come up with on their own.  
+Perhaps we want to have a way of *preventing* the use of "var_indexing," as that will be relatively unusual (e.g. (A)[3] to imply that A should not be extended).
+==> Or use static analysis to determine that we *know* index is already defined, so no need to use "var_indexing."  That seems like the safest.
+
+[DONE] Should allow implicit convertion *to* univ_* in most contexts (except when calling an operation defined in the univ_* module).   Iterators-in-aggregates should allow for this as well.
+--
+Passing var IO
+
+ Color::#red -- does this work?
+
+[DONE] Polymorphic types as type parameters!
+
+[DONE] Container comprehension should use "<|=" if available, so "reverse" means something.
+"reverse/forward" should be allowed only if we are using "<|="

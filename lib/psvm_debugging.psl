@@ -1,0 +1,783 @@
+interface PSC::Debugging<> is
+    func Dump_One_Decl(var Out_File : Output_Stream+;
+      R : Reflection::Region; Item : Reflection::Decl;
+      File_Name : Univ_String; Indent : Univ_Integer := 0)
+
+    func Dump(Pattern : Univ_String := "*.psl")
+
+    func Matches (Name : Univ_String; Pattern : Univ_String) -> Boolean
+
+    func Dump_One_Instr(var Out_File : Output_Stream+;
+      Instr : Reflection::Instruction; Indent : Univ_Integer)
+
+end interface PSC::Debugging
+
+class PSC::Debugging is
+    type Object_Locator is PSC::Reflection::Object_Locator
+
+    func Display_Type_Name
+      (var Out_File : Output_Stream+; Object_Locator) is
+        if Object_Locator not null
+          and then Object_Locator.Base() ==
+            Reflection::Object_Locator::Zero_Base then
+           const Desc := Reflection::Type_Descriptor::Type_Desc_At_Locator
+             (Object_Locator)
+           if Desc not null then
+              Out_File.Print (" = " | Desc.Name())
+           end if
+        end if
+    end func Display_Type_Name
+
+    func Display_Call_Target
+      (var Out_File : Output_Stream+;
+       Call_Target: Object_Locator; Static_Link : Object_Locator;
+       Target_Index : Reflection::Routine_Index := 0) is
+       if Target_Index != 0 then
+          Out_File.Print (" = " |
+            Reflection::Routine::Routine_At_Index(Target_Index).Name())
+       end if
+    end func Display_Call_Target
+
+    func Ext_Obj_Locator_Image(Object_Locator) -> Univ_String is
+       const Name := Name_For_Object_Locator (Object_Locator)
+    
+       if Name not null and then Name != "" then
+          //  We have something meaningful to use to annotate the locator
+          return To_String(Object_Locator) | " = " | Name
+       else
+          return To_String(Object_Locator)
+       end if
+    end func Ext_Obj_Locator_Image
+
+    func Dump_Nested_Decls(var Out_File : Output_Stream+;
+      Item : Reflection::Decl; Indent : Univ_Integer) is
+        // Recurse on nested items
+        const Region := not Is_Spec(Item) and then Kind(Item) == #operation?
+                          Body_Region (Item) : Decl_Region(Item)
+        const File_Name := File (Decl_Source_Pos (Item))
+
+        for I in 1 .. Num_Items(Region) forward loop
+            Dump_One_Decl (Out_File,
+              Region, Nth_Item(Region, I), File_Name, Indent => Indent + 2)
+        end loop
+    end func Dump_Nested_Decls
+
+    func Dump_One_Module
+     (var Out_File : Output_Stream+;
+      Item : Reflection::Decl;
+      Indent : Univ_Integer := 0) is
+
+        Out_File.Println ((Indent * " ") | "package " |
+          (Is_Spec (Item)? "" : "body ") | Id (Item) | " is")
+        Dump_Nested_Decls (Out_File, Item, Indent)
+        Out_File.Println ((Indent * " ") | "end " | Id (Item) | ";")
+
+    end func Dump_One_Module
+
+    func Dump_One_Operation
+     (var Out_File : Output_Stream+;
+      Item : Reflection::Decl;
+       Indent : Univ_Integer) is
+
+        const R := Decl_Region(Item)
+        const Routine := Routine_For_Operation(Item)
+        if Routine is null then
+           Out_File.Println ((Indent * " ") | "procedure " | Id(Item) |
+             " has a null Routine.")
+           return
+        end if
+
+        const Mod_Name := Module_Name(Routine)
+        const Full_Name := (Mod_Name is null or else Mod_Name == ""?
+                            Id(Item) : Mod_Name | "::" | Id(Item))
+        const Unique_Index := Num_Prior_Homonyms(Item)
+
+        Out_File.Print ((Indent * " ") | "procedure " |
+          Full_Name | (Unique_Index > 0? "#" | Unique_Index: "") |
+          " (Ctx : PSC.Context");
+
+        for I in 1 .. Num_Items(R) forward loop
+            const Param := Nth_Item (R, I)
+
+            Out_File.Print ("; " | Id(Param) | " : PSC.Object");
+        end loop
+
+        if Is_Spec (Item) then
+            Out_File.Println (");");
+        else
+            Out_File.Println (") is");
+
+            Out_File.Println ((Indent * " ") | "  [routine params:")
+            for each P of Parameters(Routine) {not P.Is_Operation_Output}
+              forward loop
+                Out_File.Println((Indent * " ") | "   " | P.Name |
+                  " : " | P.Type_Name)
+            end loop
+
+            for each P of Parameters(Routine) {P.Is_Operation_Output}
+              forward loop
+                Out_File.Println((Indent * " ") | "   -> " | P.Name |
+                  " : " | P.Type_Name)
+            end loop
+            Out_File.Println ((Indent * " ") | "  ]")
+
+            Dump_Nested_Decls (Out_File, Item, Indent)
+
+            Out_File.Println ((Indent * " ") | "begin");
+            Out_File.Println ("");
+
+            // Dump individual instructions
+            for I in 1 .. Num_Instrs(Routine) forward loop
+                Dump_One_Instr(Out_File, Nth_Instr(Routine, I), Indent+4)
+            end loop
+
+            Out_File.Println ((Indent * " ") | "end " | Id (Item) | ";")
+        end if;
+    end func Dump_One_Operation
+
+    func Dump_One_Type
+     (var Out_File : Output_Stream+;
+      Item : Reflection::Decl;
+       Indent : Univ_Integer) is
+
+        const Desc := Descriptor_For_Type(Item)
+
+        Out_File.Println (Indent * " " | "type " | Id (Item) | " is " |
+          " new PSC.Object;")
+
+        if Desc is null then
+           Out_File.Println (Indent * " " | "--  Type descriptor is null.");
+           return
+        end if
+
+        Out_File.Println (Indent * " " | "--  Type_Name: " | Name(Desc))
+        Out_File.Println (Indent * " " | "--    Has_Op_Map: " |
+          Has_Op_Map(Desc))
+        Out_File.Println (Indent * " " | "--    Index: " | Index(Desc))
+        Out_File.Println (Indent * " " | "--    Type_Kind: " | Type_Kind(Desc))
+        Out_File.Println (Indent * " " | "--    Is_Small: " | Is_Small(Desc))
+
+        const Ops := Operations(Desc)
+        Out_File.Println (Indent * " " | "--    Num_Ops: " | |Ops|);
+        for each [I => Op] of Ops forward loop
+           if Op is null then
+              Println("Op # " | I | " of type desc " | Name(Desc) | " is null")
+              continue loop
+           end if
+           const Op_Routine := Reflection::Routine::Routine_At_Index(Op.Index)
+           const Overload_Ix := Reflection::Routine::Num_Prior_Homonyms
+                                                         (Op_Routine)
+           const Overloading := Overload_Ix > 0? "#" | Overload_Ix: ""
+           Out_File.Println (Indent * " " | "--    " | Op.Op_Index |
+             ". " | Name(Op_Routine) | Overloading | " = #" | Op.Index)
+           if Op.Action != #no_action then
+              Out_File.Println
+                (Indent * " " | "--       Action: " | Op.Action)
+           end if
+           if Op.Use_Static_Link_For_Type then
+              Out_File.Println (Indent * " " |
+                "--       Use_Static_Link_For_Type: " |
+                Op.Use_Static_Link_For_Type)
+           end if
+        end loop
+
+    end func Dump_One_Type
+
+    func Dump_One_Object
+     (var Out_File : Output_Stream+;
+      Item : Reflection::Decl;
+       Indent : Univ_Integer) is
+
+        Out_File.Println (Indent * " " | Id (Item) | " : PSC.Object;");
+        if Base(Location(Item)) == Reflection::Object_Locator::Const_Area then
+           const Info :=
+             Const_Info_At_Locator (Location (Item))
+           if Info is null then
+              Out_File.Println ("?Const_Info_At_Locator(" | Location(Item) |
+                ") is null?")
+              return
+           end if
+           Out_File.Println (Indent * " " | " Const_Info::(Name => " |
+             Info.Name | ", Data => (Type_Desc => " |
+               Info.Data.Type_Desc.Name() | ", Addr => " | Info.Data.Addr |
+               ", Value => " | Info.Data.Value | "))")
+           var Dummy : Univ_Integer := 0
+           var PFS := Per_File_String_Table::Create(Dummy)
+           Out_File.Println (Indent * " " | " Stream_Rep = ")
+           for each Str of
+             To_String_Vec(Stream(Value_Of_Global_Const(Item), PFS))
+             forward loop
+              Out_File.Print(Str)
+           end loop
+           Out_File.Print('\n')
+           // Out_File.Print (Indent * " "); Out_File.Print(" Stream_Rep = ")
+           // Out_File.Print (To_String(Stream(Value_Of_Global_Const(Item))))
+        end if
+
+    end func Dump_One_Object
+
+  exports
+    func Dump_One_Instr(var Out_File : Output_Stream+;
+      Instr : Reflection::Instruction; Indent : Univ_Integer) is
+        const Op := Opcode(Instr)
+
+        Out_File.Print
+          (Indent * " " | Source_Pos(Instr) | ": (" | Op)
+        case Op of
+            [#Skip_Op | #Exit_Op] =>
+               Out_File.Print (", Skip_Count => " | Instr.Skip_Count());
+
+               case Op of
+                  [#Exit_Op] =>
+                     Out_File.Print (", Level_Diff => " |
+                          Instr.Level_Diff());
+                  //  This indicates how many nested block levels
+                  //  the exit statement is exiting from.
+                  [..] =>
+                     null;
+               end case;
+
+            [#Call_Op | #Indirect_Call_Op |
+             #Call_Nested_Block_Op | #Check_Nested_Block_Op] =>
+               Out_File.Print (", Params => " | Instr.Params());
+               Out_File.Print (", Static_Link => " |
+                    Instr.Static_Link());
+
+               //  Points to enclosing local area or type area
+               Out_File.Display_Type_Name (Instr.Static_Link());
+
+               case Op of
+                  [#Call_Op | #Indirect_Call_Op] =>
+                     Out_File.Print
+                       (", Call_Target => " |
+                        Instr.Call_Target());
+                     if Op == #Call_Op then
+                        Out_File.Display_Call_Target
+                          (Instr.Call_Target(), Instr.Static_Link(),
+                           Instr.Target_Index());
+                           //  Index of called routine, which might be abstract
+                     end if;
+                     Out_File.Print
+                       (", Target_Index => " |
+                        Instr.Target_Index());
+                     if Instr.Locked_Param_Index() > 0 then
+                     //  If greater than zero, indicates which parameter
+                     //  is locked during the execution of the call.
+                     //  If zero, then there is no lock acquired, though it
+                     //  might be a lock-free operation on a concurrent object.
+                        Out_File.Print
+                          (", Locked_Param_Index => " |
+                           Instr.Locked_Param_Index());
+                     end if;
+                     if Op == #Indirect_Call_Op then
+                        if Instr.Num_In_Params() > 0 then
+                           Out_File.Print
+                             (", Indirect_Num_In_Params  =>" |
+                              Instr.Num_In_Params());
+                              //  Number of input parameters in the indir call
+                        end if
+
+                        if Instr.Num_Out_Params() > 0 then
+                           Out_File.Print
+                             (", Indirect_Num_Out_Params =>" |
+                              Instr.Num_Out_Params());
+                              //  Number of output parameters in the indir call
+                        end if
+                     end if
+
+                  [#Call_Nested_Block_Op | #Check_Nested_Block_Op] =>
+                     Out_File.Print
+                       (", Code_Block => " |
+                           Instr.Code_Block());
+                     //  This describes the nested block of code
+                     case Op of
+                        [#Check_Nested_Block_Op] =>
+                           Out_File.Print
+                             (", Assertion_Str => " |
+                                 Instr.Assertion_Str());
+                        //  A string representation of assertion being checked
+                        [..] =>
+                           null;
+                     end case;
+                  [..] =>
+                     null;
+               end case;
+
+            [#Return_Op] =>
+               null;
+
+            [#Store_Int_Lit_Op                    |
+                 #Store_Str_Lit_Op                    |
+                 #Store_Real_Lit_Op                   |
+                 #Store_Enum_Lit_Op                   |
+                 #Store_Char_Lit_Op                   |
+                 #Store_Operation_Desc_Op             |
+                 #Copy_Word_Op                        |
+                 #Copy_Address_Op                     |
+                 #Store_Address_Op                    |
+                 #Assign_Word_Op                      |
+                 #Swap_Obj_Op                         |
+                 #Move_Obj_Op                         |
+                 #Store_Local_Null_Op                 |
+                 #Store_Large_Local_Null_Op           |
+                 #Store_Null_Of_Same_Stg_Rgn_Op       |
+                 #Create_Obj_Op                       |
+                 #Create_Lock_For_Obj_Op              |
+                 #Create_Polymorphic_Obj_Op           |
+                 #Unwrap_Polymorphic_Obj_Op           |
+                 #Store_Type_Related_Obj_Op           |
+                 #Store_Type_Related_Addr_Op          |
+                 #Select_Polymorphic_Ancestor_Part_Op |
+                 #Select_Ancestor_Part_Op             |
+                 #Make_Copy_In_Stg_Rgn_Op             |
+                 #Is_Null_Op                          |
+                 #Not_Null_Op                         |
+                 #Declare_Obj_Op                      |
+                 #Check_Not_Null_Op]                  =>
+
+               Out_File.Print (", Destination => " |
+                    Instr.Destination());
+
+               //  For Create_Polymorphic_Obj_Op, identifies object to be
+               //  replaced with it wrapped as a polymorphic object.
+               if Instr.Dest_Name() not null and then Instr.Dest_Name() != ""
+                 then
+                  //  If non-null, identifies object being initialized
+                  Out_File.Print (", Dest_Name => " | Instr.Dest_Name());
+               end if;
+
+               case Op of
+                  [#Store_Local_Null_Op | #Check_Not_Null_Op] =>
+                     //  Type of object determines whether or not object is
+                     //  small. Stg_Rgn is the current local region.
+                     Out_File.Print
+                       (", Null_Type_Info => " |
+                        Instr.Null_Type_Info());
+                     Out_File.Display_Type_Name (Instr.Null_Type_Info());
+
+                  [#Store_Large_Local_Null_Op] =>
+                     Out_File.Print
+                       (", Local_Addr => " |
+                        Instr.Local_Addr());
+
+                  [#Store_Int_Lit_Op] =>
+                     Out_File.Print (", Int_Value => " |
+                          Instr.Int_Value());
+
+                  [#Store_Char_Lit_Op] =>
+                     Out_File.Print
+                       (", Char_Value => " |
+                        Instr.Char_Value());
+
+                  [#Store_Real_Lit_Op] =>
+                     Out_File.Print
+                       (", Real_Value => " | Instr.Real_Value());
+
+                  [#Store_Str_Lit_Op] =>
+                     Out_File.Print
+                       (", Str_Value => \"" | Instr.Str_Value() | "\"");
+
+                  [#Store_Enum_Lit_Op] =>
+                     Out_File.Print
+                       (", Enum_Value => " | Instr.Enum_Value());
+
+                  [#Declare_Obj_Op] =>
+                     Out_File.Print
+                       (", Declare_Type_Info => " |
+                        Instr.Declare_Type_Info());
+                     Out_File.Display_Type_Name (Instr.Declare_Type_Info());
+
+                  [#Copy_Word_Op                            |
+                       #Copy_Address_Op                     |
+                       #Store_Address_Op                    |
+                       #Assign_Word_Op                      |
+                       #Swap_Obj_Op                         |
+                       #Move_Obj_Op                         |
+                       #Store_Null_Of_Same_Stg_Rgn_Op       |
+                       #Store_Operation_Desc_Op             |
+                       #Create_Obj_Op                       |
+                       #Create_Polymorphic_Obj_Op           |
+                       #Unwrap_Polymorphic_Obj_Op           |
+                       #Store_Type_Related_Obj_Op           |
+                       #Store_Type_Related_Addr_Op          |
+                       #Select_Polymorphic_Ancestor_Part_Op |
+                       #Select_Ancestor_Part_Op             |
+                       #Make_Copy_In_Stg_Rgn_Op             |
+                       #Is_Null_Op                          |
+                       #Not_Null_Op]                         =>
+                     Out_File.Print (", Source => " |
+                          Ext_Obj_Locator_Image (Instr.Source()));
+                     //  For Select_*Ancestor_Part_Op, is object
+                     //  whose ancestor part is to be extracted.
+
+                     if not Instr.Might_Be_Null() then
+                        Out_File.Print (" [non-null]");
+                     end if
+
+                     case Op of
+                        [#Store_Operation_Desc_Op] =>
+                           //  Operation_Desc includes both
+                           //  static link and routine locator.
+                           //  A "null" operation is represented by a null
+                           //  static link and a null locator.
+                           Out_File.Print
+                             (", Operation_Static_Link => " |
+                              Instr.Operation_Static_Link());
+                           Out_File.Display_Type_Name
+                             (Instr.Operation_Static_Link());
+                           Out_File.Print
+                             (", Operation_Locator => " |
+                              Instr.Operation_Locator());
+                           Out_File.Display_Call_Target
+                             (Instr.Operation_Locator(),
+                              Static_Link =>
+                                Instr.Operation_Static_Link());
+
+                        [#Assign_Word_Op                      |
+                             #Swap_Obj_Op                         |
+                             #Move_Obj_Op                         |
+                             #Store_Null_Of_Same_Stg_Rgn_Op       |
+                             #Create_Obj_Op                       |
+                             #Create_Polymorphic_Obj_Op           |
+                             #Unwrap_Polymorphic_Obj_Op           |
+                             #Store_Type_Related_Obj_Op           |
+                             #Store_Type_Related_Addr_Op          |
+                             #Select_Polymorphic_Ancestor_Part_Op |
+                             #Select_Ancestor_Part_Op             |
+                             #Make_Copy_In_Stg_Rgn_Op             |
+                             #Is_Null_Op                          |
+                             #Not_Null_Op]                         =>
+                           Out_File.Print
+                             (", Type_Info => " |
+                              Instr.Type_Info());
+                           //  Determines whether small or large.
+                           //  For Store_Null, determines kind of null if
+                           //   small.
+                           //  For Create_Obj_Op determines type of obj to
+                           //   create if large, and kind of null if small.
+                           //  For Select_*Ancestor_Part_Op, determines type of
+                           //  ancestor part to be extracted.  This becomes a
+                           //  simple
+                           //  Copy_Word_Op if the component-extension levels
+                           //  are the same between the source object's type-id
+                           //  and the ancestor type.
+                           //  For Unwrap_Polymorphic_Obj_Op, this is the
+                           //  non-polymorphic type for which we are testing.
+                           Out_File.Display_Type_Name (Instr.Type_Info());
+                           case Op of
+                              [#Make_Copy_In_Stg_Rgn_Op] =>
+                                 Out_File.Print
+                                   (", Existing_Obj_In_Stg_Rgn => " |
+                                    Instr.Existing_Obj_In_Stg_Rgn());
+
+                              //  Determines region for Make_Copy
+                              [#Select_Ancestor_Part_Op |
+                                #Unwrap_Polymorphic_Obj_Op |
+                                #Store_Type_Related_Obj_Op |
+                                #Store_Type_Related_Addr_Op] =>
+                                 Out_File.Print
+                                   (", Source_Type_Info => " |
+                                    Instr.Source_Type_Info());
+                                 Out_File.Display_Type_Name
+                                   (Instr.Source_Type_Info());
+                                 case Op of
+                                    [#Select_Ancestor_Part_Op] =>
+                                       Out_File.Print
+                                         (", Ancestor_Lvalue => " |
+                                          Instr.Ancestor_Lvalue());
+                                    [..] =>
+                                       null;
+                                 end case;
+
+                              [#Select_Polymorphic_Ancestor_Part_Op] =>
+                                 Out_File.Print
+                                   (", Polymorphic_Ancestor_Lvalue => " |
+                                    Instr.Polymorphic_Ancestor_Lvalue());
+
+                              [..] =>
+                                 null;
+                           end case;
+                        [..] =>
+                           null;
+                     end case;
+                  [..] =>
+                     null;
+               end case;
+
+            [#If_Op] =>
+               Out_File.Print (", If_Source => " |
+                    Ext_Obj_Locator_Image (Instr.If_Source()));
+               Out_File.Print
+                 (", If_Condition => " |
+                  Instr.If_Condition());
+               Out_File.Print
+                 (", Skip_If_False => " |
+                  Instr.Skip_If_False());
+
+            [#Start_Parallel_Op      |
+                 #Start_Handled_Op       |
+                 #Add_Parallel_Op        |
+                 #Wait_For_Parallel_Op   |
+                 #Start_Parallel_Call_Op |
+                 #Add_Parallel_Call_Op   |
+                 #Create_Tcb_Op          |
+                 #Prepare_To_Exit_Parallel_Op] =>
+
+               Out_File.Print
+                 (", Parallel_Master => " |
+                  Instr.Parallel_Master());
+
+               case Op of
+                  [#Start_Parallel_Op      |
+                   #Start_Handled_Op       |
+                   #Add_Parallel_Op        |
+                   #Start_Parallel_Call_Op |
+                   #Add_Parallel_Call_Op   |
+                   #Create_Tcb_Op]          =>
+
+                     Out_File.Print
+                       (", Parallel_Control => " |
+                        Instr.Parallel_Control());
+
+                     Out_File.Print
+                       (", Parallel_Static_Link => " |
+                        Instr.Parallel_Static_Link());
+                     //  Points to enclosing local area or type area
+                     Out_File.Display_Type_Name (Instr.Parallel_Static_Link());
+
+                     if Instr.Num_In_Params() > 0 then
+                        Out_File.Print
+                          (", Num_In_Params  =>" |
+                           Instr.Num_In_Params());
+                           //  Number of input parameters in the parallel call
+                     end if
+
+                     if Instr.Num_Out_Params() > 0 then
+                        Out_File.Print
+                          (", Num_Out_Params =>" |
+                           Instr.Num_Out_Params());
+                           //  Number of output parameters in the parallel call
+                     end if
+
+                     case Op of
+                        [#Start_Parallel_Op | #Start_Handled_Op |
+                         #Add_Parallel_Op] =>
+
+                           Out_File.Print
+                             (", Parallel_Code_Block => " |
+                                 Instr.Parallel_Code_Block());
+
+                        [#Start_Parallel_Call_Op | #Add_Parallel_Call_Op] =>
+
+                           Out_File.Print
+                             (", Parallel_Call_Target => " |
+                              Instr.Parallel_Call_Target());
+                           //  This identifies the operation to be called
+                           Out_File.Display_Call_Target
+                             (Instr.Parallel_Call_Target(),
+                              Instr.Parallel_Static_Link(),
+                              Instr.Parallel_Target_Index());
+
+                           //  Index of called routine, which might be abstract.
+                           Out_File.Print
+                             (", Parallel_Target_Index => " |
+                              Instr.Parallel_Target_Index());
+
+                           if Instr.Parallel_Locked_Param_Index() > 0 then
+                              //  Indicates which param, if any, is locked
+                              //  during the execution of the call.
+                              Out_File.Print
+                                (", Parallel_Locked_Param_Index => " |
+                                 Instr.Parallel_Locked_Param_Index());
+                           end if;
+
+                        [..] =>
+                           null;
+                     end case;
+
+                  [..] =>
+                     null;
+               end case;
+
+            [#Case_Op] =>
+               Out_File.Print
+                 (", Case_Selector => " |
+                  Ext_Obj_Locator_Image (Instr.Case_Selector()));
+               // Out_File.Print (", Case_First => " |
+               //     Instr.Case_First));
+               //  Skips number of instructions determined by
+               //    Case_Selector - Case_First
+               //      if Case_Selector in Case_First .. Case_Last.
+               // Out_File.Print
+               //   (", Case_Last => " | Instr.Case_Last());
+               Out_File.Print
+                 (", Case_Default_Skip => " |
+                  Instr.Case_Default_Skip());
+            //  Number of instructions to skip
+            //  if Case_Selector not in Case_First .. Case_Last.
+            //  Negative for loop back.
+
+            [#Begin_Nested_Block_Op] =>
+               Out_File.Print
+                 (", Nested_Code_Block => " |
+                     Instr.Nested_Code_Block());
+
+               Out_File.Print
+                 (", Nested_Block_Region => " | 
+                     Instr.Nested_Block_Region());
+
+            [#Loop_Op] =>
+               null;
+            [..] =>
+               Out_File.Print(" ??? ");
+        end case;
+        Out_File.Println (")")
+    end func Dump_One_Instr
+
+    func Matches (Name : Univ_String; Pattern : Univ_String) -> Boolean is
+        // Return #true if Name matches glob-like Pattern
+        if Pattern == "*"
+          or else Name == Pattern then
+            return #true
+        elsif Pattern == ""
+          or else Name == "" then
+            // Ran out of Name or Pattern
+            return #false
+        end if
+
+        const Rest_Of_Pattern := Pattern[2 .. |Pattern|]
+
+        case Pattern[1] of
+          ['*'] =>
+            //  Try all suffixes of Name against Rest_Of_Pattern
+            for I in 1 .. |Name| loop
+                if Matches (Name[I .. |Name|], Rest_Of_Pattern) then
+                    return #true
+                end if
+            end loop
+            //  No match found
+            return #false
+          ['?'] =>
+              //  Ignore next character of Name
+              return Matches(Name[2..|Name|], Rest_Of_Pattern)
+          ['\\'] =>
+              //  Next character of Pattern is taken literally
+              if |Pattern| == 1 or else Name[1] != Pattern[2] then
+                 return #false
+              end if
+              //  Recurse on rest of Name/Pattern
+              return Matches(Name[2..|Name|], Pattern[3..|Pattern|])
+          [..] =>
+              if Name[1] != Pattern[1] then
+                  //  Not a match
+                  return #false
+              end if
+              //  Recurse on rest of Name/Pattern
+              return Matches(Name[2..|Name|], Rest_Of_Pattern)
+        end case
+        //  Shouldn't get here
+        {> #false <}
+    end func Matches
+
+    func Dump_One_Decl(var Out_File : Output_Stream+;
+      R : Reflection::Region; Item : Reflection::Decl;
+      File_Name : Univ_String; Indent : Univ_Integer := 0) is
+        if Item is null then
+           return
+        end if
+        const Name := Id(Item)
+
+        const Source_Pos := Decl_Source_Pos (Item)
+        if File_Name != "" and then File (Source_Pos) != File_Name then
+            --  Ignore this one; from a different file than its encloser
+            return
+        end if
+
+        const Ind := Indent * " "
+        Out_File.Println(Ind | "--  Name: " | Name)
+        if Module_Name(Item) not null then
+           Out_File.Println(Ind | "--    Module_Name: " | Module_Name(Item))
+        end if
+        Out_File.Println(Ind | "--    Source_Pos: " | Source_Pos)
+        Out_File.Println(Ind | "--    Kind: "    | Kind(Item))
+        Out_File.Println(Ind | "--    Is_Spec: " | Is_Spec(Item))
+        Out_File.Println(Ind | "--    Is_Spec(Spec()): " | Is_Spec(Spec(Item)))
+        Out_File.Println(Ind | "--    Context: " | Context(Item))
+        Out_File.Println(Ind | "--    Level: "   | Level(Item))
+        Out_File.Println(Ind | "--    Base(Location): " |
+          Reflection::Object_Locator::Decode_Base(Base(Location(Item))))
+        Out_File.Println(Ind | "--    Offset(Location): " |
+          Offset(Location(Item)))
+        case Kind(Item) of
+          [#module] =>
+            Dump_One_Module(Out_File, Item, Indent)
+          [#operation] =>
+            Dump_One_Operation(Out_File, Item, Indent)
+          [#type] =>
+            Dump_One_Type(Out_File, Item, Indent)
+          [#object] =>
+            Dump_One_Object(Out_File, Item, Indent)
+        end case
+
+        Out_File.Println("");
+
+    end func Dump_One_Decl
+
+    func Dump(Pattern : Univ_String := "*.psl") is
+      // Dump PSVM for ParaSail modules
+        var IO := IO::Get_IO()
+        var Out_Files : Map<Univ_String, File_Output_Stream> := []
+
+        var Env := Reflection::Environment::Get_Current_Env()
+        const Outer_Region := Env.Outermost_Region()
+
+        if Pattern == "*" then
+            Println("Dump " | Env.Num_Library_Items() | " library items")
+        else
+            Println("Dump items from files matching \"" | Pattern | "\"")
+        end if
+
+        var Count := 0;
+
+        for I in 1..Env.Num_Library_Items() forward loop
+            const Item := Env.Nth_Library_Item(I);
+            const Name := Id(Item)
+            const Source_Pos := Decl_Source_Pos (Item)
+            const File_Name := File (Source_Pos)
+
+            if Pattern != "*"
+              and then not Matches(File_Name, Pattern) then
+                //  Ignore items from non-matching filenames
+                //  Println("Ignoring " | Name)
+                continue loop
+            end if
+           
+            //  Count number of items translated
+            Count += 1
+
+            if File_Name not in Out_Files then
+                --  A new source file; create a corresponding output
+                Out_Files |= [File_Name => Create(IO, File_Name | ".out")]
+            end if
+
+            Dump_One_Decl(Out_Files[File_Name], Outer_Region, Item, File_Name)
+        end loop
+
+        Println (Count | " items Dumped.")
+       
+        for each File of Out_Files loop
+            Close (File)
+        end loop
+    end func Dump
+end class PSC::Debugging
+
+func Dump(Pattern : Basic_Array<Univ_String>) is
+    if |Pattern| == 0 then
+       PSC::Debugging::Dump("*.psl")
+    else
+       for each P of Pattern forward loop
+          PSC::Debugging::Dump(P)
+       end loop
+    end if
+end func Dump
+

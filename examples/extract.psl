@@ -1,0 +1,67 @@
+// Remove all elements of Source matching Key and prepend them to Target.
+
+interface Linked_List<> is
+   var Key : Integer
+   var Value : Univ_String
+   var Next : optional Linked_List := null
+
+   func Extract(var Source, Target : Linked_List; Key : Integer)
+
+   func To_String(Linked_List) -> Univ_String
+   func Hash(Linked_List) -> Univ_Integer
+   func From_String(Univ_String) -> optional Linked_List is (null)
+   op "=?"(Left, Right : Linked_List) -> Ordering
+end interface Linked_List
+
+class Linked_List is
+  exports
+   func Extract(var Source, Target : Linked_List; Key : Integer) is
+
+     for S => Source then S.Next while S not null loop
+        while S not null and then S.Key == Key loop
+           //  We have a match, move to Target
+           var A_Match <== S
+
+           S <== A_Match.Next
+           A_Match.Next <== Target
+           Target <== A_Match
+        end loop
+     end loop
+   end func Extract
+
+   func To_String(Linked_List) -> Univ_String is
+      return (for (L => Linked_List then L.Next while L not null;
+                   Sep := "" then ", ") =>
+                <"["> | Sep | L.Key | " => " | L.Value ) | "]"
+   end func To_String
+
+   func Hash(Linked_List) -> Univ_Integer is
+      return (for L => Linked_List then L.Next while L not null =>
+                <0> * 3 + L.Key)
+   end func Hash
+
+   op "=?"(Left, Right : Linked_List) -> Ordering is
+      for (L => Left; R => Right) loop
+         if L is null then
+            return R is null? #equal : #unordered
+         elsif R is null then
+            return #unordered
+         elsif L.Key != R.Key or else L.Value != R.Value then
+            return #unordered
+         else
+            continue loop with (L => L.Next, R => R.Next)
+         end if
+      end loop
+   end op "=?"
+end class Linked_List
+
+func Test_Linked_List() is
+   const X : Linked_List := (3, "hi", (5, "hello", (3, "bye", (7, "fun"))))
+   var Y : Linked_List := (4, "already here")
+
+   var XV := X
+   Println("Source => " | XV | ", Target => " | Y)
+   Extract (XV, Target => Y, Key => 3)
+   Println("after Extract (Source, Target, 3), Source => " | XV |
+           ", Target => " | Y)
+end func Test_Linked_List

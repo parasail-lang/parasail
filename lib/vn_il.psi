@@ -1,0 +1,105 @@
+// VN_IL: VN-Based Intermediate Language
+
+// Copyright (C) 2011-2015, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+import PSC::Reflection
+
+interface PSC::VN_IL_Type<> is
+   type Code_Index is Reflection::Routine::Code_Index
+      //  Index into Routine instructions
+
+   type VN_Id is new Integer<0 .. 100_000>  
+      //  Unique id assigned to value number and index into VN_Table
+
+   func Analyze(Item : Reflection::Decl {Kind(Item) == #operation})
+     -> optional VN_IL_Type
+      //  Analyze and create a VN-based representation of the given operation
+
+   func Start_Nested_Block(var VN_IL : VN_IL_Type);
+      //  Start of a nested block; No VNs are initialized.
+
+   func Contents_Of_Locator
+     (var VN_IL : VN_IL_Type; Instr_Index : Code_Index;
+      Locator : Reflection::Object_Locator;
+      Addr : Univ_String;
+      Num_Indir, Ptr_Level : Univ_Integer := 0) -> optional VN_Id
+     //  Return VN representing contents of Locator
+     //  Addr string is remembered for later indirect store.
+
+   func Target_For_Store
+     (var VN_IL : VN_IL_Type; Instr_Index : Code_Index;
+      Locator : Reflection::Object_Locator;
+      Ptr_Level : Univ_Integer := 0) -> optional VN_Id
+     //  Return VN into which value should be copied.
+     //  Return null if no VN associated with locator.
+
+   func Object_Was_Copied
+     (var VN_IL : VN_IL_Type; Instr_Index : Code_Index;
+      Locator : Reflection::Object_Locator);
+     //  About to store into object at given locator, and we don't
+     //  want it to look like its VN is already properly initialized.
+
+   func Target_For_Store_Indir
+     (var VN_IL : VN_IL_Type; Addr : Univ_String) -> optional VN_Id
+     //  Return VN into which value should be copied rather than
+     //  stored via Addr.
+
+   func VN_Is_Inited (VN_IL : VN_IL_Type;
+                      VN : VN_Id; Instr_Index : Code_Index) -> Boolean;
+     //  Return True if VN has been initialized at a place that dominates
+     //  the instruction at the given index.
+
+   func VN_Inited_Here (var VN_IL : VN_IL_Type;
+                        VN : VN_Id; Instr_Index : Code_Index;
+                        Parallel_Output_Addr : optional Univ_String := null);
+     //  Record the index of the instruction where VN is being init'ed.
+     //  If Parallel_Output_Addr is non-null, then load into VN has been
+     //  deferred, and is currently residing in LLVM register named
+     //  by Parallel_Output_Addr string.
+
+   func Value_Only_In_VN (var VN_IL : VN_IL_Type;
+                        VN : VN_Id; Instr_Index : Code_Index;
+                        Locator : Reflection::Object_Locator);
+     //  Indicate that only the VN holds the value of the identified memory
+     //  location and hence the VN might need to be flushed
+     //  to that memory cell at some later point.
+
+   func VN_Name (VN_IL : VN_IL_Type;
+                 VN : VN_Id; Instr_Index : Code_Index) -> Univ_String;
+     //  Return "%vn_" | VN | Suffix where Suffix = "" or "_2", "_3", ...
+     //  depending on which initialization of VN dominates the instruction
+     //  at the given index.  If there is no such initialization, use the
+     //  next sequential index.
+
+   func VN_Is_Parallel_Output
+           (VN_IL : VN_IL_Type;
+            VN : VN_Id; Instr_Index : Code_Index) -> Boolean;
+     //  Return #true if VN is an output from a parallel operation and has
+     //  not yet been loaded because operation might still be in process.
+
+   func VN_Parallel_Output_Addr
+           (VN_IL : VN_IL_Type;
+            VN : VN_Id; Instr_Index : Code_Index) -> optional Univ_String;
+     //  For VNs that have not yet been loaded because they are the output
+     //  from a parallel operation, return the name of the LLVM register
+     //  pointing at their contents.
+
+   type Before_Or_After is Enum<[#before, #after]>
+     //  Enum type used to distinguish between a "flush" that needs to occur
+     //  before or after a given instruction.
+
+   func Map_Of_VNs_To_Flush
+     (VN_IL : VN_IL_Type; Instr_Index : Code_Index;
+      B_Or_A : Before_Or_After)
+     -> Map<Reflection::Object_Locator, VN_Id>
+     //  Return map from Locator to VN for each VN needing to be flushed
+     //  Before/After given instruction is performed
+
+   func VNs_Flushed_Here
+     (var VN_IL : VN_IL_Type; Instr_Index : Code_Index;
+      VNs_To_Flush : Map<Reflection::Object_Locator, VN_Id>)
+     //  Mark VNs as having been flushed at given instruction
+
+end interface PSC::VN_IL_Type

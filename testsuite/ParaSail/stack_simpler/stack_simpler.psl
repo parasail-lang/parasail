@@ -1,0 +1,89 @@
+interface Stack
+  <Component is Assignable<>; 
+   Size_Type is Integer<>> is
+    func Max_Stack_Size(S : Stack) -> Size_Type;
+    func Count(S : Stack) -> Size_Type;
+
+    func Create(Max : Size_Type {Max > 0}) -> Stack 
+      {Max_Stack_Size(Create) == Max; Count(Create) == 0};
+    
+    func Push
+      (var S : Stack {Count(S) < Max_Stack_Size(S)}; 
+       X : Component) {Count(S') == Count(S) + 1};
+
+    func Top(ref S : Stack {Count(S) > 0}) -> ref Component;
+    
+    func Pop(var S : Stack {Count(S) > 0}) -> Component
+      {Count(S') == Count(S) - 1};
+end interface Stack;
+
+class Stack is
+    const Max_Len : Size_Type;
+    var Cur_Len : Size_Type {Cur_Len in 0..Max_Len};
+    type Index_Type is Size_Type {Index_Type in 1..Max_Len};
+    var Data : Array<optional Component, Indexed_By => Index_Type>;    
+  exports
+    {for all I in 1..Cur_Len => Data[I] not null}   // invariant for Top()
+
+    func Max_Stack_Size(S : Stack) -> Size_Type is
+	return S.Max_Len;
+    end func Max_Stack_Size;
+    
+    func Count(S : Stack) -> Size_Type is
+      return S.Cur_Len;
+    end func Count; 
+
+    func Create(Max : Size_Type {Max > 0}) -> Stack
+      {Max_Stack_Size(Create) == Max; Count(Create) == 0} is
+      // return (Max_Len => Max, Cur_Len => 0, Data => [.. => null]);
+      return (Max_Len => Max, Cur_Len => 0, Data => Create(1..Max, null));
+    end func Create;
+
+    func Push
+      (var S : Stack {Count(S) < Max_Stack_Size(S)}; 
+       X : Component) {Count(S') == Count(S) + 1} is
+      S.Cur_Len += 1;
+      S.Data[S.Cur_Len] := X;
+    end func Push;
+      
+    func Top(ref S : Stack {Count(S) > 0}) -> ref Component is
+      return S.Data[S.Cur_Len];
+    end func Top;                
+
+    func Pop(var S : Stack {Count(S) > 0}) 
+      -> Result : Component is
+        Result := Top(S);
+	S.Cur_Len -= 1;
+    end func Pop;
+
+end class Stack;
+
+func Test_Stack() is
+    var Stk : Stack<Univ_Integer, Integer> := Create(5);
+
+    Println("Pushing 1..5");
+    Stk.Push(1);
+    Stk.Push(2);
+    Stk.Push(3);
+    Stk.Push(4);
+    Stk.Push(5);
+
+    Println("Pop = " | Stk.Pop());
+    Println("Pop = " | Stk.Pop());
+    Println("Pushing 6");
+    Stk.Push(6);
+    Println("Pop = " | Stk.Pop());
+    Println("Pop = " | Stk.Pop());
+    Println("Pop = " | Stk.Pop());
+    Println("Pop = " | Stk.Pop());
+
+    // Println("About to underrun the stack");
+
+    // Println("Pop = " | Stk.Pop());
+
+end func Test_Stack;
+    
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Stack ();
+end func main;

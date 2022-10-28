@@ -1,0 +1,12 @@
+
+import Test_DP
+func main(Args : Basic_Array<Univ_String>) is
+   if |Args| > 0 then
+      const Num := Univ_Integer::From_String(Args[1])
+      if Num not null then
+         Test_DP(Num)
+         return
+      end if
+   end if
+   Test_DP(7)
+end func main

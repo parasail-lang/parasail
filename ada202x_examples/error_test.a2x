@@ -1,0 +1,81 @@
+package Hello_World is
+    procedure Main(IO : in out Standard_IO);
+end package Hello_World;
+
+package body Hello_World is
+    procedure Main(IO : in out Standard_IO) is
+	X : Integer = 0;  -- ERROR should be ":="
+
+	if X != 0 then  -- ERROR, should be "/="
+	    Complain();
+	elseif X == 2 then  -- ERROR, should be elsif, "="
+	    Complain_Louder();
+	end if;
+
+        Put_Line(IO.Output, "Hello World");
+       
+    end Main;
+end package Hello_World;
+    
+generic
+   type Base is new Float;
+   Name : Univ_String;
+   Unit_Dimensions : Array
+     <Element_Type => Univ_Real, Index_Type => Dimension_Enum>;
+   Short_Hand : Univ_String;
+   Scale : Univ_Real := 1.0;
+package Float_With_Units is
+  function "from_univ"(Value : Univ_Real)
+    return Float_With_Units;
+
+  function "to_univ"(Value : Float_With_Units) return Univ_Real
+
+  function "+"(Left, Right : Float_With_Units) return Float_With_Units
+    with Post => "+"'Result == Sum(Left, Right);  -- ERROR, should be "="
+
+end package Float_With_Units;
+
+function Map (
+    Transform: access function (X : Element_Input)
+       return Element_Output;
+    Input : Container<Element_Input>)
+  return Container<Element_Output>
+is
+   Output : Container<Element_Output>;
+
+begin
+
+   Misspelling:
+   declare
+      X : T;
+   begin
+      Output := null;
+   end Mispelling; -- ERROR, misspelled.
+
+   Build:
+   for Elem of Container_Input loop
+      Output = @ & Transform(Elem);
+       --  Error, should be :=
+   end loop Build;
+
+   Verify:
+   declare
+      Error_Count : Integer := 0;
+   begin
+      for Key in Input.Keys loop
+	 if Output[Key] != Transform(Input[Key]) then 
+                --  Error, should be "/="
+	     Error_Count := @ + 1;
+	 endif;  -- ERROR, should be "end if"
+      end loop;
+      
+   end Verify;
+
+end Map;
+      
+function Test_Map (Inp: Vector<Univ_Integer>) return Vector<Univ_String> is
+  Result renames Map(Univ_Integer.To_String, Inp);
+begin
+  retrun Result;  -- ERROR
+end procedure Test_Map;
+

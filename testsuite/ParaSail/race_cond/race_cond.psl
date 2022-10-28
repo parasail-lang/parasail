@@ -1,0 +1,105 @@
+interface Race_Cond<> is
+    func Update_Both(var X : Univ_Integer; var Y : Univ_Integer);
+    func Update_One(var X : Univ_Integer; Y : Univ_Integer);
+    func Update_And_Return(var X : Univ_Integer) -> Univ_Integer;
+    func Return_Ref(ref X : Univ_Integer) -> ref Univ_Integer;
+end interface Race_Cond;
+
+class Race_Cond is
+  exports
+    func Update_Both(var X : Univ_Integer; var Y : Univ_Integer) is
+        X := X + 1 || Y := Y - 1;
+    end func Update_Both;
+
+    func Update_One(var X : Univ_Integer; Y : Univ_Integer) is
+        X := X + 10;
+    end func Update_One
+
+    func Update_And_Return(var X : Univ_Integer) -> Univ_Integer is
+        X := X + 100;
+        return X - 50;
+    end func Update_And_Return
+
+    func Return_Ref(ref X : Univ_Integer) -> ref Univ_Integer is
+        return X;
+    end func Return_Ref;
+end class Race_Cond;
+
+func Test_Race_Cond() is
+    var A : Univ_Integer := 42;
+    var B : Univ_Integer := 33;
+    var V : Vector<Univ_Integer> := [for I in 1..10 => I ** 2];
+
+    Println("A = " | A | ", B = " | B);
+    Print("V = ")
+    for (each E of V; Sep := "[" then ", ") forward loop
+       Print(Sep | E);
+    end loop;
+    Println("]");
+
+    for J in 1..|V| concurrent loop
+       A := V[J];  --  Error
+       B := B + 1;  -- Error
+       var C := 3;
+       C := V[J];
+       V[J] := V[J] + 1;  -- OK
+       if J < |V| then
+          V[J+1] := C;  -- TBD: Error
+       end if
+       if J > 1 then
+          const D := V[J-1];  --  TBD: Error
+       end if
+    end loop;
+
+    Println("A = " | A | ", B = " | B);
+    Println("Update_Both(A, B)");
+    Race_Cond::Update_Both(A, B);
+
+    Println("A = " | A | ", B = " | B);
+    Println("Update_Both(B, A)");
+    Race_Cond::Update_Both(B, A);
+
+    Println("A = " | A | ", B = " | B);
+    Println("Update_Both(A, A) -- error");
+    Race_Cond::Update_Both(A, A);
+
+    Println("A = " | A | ", B = " | B);
+    Println("Update_One(A, A) -- error");
+    Race_Cond::Update_One(A, A);
+
+    Println("A = " | A | ", B = " | B);
+    Println("Update_One(A, -A) -- should be legal");
+    Race_Cond::Update_One(A, -A);
+
+    Println("A = " | A | ", B = " | B);
+    Println("Update_One((A), B)");
+    Race_Cond::Update_One((A), B);
+
+    Println("A = " | A | ", B = " | B);
+    Println("A := Update_And_Return(A)");
+    A := Race_Cond::Update_And_Return(A);
+
+    Println("A = " | A | ", B = " | B);
+    Println("Update_One(A, Return_Ref(B))");
+    Race_Cond::Update_One(A, Race_Cond::Return_Ref(B));
+
+    Println("A = " | A | ", B = " | B);
+    Println("Update_One(Return_Ref(A), Return_Ref(A)) -- error");
+    Race_Cond::Update_One(Race_Cond::Return_Ref(A), Race_Cond::Return_Ref(A));
+
+    Println("A = " | A | ", B = " | B);
+    Println("Update_One(A, Return_Ref(A)) -- error");
+    Race_Cond::Update_One(A, Race_Cond::Return_Ref(A));
+
+    Println("A = " | A | ", B = " | B);
+    Println("Update_One(Return_Ref(A), Return_Ref(B))");
+    Race_Cond::Update_One(Race_Cond::Return_Ref(A), Race_Cond::Return_Ref(B));
+
+    Println("A = " | A | ", B = " | B);
+
+end func Test_Race_Cond;
+
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Race_Cond ();
+end func main;

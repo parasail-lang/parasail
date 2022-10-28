@@ -1,0 +1,54 @@
+-- interface Pair<> is
+--     const Sq : Univ_Integer;
+--     const Sum : Univ_Integer;
+-- end interface Pair;
+-- 
+procedure Test_MR_Expr is
+    type Pair is record
+       Sq : Univ_Integer;
+       Sum : Univ_Integer;
+    end record;
+
+    subtype Positive is Integer<1 .. Univ_Integer'Last>;
+    type Pair_Array is array (Positive range <>) of Pair;
+
+    Sum_Of_Sqs : constant Univ_Integer :=
+      [for I in 1..10 => I**2]'Reduce("+", 0);
+    Fact5 : constant Univ_Integer := [for I in 1..5 => I]'Reduce("*",1);
+    First_10_Are_Even : constant Boolean :=
+      [for I in 1..10 => I mod 2 = 0]'Reduce("and", True);
+
+    -- Vec_Of_Squares : Array<Pair, Indexed_By => Positive> :=
+    Vec_Of_Squares : Pair_Array :=
+      [for I in 1..10 => 
+        Pair'(Sq => I**2,
+              Sum => [for J in 1..I => J**2]'Reduce("+", 0))];
+begin
+    Put_Line("Sum of first 10 squares = " & Sum_Of_Sqs'Image);
+
+    Put_Line("Factorial of 5 = " & Fact5'Image);
+
+    Put_Line("First_10_Are_Even = " & First_10_Are_Even'Image);
+
+    Put_Line("Vector of squares and partial sums = ");
+    for I in Vec_Of_Squares'First .. Vec_Of_Squares'Last loop
+        V : constant Pair := Vec_Of_Squares[I];
+
+        Put_Line(I'Image & " => (" & V.Sq'Image & ", " & V.Sum'Image & ")");
+    end loop;
+
+    function Square(N : Univ_Integer) return Univ_Integer
+      with Pre => N >= 0;
+
+    function Square(N : Univ_Integer) return Univ_Integer is
+        return [for I in 1 .. 2*N-1 when I mod 2 = 1 => I]'Reduce("+", 0);
+    end Square; 
+
+    Put_Line("Sum of first N odd numbers");
+    for I in 1..10 loop
+        Put_Line(I'Image & " => " & Square(I)'Image);
+    end loop;
+
+    Put_Line("All even numbers are not odd = " &
+      Boolean'Image((for all I in 1..100 when I mod 2 = 0 => I mod 2 /= 1)));
+end Test_MR_Expr;

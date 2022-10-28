@@ -1,0 +1,663 @@
+import PSL::Short_Names::*
+import PSC::LLVM_Printer
+import PSC::LLVM_Top_Level_Op
+import PSC::Reflection
+
+class PSC::Type_Desc_LLVM_Utils is
+   //  Routines for generating LLVM to access information
+   //  from type descriptors, generate and test for null,
+   //  make indirect calls through type-descriptor tables, etc.
+
+   const Zero_Base  := Reflection::Object_Locator::Zero_Base;
+   const Local_Area := Reflection::Object_Locator::Local_Area;
+   const Param_Area := Reflection::Object_Locator::Param_Area;
+   const Type_Area  := Reflection::Object_Locator::Type_Area;
+   const Const_Area := Reflection::Object_Locator::Const_Area;
+   const Enclosing_Param_Areas :=
+      Reflection::Object_Locator::Enclosing_Param_Areas;
+   const Enclosing_Local_Areas :=
+      Reflection::Object_Locator::Enclosing_Local_Areas;
+   const Enclosing_Type_Areas :=
+      Reflection::Object_Locator::Enclosing_Type_Areas;
+   const Base_Registers := Reflection::Object_Locator::Base_Registers;
+   const Phys_Base_Registers :=
+      Reflection::Object_Locator::Phys_Base_Registers;
+
+   const Type_Self_Reference_Offset :=
+      Reflection::Object_Locator::Type_Self_Reference_Offset;
+   const Type_Formal_Parameter_Offsets :=
+      Reflection::Object_Locator::Type_Formal_Parameter_Offsets;
+   const Type_Nested_Type_Offsets :=
+      Reflection::Object_Locator::Type_Nested_Type_Offsets;
+   const Type_Operation_Offsets :=
+      Reflection::Object_Locator::Type_Operation_Offsets;
+
+   //  Large Null has a special indicator of -2 in the high byte,
+   //     a region*2, + 1 (so it is odd)
+   //  A U_String val has a special indicator of -3 in the high byte,
+   //     a U_String id in the next 3 bytes,
+   //     a region*2, + 1 (so it is odd)
+
+   //  Masks, etc. for picking apart a "special" large object
+   const High_And_Low_Bit := "or (i64 shl (i64 1, i64 63), i64 1)"
+   const Chunk_Shift_Amount := 32;
+   const Str_Shift_Amount := Chunk_Shift_Amount;
+   const Chunk_Divisor := 2**Chunk_Shift_Amount;
+   const Chunk_Mask := - Chunk_Divisor;
+   const Large_Null_Indicator := -2;
+   const U_String_Indicator := -3;
+   const Indicator_Multiplier := 2**24 * Chunk_Divisor;
+   const Large_Null_Base_Value :=
+     Large_Null_Indicator * Indicator_Multiplier + 1;
+   const U_String_Base_Value :=
+     U_String_Indicator * Indicator_Multiplier + 1;
+
+   //  Region as it appears in a large-obj header
+   const Region_Shift_Amount := 16 //  TBD: Assumes little-endian machine
+   const Region_Mask := (2**16-1) << Region_Shift_Amount
+
+ exports
+
+   //  Declare the LLVM types used for type descriptors, etc.
+   func Declare_Type_Desc_LLVM_Types (var LL : LLVM_Printer) is
+
+      LL |= "; LLVM types used for type descriptors:"
+      LL |= "%struct.ElemInfo = type { %struct.TD*, i64, i6}"
+
+      LL |= "%struct.ParamInfo = type { i8, %struct.ElemInfo }"
+
+      LL |= "%struct.CompInfo = type {%struct.TD*, i8, i8}"
+
+      LL |= "%struct.ConstInfo = type {i32*, %struct.ElemInfo}"
+
+      LL |= "%struct.RoutInfo = type {i16, %struct.TD*, i8, i16, i8,"
+      LL |= "   [8 x i8]}"
+
+      LL |= "%struct.VMOID =  type <{i3, i1, i3, i3, i32, i32}>"
+      LL |= "%struct.OL = type {i16, i32, %struct.VMOID}"
+
+            //  Magic_Num(0), Has_Op_Map, Index, Location, Corr_Poly_Type,
+      LL |= "%struct.TD = type {i64, i8, i32, %struct.OL, %struct.TD*,"
+            //  Is_Finished(5), Next_Unfin, Prev_Unfin
+      LL |= "   i8, %struct.TD*, %struct.TD*,"
+            //  Num_Ops(8), Name, Type_Sem,
+      LL |= "   i16, i32*, i32*,"
+            //  Type_Kind(11), All_Parameters_Known, Is_Small, Is_Large,
+            //    Is_Wrapper, Is_Poly, Null_Value,
+            //  Type_Kind(11), Is_Small, Is_Wrapper, Is_Poly, Null_Value,
+      LL |= "   i8, i8, i8, i8, i8, i8, i64,"
+            //  Parent_Type(18), Comp_Ext_Level,
+            //    Is_Abstract, Is_Part_Abs, Is_Concur,
+      LL |= "    %struct.TD*, i32, i8, i8, i8,"
+            //  Enclosing_Type(23), Root_Type,
+      LL |= "   %struct.TD*, %struct.TD*,"
+            //  Num_Params(25), Params, Params'Range
+      LL |= "   i32, %struct.ParamInfo*, i32*,"
+            //  Num_Acts_Of_Form(28), Act_Of_Form, Act_Of_Form'Range
+      LL |= "   i32, %struct.ParamInfo*, i32*,"
+            //  Num_Comps(31), Comps, Comps'Range
+      LL |= "   i32, %struct.CompInfo*, i32*,"
+            //  Num_Nested_Types(34), Nested_Types, Nested_Types'Range
+      LL |= "   i32, %struct.TD**, i32*,"
+            //  Num_Nested_Objs(37), Nested_Objs, Nested_Objs'Range
+      LL |= "   i32, %struct.ConstInfo*, i32*,"
+            //  Operations(40), Operations'Range
+      LL |= "   %struct.RoutInfo*, i16*}"
+
+            //  Magic_Num(0), Has_Op_Map, Index, Location, Corr_Poly_Type,
+      LL |= "%struct.OpMap = type {i64, i8, i16, %struct.OL, %struct.TD*,"
+            //  Is_Finished(5), Next_Unfin, Prev_Unfin
+      LL |= "   i8, %struct.TD*, %struct.TD*,"
+            //  Num_Ops(8), Name, Type_Sem,
+      LL |= "   i16, i32*, i32*,"
+            //  Type_Kind(11), All_Parameters_Known, Is_Small, Is_Large,
+            //    Is_Wrapper, Is_Poly, Null_Value,
+      LL |= "   i8, i8, i8, i8, i8, i8, i64,"
+            //  Op_Map(18), Op_Map'Range
+      LL |= "   i16*, i16*,"
+            //  Actual_Type(20),
+      LL |= "   %struct.TD*,"
+            //  Formal_Type_Sem(21)
+      LL |= "   i32*}"
+      LL |= ""
+
+      LL |= "; LLVM types for Exec_Context and Stg_Rgn"
+            //  _Tag(0), Local_Null, ...
+      LL |= "%struct.ExecCtx = type {i64*, i64}"
+            //  Null_Value(0), Index, Owning_Server, Enclosing_Stg_Rgn, ...
+      LL |= "%struct.StgRgn = type {i64, i32, i16, %struct.StgRgn*}"
+
+   end func Declare_Type_Desc_LLVM_Types
+
+   //  Get Nth item from type descriptor
+   func Get_Nth_Type_Area_Item_Physical_Address
+      (var TLO : LLVM_Top_Level_Op;
+       Gets, TDesc : String;
+       Locator : Reflection::Object_Locator) is
+      //  call out-of-line to get address
+
+      const Nth := "@_psc_nth_type_area_item_physical_address";
+      TLO.Declare(Nth, "i64* " | Nth | "(i64*, i16, i16)");
+      TLO |= Gets | " = call i64* " | Nth | "(i64* " | TDesc |
+         ", i16 " | Offset (Locator) | ", i16 " | Base (Locator) | ")";
+   end func Get_Nth_Type_Area_Item_Physical_Address;
+
+   //  Place a pointer to the type descriptor at Loc
+   //  relative to Cur_Type_Desc, in the LLVM identifier Desc
+   func Get_Type_Desc_Or_Op_Map
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Cur_Type_Desc : String;
+       Loc : Reflection::Object_Locator;
+       Desc : String) is
+
+      case Base(Loc) of
+       [Const_Area | Local_Area |
+        Enclosing_Local_Areas.First .. Enclosing_Local_Areas.Last |
+        Base_Registers.First .. Base_Registers.Last |
+        Phys_Base_Registers.First .. Phys_Base_Registers.Last] =>
+         //  Should not happen
+         {#false}
+
+       [Zero_Base] => {#false} // handled elsewhere
+
+       [Type_Area] =>
+         //  Get immediately enclosing type, or some formal/nested type
+         //  thereof.
+         case Offset(Loc) of
+          [Type_Self_Reference_Offset] =>
+            {#false}      // handled elsewhere
+
+          [Type_Formal_Parameter_Offsets.First + 1 ..
+             Type_Formal_Parameter_Offsets.Last] =>
+            {#false}      // handled elsewhere
+
+          [Type_Nested_Type_Offsets.First + 1 ..
+             Type_Nested_Type_Offsets.Last] =>
+            {#false}      // handled elsewhere
+
+          [..] =>
+            //  Use general-purpose out-of-line routine
+            null
+
+         end case
+
+       [Enclosing_Type_Areas.First ..
+         Enclosing_Type_Areas.Last] =>
+         //  Go out of line to get type descriptor or op map
+         null
+
+       [Param_Area |
+        Enclosing_Param_Areas.First ..
+          Enclosing_Param_Areas.Last] =>
+         //  Go out of line to get type descriptor or op map
+         null
+
+       [..] =>
+         //  Go out of line to get type descriptor or op map
+         null
+      end case
+
+      //  Go out of line to get type descriptor or op map
+      TLO.Declare("_psc_get_type_desc_or_op_map",
+         "i64* @_psc_get_type_desc_or_op_map" |
+         "(i64*, i16, i16)");
+      TLO |= Desc | " = call i64* @_psc_get_type_desc_or_op_map" |
+         "(i64* " | Cur_Type_Desc |
+         ", i16 " | Base(Loc) | ", i16 " | Offset(Loc) | ")";
+   end func Get_Type_Desc_Or_Op_Map
+
+   //  Place a pointer to the formal type descriptor at Loc
+   //  relative to Cur_Type_Desc, in the LLVM identifier Desc
+   func Get_Formal_Type_Or_Op_Map
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Cur_Type_Desc : String;
+       Loc : Reflection::Object_Locator;
+       Desc : String) is
+
+      //   return Type_Desc.Parameters (Natural (Index)).Data.Type_Desc;
+
+      const Cur_TD := "%_cur_td" | UI
+      const Param_Arr_Ptr := "%_param_arr_ptr" | UI
+      const Param_Arr := "%_param_arr" | UI;
+      const Formal_TD_Ptr_Ptr := "%_formal_td_ptr_ptr" | UI
+      const Formal_TD_Ptr := "%_formal_td" | UI
+
+      TLO |= Cur_TD | " = bitcast i64* " | Cur_Type_Desc | " to %struct.TD*" 
+      TLO |= Param_Arr_Ptr | " = getelementptr %struct.TD, %struct.TD* " |
+               Cur_TD | ", i32 0, i32 26"  //  ... Params field of TD
+      TLO |= Param_Arr | " = load %struct.ParamInfo*, %struct.ParamInfo** " |
+               Param_Arr_Ptr
+      TLO |= Formal_TD_Ptr_Ptr | " = getelementptr %struct.ParamInfo, " |
+               "%struct.ParamInfo* " | Param_Arr | ", i32 " |
+               Offset(Loc) - Type_Formal_Parameter_Offsets.First - 1 |
+                                 // LLVM arrays are zero-based
+               ", i32 1, i32 0"  //  ...Data.Type_Desc
+      TLO |= Formal_TD_Ptr | " = load %struct.TD*, %struct.TD** " |
+               Formal_TD_Ptr_Ptr
+      TLO |= Desc | " = bitcast %struct.TD* " | Formal_TD_Ptr | " to i64*"
+   end func Get_Formal_Type_Or_Op_Map
+
+   //  Place a pointer to the nested type descriptor at Loc
+   //  relative to Cur_Type_Desc, in the LLVM identifier Desc
+   func Get_Nested_Type_Or_Op_Map
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Cur_Type_Desc : String;
+       Loc : Reflection::Object_Locator;
+       Desc : String) is
+
+      //   return Type_Desc.Nested_Types (Natural (Index));
+
+      const Cur_TD := "%_cur_td" | UI
+      const Nested_Types_Arr_Ptr := "%_nested_types_arr_ptr" | UI
+      const Nested_Types_Arr := "%_nested_types_arr" | UI;
+      const Nested_TD_Ptr_Ptr := "%_nested_td_ptr_ptr" | UI
+      const Nested_TD_Ptr := "%_nested_td" | UI
+
+      TLO |= Cur_TD | " = bitcast i64* " | Cur_Type_Desc | " to %struct.TD*" 
+      TLO |= Nested_Types_Arr_Ptr |
+               " = getelementptr %struct.TD, %struct.TD* " |
+               Cur_TD | ", i32 0, i32 35"  //  Nested_Types field of TD
+      TLO |= Nested_Types_Arr | " = load %struct.TD**, %struct.TD*** " |
+               Nested_Types_Arr_Ptr
+      TLO |= Nested_TD_Ptr_Ptr | " = getelementptr %struct.TD*, " |
+               "%struct.TD** " | Nested_Types_Arr | ", i32 " |
+               Offset(Loc) - Type_Nested_Type_Offsets.First - 1
+                   // LLVM arrays are zero-based
+      TLO |= Nested_TD_Ptr | " = load %struct.TD*, %struct.TD** " |
+               Nested_TD_Ptr_Ptr
+      TLO |= Desc | " = bitcast %struct.TD* " | Nested_TD_Ptr | " to i64*"
+   end func Get_Nested_Type_Or_Op_Map
+
+   //  Put a local Null for the type identified by Desc into Nullreg
+   //  presuming that the current context is in llvm reg "%_Context"
+   func Get_Local_Null
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Desc : String;
+       Nullreg : String) is
+
+      //  if Type_Desc.Is_Small then
+      //     return Type_Desc.Null_Value;
+      //  else
+      //     pragma Assert (Context.Local_Null /= Null_Virtual_Address);
+      //     return Context.Local_Null;
+      //  end if;
+
+      const TD_Ptr := "%_td" | UI
+      const Is_Small_Ptr := "%_is_small_ptr" | UI
+      const Is_Small := "%_is_small" | UI
+      const Is_Small_Bool := "%_is_small_bool" | UI
+      const Small_Null_Ptr := "%_small_null_ptr" | UI
+      const Small_Null := "%_small_null" | UI
+      const Ctx_Ptr := "%_ctx" | UI
+      const Large_Null_Ptr := "%_large_null_ptr" | UI
+      const Large_Null := "%_large_null" | UI
+
+      //  Check whether Desc is for a "small" or "large type
+      TLO |= TD_Ptr | " = bitcast i64* " | Desc | " to %struct.TD*" 
+      TLO |= Is_Small_Ptr | " = getelementptr %struct.TD, %struct.TD* " |
+               TD_Ptr | ", i32 0, i32 13"
+      TLO |= Is_Small | " = load i8, i8* " | Is_Small_Ptr
+      TLO |= Is_Small_Bool | " = trunc i8 " | Is_Small | " to i1"
+
+      //  Get null to use if Desc is a "small" type
+      TLO |= Small_Null_Ptr | " = getelementptr %struct.TD, %struct.TD* " |
+               TD_Ptr | ", i32 0, i32 17"
+      TLO |= Small_Null | " = load i64, i64* " | Small_Null_Ptr
+
+      //  Get null to use if Desc is a "large" type
+      TLO |= Ctx_Ptr | " = bitcast i64* %_Context to %struct.ExecCtx*"
+      TLO |= Large_Null_Ptr |
+              " = getelementptr %struct.ExecCtx, %struct.ExecCtx* " |
+               Ctx_Ptr | ", i32 0, i32 1"
+      TLO |= Large_Null | " = load i64, i64* " | Large_Null_Ptr
+
+      //  Select which one to use
+      TLO |= Nullreg | "= select i1 " | Is_Small_Bool | ", i64 " |
+               Small_Null | ", i64 " | Large_Null
+   end func Get_Local_Null
+
+   //  Put a large local Null into Nullreg
+   //  presuming that the current context is in llvm reg "%_Context"
+   func Get_Large_Local_Null
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Nullreg : String) is
+
+      //  pragma Assert (Context.Local_Null /= Null_Virtual_Address);
+      //  return Context.Local_Null;
+      const Ctx_Ptr := "%_ctx" | UI
+      const Large_Null_Ptr := "%_large_null_ptr" | UI
+
+      TLO |= Ctx_Ptr | " = bitcast i64* %_Context to %struct.ExecCtx*"
+      TLO |= Large_Null_Ptr |
+              " = getelementptr %struct.ExecCtx, %struct.ExecCtx* " |
+               Ctx_Ptr | ", i32 0, i32 1"
+      TLO |= Nullreg | " = load i64, i64* " | Large_Null_Ptr
+
+   end func Get_Large_Local_Null
+
+   //  Put a Null for the type identified by Desc into Nullreg
+   //  using the region of the Source object
+   func Get_Null_In_Region
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Desc : String;
+       Nullreg : String;
+       Source : String) is
+      //  if Type_Desc.Is_Small then
+      //     return Type_Desc.Null_Value;
+      //  else
+      //     if Is_Special_Large_Value(Source) then
+      //        Region_Of_Source*2[+1] := Source and 2**32-2
+      //     else
+      //        Region_Of_Source*2[+1] :=
+      //          Source.all.Header.Region >> Region_Shift_Amount - 1
+      //     end if;
+      //     return Large_Null_Base_Value or (Region_Of_Source*2[+1])
+      //  end if;
+
+      const TD_Ptr := "%_td" | UI
+      const Is_Small_Ptr := "%_is_small_ptr" | UI
+      const Is_Small := "%_is_small" | UI
+      const Is_Small_Bool := "%_is_small_bool" | UI
+      const Small_Null_Ptr := "%_small_null_ptr" | UI
+      const Small_Null := "%_small_null" | UI
+      const Large_Null := "%_large_null" | UI
+
+      const Small_Label := "_small_label" | UI
+      const Large_Label := "_large_label" | UI
+      const Last_Large_Label := "_last_large_label" | UI
+      const Join_Label := "_join_small_and_large" | UI
+
+      //  Check whether Source is of a "small" type
+      TLO |= TD_Ptr | " = bitcast i64* " | Desc | " to %struct.TD*" 
+      TLO |= Is_Small_Ptr | " = getelementptr %struct.TD, %struct.TD* " |
+               TD_Ptr | ", i32 0, i32 13"
+      TLO |= Is_Small | " = load i8, i8* " | Is_Small_Ptr
+      TLO |= Is_Small_Bool | " = trunc i8 " | Is_Small | " to i1"
+      TLO |= "br i1 " | Is_Small_Bool | ", label %" | Small_Label |
+        ", label %" | Large_Label
+
+      //  Get null to use if Source is small
+      TLO |= Small_Label | ":"
+      TLO |= Small_Null_Ptr | " = getelementptr %struct.TD, %struct.TD* " |
+               TD_Ptr | ", i32 0, i32 17"
+      TLO |= Small_Null | " = load i64, i64* " | Small_Null_Ptr
+      TLO |= "br label %" | Join_Label
+
+      //  Pass the buck to Get_Large_Null_In_Region
+      TLO |= Large_Label | ":"
+      Get_Large_Null_In_Region
+        (TLO, UI, Large_Null, Source, Last_Label => Last_Large_Label)
+      TLO |= "br label %" | Join_Label
+
+      //  Combine results using a "phi"
+      TLO |= Join_Label | ":"
+      TLO |= Nullreg | " = phi i64 [" | Small_Null |
+        ", %" | Small_Label | "],[" | Large_Null |
+        ", %" | Last_Large_Label | "]"
+
+   end func Get_Null_In_Region
+
+   //  Put a large Null into Nullreg
+   //  using the region of the Source object.
+   //  The optional parameter Last_Label, if non-null, is the last label
+   //  in the sequence of LLVM instructions that compute the value
+   //  in Nullreg, as needed for a "phi" instruction.
+   func Get_Large_Null_In_Region
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Nullreg : String;
+       Source : String;
+       Last_Label : optional String := null) is
+      //  if Is_Special_Large_Value(Source) then
+      //     Region_Of_Source*2[+1] := Source and 2**32-2
+      //  else
+      //     Region_Of_Source*2[+1] :=
+      //       Source.all.Header.Region >> Region_Shift_Amount - 1
+      //  end if;
+      //  return Large_Null_Base_Value or (Region_Of_Source*2[+1])
+
+      const Is_Special_Bit := "%_is_special_bit" | UI
+      const Header_Ptr := "%_header_ptr" | UI
+      const Header_Of_Source := "%_hdr_of_src" | UI
+      const Region_Bits_Of_Source := "%_region_bits" | UI
+      const Region_Times_Two := "%_rgn_times2_" | UI
+      const Special_Region_Times_Two := "%_spcl_rgn_times2_" | UI
+      const Normal_Region_Times_Two := "%_normal_rgn_times2_" | UI
+      const Val_With_High_And_Low := "%_high_and_low_bits" | UI;
+
+      const Is_Special_Label := "_is_special_label" | UI
+      const Not_Special_Label := "_not_special_label" | UI
+      const Join_Label := Last_Label not null?
+        Last_Label : "_join_label" | UI
+
+      //  See whether Source is special large value (high and low bits on)
+      TLO |= Val_With_High_And_Low | " = and i64 " | Source | ", " |
+        High_And_Low_Bit
+      TLO |= Is_Special_Bit | " = icmp eq i64 " |
+               Val_With_High_And_Low | ", " | High_And_Low_Bit;
+      TLO |= "br i1 " | Is_Special_Bit | ", label %" | Is_Special_Label |
+        ", label %" | Not_Special_Label
+
+      //  Extract region from special large value
+      TLO |= Is_Special_Label | ":"
+      TLO |= Special_Region_Times_Two | " = and i64 " | Source | ", " |
+        Chunk_Divisor-1
+      TLO |= "br label %" | Join_Label
+
+      //  Source is not a special large value, so extract region from
+      //  Source Header and build up a large null for that region.
+      TLO |= Not_Special_Label | ":"
+      TLO |= Header_Ptr | " = inttoptr i64 " | Source | " to i64*"
+      TLO |= Header_Of_Source | " = load i64, i64* " | Header_Ptr
+      TLO |= Region_Bits_Of_Source | " = and i64 " | Header_Of_Source |
+        ", " | Region_Mask
+      TLO |= Normal_Region_Times_Two | " = lshr i64 " | Region_Bits_Of_Source |
+        ", " | Region_Shift_Amount-1
+      TLO |= "br label %" | Join_Label
+
+      //  Build up in NullReg the appropriate null value
+      TLO |= Join_Label | ":"
+      TLO |= Region_Times_Two | " = phi i64 [" | 
+        Special_Region_Times_Two | ", %" | Is_Special_Label | "], [" |
+        Normal_Region_Times_Two | ", %" | Not_Special_Label | "]"
+      TLO |= Nullreg | " = or i64 " | Large_Null_Base_Value | ", " |
+        Region_Times_Two
+   end func Get_Large_Null_In_Region
+
+   //  Put a boolean result into Result_Bit, appropriate to either
+   //  "is null" (For_Not_Null => #false) or "not null" (For_Not_Null => #true)
+   //  based on type descriptor in Desc and value to test in Arg
+   func Test_For_Null
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Desc : String;
+       Arg : String;
+       Result_Bit : String;
+       For_Not_Null : Boolean := #false) is
+      // const Eq_Or_Ne := For_Not_Null? "ne": "eq";
+      //
+      // if Type_Desc.Is_Small then
+      //    return Word | Eq_Or_Ne | Type_Desc.Null_Value;
+      // else
+      //    return Test_For_Large_Null(...);
+      // end if;
+
+      const TD_Ptr := "%_td" | UI
+      const Is_Small_Ptr := "%_is_small_ptr" | UI
+      const Is_Small := "%_is_small" | UI
+      const Is_Small_Bool := "%_is_small_bool" | UI
+      const Small_Null_Ptr := "%_small_null_ptr" | UI
+      const Small_Null := "%_small_null" | UI
+      const Eq_Or_Ne := For_Not_Null? "ne": "eq";
+      const Small_Result := "%_small_result" | UI
+      const Large_Result := "%_large_result" | UI
+      const Is_Small_Label := "_is_small_lbl" | UI
+      const Is_Large_Label := "_is_large_lbl" | UI
+      const Join_Label := "_join" | UI
+
+      TLO |= TD_Ptr | " = bitcast i64* " | Desc | " to %struct.TD*"
+      TLO |= Is_Small_Ptr | " = getelementptr %struct.TD, %struct.TD* " |
+               TD_Ptr | ", i32 0, i32 13"
+      TLO |= Is_Small | " = load i8, i8* " | Is_Small_Ptr
+      TLO |= Is_Small_Bool | " = trunc i8 " | Is_Small | " to i1"
+      TLO |= "br i1 " | Is_Small_Bool | ", label %" | Is_Small_Label |
+                                        ", label %" | Is_Large_Label
+
+      TLO |= Is_Small_Label | ":"
+      TLO |= Small_Null_Ptr | " = getelementptr %struct.TD, %struct.TD* " |
+               TD_Ptr | ", i32 0, i32 17"
+      TLO |= Small_Null | " = load i64, i64* " | Small_Null_Ptr
+      TLO |= Small_Result | " = icmp " | Eq_Or_Ne | " i64 " |
+               Arg | ", " | Small_Null
+      TLO |= "br label %" | Join_Label
+
+      TLO |= Is_Large_Label | ":"
+      Test_For_Large_Null (TLO, UI, Arg, Large_Result, For_Not_Null)
+      TLO |= "br label %" | Join_Label
+
+      TLO |= Join_Label | ":"
+      TLO |= Result_Bit | " = phi i1 [" |
+                        Small_Result | ", %" | Is_Small_Label | "], [" |
+                        Large_Result | ", %" | Is_Large_Label | "]"
+   end func Test_For_Null
+
+   //  Put a boolean result into Result_Bit, appropriate to either
+   //  "is null" (For_Not_Null => #false) or "not null" (For_Not_Null => #true)
+   //  for a "large" potentially null value.
+   func Test_For_Large_Null
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Arg : String;
+       Result_Bit : String;
+       For_Not_Null : Boolean := #false) is
+
+      const Val_Without_Region := "%_val_no_reg" | UI;
+      const Eq_Or_Ne   := (For_Not_Null? "ne": "eq")
+
+      TLO |= Val_Without_Region | " = and i64 " | Arg | ", " |
+        (Chunk_Mask + 1);
+
+      TLO |= Result_Bit | " = icmp " | Eq_Or_Ne | " i64 " |
+               Val_Without_Region | ", " | Large_Null_Base_Value;
+
+   end func Test_For_Large_Null
+
+   //  Put into Str_Val a string based on Str_Id_Val
+   //  using In_Same_Region_As for region, if non-null
+   func Get_Str
+      (var TLO : LLVM_Top_Level_Op;
+       UI : String;
+       Str_Id_Val : String;
+       Str_Val : String;
+       In_Same_Region_As : optional String := null) is
+
+      //  if In_Same_Region_As is null then
+      //     pragma Assert (Context.Local_Null /= Null_Virtual_Address);
+      //     Region_For_Str*2[+1] := Context.Local_Null and (2**32-2)
+      //  else
+      //     if Is_Special_Large_Value(In_Same_Region_As) then
+      //        Region_For_Str*2[+1] := In_Same_Region_As and (2**32-2)
+      //     else
+      //        Region_For_Str*2[+1] :=
+      //          In_Same_Region_As.Header.Region >> Region_Shift_Amount - 1
+      //     end if;
+      //  end if;
+      //  return U_String_Base_Value or (Str_Id*Chunk_Multiplier) or
+      //    (Region_For_Str*2[+1))
+
+      const Region_Times_Two := "%_rgn_times2_" | UI
+      const Str_Id_Shifted := "%_str_shifted" | UI
+      const Region_And_Str_Id := "%_rgn_and_str" | UI
+
+      if In_Same_Region_As is null then
+         //  Create a string value associated with local region
+
+         //  TLO.Declare("_psc_local_str_lit",
+         //              "i64 @_psc_local_str_lit(i64*, i64)");
+         //  TLO |= Str_Val |
+         //     " = call i64 @_psc_local_str_lit(i64* %_Context, i64 " |
+         //     Str_Id_Val | ")";
+
+         const Ctx_Ptr := "%_ctx" | UI
+         const Large_Null_Ptr := "%_large_null_ptr" | UI
+         const Local_Null_Val := "%_local_null" | UI
+
+         TLO |= Ctx_Ptr | " = bitcast i64* %_Context to %struct.ExecCtx*"
+         TLO |= Large_Null_Ptr |
+                 " = getelementptr %struct.ExecCtx, %struct.ExecCtx* " |
+                  Ctx_Ptr | ", i32 0, i32 1"
+         TLO |= Local_Null_Val | " = load i64, i64* " | Large_Null_Ptr
+         TLO |= Region_Times_Two | " = and i64 " |
+                  Local_Null_Val | ", " | Chunk_Divisor-1
+      else
+         //  Create a string associated with same region as In_Same_Region_As
+
+         //  TLO.Declare("_psc_str_lit_in_rgn",
+         //    "i64 @_psc_str_lit_in_rgn(i64, i64)");
+         //  TLO |= Str_Val |
+         //    " = call i64 @_psc_str_lit_in_rgn(i64 " | Str_Id_Val |
+         //    ", i64 " | Existing_ValID | ")";
+
+         const Is_Special_Bit := "%_is_special_bit" | UI
+         const Header_Ptr := "%_header_ptr" | UI
+         const Header_Of_Source := "%_hdr_of_src" | UI
+         const Region_Bits_Of_Source := "%_region_bits" | UI
+         const Special_Region_Times_Two := "%_spcl_rgn_times2_" | UI
+         const Normal_Region_Times_Two := "%_normal_rgn_times2_" | UI
+         const Val_With_High_And_Low := "%_high_and_low_bits" | UI;
+
+         const Is_Special_Label := "_is_special_label" | UI
+         const Not_Special_Label := "_not_special_label" | UI
+         const Join_Label := "_join_label" | UI
+
+         //  See whether In_Same_Region_As (aka "Source") is
+         //  special large value (high and low bits on)
+         TLO |= Val_With_High_And_Low | " = and i64 " |
+                  In_Same_Region_As | ", " | High_And_Low_Bit
+         TLO |= Is_Special_Bit | " = icmp eq i64 " |
+                  Val_With_High_And_Low | ", " | High_And_Low_Bit;
+         TLO |= "br i1 " | Is_Special_Bit | ", label %" | Is_Special_Label |
+           ", label %" | Not_Special_Label
+
+         //  Extract region from special large value
+         TLO |= Is_Special_Label | ":"
+         TLO |= Special_Region_Times_Two | " = and i64 " |
+                  In_Same_Region_As | ", " | Chunk_Divisor-1
+         TLO |= "br label %" | Join_Label
+
+         //  Source is not a special large value, so extract region from
+         //  Source Header and build up a large null for that region.
+         TLO |= Not_Special_Label | ":"
+         TLO |= Header_Ptr | " = inttoptr i64 " |
+           In_Same_Region_As | " to i64*"
+         TLO |= Header_Of_Source | " = load i64, i64* " | Header_Ptr
+         TLO |= Region_Bits_Of_Source | " = and i64 " | Header_Of_Source |
+           ", " | Region_Mask
+         TLO |= Normal_Region_Times_Two | " = lshr i64 " |
+           Region_Bits_Of_Source | ", " | Region_Shift_Amount-1
+         TLO |= "br label %" | Join_Label
+
+         //  Build up Region_Times_Two as a "phi"
+         TLO |= Join_Label | ":"
+         TLO |= Region_Times_Two | " = phi i64 [" | 
+           Special_Region_Times_Two | ", %" | Is_Special_Label | "], [" |
+           Normal_Region_Times_Two | ", %" | Not_Special_Label | "]"
+      end if;
+
+      //  Now build up the final result from Region and Str_Id
+
+      TLO |= Str_Id_Shifted | " = shl i64 " | Str_Id_Val | ", " |
+        Str_Shift_Amount
+      TLO |= Region_And_Str_Id | " = or i64 " | Str_Id_Shifted | ", " |
+        Region_Times_Two
+      TLO |= Str_Val | " = or i64 " | U_String_Base_Value | ", " |
+        Region_And_Str_Id
+   end func Get_Str
+
+end class PSC::Type_Desc_LLVM_Utils

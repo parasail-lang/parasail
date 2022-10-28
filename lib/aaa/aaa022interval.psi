@@ -1,0 +1,346 @@
+interface PSL::Core::Interval<Bound_Type is Comparable<>> is
+    // This supports closed, half-open, and open intervals.
+    // This is appropriate for uncountable types where you
+    // can't normalize all intervals into closed intervals.
+    var Low : Bound_Type
+    var Low_Is_Open : Boolean
+    var High : Bound_Type
+    var High_Is_Open : Boolean
+
+    func Singleton(Val : Bound_Type) -> Interval
+      // Return interval consisting of a single value
+
+    func Is_Empty(IV : optional Interval) -> Boolean
+      // Return True if interval is null or it represents
+      // no values
+
+    op "in"(Left : Bound_Type; Right : Interval) -> Boolean
+
+    op "=?"(Left, Right : Interval) -> Ordering
+      // "#greater" means Left is strictly greater than Right
+      // "#less" means Left is strictly less than Right
+      // "#equal" means Left and Right are the same interval
+      // "#unordered" means anything else
+
+    op "and"(Left, Right : Interval) -> optional Interval
+      // Return intersection of the two intervals
+
+    op "and="(var Left : optional Interval; Right : Interval)
+      // Intersect Right into Left
+
+    func Is_Strictly_Within(Left, Right : optional Interval) -> Boolean
+      // Return #true if Left is strictly within Right,
+      // meaning low bound of Left is higher, and high bound is lower.
+      // NOTE: If #true, then removing Right from Left will produce two 
+      //       non-overlapping intervals.
+
+    op "-"(Left, Right : Interval) {not Is_Strictly_Within(Right, Left)} 
+      -> optional Interval
+      // Subtract out Right interval from Left interval
+      // Right must not be strictly within Left, since
+      // that would require returning two intervals.
+
+    op "-="(var Left : optional Interval; Right : Interval) 
+      {not Is_Strictly_Within(Right, Left)}
+      // Subtract Right interval from Left
+
+    func Overlaps(Left, Right : optional Interval) -> Boolean
+      // Return True if intervals overlap
+
+    op "or"(Left, Right : Interval) {Overlaps(Left, Right)} -> Interval
+      // Return union of two intervals.  Must have some overlap
+      // to ensure that result can be represented as a single interval.
+    op "|"(Left, Right : Interval) {Overlaps(Left, Right)} -> Interval is "or"
+
+    op "or="(var Left : optional Interval; Right : Interval) 
+      {Overlaps(Left, Right)}
+      // Compute union of two intervals.  Must have some overlap
+      // to ensure that result can be represented as a single interval.
+    op "|="(var Left : optional Interval; Right : Interval) 
+      {Overlaps(Left, Right)} is "or="
+
+    op "<|="(var Left, Right : optional Interval) {Overlaps(Left, Right)}
+      // Compute union of two intervals; leave Right empty.  
+      // Must have some overlap to ensure that result can be 
+      // represented as a single interval.
+
+end interface PSL::Core::Interval
+
+class PSL::Core::Interval is
+  exports
+    func Singleton(Val : Bound_Type) -> Interval is
+      // Return interval consisting of a single value
+        return (Low => Val, Low_Is_Open => #false,
+          High => Val, High_Is_Open => #false)
+    end func Singleton
+
+    func Is_Empty(IV : optional Interval) -> Boolean is
+      // Return True if interval is null or it represents
+      // no values
+        return IV is null or else
+          IV.Low > IV.High or else
+          (IV.Low == IV.High and then (IV.Low_Is_Open or IV.High_Is_Open))
+    end func Is_Empty
+
+    op "in"(Left : Bound_Type; Right : Interval) -> Boolean is
+        case Left =? Right.Low of
+          [#less] => return #false
+          [#equal] => return not Right.Low_Is_Open
+          [#greater] =>
+            case Left =? Right.High of
+              [#less] => return #true
+              [#equal] => return not Right.High_Is_Open
+              [#greater] => return #false
+            end case
+        end case
+    end op "in"
+
+    op "=?"(Left, Right : Interval) -> Ordering is
+        // Compare two intervals, and consider them #unordered
+        // if they overlap at all, unless they are identical.
+        // If they don't overlap, then return #less or #greater as appropriate.
+        // Return #unordered if any of the comparisons return #unordered.
+
+        // First check for perfect equality
+        if Left.Low == Right.Low and then
+          Left.High == Right.High and then
+          Left.Low_Is_Open == Right.Low_Is_Open and then
+          Left.High_Is_Open == Right.High_Is_Open then
+            // NOTE: We are considering X..Y-1 != X..<Y since
+            //       we don't require countable elements.
+            return #equal
+        end if
+
+        case Left.High =? Right.Low of
+          [#unordered] =>
+            return #unordered
+          [#less] =>
+            return #less
+          [#equal] =>
+            if Left.High_Is_Open or else Right.Low_Is_Open then
+                // No overlap
+                return #less
+            else
+                // We have already ruled out #equal
+                return #unordered
+            end if
+          [#greater] =>
+            // Not clearly less, see whether clearly greater.
+            case Left.Low =? Right.High of
+              [#unordered] =>
+                return #unordered
+              [#less] =>
+                // We have already ruled out #equal
+                return #unordered
+              [#equal] =>
+                if Left.Low_Is_Open or else Right.High_Is_Open then
+                    // No overlap
+                    return #greater
+                else
+                    // We have already ruled out #equal
+                    return #unordered
+                end if
+              [#greater] =>
+                return #greater
+            end case
+        end case
+    end op "=?"
+
+    op "and"(Left, Right : Interval) -> optional Interval is
+      // Return intersection of the two intervals
+        var New_Low : Bound_Type
+        var New_High : Bound_Type
+        var New_Low_Is_Open : Boolean
+        var New_High_Is_Open : Boolean
+        
+        case Left.Low =? Right.Low of
+          [#less] => 
+            New_Low := Right.Low
+            New_Low_Is_Open := Right.Low_Is_Open
+          [#greater] => 
+            New_Low := Left.Low
+            New_Low_Is_Open := Left.Low_Is_Open
+          [#equal] => 
+            New_Low := Left.Low
+            New_Low_Is_Open := Left.Low_Is_Open or Right.Low_Is_Open
+          [#unordered] => 
+            return null
+        end case
+
+        case Left.High =? Right.High of
+          [#less] => 
+            New_High := Left.High
+            New_High_Is_Open := Left.High_Is_Open
+          [#greater] => 
+            New_High := Right.High
+            New_High_Is_Open := Right.High_Is_Open
+          [#equal] => 
+            New_High := Left.High
+            New_High_Is_Open := Left.High_Is_Open or Right.High_Is_Open
+          [#unordered] => 
+            return null
+        end case
+
+        return (Low => New_Low, Low_Is_Open => New_Low_Is_Open,
+          High => New_High, High_Is_Open => New_High_Is_Open)
+    end op "and"
+
+    op "and="(var Left : optional Interval; Right : Interval) is
+      // Intersect Right into Left
+        if Left not null then
+            Left := Left and Right
+        end if
+    end op "and="
+
+    func Is_Strictly_Within(Left, Right : optional Interval) -> Boolean is
+      // Return #true if Left is strictly within Right,
+      // meaning low bound of Left is higher, and high bound is lower.
+      // NOTE: If #true, then removing Right from Left will produce two 
+      //       non-overlapping intervals.
+        if Right is null or else Left is null then
+            return #false
+        end if
+        return (Left.Low > Right.Low or else 
+          (Left.Low == Right.Low and then Left.Low_Is_Open > Right.Low_Is_Open))
+          and then
+            (Left.High < Right.High or else
+             (Left.High == Right.High and then 
+              Left.High_Is_Open > Right.High_Is_Open))
+    end func Is_Strictly_Within
+
+    op "-"(Left, Right : Interval) {not Is_Strictly_Within(Right, Left)} 
+      -> Result : optional Interval is
+      // Subtract out Right interval from Left interval
+      // Right must not be strictly within Left, since
+      // that would require returning two intervals.
+        var New_Low : Bound_Type
+        var New_High : Bound_Type
+        var New_Low_Is_Open : Boolean
+        var New_High_Is_Open : Boolean
+        
+        case Left.Low =? Right.Low of
+          [#less] => 
+            // Return left part of Left
+            Result := (Low => Left.Low, Low_Is_Open => Left.Low_Is_Open,
+              High => Right.Low, High_Is_Open => not Right.Low_Is_Open)
+          [#greater] => 
+            // Return right part of Left
+            Result := (Low => Right.High, Low_Is_Open => not Right.High_Is_Open,
+              High => Left.High, High_Is_Open => Left.High_Is_Open)
+          [#equal] => 
+            if Left.Low_Is_Open >= Right.Low_Is_Open then
+                // Return right part of Left
+                Result := (Low => Right.High, 
+                  Low_Is_Open => not Right.High_Is_Open,
+                  High => Left.High, 
+                  High_Is_Open => Left.High_Is_Open)
+            else
+                // Only one element is left
+                return (Left.Low, #false, Left.Low, #false)
+            end if
+          [#unordered] => 
+            return null
+        end case
+
+        if Result.Low > Result.High then
+            // Empty interval
+            return null
+        elsif Result.Low == Result.High and then
+          (Result.Low_Is_Open or Result.High_Is_Open) then
+            // Empty interval
+            return null
+        else
+            return Result
+        end if
+    end op "-"
+
+    op "-="(var Left : optional Interval; Right : Interval) 
+      {not Is_Strictly_Within(Right, Left)} is
+      // Subtract Right interval from Left
+        if Left not null then
+            Left := Left - Right
+        end if
+    end op "-="
+
+    func Overlaps(Left, Right : optional Interval) -> Boolean is
+        if Left is null or else Right is null then
+            return #false
+        else
+            case Left =? Right of
+              [#equal | #unordered] => return #true
+              [#less | #greater] => return #false
+            end case
+        end if
+    end func Overlaps
+
+    op "or"(Left, Right : Interval) {Overlaps(Left, Right)} 
+      -> Result : Interval is
+      // Return union of two intervals.  Must have some overlap
+      // to ensure that result can be represented as a single interval.
+        
+        Result := Left
+        Result or= Right
+    end op "or"
+
+    op "or="(var Left : optional Interval; Right : Interval) 
+      {Overlaps(Left, Right)} is
+      // Compute union of two intervals.  Must have some overlap
+      // to ensure that result can be represented as a single interval.
+        var Right_Copy for Left := Right
+        Left <|= Right_Copy
+    end op "or="
+
+    op "<|="(var Left, Right : optional Interval) {Overlaps(Left, Right)} is
+      // Compute union of two intervals; leave Right empty.  
+      // Must have some overlap to ensure that result can be 
+      // represented as a single interval.
+        if Left is null then
+            Left <== Right
+        elsif Right not null then
+            var Right_Copy <== Right
+                // Make copy and null out Right, so
+                // we don't end up with Right partially nulled out
+            
+            case Left.Low =? Right_Copy.Low of
+              [#less] => 
+                // No change to Left.Low
+                null
+              [#greater] => 
+                Left.Low <== Right_Copy.Low
+                Left.Low_Is_Open := Right_Copy.Low_Is_Open
+              [#equal] => 
+                Left.Low_Is_Open and= Right_Copy.Low_Is_Open
+            end case
+
+            case Left.High =? Right_Copy.High of
+              [#less] => 
+                Left.High <== Right_Copy.High
+                Left.High_Is_Open := Right_Copy.High_Is_Open
+              [#greater] => 
+                // No change to Left.High
+                null
+              [#equal] => 
+                Left.High_Is_Open and= Right_Copy.High_Is_Open
+            end case
+        end if
+    end op "<|="
+
+end class PSL::Core::Interval
+
+func PSL::Test::Test_Interval(X, Y, Z : Univ_Integer) is
+    var Y_Up_To_Z : Interval<Univ_Integer> := 
+      (Low => Y, Low_Is_Open => #false, High => Z, High_Is_Open => #true)
+
+    Println(X | " in " | Y | "..<" | Z | " = " | (X in Y_Up_To_Z))
+
+    var Y_To_Z : Closed_Interval<Univ_Integer> := (Low => Y, High => Z)
+
+    Println(X | " in " | Y | ".." | Z | " = " | (X in Y_To_Z))
+
+    var One_To_X : Closed_Interval<Univ_Integer> :=
+      (Low => 1, High => X)
+
+    Println(1 | ".." | X | "=?" | Y | ".." | Z | " = " | 
+      (One_To_X =? Y_To_Z))
+
+end func PSL::Test::Test_Interval

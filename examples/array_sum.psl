@@ -1,0 +1,111 @@
+concurrent interface Atomic_Integer<> is
+    func Create(Initial_Val : Univ_Integer) -> Atomic_Integer
+    func Set_Value(locked var A : Atomic_Integer; Val : Univ_Integer)
+    func Value(locked A : Atomic_Integer) -> Univ_Integer
+
+    op "from_univ"(Initial_Val : Univ_Integer) -> Atomic_Integer is Create
+    op "to_univ"(locked A : Atomic_Integer) -> Univ_Integer is Value
+
+    op "+="(locked var Left : Atomic_Integer; Right : Univ_Integer)
+    op "-="(locked var Left : Atomic_Integer; Right : Univ_Integer)
+    op "*="(locked var Left : Atomic_Integer; Right : Univ_Integer)
+    op "/="(locked var Left : Atomic_Integer; Right : Univ_Integer)
+end interface Atomic_Integer;
+
+concurrent class Atomic_Integer is
+    var Val : Univ_Integer
+  exports
+    func Create(Initial_Val : Univ_Integer) -> Atomic_Integer is
+        return (Val => Initial_Val)
+    end func Create
+
+    func Set_Value(locked var A : Atomic_Integer; Val : Univ_Integer) is
+         A.Val := Val
+    end func Set_Value
+
+    func Value(locked A : Atomic_Integer) -> Univ_Integer is
+        return A.Val
+    end func Value
+
+    op "+="(locked var Left : Atomic_Integer; Right : Univ_Integer) is
+        Left.Val := Left.Val + Right
+    end op "+="
+
+    op "-="(locked var Left : Atomic_Integer; Right : Univ_Integer) is
+        Left.Val := Left.Val - Right
+    end op "-="
+
+    op "*="(locked var Left : Atomic_Integer; Right : Univ_Integer) is
+        Left.Val := Left.Val * Right
+    end op "*="
+
+    op "/="(locked var Left : Atomic_Integer; Right : Univ_Integer) is
+        Left.Val := Left.Val / Right
+    end op "/="
+end class Atomic_Integer
+
+// TBD: "concurrent" applied to a "small" type doesn't work yet
+// func Array_Sum() is
+//     const X : Vector<Univ_Integer> := [for I in 1..10_000 => I]
+//     var Sum : concurrent Univ_Integer := 0
+//     for each C of X concurrent loop
+//        Sum += C
+//     end loop
+//     const Result := Sum;
+//     Println("Sum of X = " | Result)
+// end func Array_Sum;
+// 
+func Array_Sum2() is
+    const X : Vector<Univ_Integer> := [for I in 1..10_000 => I]
+    var Sum : Atomic<Univ_Integer> := Create(0)
+    for each C of X concurrent loop
+       loop
+          const Val := Sum.Value();
+          if Sum.Compare_And_Swap(Val, Val+C) == Val then
+             exit loop
+          end if
+       end loop
+    end loop
+    const Result := Sum.Value()
+    Println("Sum of X = " | Result)
+end func Array_Sum2;
+
+func Array_Sum3() is
+    const X : Vector<Univ_Integer> := [for I in 1..10_000 => I]
+    var Sum : Atomic_Integer<> := 0
+    for each C of X concurrent loop
+       Sum += C
+    end loop
+    Println("Sum of X = " | [[Sum]])
+end func Array_Sum3;
+
+func Array_Sum4() is
+    const X : Vector<Univ_Integer> := [for I in 1..10_000 => I]
+    const Sum := (for each C of X => <0> + C)
+    Println("Sum of X = " | Sum)
+end func Array_Sum4;
+
+func Array_Sum5(N : Univ_Integer) is
+    const X : Vector<Univ_Integer> := [for I in 1..10_000 => I]
+    var Partial_Sum : Vector<Univ_Integer> := Create(N, 0)
+    for each [Index => Subrange] of (1..10_000)/N concurrent loop
+        for I in Subrange loop
+            Partial_Sum[Index] += X[I]
+        end loop
+    end loop
+    const Sum := (for each S of Partial_Sum => <0> + S)
+    Println("Sum of X = " | Sum)
+end func Array_Sum5;
+
+func main(Args : Basic_Array<Univ_String>) is
+    if |Args| == 0 then
+       Array_Sum5(20)
+    else
+       const N : optional Univ_Integer := From_String(Args[1])
+       if N is null then
+           Array_Sum5(20)
+       else
+           Array_Sum5(N)
+       end if
+    end if
+end func main

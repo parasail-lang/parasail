@@ -1,0 +1,171 @@
+// Example ParaSail modules for matrix/vector manipulation -- matvec.ps{i,l}
+
+// Copyright (C) 2012, Ada Core Technologies, New York, NY
+// To be used only for Personal, Academic, or Evaluation Purposes;
+// Not for Commercial Production Use.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+class interface Matrix<UnivInteger Rows, UnivInteger Cols> {
+  // Define a 2-dimensional (Row x Cols) matrix of UnivReals, 
+
+    type Scalar is UnivReal;  // The component type
+
+    // The types used for indexing
+    type Row is Integer<1..Rows>;
+    type Col is Integer<1..Cols>;
+
+    // A "countable" type used to provide sequential iteration
+    // over a 2-dimensional matrix; column varies fastest.
+    class interface RowCol<> {
+        var Row R;
+        var Col C;
+	Ordering "=?"(RowCol Left, RowCol Right);
+	RowCol first();
+	RowCol last();
+        optional RowCol min(optional RowCol Left, optional RowCol Right);
+        optional RowCol max(optional RowCol Left, optional RowCol Right);
+
+	RowCol "+"(RowCol Left, UnivInteger Right);
+	RowCol "+"(UnivInteger Left, RowCol Right);
+	RowCol "-"(RowCol Left, UnivInteger Right);
+	UnivInteger "-"(RowCol Left, RowCol Right);
+
+        void "+=" (var RowCol Left, UnivInteger Right);
+        void "-=" (var RowCol Left, UnivInteger Right);
+
+	CountableRange<RowCol> "[..]"() is in CountableRange<RowCol>;
+
+	UnivInteger hash(RowCol Val);
+
+	CountableSet<RowCol> ".."(RowCol Left, RowCol Right)
+	  is in CountableSet<RowCol>;
+	CountableSet<RowCol> "<.."(RowCol Left, RowCol Right)
+	  is in CountableSet<RowCol>;
+	CountableSet<RowCol> "..<"(RowCol Left, RowCol Right)
+	  is in CountableSet<RowCol>;
+	CountableSet<RowCol> "<..<"(RowCol Left, RowCol Right)
+	  is in CountableSet<RowCol>;
+	CountableSet<RowCol> "|"(RowCol Left, RowCol Right)
+	  is in CountableSet<RowCol>;
+    }
+
+    // Constructors for a matrix.
+    Matrix create(optional Scalar Default);
+    Matrix "[]"(Vector<Scalar> Elems);
+
+    // Element-by-element addition/subtraction/negation
+    Matrix "+"(Matrix Left, Matrix Right);
+    Matrix "-"(Matrix Left, Matrix Right);
+    Matrix "+"(Matrix Right);
+    Matrix "-"(Matrix Right);
+
+    // Matrix times or divide-by scalar
+    Matrix "*"(Matrix Left, Scalar Right);
+    Matrix "*"(Scalar Left, Matrix Right);
+    Matrix "/"(Matrix Left, Scalar Right);
+
+    // Matrix multiplication.  This is a "generic" operation
+    // where the left and right operands need not have the same
+    // numbers of rows and columns.  
+    Matrix<Rows => Rows, Cols => RightType.Cols> "*"
+      (Matrix Left, Matrix<> as RightType Right) as ResultType Result
+      //  {> Cols == RightType.Rows <}
+
+    // All-zeros and all ones Constructors
+    Matrix zeroes();  // All zeroes
+    Matrix zeros() is zeroes;  // A synonym
+    Matrix ones();    // All ones
+
+    // Transpose
+    Matrix<Rows => Cols, Cols => Rows> T(Matrix M) as ResultType Result;
+
+    // Indexing operations
+    ref Scalar "indexing"(ref Matrix M, Row R, Col C);
+    ref Scalar "indexing"(ref Matrix M, RowCol RC);
+
+    // "var" indexing used to implement "[1 => x, 2 => y, 3 => z]" 
+    // "named" container aggregate.
+    ref var Scalar "var_indexing"(ref var Matrix M, Row R, Col C);
+    ref var Scalar "var_indexing"(ref var Matrix M, RowCol RC);
+
+    // Used for iterating over a matrix
+    CountableSet<RowCol> "index_set"(Matrix M);
+
+    // Imageable operations
+    Ordering "=?"(Matrix Left, Matrix Right);
+    UnivInteger hash(Matrix M);
+    UnivString toString(Matrix M);
+    Matrix fromString(UnivString Str);
+    
+    // Used to implement "[x, y, z]" positional container aggregate
+    Matrix "[]"();
+    void "<|="(var Matrix M, var optional UnivReal Val);
+
+}
+
+class interface ColVec<UnivInteger Elems> 
+  extends Matrix<Rows => Elems, Cols => 1> {
+  // Column vector of Elems elements
+
+    // inherited: type Scalar is UnivReal;
+    type Index is Integer<1..Elems>;
+
+  new  // "new" separates overridings of inherited ops (none in this case)
+       // from new operations (below: indexing, Length, and abs in this case).
+
+    // Single dimension indexing
+    ref Scalar "indexing"(ref ColVec CV, Index I);
+
+    // Number of elements in vector
+    UnivInteger length(ColVec CV);
+
+    // Magnitude of vector
+    Scalar "abs"(ColVec CV);
+    
+}
+
+class interface RowVec<UnivInteger Elems> 
+  extends Matrix<Rows => 1, Cols => Elems> {
+  // Row vector of length Elems
+
+    // inherited: type Scalar is UnivReal;
+    type Index is Integer<1..Elems>;
+
+  new
+
+    // Single-dimensional indexing
+    ref Scalar "indexing"(ref RowVec RV, Index I);
+
+    // Number of elements
+    UnivInteger length(RowVec RV);
+    
+}
+
+class interface SquareMatrix<UnivInteger Elems>
+  extends Matrix<Rows => Elems, Cols => Elems> {
+  // Square matrix (Elems x Elems)
+
+    // inherited: type Scalar is UnivReal;
+    type Index is Integer<1..Elems>;
+
+  new
+
+    // identity matrix
+    SquareMatrix identity();   // identity matrix
+    SquareMatrix ident() is identity;   // A synonym for identity
+
+    // inverse of matrix.
+    // Returns null if not defined.
+    optional SquareMatrix inverse(SquareMatrix SM);
+
+    // determinant.
+    // Returns null if not defined.
+    optional Scalar determinant(SquareMatrix SM);
+    optional Scalar det(SquareMatrix SM) is determinant;
+
+    // eigenvalue and eigenvector of matrix.
+    // Returns null if not defined.
+    optional Scalar eigenvalue(SquareMatrix SM);
+    optional ColVec<Elems> eigenvector(SquareMatrix SM);
+
+}

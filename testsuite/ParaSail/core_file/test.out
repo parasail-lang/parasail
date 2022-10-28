@@ -1,0 +1,7 @@
+Writing to file: test.txt
+Give me somethin: You gave me: "ParaSail"
+Contents of file test.txt
+Pi = 3.14159265389793, True prints as #true
+X = "hey is", Y = "for horses"
+User input = "ParaSail"
+All done

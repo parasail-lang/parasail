@@ -1,0 +1,226 @@
+interface PSL::Containers::Map
+  <Key_Type is Hashable<>; Value_Type is Assignable<>> is
+  // A hashed-map module
+    type Pair is Key_Value<Key_Type, Value_Type>
+
+    op "[]"() -> Map
+
+    op "|="(var Left : Map; Right : Pair)
+        // Add Key=>Value to Map, replacing pre-existing mapping
+        // for Key, if any.
+
+    op "|"(Left : Map; Right : Pair) -> Map
+        // Add Key=>Value to Map, replacing pre-existing mapping
+        // for Key, if any in result.
+
+    op "<|="(var Left : Map; var Right : optional Pair)
+        // Move Key/Value pair into map, leaving Right null
+
+    op "<|="(var Left : Map; var Right : Map)
+        // Move key/value pairs from Right into Left, leaving Right empty,
+        // replacing any pre-existing entries with the same key.
+
+    op "+="(var Left : Map; Right : Pair) is "|="
+        // A synonym for adding a key=>value pair
+
+    op "in"(Left : Key_Type; Right : Map) -> Boolean
+        // Return True if given key has a mapping in the Map
+
+    op "-="(var M : Map; Key : Key_Type)   // aka Exclude
+        // Remove mapping for Right, if present
+
+    op "index_set"(M : Map) -> Set<Key_Type>
+        // Return set of keys with mappings
+
+    func Keys(M : Map) -> Set<Key_Type> is "index_set"
+
+    op "indexing"(ref M : Map; Key : Key_Type) {Key in M} -> ref Value_Type
+        // Used for references to M[Key]; requires the Key to be in M.
+
+    op "var_indexing"(ref var M : Map; Key : Key_Type) 
+      -> ref var optional Value_Type
+        // Used for assignments to M[Key]; Key is added to M if not present
+
+    func Remove_Any(var M : Map) -> optional Pair
+        // Remove one mapping from the Map.  Return null if Map is empty
+
+    func Count(M : Map) -> Univ_Integer
+        // Number of mappings in the table
+
+    op "magnitude"(Map) -> Univ_Integer is Count
+
+    func Is_Empty(M : Map) -> Boolean
+        // Return True if no mappings in the table
+
+    func Dump_Statistics(M : Map)
+      // A debugging routine to show bucket sizes of Map
+
+end interface PSL::Containers::Map
+
+class PSL::Containers::Map is
+  // A hashed-map module
+
+    var Data : Basic_Map<Key_Value<Key_Type, Value_Type>>
+
+  exports
+    op "[]"() -> Map is
+        return (Data => [])
+    end op "[]"
+
+    op "|"(Left : Map; Right : Pair) -> Result : Map is
+        // Add Key=>Value to Map, replacing pre-existing mapping
+        // for Key, if any in result.
+        Result := Left
+        Result.Data |= Right
+    end op "|"
+
+    op "|="(var Left : Map; Right : Pair) is
+        // Add Key=>Value to Map, replacing pre-existing mapping
+        // for Key, if any.
+        Left.Data |= Right
+    end op "|="
+
+    op "<|="(var Left : Map; var Right : optional Pair) is
+        // Move Key/Value pair into map, leaving Right null
+        Left.Data <|= Right
+    end op "<|="
+
+    op "<|="(var Left : Map; var Right : Map) is
+        // Move key/value pairs from Right into Left, leaving Right empty,
+        // replacing any pre-existing entries with the same key.
+        loop
+            var Right_Elem for Left := Remove_Any(Right)
+            if Right_Elem is null then
+                return   // All done
+            end if
+
+            Left.Data <|= Right_Elem
+        end loop
+    end op "<|="
+
+    op "in"(Left : Key_Type; Right : Map) -> Boolean is
+        return Left in Right.Data
+    end op "in"
+
+    op "-="(var M : Map; Key : Key_Type) is
+      // Remove the given key from the Map, if present
+        M.Data -= Key
+    end op "-="
+   
+    op "index_set"(M : Map) -> Result : Set<Key_Type> is
+        // Return set of keys with mappings
+        if M.Data is null then
+            return []
+        else
+           return "index_set"(M.Data)
+        end if
+    end op "index_set"
+
+    op "indexing"(ref M : Map; Key : Key_Type) {Key in M} -> ref Value_Type is
+        // Used for references to M[Key]; requires the Key to be in M.
+        return M.Data[Key].Value
+    end op "indexing"
+
+    op "var_indexing"(ref var M : Map; Key : Key_Type) 
+      -> ref var optional Value_Type is
+        // Used for assignments to M[Key]; Key is added to M if not present
+        return "var_indexing"(M.Data, Key).Value
+    end op "var_indexing"
+
+    func Count(M : Map) -> Univ_Integer is
+        return Count(M.Data)
+    end func Count
+
+    func Is_Empty(M : Map) -> Boolean is
+        // Return True if no mappings in the table
+        return Is_Empty(M.Data)
+    end func Is_Empty
+
+    func Remove_Any(var M : Map) -> Result : optional Pair is
+        return Remove_Any(M.Data)
+    end func Remove_Any
+
+    func Dump_Statistics(M : Map) is
+      // A debugging routine to show bucket sizes of Map
+        Dump_Statistics(M.Data)
+    end func Dump_Statistics
+
+end class PSL::Containers::Map
+
+func PSL::Test::Test_Map(X : Univ_Enumeration; Y : Univ_String;
+  A : Univ_Enumeration; B : Univ_String) is
+    type Enum_String_Map is Map<Univ_Enumeration, Univ_String>
+
+    var M : Enum_String_Map := [X => Y, A => B]
+
+    Println("Count = " | Count(M))
+
+    for each [K => V] of M loop
+        Println("Mapping " | K | " => " | V)
+        Println(K | " in M = " | (K in M))
+    end loop
+
+    Println("#xy in M = " | (#xy in M))
+
+    M -= X
+
+    Println("Count after deletion = " | Count(M))
+
+    for each [K => V] of M loop
+        Println("Mapping " | K | " => " | V)
+    end loop
+
+    M |= [X => "a new value"]
+
+    Println("Count after addition = " | Count(M))
+
+    for each [K => V] of M loop
+        Println("Mapping " | K | " => " | V)
+    end loop
+
+    M |= [X => "a third value"]
+
+    Println("Count after replacement = " | Count(M))
+
+    for each [K => V] of M loop
+        Println("Mapping " | K | " => " | V)
+    end loop
+
+    M -= A
+
+    Println("Count after deletion = " | Count(M))
+
+    for each [K => V] of M loop
+        Println("Mapping " | K | " => " | V)
+    end loop
+
+    var Ran := Random::Start(Hash(A))
+    var MUI : Map<Univ_Integer, Univ_Integer> := []
+
+    Println("Adding 100 random pairings to Map.")
+    for I in 1..100 loop
+        const Key := Next(Ran) mod 100
+        const Value := Next(Ran) mod 100
+        MUI[Key] := Value
+    end loop
+    Println("Map is now of count = " | Count(MUI))
+
+    for each [K => V] of MUI loop
+        Println("Mapping " | K | " => " | V)
+        Println("MUI[" | K | "] = " | MUI[K])
+    end loop
+
+    for (Pair in MUI; I in 1..60 forward) loop
+        Print(" [" | Pair.Key | " => " | Pair.Value | "]")
+        if I mod 5 == 0 then
+            Print('\n')
+        end if
+    end loop
+
+    if Count(MUI) > 60 then
+        Println(" ...")
+    elsif Count(MUI) mod 5 != 0 then
+        Print('\n')
+    end if
+
+end func PSL::Test::Test_Map

@@ -1,0 +1,97 @@
+interface Board<> is
+    const Max_Size := 10;
+
+    type Nought_Or_Cross is Enum< [#O, #X] >;
+
+    type Row is new Integer<1..10>;
+    type Col is new Integer<1..10>;
+    func Create(Size : Univ_Integer) {Size in 1..Max_Size} 
+      -> Board {Size(Create) == Size};
+
+    func Size(B : Board) -> Univ_Integer {Size in 1..Max_Size};
+
+    op "indexing"(ref B : Board; R : Row; C : Col) 
+      {R in 1..Size(B); C in 1..Size(B)} 
+      -> ref optional Nought_Or_Cross;
+
+    func Display_Board(B : Board);
+end interface Board;
+
+class Board is
+    const Size : Univ_Integer;
+    var Cells : Basic_Array<optional Nought_Or_Cross>;
+
+  exports
+    func Create(Size : Univ_Integer) {Size in 1..Max_Size} 
+      -> Board {Size(Create) == Size} is
+        return (Size => Size, Cells => Create(Length => Size**2, Val => null));
+    end func Create;
+
+    func Size(B : Board) -> Univ_Integer {Size in 1..Max_Size} is
+	return B.Size;
+    end func Size;
+
+    op "indexing"(ref B : Board; R : Row; C : Col) 
+      {R in 1..Size(B); C in 1..Size(B)} 
+      -> ref optional Nought_Or_Cross is
+	return B.Cells[ (R-1)*B.Size + [[C]] ];
+    end op "indexing";
+
+    func Display_Board(B : Board) is
+	for I in 1..B.Size forward loop
+	    for J in 1..B.Size forward loop
+		Print( B[I, J] | " ");
+	    end loop;
+	    Print('\n');
+	end loop;
+    end func Display_Board;
+end class Board;
+
+func Play(Size : Univ_Integer) is
+    var B := Board::Create(Size);
+
+    Println("Initial board:");
+    B.Display_Board(); // Equivalent to Display_Board(B)
+
+    loop
+        Print("X, O, or quit: ");
+        const Command : Univ_String := Readln();
+        Println("Command = \"" | Command | '\"');
+        var Mark : optional Board::Nought_Or_Cross := null;
+        case Command of
+          ["quit"] =>
+            exit loop;
+          ["X"|"x"] =>
+            Mark := #X;
+          ["O"|"o"] =>
+            Mark := #O;
+          [..] =>
+            Println("Huh? I don't understand the command; 'quit' to exit");
+            continue loop;
+        end case;
+        Print("Row: "); 
+        const Row : Univ_Integer := From_String(Readln());
+        Print("Col: ");
+        const Col : Univ_Integer := From_String(Readln());
+        if Row not in 1..Size or else Col not in 1..Size then
+            Println("Row, Col of " | Row | ", " | Col |
+              " must both be less than " | Size);
+            continue loop;
+        end if;
+        if B[Row, Col] not null then
+            Println("Board[" | Row | ", " | Col | "] is already marked with " |
+              B[Row, Col]);
+            continue loop;
+        end if;
+        B[Row, Col] := Mark;
+        Println("Board now:");
+        Display_Board(B);  // Equivalent to B.Display_Board()
+    end loop;
+
+    Println("bye.");
+
+end func Play;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Play (5);
+end func main;

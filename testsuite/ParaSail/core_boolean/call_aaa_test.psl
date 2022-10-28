@@ -1,0 +1,5 @@
+func main(Args : Basic_Array<Univ_String>) is
+   PSL::Test::Test_Boolean(#true, #false);
+   PSL::Test::Test_Boolean(#true, #true);
+   PSL::Test::Test_Boolean(#false, #false);
+end func main;

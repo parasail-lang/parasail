@@ -1,0 +1,103 @@
+interface Int_Vector<> is
+    type Element_Type is Univ_Integer<>;
+    op "[]"() -> Int_Vector;
+    op "indexing"(ref V : Int_Vector; Index : Univ_Integer) -> 
+      ref Element_Type;
+    op "|="(var V : Int_Vector; Elem : Element_Type);
+    op "|"(Left, Right : Int_Vector) -> Int_Vector;
+    func Length(V : Int_Vector) -> Univ_Integer;
+end interface Int_Vector;
+    
+class Int_Vector is
+    const SV_Length := 250;
+
+    interface Subvector<> is
+	const Level : Univ_Integer;
+	var Small : optional Basic_Array<optional Element_Type> := null;
+	var Large : optional Basic_Array<optional Subvector> := null;
+	var Capacity : Univ_Integer := 0;
+	op "indexing"(ref SV : Subvector; Index : Univ_Integer) -> 
+	  ref Element_Type;
+	func Expand(var SV : Subvector); 
+	  // Expand by adding a subvector at the bottom level.
+	  // If that is full, add a subvector at the next level up.
+	  // If totally full, add a new level.
+    end interface Subvector;
+
+    class Subvector is
+      exports
+	op "indexing"(ref SV : Subvector; Index : Univ_Integer) -> 
+	  ref Element_Type is
+	    if SV.Level == 0 then
+		// Small vector, index is direct index into Small array
+		return SV.Small[Index];
+	    else
+		// Large vector, index needs to be divided by SV_Length ** Level
+		// 
+		const Divisor := SV_Length ** SV.Level;
+		const Big_Index := Index / Divisor;
+		const Small_Index := Index mod Divisor;
+		// Recurse on appropriate subvector
+		return SV.Large[Big_Index][Small_Index];
+	    end if;
+	end op "indexing";
+    end class Subvector;
+
+    var Count : Univ_Integer := 0;
+    // var Top : optional Subvector<Element_Type>;
+    var Top : optional Subvector<>;
+  exports
+    op "[]"() -> Int_Vector is
+	return (Count => 0, Top => null);
+    end op "[]";
+
+    op "indexing"(ref V : Int_Vector; Index : Univ_Integer) -> 
+      ref Element_Type is
+	return V.Top[Index];
+    end op "indexing";
+
+    op "|="(var V : Int_Vector; Elem : Element_Type) is
+	if V.Top is null then
+	    // Need to create initial subvector
+	    V.Top := (Level => 0, Small => Create(SV_Length, null), 
+	      Large => null, Capacity => SV_Length);
+	elsif V.Count >= V.Top.Capacity then
+	    // Need to expand structure
+	    Expand(V.Top);
+	end if;
+	V.Count += 1;
+	V.Top[V.Count] := Elem;
+    end op "|=";
+    
+    op "|"(Left, Right : Int_Vector) -> Result : Int_Vector is
+	// Copy Left into Result, and then add in the Right elements
+	if Left.Top is null then
+	    // Left is null Int_Vector; result is determined by Right
+	    Result := Right;
+	else
+	    // Start with Left
+	    Result := Left;
+
+	    // TBD: Expand capacity to make sure there is room
+	    // Assign all elements of Right into tail of Result.
+	    const Total_Length := Left.Count + Right.Count;
+	    while Result.Top.Capacity < Total_Length loop
+		Expand(Result.Top);
+	    end loop;
+	    for I in 1..Right.Count concurrent loop
+		// TBD: Use slice assignment
+		Result.Top[Left.Count + I] := Right.Top[I];
+	    end loop;
+	    // Set the final count
+	    Result.Count := Total_Length;
+	end if;
+    end op "|";
+
+    func Length(V : Int_Vector) -> Univ_Integer is
+        return V.Count;
+    end func Length;
+end class Int_Vector;
+
+func main(Args : Basic_Array<Univ_String>) is
+   null;
+end func main;

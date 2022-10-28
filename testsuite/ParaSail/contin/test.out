@@ -1,0 +1,12 @@
+I = 1
+I = 9
+We skipped 1, but I still = 9
+I = 7
+We skipped 1, but I still = 7
+X now 0
+We should have just exited if I == 8
+J = 1
+J = 2
+J = 3
+I = 8
+We skipped 1, but I still = 8

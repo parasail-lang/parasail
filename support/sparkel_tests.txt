@@ -1,0 +1,26 @@
+annotation.skl
+# assign.skl
+case_expr.skl
+case_stmt.skl
+contin.skl
+dgraph.skl
+drinking_phils.skl
+for_loop.skl
+func_result.skl
+membership.skl
+move.skl
+multi_continue.skl
+n_queens.skl
+para_block.skl
+para_hello.skl
+parse_tree2.skl
+prime_cycles.skl
+simple_fib.skl
+simple_hello_world.skl
+simp_loop.skl
+string_case.skl
+table.skl
+#
+# tests with dependencies (unsupported by the script)
+#
+# hippo_game.skl

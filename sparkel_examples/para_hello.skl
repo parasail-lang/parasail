@@ -1,0 +1,14 @@
+proc Para_Hello() is
+    Print("Hello ") || Print("World ");
+    Println("");
+end proc Para_Hello;
+
+proc Slow_Print(S : Univ_String) is
+    Print(S);
+end proc Slow_Print;
+
+proc Para_Hello2() is
+    Slow_Print("Hello ") || Slow_Print("World ")
+  then
+    Println("");
+end proc Para_Hello2;

@@ -1,0 +1,228 @@
+-- $Revision: 1.5 $ $Date: 2012/01/11 22:26:06 $
+
+To implement a queued call, we probably want to use
+the wait-for-master approach to provide some uniformity.
+The actual code starts by evaluating the dequeue condition,
+and if satisifed, executes the rest of the routine.
+If not satisifed, it does some kind of special return which
+indicates that the call should be tried again after the
+state of things has changed, and depending on whether
+this was the original call or a re-call, either it should
+add the call to a list and wait for the master, or just go
+on to the next waiting call.
+
+For a locked call, we need to know which object is to be
+locked/unlocked around the call.  If there are multiple objects,
+that clearly requires a more complex data structure.
+
+------- thoughts beginning 9/18/2011 -------------
+
+Is it possible to use entry families to implement a queued call?
+Presumably we will have a separate protected object for each
+concurrent object.  The challenge is that we are allowing the
+dequeue condition to depend on the parameters.  With an entry
+family, all we have is an entry family index.  How does it get
+access to the entry family?  Could the 'Caller attribute help?
+No, that cannot be allowed in entry barriers, because that would
+break the model that the barrier is the same for all callers
+of the same family member.  So clearly we need a separate family
+member for each ongoing call, and some kind of a table indexed by
+the family member which gives access to the parameter list.
+
+This could be done using a requeue perhaps.  That is, we call an
+entry with entry barrier True, it gets an available family member,
+records the parameter block there, and then requeues on that
+family member.  Its barrier involves a call on the dequeue condition (internal
+precondition) with the appropriate parameter block.  Of course,
+before doing the requeue we should check whether the dequeue condition
+is satisfied, and if so, just proceed to do the operation.
+If we succeed with a requeue, then we should free up the
+entry family member before doing the operation.
+
+------
+
+The above doesn't really work.  We can't afford to have
+a server process waiting on an entry queue.  We clearly
+need to do queued calls using picothreads.  So any call
+that might require queueing needs to be a parallel call.
+So how can this work?  We could perhaps use enclosing-master-outcome
+field, but that only works if the only call using the
+master is the queued call.  But would we ever allow
+multiple queued calls using the same master?  I don't
+see why not.  That would seem to be efficient in some
+cases.  We could of course insert another master to
+ensure this happens, but not clear why that is necessary.
+
+What happens if we would want to evaluate the parameters
+as part of a parallel block, and then do a non-parallel
+call?  That is a bit of a problem, but not really.  It may
+be less efficient, but we can just create another master
+for the parallel block and do a parallel call from inside
+the parallel block.
+
+So let's run a scenario.  Caller does a Start/Add_Parallel_Call,
+which has Locked_Param_Index /= 0.  When the call starts up,
+we discover that there is a locked param, so we need to get
+a lock.  So we call a version of "Execute" that is a protected
+operation of a protected object associated with the locked
+param.  It is not entirely clear how we find this protected
+object.  We could "hash" on the virtual address, or we could
+store an index in the object header somewhere.  We really
+ought to create this when the concurrent object is created,
+so we should probably add a flag to Creat_Obj_Op that indicates
+the object is concurrent, and have it propagated by Copy_Large_Obj.
+We need to allocate this when the object is created
+to avoid a race condition later.
+Another issue is what happens if you have a concurrent object
+of a "small" type?  For now, we should disallow that.  We also
+want to be sure that a concurrent module isn't treated as a
+wrapper, unless the component obj is also concurrent, or at
+least large.
+
+Once we have the lock, we notice that there is an internal 
+precondition, aka dequeue condition.  We call the code for that first.
+If it returns true, we are all set.  We proceed to execute the
+"main" code of the routine.  If not true, we need to put the
+picothread on a list hanging off the concurrent object.  
+
+When a locked operation is complete (with a "var" parameter?), 
+before releasing the lock, we notify the master we are complete 
+(only if that is safe, since we don't want any more references 
+to the TCB or the master after we do that), and then we try 
+to find a thread whose dequeue condition is satisfied.  
+If we find one, then we may want to "adopt" that new TCB, 
+and execute it immediately.  If not, then we are done.
+
+Is it possible to "adopt" a new TCB?  Clearly that is what
+servers do, but in this case we want to do it without returning
+to the server.  Furthermore, the server is going to do some
+of this when we return in any case, so we will need some way
+of indicating that the master has already been notified
+and the TCB has been freed.
+
+For now, we won't allow the original TCB to continue.  This will
+be very similar to what we do now when we execute Wait_For_Parallel_Op,
+where if the master is not yet complete, we grab another task
+to execute.  In this case, we will grab another task to execute
+if its dequeue condition is now satisfied.
+
+---------- 9/25/2011 -----------
+
+The above approach is not ideal.  What we would like is for
+Execute_For_Thread/finish_thread to recognize this situation.
+The Server_Index might be a way to communicate the situation
+when returning from Execute_For_Thread.  Even better would be
+to add an OUT parameter to Execute/Execute_For_Thread to indicate
+that the thread is *not* finished but rather has been added
+to an internal queue.
+
+---------- 10/31/2011 -----------
+
+We now have a livelock/deadlock situation, where a server
+is at a wait_for_parallel call, and it goes and steals
+a thread from another server which turns out to do another
+wait_for_parallel call.  Meanwhile a thread for the first "wait"
+finishes, but we don't notice it, since we are stuck waiting
+for a second master.  
+
+  Possible solutions: 
+     - disallow stealing threads when waiting for a master.  
+     - When waiting for a master, only allow serving threads
+       which are subthreads of that master.
+     - This is really only a problem if while waiting for
+       a queued call, we end up serving another thread
+       which also waits for a queued call.  This implies
+       that if we distinguish threads which might queue
+       from those that never queue, we could always safely
+       serve a thread which never queues.  We still have
+       to worry about locks, so we need to always limit
+       ourselves to threads holding all of the locks held
+       by the master being awaited.  So it is really only
+       a concern for a master holding no locks, it is limited
+       to serving never-queueing threads, or any of its
+       subthreads.  So if holding a lock, serve only threads
+       holding the same lock.  If not holding a lock, then
+       serve only subthreads and never-queuing threads (which
+       presumably includes all threads holding a lock).
+
+This last solution implies we need to know whether a given
+operation might involve internal queuing, as well as any 
+nested block of code.  We could require that operations
+that make queued calls either be explicitly marked as "queued,"  
+or take a parameter that is unlocked, concurrent, with a 
+queued operation.  This means you need to mark a function
+as "queued" if it is an operation of a concurrent module
+and it queues internally, but there is no visible
+queued operation, or if it is an operation that creates a 
+concurrent object and calls a potentially queued operation.
+
+We are currently keeping track of Num_Serviceable_Threads representing
+the number of threads holding the same lock as the given master,
+and Num_Serviceable_Subthreads, representing the number
+of threads that are subthreads of the given master.  We now need to
+have a count of Num_Nonqueuing_Threads, and an indication whether
+a thread is non-queueing.  If the master holds a lock, then we
+only look at threads holding the same lock.  If the master
+does *not* hold a lock, then we look at threads holding a lock,
+and at subthreads, and at non-queuing threads.  We can keep
+three separate counts, where the non-queuing threads need not
+be separated by master.
+
+How do we mark a thread as non-queuing?  In Pre-CG, we can propagate
+whether a block of code makes a queuing call.  Before then we determine
+whether a given function involves queuing.  That would include any
+function with an unlocked concurrent parameter that uses queuing,
+any function marked "queued" or with a "queued" parameter,
+and any top-level function.  Any nested block would use the
+propagated calls-queuing-function info.  Any parallel call would
+use the uses-queuing flag on the function, unless the object
+is already locked, in which case the dequeue condition becomes
+a precondition.
+
+------------  Trouble with locks  5/14/2012  --------------
+
+In the Drinking_Philosophers example, we are ending up with a locked
+concurrent object getting reentered by a different operation.
+At first we thought it was because of the "delay 0.0" that we
+were inserting after spawning a new thread.  But we suppressed
+that if we were holding a lock, and still had the same problem.
+It turned out that if inside a locked operation we spawned
+and waited for pico-threads, the operation of waiting for a
+pico-thread involved an entry call, which causes trouble
+if called in the middle of a protected action.
+
+There seem to be a few possible solutions.  One is to
+be "careful" while holding a lock and never make an entry
+call.  This interferes with work stealing, because if
+a pico-thread is stolen, we may ultimately have to wait
+for it, and we don't want to busy wait.  Another alternative
+is to never use multiple servers while holding a lock.  
+Essentially locked operations become single-threaded.
+Pico-threads are never stolen if they are part of a locked
+operation, and the server that starts the execution of
+a locked operation serves all of the threads ever spawned
+inside the locked operation, and finishes the locked operation.
+A third alternative is to make locked operations not a single
+protected action.  Instead, the lock would be acquired and
+released as separate operations.  This means that acquiring
+a lock would be an entry call.
+
+The first alternative of simply being "careful" essentially
+comes down to being equivalent to the second alternative,
+namely, no stealing of threads holding a lock.  The compiler
+could avoid creating picothreads in the first place for
+locked operations, and if they do happen to occur (because
+a call is made to an operation outside the concurrent
+object), then they would be served only by the original
+server.  
+
+The third alternative is presumably higher overhead, and it
+is not obvious that that could ever be made back by the
+potential for added parallelism.  Presumably locked operations
+are relatively short (though in the n-queens problem we are adding an
+element onto a vector, which could involve a fair amount of
+shuffling, etc.).
+
+Perhaps we should support both, with a given concurrent object
+being one or the other, depending on its complexity.
+

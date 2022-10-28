@@ -1,0 +1,180 @@
+// Example ParaSail modules for matrix/vector manipulation -- mat_vec.ps{i,l}
+
+// Copyright (C) 2011-2014, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+interface Matrix<Rows : Univ_Integer; Cols : Univ_Integer> is
+  // Define a 2-dimensional (Row x Cols) matrix of Univ_Reals, 
+
+    type Scalar is Univ_Real;  // The component type
+
+    // The types used for indexing
+    type Row is Integer<1..Rows>;
+    type Col is Integer<1..Cols>;
+
+    // A "countable" type used to provide sequential iteration
+    // over a 2-dimensional matrix; column varies fastest.
+    interface Row_Col<> is
+        var R : Row;
+        var C : Col;
+	op "=?"(Left, Right : Row_Col) -> Ordering;
+	func First() -> Row_Col;
+	func Last() -> Row_Col;
+        func Min(Left, Right : optional Row_Col) -> optional Row_Col;
+        func Max(Left, Right : optional Row_Col) -> optional Row_Col;
+
+	op "+"(Left : Row_Col; Right : Univ_Integer) -> Row_Col;
+	op "+"(Left : Univ_Integer; Right : Row_Col) -> Row_Col;
+	op "-"(Left : Row_Col; Right : Univ_Integer) -> Row_Col;
+	op "-"(Left : Row_Col; Right : Row_Col) -> Univ_Integer;
+
+	op "+="(var Left : Row_Col; Right : Univ_Integer);
+	op "-="(var Left : Row_Col; Right : Univ_Integer);
+
+	op "[..]"() -> Countable_Range<Row_Col> is in Countable_Range<Row_Col>;
+
+	func Hash(Val : Row_Col) -> Univ_Integer;
+
+	op ".."(Left, Right : Row_Col) -> Countable_Set<Row_Col>
+	  is in Countable_Set<Row_Col>;
+	op "<.."(Left, Right : Row_Col) -> Countable_Set<Row_Col>
+	  is in Countable_Set<Row_Col>;
+	op "..<"(Left, Right : Row_Col) -> Countable_Set<Row_Col>
+	  is in Countable_Set<Row_Col>;
+	op "<..<"(Left, Right : Row_Col) -> Countable_Set<Row_Col>
+	  is in Countable_Set<Row_Col>;
+	op "|"(Left, Right : Row_Col) -> Countable_Set<Row_Col>
+	  is in Countable_Set<Row_Col>;
+
+        func To_String(Row_Col) -> Univ_String
+          is ("(" | Row_Col.R | ", " | Row_Col.C | ")");
+        optional func From_String(Univ : Univ_String)
+          -> optional Row_Col is (null)
+
+    end interface Row_Col;
+
+    // Constructors for a matrix.
+    func Create(Default : optional Scalar) -> Matrix;
+    op "[]"(Elems : Vector<Scalar>) -> Matrix;
+
+    // Element-by-element addition/subtraction/negation
+    op "+"(Left, Right : Matrix) -> Matrix;
+    op "-"(Left, Right : Matrix) -> Matrix;
+    op "+"(Right : Matrix) -> Matrix;
+    op "-"(Right : Matrix) -> Matrix;
+
+    // Matrix times or divide-by scalar
+    op "*"(Left : Matrix; Right : Scalar) -> Matrix;
+    op "*"(Left : Scalar; Right : Matrix) -> Matrix;
+    op "/"(Left : Matrix; Right : Scalar) -> Matrix;
+
+    // Matrix multiplication.  This is a "generic" operation
+    // where the left and right operands need not have the same
+    // numbers of rows and columns.  
+    op "*"(Left: Matrix; Right : Right_Type is Matrix<>)
+      {Cols == Right_Type::Rows}  // Required by rules of matrix multiply
+      -> (Result_Type is 
+	    Matrix<Rows => Rows, Cols => Right_Type::Cols>);
+
+    // All-zeros and all ones Constructors
+    func Zeroes() -> Matrix;  // All zeroes
+    func Zeros() -> Matrix is Zeroes;  // A synonym
+    func Ones() -> Matrix;    // All ones
+
+    // Transpose
+    func T(M : Matrix) 
+      -> (Result_Type is Matrix<Rows => Cols, Cols => Rows>);
+
+    // Indexing operations
+    op "indexing"(ref M : Matrix; R : Row; C : Col) -> ref Scalar;
+    op "indexing"(ref M : Matrix; RC : Row_Col) -> ref Scalar;
+
+    // "var" indexing used to implement "[1 => x, 2 => y, 3 => z]" 
+    // "named" container aggregate.
+    op "var_indexing"(ref var M : Matrix; R : Row; C : Col) 
+      -> ref var Scalar;
+    op "var_indexing"(ref var M : Matrix; RC : Row_Col) 
+      -> ref var Scalar;
+
+    // Used for iterating over a matrix
+    op "index_set"(M : Matrix) -> Countable_Set<Row_Col>;
+
+    // Imageable operations
+    op "=?"(Left, Right : Matrix) -> Ordering;
+    func Hash(M : Matrix) -> Univ_Integer;
+    func To_String(M : Matrix) -> Univ_String;
+    func From_String(Str : Univ_String) -> Matrix;
+    
+    // Used to implement "[x, y, z]" positional container aggregate
+    op "[]"() -> Matrix;
+    op "<|="(var M : Matrix; var Val : optional Univ_Real);
+
+end interface Matrix;
+
+interface Col_Vec<Elems : Univ_Integer> 
+  extends Matrix<Rows => Elems, Cols => 1> is
+  // Column vector of Elems elements
+
+    // inherited: type Scalar is Univ_Real;
+    type Index is Integer<1..Elems>;
+
+  new  // "new" separates overridings of inherited ops (none in this case)
+       // from new operations (below: indexing, Length, and abs in this case).
+
+    // Single dimension indexing
+    op "indexing"(ref CV : Col_Vec; I : Index) -> ref Scalar;
+
+    // Number of elements in vector
+    func Length(CV : Col_Vec) -> Univ_Integer;
+
+    // Magnitude of vector
+    op "abs"(CV : Col_Vec) -> Scalar;
+    
+end interface Col_Vec;
+
+interface Row_Vec<Elems : Univ_Integer> 
+  extends Matrix<Rows => 1, Cols => Elems> is
+  // Row vector of length Elems
+
+    // inherited: type Scalar is Univ_Real;
+    type Index is Integer<1..Elems>;
+
+  new
+
+    // Single-dimensional indexing
+    op "indexing"(ref RV : Row_Vec; I : Index) -> ref Scalar;
+
+    // Number of elements
+    func Length(RV : Row_Vec) -> Univ_Integer;
+    
+end interface Row_Vec;
+
+interface Square_Matrix<Elems : Univ_Integer>
+  extends Matrix<Rows => Elems, Cols => Elems> is
+  // Square matrix (Elems x Elems)
+
+    // inherited: type Scalar is Univ_Real;
+    type Index is Integer<1..Elems>;
+
+  new
+
+    // Identity matrix
+    func Identity() -> Square_Matrix;   // Identity matrix
+    func Ident() -> Square_Matrix is Identity;   // A synonym for Identity
+
+    // Inverse of matrix.
+    // Returns null if not defined.
+    func Inverse(SM : Square_Matrix) -> optional Square_Matrix;
+
+    // Determinant.
+    // Returns null if not defined.
+    func Determinant(SM : Square_Matrix) -> optional Scalar;
+    func Det(SM : Square_Matrix) -> optional Scalar is Determinant;
+
+    // Eigenvalue and eigenvector of matrix.
+    // Returns null if not defined.
+    func Eigenvalue(SM : Square_Matrix) -> optional Scalar;
+    func Eigenvector(SM : Square_Matrix) -> optional Col_Vec<Elems>;
+
+end interface Square_Matrix;

@@ -1,0 +1,15 @@
+Length(Agg) = 3
+Length(Enum_Tab1) = 3
+Agg[1] = 1
+Enum_Tab1[1] = #red
+Agg[2] = 2
+Enum_Tab1[2] = #green
+Agg[3] = 3
+Enum_Tab1[3] = #blue
+Length(Enum_Tab2) = 6
+Enum_Tab2[2] = #red
+Enum_Tab2[3] = #green
+Enum_Tab2[4] = null
+Enum_Tab2[5] = #blue
+Enum_Tab2[6] = null
+Enum_Tab2[7] = #orange

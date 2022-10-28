@@ -1,0 +1,72 @@
+import Point
+
+interface Init_Points<Flt is Float<>> is
+   func Points(Limit : Univ_Integer := 10**6) -> Vector<Point<Flt>>
+end interface Init_Points
+
+class Init_Points is
+   const Dummy : Basic_Array<optional Univ_Integer> := []  //  to get type desc
+  exports
+   func Points(Limit : Univ_Integer := 10**6) -> Result : Vector<Point<Flt>> is
+      //  Read json file full of points
+      Result := []
+      var X : optional Flt := null
+
+      func Use_Num(Half_A_Point : optional Flt; Str : Univ_String) is
+         if Half_A_Point is null then
+            Println
+              ("Value in point #`(|Result|+1) in json file is bad: `(Str)")
+         elsif X is null then
+            // First of a pair
+            X := Half_A_Point
+         else
+            // Second of a pair, add to result
+            Result |= New(X, Half_A_Point)
+            X := null
+            if |Result| mod 5000 == 0 then
+               Println (|Result| | " points read")
+            end if
+         end if
+      end func Use_Num
+
+      var IO := IO::Get_IO()
+      var Input : File_Input_Stream := IO.Open("points.json")
+      if Input is null then
+         Println ("File not found: points.json")
+         return []
+      end if
+      var Buf : Univ_String := ""
+      var Find_Num : Boolean := #true  // True when looking for start of num
+      var Numeric : Countable_Set<Univ_Character> := '0' .. '9' | '.' | '-'
+
+     *Outer*
+      for Line := Input.Readln() then Input.Readln() while Line not null loop
+         for each C of Line forward loop
+            if Find_Num then
+               if C not in Numeric then
+                  continue loop
+               end if
+               //  Found first character of number
+               Buf := "" | C
+               Find_Num := #false
+            else
+               //  Add characters to number until non-numeric found
+               if C not in Numeric then
+                  //  Reached end of number -- use this number,
+                  //  check if done, and reset if not
+                  Use_Num(From_String(Buf), Buf)
+                  if |Result| >= Limit then
+                     //  We have all the numbers we need
+                     exit loop Outer
+                  end if
+                  Buf := ""
+                  Find_Num := #true
+               else
+                  Buf |= C
+               end if
+            end if
+         end loop
+      end loop Outer
+      Input.Close()
+   end func Points
+end class Init_Points

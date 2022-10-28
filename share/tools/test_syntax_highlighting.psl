@@ -1,0 +1,33 @@
+abs abstract all and block class
+concurrent const continue each
+end exit extends exports
+forward func global implements
+import in interface is lambda locked
+mod new not null of op optional 
+or private queued ref rem return reverse
+with xor
+if then else elsif case for while loop
+
+Obj.Field Module::Func()
+( ) { } [ ]
+<=> <== ==> := <= >= <|= |= ==
+/= != >> << >>= <<= =? ** + - * / **=
+3 >> 4
+"hello" | "world"
+3.0e9 3.0e-9
+hello0x30 0x30
+0b01010101111 0B1
+0X101011 3#012210#
+1_000_000
+if 3 > 4 then;
+..< <..< <.. ..
+Arr1 Arr1[1] ,1 1.0, 0.1 .1 v_1
+and= or= xor=
+[[V]]
+|V|
+//comment
+// comment
+//  comment
+#enum
+'c'
+Module<E is Assignable<>>

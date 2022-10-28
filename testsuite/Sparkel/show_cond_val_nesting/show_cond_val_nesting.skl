@@ -1,0 +1,56 @@
+proc Show_Cond_Val_Nesting (Name : Univ_String) is
+
+   func Starts_With (Str1, Str2 : Univ_String) return Boolean is
+      return |Str1| >= |Str2| and then Str1[1..|Str2|] = Str2
+   end func Starts_With
+
+   var IO := SSL.Core.IO.Get_IO()
+   var Infile := File_Input_Stream.Open (IO, Name)
+   if Infile is null then
+      Put_Line (Name & " not found.")
+      return
+   end if
+
+   const Outfile_Name := Name & ".nested"
+
+   Put_Line ("Showing conditional-vals nesting in " & Outfile_Name)
+
+   var Outfile := File_Output_Stream.Create (IO, Outfile_Name)
+
+   var Nesting := 0
+   var Max_Nesting := 0
+   var Line_Num := 0
+   var Extra := 5  --  Amount of extra indent
+   var Start_Line : optional Univ_String
+   var Start_Line_Num : optional Univ_Integer
+
+   loop
+      var Line := Infile.Get_Line()
+      exit loop when Line is null
+      Line_Num += 1
+      if Line_Num = 10 then
+         Extra -= 1
+      elsif Line_Num = 100 then
+         Extra -= 1
+      elsif Line_Num = 1000 then
+         Extra -= 1
+      elsif Line_Num = 10_000 then
+         Extra -= 1
+      elsif Line_Num = 100_000 then
+         Extra -= 1
+      end if
+
+      if Line_Num mod 10_000 = 0 then
+         Put_Line (Extra * " " & Line_Num & " reached.")
+      end if
+      
+      if Line.Starts_With ("Conditional_Vals: Predicate") then
+         Nesting += 1
+         Max_Nesting := Max (Max_Nesting, Nesting)
+      elsif Line.Starts_With ("Conditional_Vals: Pred,") then
+         Nesting -= 1
+      end if
+      Outfile.Put_Line (Nesting * "*" & Line)
+   end loop
+   Put_Line (Line_Num & " lines, max nesting = " & Max_Nesting)
+end proc Show_Cond_Val_Nesting

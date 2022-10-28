@@ -1,0 +1,90 @@
+proc Make_Patch_File(In_File_Name : Univ_String) is
+    --  Procedure to take the output of a CodePeer regression-test run,
+    --  and convert it into a "patch" file.
+    --  It converts the lines containing a ticket number, preceding the "----"
+    --  lines, into patch entries, presuming each file to be patched is called
+    --  <ticket-number>/test.out
+    --  Result goes into <in_file_name>.patch
+
+    func Is_TN(Line : Univ_String) return Boolean is
+        --  Return #True if Str matches the syntax of a TN
+        return |Line| = 8 and then Line[1] in '0'..'9'|'A'..'Z'
+          and then Line[4] in '0'..'9' and then Line[5] = '-'
+          and then Line[6] in '0'..'9'
+    end func Is_TN
+
+    var IO := SSL.Core.IO.Get_IO()
+    var In_File := File_Input_Stream.Open(IO, In_File_Name);
+    if In_File is null then
+        Put_Line(In_File_Name & " not found")
+        return
+    end if
+    var Out_File := File_Output_Stream.Create(IO, In_File_Name & ".patch")
+    var Line : Univ_String
+
+    Put_Line ("Converting '" & In_File_Name & "' to produce '" &
+      In_File_Name & ".patch'");
+
+    --  Read up to first bug
+    loop
+        Line := In_File.Get_Line()
+        if Line is null then
+            Put_Line("No bug entries found in " & In_File_Name)
+            return
+        end if
+
+        exit loop when Is_TN(Line)
+    end loop
+
+    --  Convert each entry
+    loop
+        while Line not null and then not Is_TN(Line) loop
+           if |Line| > 5 and then Line[1..5] = "XFAIL" then
+               Line := null
+               exit loop
+           end if
+           Line := In_File.Get_Line()
+        end loop
+        exit loop when Line is null
+
+        const TN : Univ_String := Line
+
+        Out_File.Put_Line ("Index: " & TN & "/test.out")
+        Out_File.Put_Line ("=====================")
+
+        loop
+           Line := In_File.Get_Line ()
+           exit loop when Line is null
+             or else (|Line| >= 3 and then Line[1..3] = "---")
+        end loop
+
+        if Line is null then
+            Put_Line ("Unexpected EOF in middle of TN " & TN)
+            exit loop
+        end if
+
+        Out_File.Put_Line("--- " & TN & "/test.out")
+
+        Line := In_File.Get_Line ()
+        if |Line| < 3 or else Line[1..3] /= "+++" then
+            Put_Line ("Expected line starting with '+++' and found: '" &
+              Line & "'")
+            Out_File.Put_Line (Line)
+            exit loop
+        else
+            Out_File.Put_Line ("+++ " & TN & "/test.out")
+        end if
+
+        --  Write out rest of lines of bug entry
+        loop
+            Line := In_File.Get_Line()
+            exit loop
+              when Line is null or else |Line| = 0
+                or else Line[1] not in '-'|'+'|' '|'@'
+            Out_File.Put_Line (Line)
+        end loop
+    end loop
+
+    Out_File.Close()
+    Put_Line ("All done.")
+end proc Make_Patch_File

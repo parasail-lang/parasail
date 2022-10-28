@@ -1,0 +1,3 @@
+func Abs() -> Univ_Integer is
+   return (abs -1) + (abs -2) + (abs 3) + (abs -4) + (abs 0);
+end func Abs;

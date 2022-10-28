@@ -1,0 +1,3 @@
+fancy_int_vector.psl:14:15: Error: Missing compiled code for Expand (operation # 2):
+fancy_int_vector.psl:14:15: Info:   interface Subvector<> is ...
+ 1 codegen errors found

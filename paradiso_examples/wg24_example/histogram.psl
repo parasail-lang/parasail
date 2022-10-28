@@ -1,0 +1,45 @@
+interface Histogram<Flt is Float<>> is
+   const Num_Buckets : Integer
+   const Low : Flt
+   const High : Flt
+   func Create (Num_Buckets : Integer; Low, High : Flt) -> Histogram
+   func Build (Vector<Flt>; Num_Buckets : Integer; Low, High : Flt) -> Histogram
+   op "+="(var Histogram; Item : Flt)
+   func Buckets (Histogram) -> Vector<Integer>
+   --  First bucket are values < Low; Last bucket are values > High
+   --  Remaining buckets take up even amounts of range Low .. High.
+end interface Histogram
+
+class Histogram is
+   var Buckets : Vector<Integer>
+   var Num_Items : Integer := 0
+ exports
+   func Create (Num_Buckets : Integer; Low, High : Flt) -> Histogram is
+     ((Num_Buckets => Num_Buckets, Low => Low, High => High,
+       Buckets => Create (Num_Buckets, 0)));
+
+   func Build (Vec : Vector<Flt>; Num_Buckets : Integer; Low, High : Flt)
+     -> Result : Histogram is
+      Result := Create(Num_Buckets, Low, High);
+      for each Item of Vec loop
+         Result += Item
+      end loop
+   end func Build
+
+   op "+="(var H : Histogram; Item : Flt) is
+      H.Num_Items += 1
+      if Item < H.Low then
+         H.Buckets[1] += 1
+      elsif Item > H.High then
+         H.Buckets[H.Num_Buckets] += 1
+      else
+         const Index : Integer :=
+           1 + Round_To_Int((Item - H.Low) * (H.Num_Buckets-2) /
+                                     (H.High - H.Low) + 0.5)
+         H.Buckets[Min (Index, H.Num_Buckets-1)] += 1
+      end if
+   end op "+="
+
+   func Buckets (H : Histogram) -> Vector<Integer> is ((H.Buckets))
+   
+end class Histogram

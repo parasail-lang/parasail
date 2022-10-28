@@ -1,0 +1,6 @@
+interface Cairo<> is
+end interface Cairo
+
+interface Cairo::Context<> is
+end interface Cairo::Context
+

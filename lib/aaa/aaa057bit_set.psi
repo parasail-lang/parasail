@@ -1,0 +1,512 @@
+interface PSL::Containers::Bit_Set<Element_Type is Countable<>>
+  implements
+   Ordered_Set<Element_Type> is
+
+    op "[]"() -> Bit_Set
+
+    func Singleton(Elem : Element_Type) -> Bit_Set
+
+    op ".."(Left, Right : Element_Type) -> Bit_Set
+    op "<.."(Left, Right : Element_Type) -> Bit_Set
+    op "..<"(Left, Right : Element_Type) -> Bit_Set
+    op "<..<"(Left, Right : Element_Type) -> Bit_Set
+
+    func Create(Range : Countable_Range<Element_Type>; Val : Boolean)
+      -> Bit_Set
+
+    op "|"(Left, Right : Element_Type) -> Bit_Set
+    op "|"(Left : Bit_Set; Right : Element_Type) -> Bit_Set
+    op "|"(Left : Element_Type; Right : Bit_Set) -> Bit_Set
+    op "|"(Left : Bit_Set; Right : Bit_Set) -> Bit_Set
+
+    op "|="(var Left : Bit_Set; Right : Bit_Set)
+
+    op "|="(var Left : Bit_Set; Right : Element_Type)
+        // Add element to Bit_Set.
+
+    op "<|="(var Left : Bit_Set; var Right : optional Element_Type)
+        // Move element into Bit_Set.
+
+    op "<|="(var Left : Bit_Set; var Right : Bit_Set)
+        // Move all elements of Right into Left, leaving Right empty.
+
+    op "in"(Left : Element_Type; Right : Bit_Set) -> Boolean<>
+
+    op "=?"(Left, Right : Bit_Set) -> Ordering
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left is a proper subset of Right
+        // Return #greater if Left is a proper superset of Right
+        // Return #unordered otherwise
+
+    op "or"(Left, Right : Bit_Set) -> Bit_Set is "|"  // Union
+    op "or="(var Left : Bit_Set; Right : Bit_Set) is "|="
+
+    op "+"(Left, Right : Bit_Set) -> Bit_Set is "|"   // Union
+    op "+="(var Left : Bit_Set; Right : Bit_Set) is "|="
+    op "+="(var Left : Bit_Set; Right : Element_Type) is "|="   // aka Include
+
+    op "and"(Left, Right : Bit_Set) -> Bit_Set
+        // Intersection
+    op "and="(var Left : Bit_Set; Right : Bit_Set)
+
+    op "xor"(Left, Right : Bit_Set) -> Bit_Set
+        // Symmetric difference
+    op "xor="(var Left : Bit_Set; Right : Bit_Set)
+
+    op "-"(Left, Right : Bit_Set) -> Bit_Set
+        // Bit_Set difference
+
+    op "-="(var Left : Bit_Set; Right : Bit_Set)
+        // Compute Bit_Set difference
+
+    op "-="(var S : Bit_Set; Elem : Element_Type)   // aka Exclude
+        // Remove one element, if present
+
+    op "indexing"(S : Bit_Set; Elem : Element_Type) -> Boolean is (Elem in S)
+
+    func Count(S : Bit_Set) -> Univ_Integer
+
+    op "magnitude"(Bit_Set) -> Univ_Integer is Count
+
+    func Is_Empty(S : Bit_Set) -> Boolean<>
+
+    func Remove_First(var S : Bit_Set) -> optional Element_Type
+      // Remove and return the first element of the Bit_Set S
+    func Remove_Last(var S : Bit_Set) -> optional Element_Type
+      // Remove and return the last element of the Bit_Set S
+    func Remove_Any(var S : Bit_Set) -> optional Element_Type
+      // Remove and return an arbitrary element of the Bit_Set S
+
+    func First(S : Bit_Set) -> optional Element_Type
+      // Return the first element of the Bit_Set S;
+      // return null if S is empty.
+    func Last(S : Bit_Set) -> optional Element_Type
+      // Return the last element of the Bit_Set S;
+      // return null if S is empty.
+    func Any_Element(S : Bit_Set) -> optional Element_Type
+      // Return an arbitrary element of the Bit_Set S;
+      // return null if S is empty.
+
+end interface PSL::Containers::Bit_Set
+
+
+class PSL::Containers::Bit_Set is
+    var Bit_Arr : Packed_Array<Boolean, Indexed_By => Element_Type>
+       //  TBD: should add "|", "and", "or" to Packed_Array
+    //  When created: Bit_Arr[Bit_Arr.First()] == #true
+    //            and  Bit_Arr[Bit_Arr.Last()] == #true
+    //  This can change due to "and" and "-"
+    var Count : Univ_Integer
+  exports
+    op "[]"() -> Bit_Set is ((Bit_Arr => [], Count => 0))
+
+    func Singleton(Elem : Element_Type) -> Bit_Set
+      is ((Bit_Arr => [Elem => #true], Count => 1))
+
+    op ".."(Left, Right : Element_Type) -> Bit_Set
+      is ((Bit_Arr => Create(Left .. Right, #true),
+        Count => Max (Right - Left + 1, 0)))
+    
+    op "<.."(Left, Right : Element_Type) -> Bit_Set
+      is ((Bit_Arr => Create(Left <.. Right, #true),
+        Count => Max (Right - Left, 0)))
+    
+    op "<..<"(Left, Right : Element_Type) -> Bit_Set
+      is ((Bit_Arr => Create(Left <..< Right, #true),
+        Count => Max (Right - Left - 1, 0)))
+    
+    op "..<"(Left, Right : Element_Type) -> Bit_Set
+      is ((Bit_Arr => Create(Left ..< Right, #true),
+        Count => Max (Right - Left, 0)))
+    
+    func Create(Range : Countable_Range<Element_Type>; Val : Boolean)
+      -> Bit_Set is ((Bit_Arr => Create(Range, Val),
+            Count => Val? |Range| : 0))
+
+    op "|"(Left, Right : Element_Type) -> Result : Bit_Set is
+       const Low := Min(Left, Right)
+       const High := Max(Left, Right)
+       Result := (Bit_Arr => Create(Low .. High, #false), Count => 0)
+       Result.Bit_Arr[Low] := #true
+       Result.Bit_Arr[High] := #true
+       Result.Count := Low==High? 1 : 2
+    end op "|"
+       
+    op "|"(Left : Bit_Set; Right : Element_Type) -> Result : Bit_Set is
+       if Left.Count == 0 then
+          Result := Singleton(Right)
+       elsif Right in Left.Bit_Arr.Bounds() then
+          //  Left already encompasses Right
+          Result := Left
+          if not Result.Bit_Arr[Right] then
+             Result.Bit_Arr[Right] := #true
+             Result.Count += 1
+          end if
+       else
+          //  Right is outside limits of Left
+          const Low := Min(Left.Bit_Arr.First(),
+                       Max(Right - Left.Count, Element_Type::First()))
+          const High := Max(Left.Bit_Arr.Last(), 
+                       Min(Right + Left.Count, Element_Type::Last()))
+          // Println("Growing bounds of Left from " | Left.Bit_Arr.First() |
+          //   " .. " | Left.Bit_Arr.Last() | " to " | Low | " .. " | High)
+          Result := (Bit_Arr => Create(Low .. High, #false), Count => 0)
+          //  Copy over all the #true values from Left
+          for each [I => V] of Left.Bit_Arr {V} loop
+             Result.Bit_Arr[I] := #true
+          end loop
+          //  And the Right value
+          Result.Bit_Arr[Right] := #true
+          Result.Count := Left.Count + 1
+       end if;
+    end op "|"
+
+    op "|"(Left : Element_Type; Right : Bit_Set) -> Bit_Set
+     is (Right | Left)
+        
+    op "|"(Left : Bit_Set; Right : Bit_Set) -> Result : Bit_Set is
+       if Left.Count == 0 then
+          return Right
+       elsif Right.Count == 0 then
+          return Left
+       end if
+
+       const Low := Min(Left.Bit_Arr.First(), Right.Bit_Arr.First())
+       const High := Max(Left.Bit_Arr.Last(), Right.Bit_Arr.Last())
+       if Low == Left.First() and then High == Left.Last() then
+          //  Left subsumes Right, start from Left
+          Result := Left;
+       elsif Low == Right.First() and then High == Right.Last() then
+          //  Rights subsumes Left
+          return Right | Left
+       else
+          //  Neither is subsumed, create a new value
+          Result := (Bit_Arr => Create(Low .. High, #false), Count => 0)
+          for each [I => V] of Left.Bit_Arr {V} loop
+             Result.Bit_Arr[I] := #true
+          end loop
+          Result.Count := Left.Count
+       end if
+       for each [I => V] of Right.Bit_Arr {V and not Result.Bit_Arr[I]} loop
+          //  Set bit-arr true for the elements of Right that are not in Left
+          Result.Bit_Arr[I] := #true
+          Result.Count += 1
+       end loop
+    end op "|"
+
+    op "|="(var Left : Bit_Set; Right : Bit_Set) is
+       if Left.Bit_Arr.First() <= Right.Bit_Arr.First()
+         and then Left.Bit_Arr.Last() >= Right.Bit_Arr.Last()
+       then
+          for each [I => V] of Right.Bit_Arr {V and not Left.Bit_Arr[I]} loop
+             Left.Bit_Arr[I] := #true
+             Left.Count += 1
+          end loop
+       else
+          Left := Left | Right
+       end if
+    end op "|="
+
+    op "|="(var Left : Bit_Set; Right : Element_Type) is
+       // Add element to Bit_Set.
+       if Right in Left.Bit_Arr.Bounds() then
+          //  Right is within bounds of Left's bit array
+          if not Left.Bit_Arr[Right] then
+             Left.Bit_Arr[Right] := #true
+             Left.Count += 1
+          end if
+       else
+          //  Need to create a new object
+          Left := Left | Right
+       end if
+    end op "|="
+
+    op "<|="(var Left : Bit_Set; var Right : optional Element_Type) is
+        // Move element into Bit_Set.
+        // Not worth doing anything special for a bit set
+        Left |= Right
+        Right := null
+    end op "<|="
+
+    op "<|="(var Left : Bit_Set; var Right : Bit_Set) is
+        // Move all elements of Right into Left, leaving Right empty.
+        Left |= Right
+        Right := []
+    end op "<|="
+
+    op "in"(Left : Element_Type; Right : Bit_Set) -> Boolean<> is
+       return Left in Right.Bit_Arr.Bounds()
+         and then
+           Right.Bit_Arr[Left]
+    end op "in"
+
+    op "=?"(Left, Right : Bit_Set) -> Ordering is
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left is a proper subset of Right
+        // Return #greater if Left is a proper superset of Right
+        // Return #unordered otherwise
+        var Right_Count_In_Overlap := 0
+        for each [I => Left_V] of Left.Bit_Arr loop
+           const Right_V := (I in Right)
+           if Left_V != Right_V then
+              case Left.Count =? Right.Count of
+                 [#equal] =>
+                    //  Left can't be subset or superset
+                    return #unordered
+                 [#less] =>
+                    if Left_V > Right_V then
+                       //  Left can't be subset or superset
+                       return #unordered
+                    end if
+                 [#greater] =>
+                    if Left_V < Right_V then
+                       //  Left can't be subset or superset
+                       return #unordered
+                    end if
+              end case
+           end if
+           if Right_V then
+              //  Keep track of number of elements in Right when only
+              //  looking at elements in Left's Bit_Arr
+              Right_Count_In_Overlap += 1
+           end if
+        end loop
+        case Left.Count =? Right.Count of
+           [#equal] =>
+              //  Must be equal since same count and equal
+              //  in all overlapping items
+              return #equal
+           [#less] =>
+              //  Left is a proper subset of right
+              return #less
+           [#greater] =>
+              if Right.Count > Right_Count_In_Overlap then
+                 //  Right has some elements that are not in Left's Bit_Arr
+                 return #unordered
+              else
+                 //  All #true elements of Right have been accounted for,
+                 //  so Left is a proper superset of Right
+                 return #greater
+              end if
+        end case
+    end op "=?"
+
+    op "and"(Left, Right : Bit_Set) -> Result : Bit_Set is
+        // Intersection
+        Result := Left
+        Result and= Right
+    end op "and"
+
+    op "and="(var Left : Bit_Set; Right : Bit_Set) is
+        for each [I => V] of Right.Bit_Arr {not V and I in Left} loop
+           Left.Bit_Arr[I] := #false
+           Left.Count -= 1
+        end loop
+    end op "and="
+
+    op "xor"(Left, Right : Bit_Set) -> Result : Bit_Set is
+       // Symmetric difference
+       if Left.Count == 0 then
+          return Right
+       elsif Right.Count == 0 then
+          return Left
+       end if
+
+       const Low := Min(Left.Bit_Arr.First(), Right.Bit_Arr.First())
+       const High := Max(Left.Bit_Arr.Last(), Right.Bit_Arr.Last())
+       if Low == Left.First() and then High == Left.Last() then
+          //  Left subsumes Right, start from Left
+          Result := Left;
+       elsif Low == Right.First() and then High == Right.Last() then
+          //  Rights subsumes Left
+          return Right xor Left
+       else
+          //  Neither is subsumed, create a new value
+          Result := (Bit_Arr => Create(Low .. High, #false), Count => 0)
+          for each [I => V] of Left.Bit_Arr {V} loop
+             Result.Bit_Arr[I] := #true
+          end loop
+          Result.Count := Left.Count
+       end if
+       for each [I => V] of Right.Bit_Arr {V} loop
+          //  Invert element of Result when Right is #true
+          if Result.Bit_Arr[I] then
+             Result.Bit_Arr[I] := #false
+             Result.Count -= 1
+          else
+             Result.Bit_Arr[I] := #true
+             Result.Count += 1
+          end if
+       end loop
+    end op "xor"
+
+    op "xor="(var Left : Bit_Set; Right : Bit_Set) is
+       if Left.Bit_Arr.First() <= Right.Bit_Arr.First()
+         and then Left.Bit_Arr.Last() >= Right.Bit_Arr.Last()
+       then
+          //  Right is subsumed by Left
+          for each [I => V] of Right.Bit_Arr {V} loop
+             //  Invert I'th element of Left
+             if Left.Bit_Arr[I] then
+                Left.Bit_Arr[I] := #false
+                Left.Count -= 1
+             else
+                Left.Bit_Arr[I] := #true
+                Left.Count += 1
+             end if
+          end loop
+       else
+          //  Need to create a new object
+          Left := Left xor Right
+       end if
+    end op "xor="
+
+    op "-"(Left, Right : Bit_Set) -> Result : Bit_Set is
+        // Bit_Set difference
+        Result := Left
+        Result -= Right
+    end op "-"
+
+    op "-="(var Left : Bit_Set; Right : Bit_Set) is
+        // Compute Bit_Set difference
+        if Left.Count == 0 then
+           //  Nothing to do
+           return
+        end if
+
+        for I in Max(Left.Bit_Arr.First(), Right.Bit_Arr.First()) ..
+          Min(Left.Bit_Arr.Last(), Right.Bit_Arr.Last()) loop
+           //  Only need to visit overlapping part of ranges
+           if Right.Bit_Arr[I] and then Left.Bit_Arr[I] then
+              Left.Bit_Arr[I] := #false
+              Left.Count -= 1
+           end if
+        end loop
+    end op "-="
+
+    op "-="(var S : Bit_Set; Elem : Element_Type) is   // aka Exclude
+        // Remove one element, if present
+        if S.Count == 0 then
+           //  Nothing to do
+           return
+        end if
+
+        if Elem in S.Bit_Arr.Bounds() and then S.Bit_Arr[Elem] then
+            S.Bit_Arr[Elem] := #false
+            S.Count -= 1
+        end if
+    end op "-="
+
+    func Count(S : Bit_Set) -> Univ_Integer is (S.Count)
+
+    func Is_Empty(S : Bit_Set) -> Boolean<> is (S.Count == 0)
+
+    func Remove_First(var S : Bit_Set) -> optional Element_Type is
+      // Remove and return the first element of the Bit_Set S
+      for each [I => V] of S.Bit_Arr {V} forward loop
+         S.Bit_Arr[I] := #false
+         S.Count -= 1
+         return I
+      end loop
+    end func Remove_First
+
+    func Remove_Last(var S : Bit_Set) -> optional Element_Type is
+      // Remove and return the last element of the Bit_Set S
+      for each [I => V] of S.Bit_Arr {V} reverse loop
+         S.Bit_Arr[I] := #false
+         S.Count -= 1
+         return I
+      end loop
+    end func Remove_Last
+
+    func Remove_Any(var S : Bit_Set) -> optional Element_Type is
+      // Remove and return an arbitrary element of the Bit_Set S
+       if S.Count mod 2 == 0 then
+          return Remove_Last(S)
+       else
+          return Remove_First(S)
+       end if
+    end func Remove_Any
+
+    func First(S : Bit_Set) -> optional Element_Type is
+      // Return the first element of the Bit_Set S;
+      // return null if S is empty.
+      for each [I => V] of S.Bit_Arr {V} forward loop
+         return I
+      end loop
+    end func First
+
+    func Last(S : Bit_Set) -> optional Element_Type is
+      // Return the last element of the Bit_Set S;
+      // return null if S is empty.
+      for each [I => V] of S.Bit_Arr {V} reverse loop
+         return I
+      end loop
+    end func Last
+
+    func Any_Element(S : Bit_Set) -> optional Element_Type is
+      // Return an arbitrary element of the Bit_Set S;
+       if S.Count mod 2 == 0 then
+          return Last(S)
+       else
+          return First(S)
+       end if
+    end func Any_Element
+
+end class PSL::Containers::Bit_Set
+
+func PSL::Test::Test_Bit_Set(Args : Basic_Array<Univ_String>) is
+   type BSI is Bit_Set<Integer<0 .. 199>>
+
+   func Print_Set(S : BSI) is
+      for (V in S; Sep := "[" then ", ") forward loop
+         Print(Sep | V)
+      end loop
+      Println("]")
+   end func Print_Set
+
+   Println("Bit_Set of 3..33 = ")
+   Print_Set(3 .. 33)
+
+   var Test_Set : BSI
+
+   if |Args| == 0 then
+      Test_Set := [1, 3, 5, 7, 9]
+   else
+      Test_Set := []
+      for each Arg of Args forward loop
+         const Val : optional Univ_Integer := From_String(Arg)
+         if Val is null then
+            Println(Arg | ": not an integer")
+         else
+            Test_Set |= Val
+         end if
+      end loop
+   end if
+
+   Println ("Initial set:")
+   Print_Set(Test_Set)
+
+   Println ("Initial set xor 3..33 = ")
+   Print_Set(Test_Set xor (3..33))
+
+   Println ("(Initial set xor 3.33) and Create(15..20, #false) =")
+   Print_Set((Test_Set xor (3..33)) and Create(15..20, #false))
+
+   var Ran : Random := Start()
+   for I in 1 .. 1000 forward loop
+      const R := Ran.Next() mod 200
+      if I mod 2 == 1 then
+         Println("Adding " | R)
+         Test_Set += R
+      else
+         Println("Subtracting " | R)
+         Test_Set -= R
+      end if
+   end loop
+
+   Println ("After 500 random adds and 500 random subtracts there are " |
+     Test_Set.Count() | " left in set:")
+   Print_Set(Test_Set)
+
+end func PSL::Test::Test_Bit_Set

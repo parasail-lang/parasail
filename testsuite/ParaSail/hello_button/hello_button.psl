@@ -1,0 +1,14 @@
+interface Hello_Button<> is
+   func Display_Button (Str : Univ_String)
+     is import (#display_button);
+end interface Hello_Button;
+
+func Test_Button(Str : Univ_String) is
+   Println ("About to display button with " | Str);
+   Hello_Button::Display_Button(Str);
+   Println ("All done!");
+end func Test_Button;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Button ("");
+end func main;

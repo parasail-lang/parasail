@@ -1,0 +1,153 @@
+# Example ParaSail program -- Parallel, non-recursive N_Queens solver
+
+# Copyright (C) 2011-2012, AdaCore, New York, NY
+# To be used only for Personal, Academic, or Evaluation Purposes;
+# Not for Commercial Production Use.
+# Report errors at http://groups.google.com/group/parasail-programming-language
+class interface N_Queens <Max_N : Univ_Integer = 8> :
+    # Place N queens on an NxN checkerboard so that none of them can
+    # "take" each other.
+    type Chess_Unit is new Integer< -Max_N*2 .. Max_N*2 >;
+        # An integer type sufficiently big to represent
+        # values -Max_N*2 .. +Max_N*2
+    type Row is Chess_Unit; # A subrange in 1..Max_N
+    type Column is Chess_Unit; # A subrange in 1..Max_N
+    type Solution is Array<optional Column, Row>;  
+      # A "solution" is an array of Column's, indexed by "Row."
+      # It indicates in which Column a queen of the given Row is located
+      # An example solution would be:  2 8 6 1 3 5 7 4
+      #   meaning that the queen in row 1 is at column 2,
+      #   the queen in row 2 is at column 8, the queen in
+      #   row 3 is at column 6, and so on.
+     
+    def Place_Queens(N : Univ_Integer) -> Vector<Solution> 
+      {> for all Sol of Place_Queens => for all Col of Sol => Col not null <};
+        # Produce a vector of solutions, with the requirement
+        # that for each solution, there are non-null column numbers
+        # specified for each row of the checkerboard.
+end interface N_Queens;
+
+class N_Queens :
+    type Sum_Range is Chess_Unit; # {Sum_Range in 2..2*Max_N};
+        # Sum_Range is used for diagonals where the row+column is the
+        # same throughout the diagonal.
+    type Diff_Range is Chess_Unit; # {Diff_Range in (1-Max_N) .. (Max_N-1)};
+        # Diff_Range is used for diagonals where row-column is the
+        # same throughout the diagonal.
+    type Sum is Countable_Set<Sum_Range>;
+        # This type of set keeps track of which Sum_Range diagonals
+        # have a queen on them already.
+    type Diff is Countable_Set<Diff_Range>;
+        # This type of set keeps track of which Diff_Range diagonals
+        # have a queen on them already.
+
+    class interface Solution_State<> :
+        # We build up a solution state progressively as we move
+        # across the checkerboard, one column at a time.
+        def Initial_State(N : Row) -> Solution_State;
+        def Is_Acceptable(S : Solution_State; R : Row) -> Boolean;
+          # Is_Acceptable returns True if the next queen could be
+          # place in row R.
+        def Current_Column(S : Solution_State) -> Column;
+          # Current_Column indicates which column we are working on.
+        def Next_State(S : Solution_State; R : Row) -> Solution_State;
+          # Next_State returns a Solution_State produced by
+          # adding a queen at (Current_Column(S), R).
+        def Final_Result(S : Solution_State; R : Row) -> Solution;
+          # Final_Result returns a result produced by adding a queen
+          # at (Columns.Last, R) to a solution with all other columns
+          # placed.
+    end interface Solution_State;
+
+    class Solution_State :
+        const C : Column;    # Current column
+        const Trial : Solution;  # Trial solution, some col#s still null
+        const Diag_Sum : Sum;   # Set of "sum" diagonals in use
+        const Diag_Diff : Diff; # Set of "diff" diagnoals in use
+      exports :
+        def Initial_State(N : Row) -> Solution_State :
+            return (C => 1, Trial => Create(1..N, null), 
+              Diag_Sum => [], Diag_Diff => []);
+        end def Initial_State;
+
+        def Is_Acceptable(S : Solution_State; R : Row) -> Boolean :
+          # Is_Acceptable returns True if the next queen could be
+          # place in row R.
+            return S.Trial[R] is null and then
+              (R+S.C) not in S.Diag_Sum and then 
+              (R-S.C) not in S.Diag_Diff;
+        end def Is_Acceptable;
+        
+        def Current_Column(S : Solution_State) -> Column :
+          # Current_Column indicates which column we are working on.
+            return S.C;
+        end def Current_Column;
+
+        def Next_State(S : Solution_State; R : Row) -> Solution_State :
+          # Next_State returns a Solution_State produced by
+          # adding a queen at (Current_Column(S), R).
+            return (C => S.C+1, 
+              Trial     => S.Trial | [R : S.C],
+              Diag_Sum  => S.Diag_Sum | (R+S.C),
+              Diag_Diff => S.Diag_Diff | (R-S.C));
+        end def Next_State;
+
+        def Final_Result(S : Solution_State; R : Row) -> Solution :
+          # Final_Result returns a result produced by adding a queen
+          # at (Columns.Last, R) to a solution with all other columns
+          # placed.
+            return S.Trial | [R : S.C];
+        end def Final_Result;
+
+    end class Solution_State;
+
+  exports :
+    def Place_Queens(N : Univ_Integer) -> Vector<Solution> 
+      {> for all Sol of Place_Queens => for all Col of Sol => Col not null <} :
+        # Produce a vector of solutions, with the requirement
+        # that for each solution, there are non-null column numbers
+        # specified for each row of the checkerboard.
+    
+      var Solutions : concurrent Vector<Solution> = [];
+      
+     *Outer_Loop*
+      for State : Solution_State = Initial_State(N) :
+          # Iterate over the columns
+        
+          for R in 1..N concurrent :
+              # Iterate over the rows
+              if Is_Acceptable(State, R) :
+                  # Found a Row/Column combination that is not on any diagonal
+                  # already occupied.
+                  if Current_Column(State) < N :
+                      # Keep going since haven't reached Nth column.
+                      continue loop Outer_Loop
+                        with State => Next_State(State, R);
+                  else :
+                      # All done, remember trial result with last queen placed
+                      Solutions |= Final_Result(State, R); 
+
+      return Solutions;
+      
+    end def Place_Queens;
+end class N_Queens;
+
+def Test_N_Queens(N : Univ_Integer) :
+
+    type Max_12_Queens is N_Queens<Max_N => 12>;
+
+    var Results = Max_12_Queens.Place_Queens(N);
+
+    Println("Number of results with " | N | " queens = " | |Results|);
+
+    # for each [I => Result] of Results forward loop
+
+    #     Print("Result #" | I);
+
+    #     for each Col of Result forward loop
+    #         Print(" " | Col);
+    #     end loop;
+    #     Print('\n');
+    # end loop;
+
+end def Test_N_Queens;

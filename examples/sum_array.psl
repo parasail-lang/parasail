@@ -1,0 +1,31 @@
+func Sum(A : Basic_Array<Univ_Integer>) -> Univ_Integer is
+   var I := 1;
+   var S := 0;
+   while I <= Length(A) loop
+      S := S + A[I];
+      I := I + 1;
+   end loop;
+   return S;
+end func Sum;
+
+func main(Args : Basic_Array<Univ_String>) is
+   const A : Basic_Array<Univ_Integer> := Create(50_000, 1);
+   var Sum_Eq := "Sum = ";
+   Print (Sum_Eq); Print(Sum(A)); Print('\n');
+   if Args is null or else |Args| == 0 then
+      Print ("calling main recursively\n")
+      const B : Basic_Array<Univ_String> := Create(10, "ho");
+      Print ("B is null = "); Print([[B is null]]); Print('\n');
+      Print ("B not null = "); Print([[B not null]]); Print('\n');
+      main(B);
+   else
+      Print ("Args = ")
+      var I := 1;
+      while I <= Length (Args) loop
+         Print(Args[I]); Print(' ');
+         I := I + 1;
+      end loop;
+      Print ('\n');
+   end if
+end func main;
+

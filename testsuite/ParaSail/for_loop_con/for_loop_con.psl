@@ -1,0 +1,80 @@
+concurrent interface Locked_Set<Element_Type is Countable<>> is
+   op "[]"() -> Locked_Set
+   op "in"(Elem : Element_Type; locked Set : Locked_Set) -> Boolean
+   op "|="(locked var Set : Locked_Set; Elem : Element_Type)
+   func Count(locked Set : Locked_Set) -> Univ_Integer
+end interface Locked_Set
+
+concurrent class Locked_Set is
+   var Contents : Countable_Set<Element_Type> := []
+ exports
+   op "[]"() -> Locked_Set is
+      return (Contents => [])
+   end op "[]"
+
+   op "in"(Elem : Element_Type; locked Set : Locked_Set) -> Boolean is
+      return Elem in Set.Contents
+   end op "in"
+
+   op "|="(locked var Set : Locked_Set; Elem : Element_Type) is
+      Set.Contents |= Elem
+   end op "|="
+
+   func Count(locked Set : Locked_Set) -> Univ_Integer is
+      return Count(Set.Contents)
+   end func Count
+end class Locked_Set
+
+func First_Time(var Seen : Locked_Set<Univ_Integer>; I : Univ_Integer) 
+  -> Boolean is
+    if I in Seen then
+	// Already seen it
+	return #false;
+    end if;
+
+    Seen |= I;
+    return #true;
+end func First_Time;
+
+func Test_For_Loop(X, Y : Univ_Integer) is
+
+    Println("unordered loop:");
+    for I in X..Y loop
+	Println("I = " | I);
+    end loop;
+
+    Println("forward loop:");
+    for I in X..Y forward loop
+	Println("I = " | I);
+    end loop;
+
+    Println("reverse loop:");
+    for I in X..Y reverse loop
+	Println("I = " | I);
+    end loop;
+
+    Println("concurrent loop:");
+    for I in X..Y concurrent loop
+	Println("I = " | I);
+    end loop;
+
+    Println("then/while loop:");
+    for I := X then I+1 while I <= Y loop
+	Println("I = " | I);
+    end loop;
+
+    var Seen : Locked_Set<Univ_Integer> := [];
+    Println("then/while loop, combinations of powers of 2 and 3:");
+    for I := X then 2*I || 3 * I while 
+      I <= Y and then First_Time(Seen, I) loop
+	// Only print it the first time
+   // JM: Output modified to avoid differences between executions
+	// Println("I = " | I | ", Seen = " | Count(Seen));
+	Println("I = " | I);
+    end loop;
+
+end func Test_For_Loop;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_For_Loop (1, 5);
+end func main;

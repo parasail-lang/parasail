@@ -1,0 +1,33 @@
+Javallel design issues
+
+done ** Univ_String, Vector/Array should use zero-based indexing.
+* blah[] should be equivalent to ZVector<blah>
+* break should be required, unless list is empty in which case it is combined
+
+for (a;b;c) { equiv to for a then c while b; can specify parallel
+}
+
+How does this relate to iterators?  Java has iterators -- with what syntax?
+for (type X : iterable)  // make "type" optional, allow forward/reverse/parallel
+Require {} for all compound statements
+parallel/forward/reverse goes immediately after ")"?
+Allow
+
+@Import(...) public void Put(...);
+
+Any notion of an expression function?  Not obvious why you would bother because a simple "return" is pretty low syntactic overhead.
+
+done ** class interface X {} used for providing non-abstract interface to a class
+
+@Pre, @Post
+
+"var this", "final this", to override default of "final," "var" for non-void-returning and void-returning methods, respectively.
+
+constructors with name same as class do not need a return type, also are not inherited, as though defined in a nested module.
+
+Implicit "this." not supported initially.
+
+done ** Do we support X++?  Equiv to X += 1, except in "for" loop where is equiv to X => X+1
+
+done ** var X = ...
+done ** final Y = ...  // Allows type to be inferred

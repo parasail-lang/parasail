@@ -1,0 +1,21 @@
+def Case_Expr(X, Y, Z : Univ_Integer) :
+
+   type Color is Enum<[#red, #green, #blue]>;
+   var C : Color = #green;
+
+   if X in 0..2 :
+      C = #red + X;
+   end if;
+
+   Println("C = " | C);
+
+   const Result = (switch C : case #red : X; case #green : Y; case #blue : Z);
+
+   const Result2 = (switch C: case #red : X; case #green : Y; case #blue : Z);
+
+   {> Result == Result2 <}
+
+   Println("(switch C : case #red : " | X | "; case #green : " | Y |
+      "; case #blue : " | Z | ") = " | Result);
+
+end def Case_Expr;

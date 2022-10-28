@@ -1,0 +1,130 @@
+interface PSL::Core::Integer
+  <Range : Countable_Range<Univ_Integer> := -2**62 .. +2**62> is
+    // NOTE: We restrict Integer to this range so Univ_Integer can use
+    //       values outside this range as indices into an extended-range
+    //       integer table.
+    op "from_univ"(Lit : Univ_Integer) -> Integer 
+      is import(#integer_from_univ)
+
+    op "to_univ"(Val : Integer) -> Univ_Integer 
+      is import(#integer_to_univ)
+
+    op "+"(Right : Integer) -> Integer
+      is import(#identity)
+
+    op "-"(Right : Integer) -> Integer
+      is import(#negate)
+
+    op "abs"(Right : Integer) -> Integer
+      is import("abs")
+
+    op "magnitude"(Integer) -> Integer is "abs"
+
+    op "+"(Left, Right : Integer) -> Result : Integer 
+      is import("+")
+
+    op "-"(Left, Right : Integer) -> Result : Integer
+      is import("-")
+
+    op "*"(Left, Right : Integer) -> Result : Integer 
+      is import("*")
+
+    op "/"(Left, Right : Integer) -> Result : Integer
+      is import("/")
+
+    op "mod"(Left, Right : Integer) -> Integer
+      is import("mod")
+
+    op "rem"(Left, Right : Integer) -> Integer
+      is import("rem")
+
+    op "**"(Left, Right : Integer) -> Result : Integer
+      is import("**")
+
+    op "+="(var Left : Integer; Right : Integer) 
+      is import("+=")
+
+    op "-="(var Left : Integer; Right : Integer) 
+      is import("-=")
+
+    op "*="(var Left : Integer; Right : Integer) 
+      is import("*=")
+
+    op "/="(var Left : Integer; Right : Integer) 
+      is import("/=")
+
+    op "**="(var Left : Integer; Right : Integer) 
+      is import("**=")
+
+    op "=?"(Left, Right : Integer) -> Ordering
+      is import("=?")
+
+    op ">>"(Integer; Integer) -> Integer is import(">>")
+
+    op "<<"(Integer; Integer) -> Integer is import("<<")
+
+    func Min(Left, Right : optional Integer) -> optional Integer
+      is import(#min)
+    func Max(Left, Right : optional Integer) -> optional Integer
+      is import(#max)
+
+    func Hash(Val : Integer) -> Univ_Integer
+      is import(#identity)
+
+    func To_String(Val : optional Integer) -> Univ_String
+      is import(#to_string_int)
+
+    func From_String(Str : Univ_String) -> optional Integer
+      is import(#from_string_int)
+
+    func Print(X : Integer) is import(#print_int)
+    func Println(X : Integer) is (Println(To_String(X)))
+
+    func First() -> Integer
+
+    func Last() -> Integer
+
+    op "[..]"()->Countable_Range<Integer> is in Countable_Range<Integer>
+
+    op ".."(Left, Right : Integer) -> Countable_Set<Integer>
+      is in Countable_Set<Integer>
+    op "<.."(Left, Right : Integer) -> Countable_Set<Integer>
+      is in Countable_Set<Integer>
+    op "..<"(Left, Right : Integer) -> Countable_Set<Integer>
+      is in Countable_Set<Integer>
+    op "<..<"(Left, Right : Integer) -> Countable_Set<Integer>
+      is in Countable_Set<Integer>
+    op "|"(Left, Right : Integer) -> Countable_Set<Integer>
+      is in Countable_Set<Integer>
+  implements for Countable
+    // These operations are needed so Integer satifies
+    // requirements of "Countable" interface, but these
+    // operations are not directly callable (if they were callable,
+    // we would have ambiguity when adding an integer to an int-literal).
+
+    op "+"(Left : Integer; Right : Univ_Integer) -> Result : Integer 
+      is import("+")
+
+    op "+"(Left : Univ_Integer; Right : Integer) -> Result : Integer 
+      is import("+")
+
+    op "-"(Left : Integer; Right : Univ_Integer) -> Result : Integer 
+      is import("-")
+
+    op "-"(Left, Right : Integer) -> Result : Univ_Integer
+      is import("-")
+
+end interface PSL::Core::Integer
+
+class PSL::Core::Integer is
+    const Content : Univ_Integer;  // So this ends up as a wrapper
+  exports
+    func First() -> Integer is
+        return Range.First
+    end func First
+
+    func Last() -> Integer is
+        return Range.Last
+    end func Last
+
+end class PSL::Core::Integer

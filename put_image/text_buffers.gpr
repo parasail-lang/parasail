@@ -1,0 +1,22 @@
+project Text_Buffers is
+
+   for Object_Dir use "obj";
+   for Exec_Dir use "bin";
+   for Source_Dirs use (".");
+   for Main use ("test_buf.adb", "test_put.adb");
+
+   package Builder is
+      for Default_Switches ("ada") use ("-s", "-g", "-k");
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("ada") use ("-gnatE", "-fstack-check",
+        "-g", "-gnata", "-gnatU");  --  "-gnat95" no longer supported
+   end Compiler;
+
+   package Linker is
+      for Default_Switches ("ada") use ("-g", "-L/usr/lib", "-L.", "-ltermcap");
+   end Linker;
+
+end Text_Buffers;
+

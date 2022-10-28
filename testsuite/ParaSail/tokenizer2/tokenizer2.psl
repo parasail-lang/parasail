@@ -1,0 +1,69 @@
+// Example based on Guy Steele InfoQ lecture of January 2011
+// "Words" takes in a string and returns a vector of strings
+// representing the words separated by spaces.
+// Below, we presume that Strings and Vectors are indexed 1..Length(),
+// and even a slice is renumbered to start with index of 1.
+
+interface Tokenizer<> is
+    func Words
+      (Input : Univ_String; Separators : Set<Univ_Character> := [' '])
+         -> Vector<Univ_String>;
+end interface Tokenizer;
+
+class Tokenizer is
+  exports
+    func Words
+      (Input : Univ_String; Separators : Set<Univ_Character> := [' '])
+         -> Vector<Univ_String> is
+        const Len := |Input|
+        case Len of
+          [0] => return [];
+          [1] =>
+            if Input[1] in Separators then
+                return [];
+            else
+                return [Input];
+            end if;
+          [..] =>
+            // Divide and conquer
+            const Mid := Len/2;
+            var Left : Vector<Univ_String>;
+            var Right : Vector<Univ_String>;
+          then  // Recurse on two halves of input
+            Left := Words(Input[1 .. Mid], Separators);
+          ||
+            Right := Words(Input[Mid <.. Len], Separators);
+          then
+            if Input[Mid] in Separators or else Input[Mid+1] in Separators then
+                // At least one separator at dividing line; Just combine 
+                return Left | Right;
+            else
+                // Merge last word of Left and first of Right
+                return
+                     Left[1 ..< |Left|]
+                  | [ Left[|Left|] | Right[1] ]
+                  |  Right[1 <.. |Right|];
+            end if;
+        end case;
+    end func Words;
+end class Tokenizer;
+
+func Tokenize(Str : Univ_String; Seps : Univ_String) is
+    const Words1 := Tokenizer::Words(Str);
+    Println("splitting \"" | Str | "\" into words using spaces produces");
+    for each W of Words1 forward loop
+        Println(W);
+    end loop;
+
+    const Separators : Set<Univ_Character>
+    const Words2 := Tokenizer::Words(Str, [for I in 1..|Seps| => Seps[I]]);
+    Println("splitting \"" | Str | "\" into words using '" |
+      Seps | "' produces");
+    for each W of Words2 forward loop
+        Println(W);
+    end loop;
+end func Tokenize;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Tokenize ("This is:a simple test", ":");
+end func main;

@@ -1,0 +1,31 @@
+generic
+   type Element_Type is new Integer<>;  --  Should default to Integer itself
+package Box is
+   type Box is private;
+   func Create(Elem : Element_Type) return Box;
+   func Value (B    : Box) return Element_Type;
+end Box;
+
+package body Box is
+   type Box is record
+      const Contents : Element_Type;
+   end record Box;
+
+ exports
+
+   func Create(Elem : Element_Type) return Box is
+      return with (Contents => Elem);
+   end func Create;
+
+   func Value(B : Box) return Element_Type is
+      return B.Contents;
+   end func Value;
+end Box;
+
+func Test_Box() return Integer is
+     const B : Box<Integer<>> := Create(1);
+     const C : Box<Integer<>> := Create(Value(B) + 2);
+     const D : Box<> := Create(4);  -- Should default to Integer
+ 
+     return Value(B) + Value(C);
+end func Test_Box;

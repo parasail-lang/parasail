@@ -1,0 +1,122 @@
+interface Skipper<Elem_Type is Countable<>> is
+ // Define a range that can skip elements
+   op "[]"() -> Skipper
+
+   op ".."(Left, Right : Elem_Type) -> Skipper
+
+   op ".."(Skipper; By : Univ_Integer) -> Skipper  // Add a "skip" count
+     
+   func Remove_First(var Skipper) -> optional Elem_Type
+   func Remove_Last(var Skipper) -> optional Elem_Type
+   func Remove_Any(var Skipper) -> optional Elem_Type
+end interface Skipper
+
+class Skipper is
+   var Range : Countable_Range<Elem_Type> := []
+   var Skip : Univ_Integer := 1
+  exports
+   op "[]"() -> Skipper is
+       return (Range => [])
+   end op "[]"
+
+   op ".."(Left, Right : Elem_Type) -> Skipper is
+       return (Range => Left .. Right)
+   end op ".."
+
+   op ".."(Skipper; By : Univ_Integer) -> Skipper is
+       return (Range => Skipper.Range, Skip => Skipper.Skip * By)
+   end op ".."
+
+   func Remove_First(var Skipper) -> Result : optional Elem_Type is
+       Result := Remove_First (Skipper.Range)
+       if Result not null then
+          Skipper.Range :=
+            Skipper.Range.First + (Skipper.Skip-1) .. Skipper.Range.Last
+       end if
+   end func Remove_First
+
+   func Remove_Last(var Skipper) -> Result : optional Elem_Type is
+       if Skipper.Range.First > Skipper.Range.Last then
+          return null
+       else
+          //  Pick largest value <= Last which is First + N*Skip
+          Result := Skipper.Range.Last -
+            (Skipper.Range.Last - Skipper.Range.First) mod Skipper.Skip
+
+          //  Shrink the range
+          Skipper.Range :=
+            Skipper.Range.First .. Skipper.Range.Last - Skipper.Skip
+       end if
+   end func Remove_Last
+
+   func Remove_Any(var Skipper) -> optional Elem_Type is
+       //  Alternate between Remove_First and Remove_Last
+       if (Skipper.Range.Last - Skipper.Range.First) mod (2*Skipper.Skip) >=
+         Skipper.Skip then
+          return Remove_First (Skipper)
+       else
+          return Remove_Last (Skipper)
+       end if
+   end func Remove_Any
+
+end class Skipper
+  
+func Print_Skipper(V : Skipper<Univ_Integer>) is
+   var Sep := "["
+   for E in V forward loop
+      Print (Sep | E)
+      Sep := ", "
+   end loop
+   Println ("]")
+end func Print_Skipper
+
+func Print_Vec(V : Vector<Univ_Integer>) is
+   var Sep := "["
+   for each E of V forward loop
+      Print (Sep | E)
+      Sep := ", "
+   end loop
+   Println ("]")
+end func Print_Vec
+
+func Skipping_Loop(Start, End, By : Univ_Integer) is
+   const X : Vector<Univ_Integer> :=
+     [for I in Start .. End {I mod By == 0} => I]
+
+   Println(
+     "[for I in " | Start | " .. " | End | " {I mod " | By | " == 0} => I]")
+   Print_Vec(X)
+
+   const Y : Vector<Univ_Integer> :=
+     [for I := Start then I+By while I <= End => I]
+
+   Println(
+     "[for I := " | Start | " then I+" | By | " while I <= " | End | " => I]")
+   Print_Vec(Y)
+
+   const YY : Vector<Univ_Integer> :=
+     [for I in Start/By .. End/By => I * By + Start mod By]
+
+   Println("[for I in " | Start | "/" | By | " .. " | End | "/" | By |
+              " => I * " | By | " + " | Start | " mod " | By | "]")
+   Print_Vec(YY)
+
+   const Z : Skipper<Univ_Integer> := (Start..End)..By
+
+   Println("(" | Start | ".." | End | ").." | By | "")
+   Print_Skipper(Z)
+
+   const ZZ : Skipper<Univ_Integer> := ((Start..End)..By)..2
+
+   Println("((" | Start | ".." | End | ").." | By | ")..2")
+   Print_Skipper(ZZ)
+
+   Println("for J in (" | Start | ".." | End | ").." | By | " loop ...")
+   for J in Z loop
+      Println("  " | J)
+   end loop
+end func Skipping_Loop
+
+func main(Args : Basic_Array<Univ_String>) is
+   Skipping_Loop (1, 20, 2);
+end func main;

@@ -1,0 +1,14 @@
+func Poly_Type() is
+    var X : Comparable+ := 3;
+    var Y : Comparable+ := 4;
+
+    if X < Y then
+	Println("Comparable+ 3 < 4");
+    else
+	Println("Comparable+ 3 >= 4???");
+    end if;
+end func Poly_Type;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Poly_Type ();
+end func main;

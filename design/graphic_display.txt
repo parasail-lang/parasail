@@ -1,0 +1,47 @@
+-- $Revision: 1.2 $ $Date: 2012/01/12 23:25:35 $
+
+Graphic display of a running ParaSail VM and/or application:
+
+GTK+, probably in the guise of GtkAda, provides a portable
+base for building some kind of graphic interface to the ParaSail Compiler
+and VM.  We probably don't want it to be mandatory, so we probably
+want a level of indirection, so that a GUI would "register" itself
+with the VM to receive information at appropriate moments.
+
+Many graphic toolkits, including GtkAda on windows, require that
+all graphics be done on a single thread.  Typically these have
+some kind of infinite loop servicing a queue of activities, events,
+etc.  So we should devote a thread to the GUI, and set up some
+safe way for the rest of the PSVM to communcate with it.
+
+(We might want to use GPS as the front end.  It is not clear
+how much work that would be.)
+
+Events handled by the PSVM:
+
+   Compile files, Run a top-level func, Stop execution, 
+   Set some kind of breakpoint (e.g. on a run-time error,
+   a run-time exception, on entering/exiting a particular
+   operation, etc.) Debug when hitting a breakpoint.  Show
+   the state of the world or a particular server thread.
+   Requests to increase/decrease tracing both of PSVM
+   activities and application-specific events.
+
+Events handled by the GUI, coming from PSVM:
+
+   Trace information about interesting PSVM events.
+   Application-specific trace information.
+   Some kind of standard output stream.
+   Some kind of standard error stream.
+
+Probably there needs to be two queues of events, handling
+traffic in each direction.  It should also be possible
+for the GUI to call some interface provided by the PSVM
+to answer specific queries, such as to retrieve state
+of the world, etc.  These necessarily have to be 
+wait-free requests to avoid freezing the GUI, and probably
+should only be about the state of tracing, plus requests
+to stop and/or restart the PSVM and then queries about the
+state while stopped.
+
+Chances are that none of this will work with AdaMagic.

@@ -1,0 +1,301 @@
+Release notes for 2021-Jun-09 release 9.3 of the
+Ada202X Interpreter and Virtual Machine.
+
+All ParaSail/Ada202X-specific parts of this release are:
+
+   Copyright (C) 2011-2021, AdaCore, New York NY, USA
+   This program is provided "as is" with no warranty.
+
+The ParaSail and Ada202X parsers were built using aflex and ayacc, which
+were originally developed at the University of California, Irvine.
+Aflex is in turn based on flex, which was originally developed
+at the University of California, Berkeley.
+
+The arbitrary precision Univ_Integer type is implemented using
+an old Large_Integers package implemented by Mats Weber, for which
+no copyright is asserted.
+
+Please report any errors on the ParaSail Google Group, at:
+
+   http://groups.google.com/group/parasail-programming-language
+
+There is now a home page for ParaSail and friends, where new
+releases will be announced:
+
+   http://www.parasail-lang.org
+
+PARASAIL/ADA202X INSTALLATION
+
+The ParaSail/Ada202X release contains pre-built executables for
+Linux, Mac, Windows executables, plus full sources.
+
+NOTE: We don't the LLVM-based compiler with this release -- only
+an interpreter, though the interpreter does compile into an internal
+"PSVM" representation.
+
+Here are files that are part of this release:
+
+    * documentation/ada202x_release_notes.txt -- This file
+    * documentation/ref_manual/parasail_ref_manual.pdf
+                                     -- ParaSail Reference Manual
+    * documentation/ref_manual/parasail_ref_manual.ltx
+                                     -- ParaSail Reference Manual latex source
+    * documentation/ada202x_ref_manual/ada202x_ref_manual.pdf
+                                     -- Ada202x Reference Manual
+    * documentation/ada202x_ref_manual/ada202x_ref_manual.ltx
+                                     -- Ada202x Reference Manual latex source
+    * documentation/parasail_intro.pdf -- Introductory article on ParaSail
+    * documentation/ParaSail_Intro_Jun_2012.ppt.pdf -- Introductory powerpoint
+    * lib/aaa.psi                    -- ParaSail Standard Library (PSL)
+    * lib/aaa.a2i                    -- Ada202X Standard Library
+    * lib/reflection.ps?             -- ParaSail/Ada202X "reflection" module
+                                     -- for getting information about parsed
+                                     -- source code for compiling/analyzing.
+    * lib/psvm_debugging.ps?         -- Module for displaying PSVM code
+    * lib/debugger_console.psl       -- Interactive debugging console (new!)
+    * bin/ada_interp.csh             -- Script to run the interpreter, plus the
+                                     -- interactive debugger console (new!).
+    * bin/ada_interp.dat             -- Windows "cmd" file to run the Ada202x
+                                     -- interpreter, plus the interactive
+                                     -- debugger console (new!).
+
+    * ada202x_examples/*.a2x         -- Example Ada202X programs
+
+    * aflex_ayacc/aflex              -- Sources to AFlex lexer generator
+    * aflex_ayacc/ayacc              -- Sources to AYacc parser generator
+
+    * ada202x_parser/*.l,*.y         -- AFlex/AYacc grammars for Ada202X
+    * ada202x_parser/*.ad?           -- Handwritten skeleton for parser
+    * ada202x_parser/build/Makefile  -- Makefile for Ada202X parser
+
+    * parser/*.l,*.y                 -- AFlex/AYacc grammars for ParaSail
+    * parser/build/Makefile          -- Makefile for ParaSail parser
+
+    * semantics/*.ad?                -- Static and Dynamic semantics phases
+    * interpreter/*.ad?              -- ParaSail virtual machine interpreter
+    * build/ada202x.gpr              -- Project file for building ParaSail
+    * build/*.gpr                    -- Project files for other compilers and
+                                     -- compiled ParaSail programs.
+    * share/tools/*                  -- Various tools, highlighting info, etc.
+    * share/contrib/*                -- Some larger sample ParaSail programs.
+    * testsuite/*                    -- A testsuite for ParaSail
+    * Makefile                       -- Makefile to build executables, etc.
+
+There are pre-built executables for Linux, Mac, and Windows:
+    * _linux/*_main                  -- ParaSail, Ada202X, etc. interpreter
+    * _mac/*_main                    -- ParaSail, Ada202X, etc. interpreter
+    * _win/*_main                    -- ParaSail, Ada202X, etc. interpreter
+
+Instead of running the Makefile you can immediately start
+using the above executables by moving them into
+the appropriate places:
+
+    copy _<OS>/*_main => build/bin, and create symbolic links in install/bin
+
+Note that several of the scripts used for the Ada202X interpreter are
+implemented using the "C Shell" and they expect a version of "csh" to
+be present in "/bin/csh".  These days, this is often a link to the "tcsh"
+(T-Shell) program.  On windows, we now have a Windows CMD version of 
+of the main ada_interp script called bin/ada_interp.dat, courtesy of colleague
+Jeff Cousins.  This windows CMD version has essentially the same
+features as bin/ada_interp.csh -- run it with no parameters and it will
+give you some rudimentary documentation.  Its ability to do timing
+is a bit limited, and it only supports passing two parameters to the
+program from the Windows command line.
+
+BUILDING PARASAIL/Ada202X FROM SOURCES
+
+If you want to build from sources, then use the Makefile, as in
+"make all" or "make all_with_gtk" (depending on whether you have an
+appropriate GTK installed).  On Windows, you will probably need to
+be running on cygwin or equivalent, so the appropriate "make" tool
+is installed.
+
+If the "make" fails, one common problem is a lack of the "readline"
+library.  You can eliminate dependence on readline by commenting
+out the "with RL_C_Interface;" line in ada202x_parser/ada202x_main.adb,
+which will remove all uses of the readline library.
+
+After running the Makefile ("make"), the following should be present:
+
+    * install/bin/psli              -- ParaSail interpreter will be copied here
+    * install/bin/skli              -- Sparkel interpreter will be copied here
+    * install/bin/jlli              -- Javallel interpreter will be copied here
+    * install/bin/pryi              -- Parython interpreter will be copied here
+    * install/bin/a2xi              -- Ada202X interpreter will be copied here
+    * install/share/doc/*/*         -- Copies of documentation
+    * install/share/examples/*/*.??? -- Copies of examples and libraries
+    * install/share/ada202x_examples/*/*.??? -- Ada202X examples
+    * install/share/tools/*/*       -- Various tools, highlighting info, etc.
+    * build/bin/*main               -- Executables for all interpreters
+    * build/bin/*main_gtk           -- Executables for interpreters with GTK
+                                    -- NOTE: GTK support not fully functional
+                                    --       at this time.
+
+
+Ada202X INSTALLATION "SMOKE TEST"
+
+You can test the installation by "cd ada202x_examples" and then:
+
+   % ../bin/ada_interp.csh qsort.a2x
+
+Program should produce:
+
+   Ada202x Interpreter and Virtual Machine Revision: 9.x
+   ...
+   Parsing <install-dir>/lib/aaa.psi
+   Parsing <install-dir>/lib/reflection.psi
+   Parsing <install-dir>/lib/reflection.psl
+   Parsing <install-dir>/lib/reflection.psi
+   Parsing <install-dir>/lib/reflection.psl
+   Parsing <install-dir>/lib/psvm_debugging.psl
+   Parsing <install-dir>/lib/debugger_console.psl
+   Parsing qsort.a2x
+   ---- Beginning semantic analysis ----
+   Starting up thread servers
+    xxx trees in library.
+   Done with First pass.
+   ...
+   Finishing type descriptors.
+
+   Command to execute: 
+
+You can then type: Test_Sort 8
+
+Program should produce, approximately:
+
+   Seed =  8, Mult =  16807, Mod =  2147483647
+   Before sort, Vec = 
+     56,  45,  2,  23,  52,  29,  52,  89
+   After sort, Vec = 
+     2,  23,  29,  45,  52,  52,  56,  89
+   After 2nd sort, Vec2 = 
+     2,  23,  29,  45,  52,  52,  56,  89
+
+   Command to execute:
+
+And then you can type: quit
+
+You can look at the ada202x_examples/qsort.a2x file to better understand
+what it is doing.
+
+PARASAIL/Ada202X INTERACTIVE DEBUGGER
+
+A nice new feature since release 8.0 is an interactive debugger.  It is only
+useful when using the ParaSail or Ada202X interpreters, and is loaded
+automatically by using the "bin/ada_interp.csh" (or bin/interp.csh) script.
+The debugger gets invoked any time an assertion or
+a pre/postcondition fails at run-time, as well on other
+run-time failures.  It allows you to go "up" and "down" the call chain,
+display "params" or "locals", "list" lines of code around the point of failure,
+and then either "continue" execution or "quit" the program.  It is brand new,
+and is written in ParaSail itself, so feel free to take a look at its source
+code (lib/debugger_console.psl), and feel free to enhance it if you want.
+More support for viewing and switching between pico-threads will be part of
+the next group of features we implement.
+
+Ada202X DOCUMENTATION AND REFERENCES
+
+The Ada202X reference manual (ada202x_ref_manual.pdf) contains
+the description of the part of Ada202X currently supported, as
+well as an appendix with a short interpreter/virtual-machine user manual.
+Please READ THIS APPENDIX!  It has important information the use of "vim -q"
+for handling error messages.
+
+Not all Ada202X features are currently implemented.  See the standard library
+(lib/aaa.a2i) and the example programs for illustrations of features that 
+are implemented.  The standard library (aaa.a2i) contains quite a number 
+of examples of Ada202X coding, so be sure to look it over.
+See below for the list of unimplemented features.
+
+The interpreter does some error recovery, but after a couple of syntax
+errors it sometimes gets totally confused.  That means you should 
+not spend too much time diagnosing syntax errors unless they are some of the
+first ones reported in a given run.  Use "vim -q" to fix the first
+few syntax errors, and then try again.
+
+This is very much a prototype implementation of various Ada 202x features.
+Most of the focus has been on supporting the parallel programming
+features, in particular parallel loops, with optional "chunking,"
+parallel blocks, and reduction expressions (actually only sequential
+reductions, for now).  Some of the syntax remains ParaSail-ish,
+but most has been shifted over to be more fully Ada compatible.
+There are still plenty of limitations, and some "relaxations":
+
+    * The filenames for all Ada 202X source code must be specified as
+      command-line parameters -- there is no automatic searching of the disk;
+      a single file may contain any number of Ada 202x compilation units
+
+    * In a subprogram, "begin" is optional, and generally declarations can 
+      be interspersed with statements in a subprogram body
+
+    * ";" is optional at the end of a line
+
+    * some kinds of types still rely on ParaSail's "module<params>" syntax
+      such as "Integer<1 .. 1000>" or "Float<Digits => 3>"
+
+    * the parser is case *sensitive*, and all reserved words are in lower
+      case, while essentially all other identifiers are typically capitalized
+
+    * there is no syntax for tasks and task types, though
+      parallel blocks and parallel loops can serve the purpose
+      in many cases
+
+    * protected types are created by declaring a
+      "synchronized private" type, and then operations
+      with an object of the type as their first parameter
+      become protected functions/procedures
+
+    * "use type all" applies implicitly to all types.
+      "use <pkg>" only works within the context
+      clause, and an associated "with <pkg>" is implied.
+
+    * Indexing uses square brackets such as "A[...]" rather
+      than parentheses.
+
+    * Container/Array aggregates only allow square brackets "[...]",
+      while record aggregates use parentheses "(...)"
+
+    * "tagged" is implicit, in that any type can be extended,
+      but there is no need to say "with null record" if you
+      are deriving a new type from an existing type with no
+      extra components.
+
+    * discriminants are not supported, nor are variant records
+      or discriminant-dependent arrays
+
+    * objects (including components) can be unconstrained arrays
+      or class-wide objects, and the bounds or tag can change on
+      assignment
+
+    * access types and exceptions are flakey -- avoid their use
+      for now.
+
+    * private types can be completed in the package body
+
+    * 'Range is not implemented; use 'First .. 'Last
+
+    * "()" is allowed to indicate a parameterless call, and
+      a known bug is that "()" is required in some rare cases
+
+    * ".." is an operator, which returns a Countable_Range
+
+    * As of release 9.2, an assignment statement of the form "X := Y'Move;"
+      has the effect of "moving" the content of Y into X, and leaving
+      Y null.  It is semanticallly equivalent to "X := Y; Y := null;"
+      but has the potential of being more efficient.
+
+    * The target name feature identified by "@" is now supported as of
+      release 9.2
+
+We are very interested in your feedback.  Please use the ParaSail Google 
+Group (see link above) to provide whatever comments or suggestions you
+might have, as well as bug reports.  Please include a minimal self-contained
+Ada202X example program with each bug report.
+
+Sincerely,
+-Tucker Taft
+Director of Language Research
+AdaCore
+Lexington, MA  USA
+June 2021

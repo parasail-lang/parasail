@@ -1,0 +1,158 @@
+interface PSL::Core::Fixed<Delta : Univ_Real> is
+  // Fixed point types, represented as an integer
+  // multiple of the given Delta
+    op "from_univ"(Univ : Univ_Real) -> Fixed
+    op "to_univ"(Val : optional Fixed) -> optional Univ_Real
+
+    op "+"(Right : Fixed) -> Fixed
+      is import(#identity)
+
+    op "-"(Right : Fixed) -> Fixed
+      is import(#negate)
+
+    op "abs"(Right : Fixed) -> Fixed
+      is import("abs")
+
+    op "magnitude"(Fixed) -> Fixed is "abs"
+
+    op "+"(Left, Right : Fixed) -> Fixed
+      is import("+")
+    op "-"(Left, Right : Fixed) -> Fixed
+      is import("-")
+    op "*"(Left : Fixed; Right : Univ_Real) -> Fixed
+      is import(#fixed_real_mul)
+    op "*"(Left : Univ_Real; Right : Fixed) -> Fixed
+      is import(#real_fixed_mul)
+    op "*"(Left : Fixed; Right : Univ_Integer) -> Fixed
+      is import("*")
+    op "*"(Left : Univ_Integer; Right : Fixed) -> Fixed
+      is import("*")
+    op "/"(Left : Fixed; Right : Univ_Real) -> Fixed
+      is import(#fixed_real_div)
+    op "/"(Left : Fixed; Right : Univ_Integer) -> Fixed
+      is import("/")
+
+    op "+="(var Left : Fixed; Right : Fixed) 
+      is import("+=")
+
+    op "-="(var Left : Fixed; Right : Fixed) 
+      is import("-=")
+
+    op "*="(var Left : Fixed; Right : Fixed) 
+      is import("*=")
+
+    op "/="(var Left : Fixed; Right : Univ_Integer) 
+      is import("/=")
+
+    op "/="(var Left : Fixed; Right : Univ_Real)
+
+    op "=?"(Left, Right : Fixed) -> Ordering
+      is import("=?")
+
+    func Min(Left, Right : optional Fixed) -> optional Fixed
+      is import(#min)
+    func Max(Left, Right : optional Fixed) -> optional Fixed
+      is import(#max)
+
+    func Hash(Val : Fixed) -> Univ_Integer
+      is import(#identity)
+
+    func Round_To_Int(Val : Fixed) -> Univ_Integer
+
+    func To_String(Val : optional Fixed) -> Univ_String
+
+    func From_String(Str : Univ_String) -> optional Fixed
+
+    func Print(X : Fixed)
+    func Println(X : Fixed) is (Println(To_String(X)))
+
+    op "in"(Left : Fixed; Right : Range_Set<Fixed>) 
+      -> Boolean is in Range_Set<Fixed>
+    
+end interface PSL::Core::Fixed
+
+class PSL::Core::Fixed is
+    const Value : Univ_Integer
+
+  exports
+    op "from_univ"(Univ : Univ_Real) -> Fixed is
+        return (Value => Univ_Real::Round_To_Int(Univ/Delta))
+    end op "from_univ"
+
+    op "to_univ"(Val : optional Fixed) -> optional Univ_Real is
+        if Val is null then
+            return null
+        else
+            return Delta * Int_To_Real(Val.Value)
+        end if
+    end op "to_univ"
+
+    op "/="(var Left : Fixed; Right : Univ_Real) is
+        Left := Left / Right
+    end op "/="
+
+    func Print(X : Fixed) is
+        var Val : Univ_Real := [[X]]
+        Print(Val)
+    end func Print
+
+    func To_String(Val : optional Fixed) -> Univ_String is
+        return Univ_Real::To_String([[Val]])
+    end func To_String
+
+    func From_String(Str : Univ_String) -> optional Fixed is
+        return Univ_Real::From_String(Str)
+    end func From_String
+
+    func Round_To_Int(Val : Fixed) -> Univ_Integer is
+        return Univ_Real::Round_To_Int([[Val]])
+    end func Round_To_Int
+
+end class PSL::Core::Fixed
+
+func PSL::Test::Test_Fixed(X : Univ_Real) is
+    type My_Fixed is Fixed<Delta => 1.0E-6>
+
+    var XTI : My_Fixed := X
+    const Minute : My_Fixed := 60.0
+    Println("X = " | XTI)
+    Println("X * 2 = " | (XTI*2))
+    Println("X + X = " | (XTI + XTI))
+    Println("X - X = " | (XTI - XTI))
+    Println("X / 2 = " | (XTI / 2))
+    Println("X / 2.0 = " | (XTI / 2.0))
+    Println("X * 3.0 = " | (XTI * 3.0))
+    Println("5.0 * X = " | (5.0 * XTI))
+    Println("-5.0 * X = " | (-5.0 * XTI))
+    Println("-5.0 = " | -5.0)
+    Println("Minute = " | Minute)
+    Println("-5.0*Minute = " | -5.0*Minute)
+
+    Println("Round_To_Int(X) = " | Round_To_Int(XTI))
+
+    const Rng : Range_Set<My_Fixed> := 1.0 ..< 5.0
+
+    Print("Rng = ")
+    const Open_Ind : Map<Boolean, Univ_String> := [#false => "", #true => "<"]
+    for IV in Rng forward loop
+        if IV.Low != IV.High then
+            Print(IV.Low | Open_Ind[IV.Low_Is_Open] | ".." | 
+              Open_Ind[IV.High_Is_Open] | IV.High | " ")
+        else
+            Print(IV.Low | " ")
+        end if
+    end loop
+    Print('\n')
+
+    Println("X = " | XTI)
+    Println("X in Rng = " | (XTI in Rng))
+
+    if XTI in 1.0 ..< 5.0 then
+        Println("X in 1.0 ..< 5.0")
+    else
+        Println("X not in 1.0 ..< 5.0")
+    end if
+
+    Println("X in 1.0 ..< 5.0 = " | (XTI in 1.0 ..< 5.0))
+
+end func PSL::Test::Test_Fixed

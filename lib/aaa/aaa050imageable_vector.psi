@@ -1,0 +1,48 @@
+interface PSL::Containers::Imageable_Vector<Element_Type is Imageable<>>
+  extends Vector<Element_Type>
+  implements Imageable<> is
+  //  A vector which can be easily printed.
+  //  Requires element type to itself be Imageable.
+    func To_String(Val : Imageable_Vector) -> Univ_String<>
+
+    func From_String(Str : Univ_String<>) -> optional Imageable_Vector
+      is (null)  // TBD
+
+    op "=?"(Left, Right : Imageable_Vector) -> Ordering
+    func Hash(Val : Imageable_Vector) -> Univ_Integer
+
+    func Print(Val : Imageable_Vector) is (Print(To_String(Val)))
+    func Println(Val : Imageable_Vector) is (Println(To_String(Val)))
+end interface PSL::Containers::Imageable_Vector
+
+class PSL::Containers::Imageable_Vector is
+  exports
+    func To_String(Val : Imageable_Vector) -> Result : Univ_String<> is
+        Result := "";
+        for (each V of Val; Sep := "[" then ", ") forward loop
+            Result |= Sep | V;
+        end loop
+        return Result | "]"
+    end func To_String
+
+    op "=?"(Left, Right : Imageable_Vector) -> Ordering is
+        for I in 1 .. Min(|Left|, |Right|) forward loop
+            const Result := Left[I] =? Right[I]
+            if Result != #equal then
+                //  First mismatch determines result
+                return Result
+            end if
+        end loop
+        //  Prefixes match, result determined by length comparison
+        return |Left| =? |Right|
+    end op "=?"
+
+    func Hash(Val : Imageable_Vector) -> Univ_Integer is
+        if |Val| == 0 then
+            return 0
+        else
+            //  Hash first and last
+            return Hash(Val[1])*7 + Hash(Val[|Val|])
+        end if
+    end func Hash
+end class PSL::Containers::Imageable_Vector

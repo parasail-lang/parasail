@@ -1,0 +1,12 @@
+func Test_For_Loop(X, Y : Univ_Integer) is
+
+    Println("unordered loop:");
+    for I in X..Y loop
+	Println("I = " | I);
+    end loop;
+
+end func Test_For_Loop;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_For_Loop (1, 10);
+end func main;

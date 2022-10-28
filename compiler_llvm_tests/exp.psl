@@ -1,0 +1,3 @@
+func Exp(A : Univ_Real ; I : Univ_Integer) -> Univ_Real is
+   return A ** I;
+end func Exp;

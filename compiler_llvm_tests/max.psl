@@ -1,0 +1,7 @@
+func JMax(A : Univ_Integer; B : Univ_Integer) -> Univ_Integer is
+   if A > B then
+      return A;
+   else
+      return B;
+   end if;
+end func JMax;

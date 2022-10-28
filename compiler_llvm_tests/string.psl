@@ -1,0 +1,3 @@
+func Greeting() -> Univ_String is
+   return "Hello there. Nice to meet you!";
+end func Greeting;

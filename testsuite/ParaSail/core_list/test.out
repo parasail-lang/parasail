@@ -1,0 +1,8 @@
+X = 4
+Y = 10
+Combining 4 and 10 produces 
+4, 10
+Combining X | Y | X | X | Y | Y produces 
+Forward: 4, 10, 4, 4, 10, 10
+Reverse: 10, 10, 4, 4, 10, 4
+

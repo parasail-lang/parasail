@@ -1,0 +1,24 @@
+Initial board:
+null null null null null 
+null null null null null 
+null null null null null 
+null null null null null 
+null null null null null 
+X, O, or quit: Command = "X"
+Row: Col: Board now:
+#X null null null null 
+null null null null null 
+null null null null null 
+null null null null null 
+null null null null null 
+X, O, or quit: Command = "O"
+Row: Col: Board now:
+#X #O null null null 
+null null null null null 
+null null null null null 
+null null null null null 
+null null null null null 
+X, O, or quit: Command = "Z"
+Huh? I don't understand the command; 'quit' to exit
+X, O, or quit: Command = "quit"
+bye.

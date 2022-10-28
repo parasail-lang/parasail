@@ -1,0 +1,64 @@
+func johns() is
+   const Base := 10
+   const Reducer := 13 * 14 * 15 * 16  --  Deal with big integers
+   const Start_Reducing := 13
+
+   func Dig_Val(C : Univ_Character) -> Result : optional Univ_Integer is
+      case C of
+        ['0' .. '9'] => Result := C - '0'
+        ['A' .. 'Z'] => Result := C - 'A' + 10
+        [..]         => Result := null
+      end case
+      //  Println ("Char '" | C | "' = " | Result)
+   end func Dig_Val
+
+   var Solutions : concurrent Vector<Univ_String> := []
+   var Partials  : concurrent Vector<Univ_String> := []
+
+  *Outer*
+   for (Not_Used := '1'..Min('9','0' + (Base-1)) | 'A' .. 'A' + (Base-11);
+        N := 0; I := 1; Digs := "") loop
+      for C in Not_Used concurrent loop
+          const D := Dig_Val (C)
+          if D is null then
+              Println ("Character '" | C | "' not a legal digit")
+              return
+          end if
+          var New_Num := N * Base + D
+          if (New_Num) mod I == 0 then
+              const New_Digs := Digs | C
+              if I == Base-1 then
+                  const Final_Answer := New_Digs | '0'
+                  Println ("Answer is " | Final_Answer);
+                  Solutions |= Final_Answer
+              else
+                 if I > |Partials| then
+// JM: Output disabled to avoid differences between executions
+//                     Println ("Now have a " | I | " digit solution = " |
+//                       New_Digs)
+                     Partials |= New_Digs
+                 end if
+                 if I >= Start_Reducing then
+                     New_Num := New_Num mod Reducer
+                 end if
+                 continue loop Outer
+                   with (Not_Used => Not_Used - C, N => New_Num, I => I+1,
+                         Digs => New_Digs)
+              end if;
+          end if;
+      end loop;
+   end loop Outer;
+   if |Solutions| == 0 then
+      Println ("No solutions for base " | Base | ".")
+   else
+      Print("Solutions for base " | Base | ": ")
+      for each S of Solutions loop
+         Print(S | " ")
+      end loop
+      Print('\n')
+   end if
+end func johns
+
+func main(Args : Basic_Array<Univ_String>) is
+   johns ();
+end func main;

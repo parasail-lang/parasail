@@ -1,0 +1,1124 @@
+interface PSC<> is
+    type Stream_Elem is Integer<0..255>  //  8-bit stream elements
+end interface PSC
+
+interface PSC::Info_Array<Elem_Type is Assignable<>;
+  Entity_Type is Any<>;
+  Indexed_By is Countable<>>
+    implements Indexable<Elem_Type, Indexed_By> is
+  //  This module provides an array-like interface to an internal
+  //  table to represent attributes of the given entity type.
+
+    type Info_Kind_Enum is Enum
+      <[#type_parameters, #actuals_of_formals,
+        #components, #nested_types, #nested_objs, #operations,
+        #type_desc_stream, #op_map,
+        #routine_parameters, #routine_uplevel_refs,
+        #string_stream, #const_value_stream,
+        #large_const_component_values]>
+      //  Kinds of info-arrays available for a Type_Descriptor, Routine, 
+      //  Univ_String, or Element_Info.
+
+    const Entity : Entity_Type
+    const Info : Info_Kind_Enum
+
+    func First(Arr : Info_Array) -> Indexed_By
+      is import(#info_array_first)
+    func Last(Arr : Info_Array) -> Indexed_By
+      is import(#info_array_last)
+
+    func Length(Arr : Info_Array) -> Univ_Integer
+      is (Last(Arr) - First(Arr) + 1)
+    op "magnitude"(Info_Array) -> Univ_Integer is Length
+
+    func Bounds(Arr : Info_Array) -> Countable_Range<Indexed_By>
+      is (First(Arr) .. Last(Arr))
+
+    op "indexing"(Arr : Info_Array; Index : Indexed_By)
+      -> Elem_Type
+      is import(#info_array_indexing)
+
+    op "index_set"(Arr : Info_Array) -> Countable_Range<Indexed_By>
+      is Bounds
+
+end interface PSC::Info_Array
+
+interface PSC::Info_Stream<Entity_Type is Any<>>
+  extends PSC::Info_Array <Stream_Elem, Entity_Type, Univ_Integer>
+  implements Indexable<Stream_Elem, Univ_Integer> is
+    //  Stream associated with an Entity, where a Stream
+    //  is an array of Stream_Elems, indexed by Univ_Integers
+
+    var Cache : optional Basic_Array<optional Univ_Integer> := null
+    //  This caches the content of the stream
+
+    //  String vector representation matching LLVM array literal
+    func To_String_Vec(Info_Stream) -> ZVector<Univ_String>
+end interface PSC::Info_Stream
+
+interface PSC::Per_File_String_Table<> is
+    //  Per-File Table of strings -- This one is passed to the Stream op
+    type Local_Index is new Integer<0 .. 2**15-1>
+
+    func Create(var Dummy : Univ_Integer) -> Per_File_String_Table
+      is import (#pfs_create)
+    //  Create an empty per-file table -- Dummy ensures this is not seen
+    //  as a reusable constant.
+
+    func Get_Local_Index
+      (var Per_File_String_Table; Univ_String) -> Local_Index
+      is import (#pfs_get_local_index)
+    //  Return a local index to be used in LLVM code, as an index
+    //  into a run-time table which will be initialized when the compiled
+    //  module is loaded at run-time.
+
+    func Num_Elems(Per_File_String_Table) -> Local_Index
+      is import (#pfs_num_elems)
+    //  Number of strings in the table
+    
+    func Nth_Elem(Per_File_String_Table; Local_Index) -> Univ_String
+      is import (#pfs_nth_elem)
+    //  Nth string in the table
+
+    func Nth_Elem_As_Stream(Per_File_String_Table; Local_Index)
+      -> Info_Stream <Univ_String>
+    //  Nth String in the table as a byte-stream
+          is ((Nth_Elem (Per_File_String_Table, Local_Index), #string_stream))
+
+    func Reset (var Per_File_String_Table)
+      is import (#pfs_reset)
+    //  Set string table back to empty
+end interface PSC::Per_File_String_Table
+
+abstract interface PSC::Streamable_Global<Name_Type is Imageable<>> is
+   //  This interface in conjunction with Per_File_Table (below)
+   //  is used for type descriptors, univ strings,
+   //  and global constants, which have global tables in the interpreter
+   //  We create a local index for them for each llvm file.
+   //  This same local index is used for tables in the code generator
+   //  as well as in run-time tables.
+   //  These globals are represented as a byte stream in the generated
+   //  llvm, and then reconstructed in the interpreter when the compiled
+   //  module is later loaded at run-time.
+   func Unique_Name(Streamable_Global) -> Name_Type
+   //  This name distinguishes this global from all others of the same
+   //  kind within the interpreter.
+
+   func Dependent_Globals(Streamable_Global) -> Vector<Streamable_Global>
+   //  Get vector of other streamable globals on which this depends
+
+   func Stream(Stream : Streamable_Global;
+               var Per_File_String_Table) -> Info_Stream<Streamable_Global>
+   //  Produce a byte-stream representation of the global object
+   //  Update the Per-File string table as appropriate
+end interface PSC::Streamable_Global
+
+interface PSC::Reflection<> is
+    type Decl_Index is new Integer<0..2**6>
+      // An index into a declarative region
+
+    type Code_Nesting_Level is new Integer<0 .. 7>
+      // Depth of nesting in operations; level 0 is static constants.
+      // and top-level operations.
+      // NOTE: This should match the range of nesting levels supported
+      //       by Enclosing_Local_Areas
+
+    type Offset_Within_Area is Integer<0..2**16-1>
+      // Offset within a data area
+
+    type Offset_Range is Countable_Range<Offset_Within_Area>
+
+    const Tcb_Size : Offset_Within_Area := 11
+      // Parameter area follows Tcb
+
+    type Operation_Index is new Integer<0..9999>
+      // Index into operation table
+
+    type Routine_Index is new Integer<0 .. 2**16-1>
+      // Unique id for PSVM routine
+
+    type VM_Reg_Num is new Integer<0 .. 2**31-1>
+      // Unique id of VM register within a given code block of an operation.
+
+    concurrent interface Environment<> is
+        func Get_Current_Env() -> optional Environment
+        func Outermost_Region(Env : Environment) -> optional Region
+        func Num_Library_Items(Env : Environment) -> Decl_Index
+          is import(#num_library_items)
+        func Nth_Library_Item(Env : Environment; Decl_Index) -> Decl
+          is import(#nth_library_item)
+ 
+    end interface Environment
+
+    interface Region<> is
+        type Region_Kind is Enum<
+          [#No_Region_Kind,
+           #Library_Region_Kind,
+           #Module_Region_Kind,
+           #Operation_Param_Region_Kind,
+           #Operation_Body_Region_Kind,
+           #Loop_Param_Region_Kind,
+           #Loop_Body_Region_Kind,
+           #Block_Stmt_Region_Kind,
+           #If_Stmt_Region_Kind,
+           #Case_Stmt_Region_Kind,
+           #Parallel_Stmt_Region_Kind,
+           #Type_Annotation_Region_Kind]>
+
+        type Region_Index is Integer<0..2**31-1>
+
+        func Kind(Region) -> Region_Kind
+          is import(#region_kind)
+        func Index(Region) -> Region_Index
+          is import(#region_index)
+        func Associated_Decl(Region) -> Decl
+          is import(#region_associated_decl)
+        func Produces_Nested_Block(Region) -> Boolean
+          is import(#region_produces_nested_block)
+        func Num_Items(Region) -> Decl_Index
+          is import(#region_num_items)
+        func Nth_Item(Region; Decl_Index) -> Decl
+          is import(#region_nth_item)
+        func Num_Nested_Regions(Region) -> Univ_Integer
+          is import(#region_num_nested_regions)
+        func Nth_Nested_Region(Region; Univ_Integer) -> optional Region
+          is import(#region_nth_nested_region)
+        func Sibling_Region(Region) -> optional Region
+          is import(#region_sibling_region)
+
+        func Region_At_Index(Region_Index) -> Region
+          is import(#region_at_index)
+    end interface Region
+
+    interface Object_Locator<> is
+      //  An object locator is used to indicate the location of
+      //  an object or type descriptor within a parameter area,
+      //  a local stack frame, or a global constants area.
+
+        type Area_Base_Indicator is Integer<0..2**15-1>
+        type Area_Range is Countable_Range<Area_Base_Indicator>
+
+        const Zero_Base : Area_Base_Indicator := 0
+        const Local_Area : Area_Base_Indicator := 1
+        const Param_Area : Area_Base_Indicator := 2
+        const Type_Area : Area_Base_Indicator := 3
+        const Const_Area : Area_Base_Indicator := 4
+
+        const Enclosing_Param_Areas : Area_Range := 16 .. 31;
+        const Enclosing_Local_Areas : Area_Range := 32 .. 47;
+        const Enclosing_Type_Areas : Area_Range := 48 .. 63;
+        const Base_Registers : Area_Range := 10_000 .. 19_999
+        const Phys_Base_Registers : Area_Range := 20_000 .. 29_999
+
+        const Type_Self_Reference_Offset : Offset_Within_Area := 0;
+          //  Offset used to indicate a reference to the enclosing type itself
+
+        const Type_Formal_Parameter_Offsets : Offset_Range := 0 .. 999;
+          //  Offsets used to refer to the formal
+          //  parameters of the enclosing module
+
+        const Type_Actual_Of_Formal_Offsets : Offset_Range := 1000 .. 1999;
+          //  Offsets used to refer to actuals of formal types.
+
+        const Type_Nested_Type_Offsets : Offset_Range := 2000 .. 9999;
+          //  Offsets used to refer to nested types.
+
+        const Last_Type_Op : Offset_Within_Area :=
+          10_000 + [[Operation_Index::Last()]]
+
+        const Type_Operation_Offsets : Offset_Range :=
+          10_000 ..  10_000 + [[Operation_Index::Last()]]
+          // Range of offsets within a type area devoted to
+          // operations.
+
+        const Type_Nested_Objs_Offsets : Offset_Range := 20_000 .. 29_999;
+          //  Range of offsets within a type area devoted to
+          //  nested objects
+
+        const Corresponding_Polymorphic_Type_Offsets : Offset_Range :=
+          30_000 .. 39_999;
+          //  Offsets used to refer to corresponding polymorphic type
+
+        func Create(Base : Area_Base_Indicator; Offset : Offset_Within_Area)
+          -> Object_Locator
+        func Base(Object_Locator) -> Area_Base_Indicator
+        func Offset(Object_Locator) -> Offset_Within_Area
+        func Decode_Base(Base : Area_Base_Indicator) -> Univ_String
+
+        func Is_Null_Locator(Object_Locator) -> Boolean
+
+        func VM_Name(Object_Locator) -> Univ_String
+          //  LLVM register name associated with Local_Area locator
+          //  as well as Base_Register and Phys_Base_Register.
+          //  For a call, this is the name of the reg used for the
+          //  result of the call.
+
+        func VM_Num(Object_Locator) -> VM_Reg_Num
+          //  LLVM register num associated with Local_Area locator
+          //  as well as Base_Register and Phys_Base_Register.
+          //  For a call, this is the name of the reg used for the
+          //  result of the call.
+
+        func VM_Param_Name(Locator : Object_Locator;
+                           Param_Offset : Offset_Within_Area) -> Univ_String
+          //  LLVM register name associated with ingoing parameter at
+          //  given offset
+
+        func VM_Param_Num(Locator : Object_Locator;
+                          Param_Offset : Offset_Within_Area) -> VM_Reg_Num
+          //  LLVM register num associated with ingoing parameter at
+          //  given offset
+
+        func VM_Is_Indir(Object_Locator) -> Boolean
+          //  Indicates type of VM_Name reg is i64* rather than i64.
+          //  When used in [Enclosing_]Local_Area, implies a level of
+          //  indirection should be inserted automatically.
+
+        func VM_Is_Component(Object_Locator) -> Boolean
+          //  Indicates that we are fetching a component.  VM_Is_Indir
+          //  indicates whether extra level of indirection needed after
+          //  fetching component.  VM_Name gives VM reg for base of
+          //  object.
+
+        func VM_Component_Offset(Object_Locator) -> Offset_Within_Area
+          //  Returns offset relative to base of object when
+          //  fetching a component.
+
+        func Name_For_Object_Locator(Object_Locator) -> Univ_String
+          is import(#name_for_object_locator)
+
+        op "+"(Left : Object_Locator; Right : Offset_Within_Area)
+          -> Object_Locator
+          //  Add additional offset to locator
+
+        //  These are here so they have access to Object_Locator type desc.
+        func Location(Decl) -> Object_Locator
+          is import(#decl_location)
+
+        func Const_Value_Locator (Streamable_Value) -> Object_Locator
+          is import(#const_value_locator)
+
+        //  Some useful renames
+        func Routine_At_Locator(Locator : Object_Locator;
+          Type_Desc : optional Type_Descriptor := null) -> Routine
+          is in Routine
+        func Const_Info_At_Locator (Locator : Object_Locator) -> Const_Info
+          is in Const_Info
+        func Const_Value_At_Locator (Locator : Object_Locator)
+          -> Streamable_Value
+          is in Streamable_Value
+        func Type_Desc_At_Locator(Locator : Object_Locator) -> Type_Descriptor
+          is in Type_Descriptor
+
+        //  For Imageable
+        func To_String(Object_Locator) -> Univ_String
+        func From_String(Univ_String) -> optional Object_Locator
+        op "=?"(Left, Right : Object_Locator) -> Ordering
+        func Hash(Val : Object_Locator) -> Univ_Integer
+    end interface Object_Locator
+
+    interface Decl<> is
+        type Decl_Kind is Enum<[#module, #type, #object, #operation]>
+        type Decl_Context_Enum is
+          Enum<[#exported, #inherited, #local, #implements]>
+        type Convention_Enum is
+          Enum<[#internal_default, #external_default,
+                #locking_default, #queuing_default,
+                #parasail, #sparkel, #parython, #javallel, #ada, #c, #cpp]>
+
+        type Overloading_Index is new Integer<0 .. 1000>
+
+        type Static_Level is Code_Nesting_Level
+          // A synonym for Code_Nesting_Level
+
+        func Id(Decl) -> Univ_String
+          is import(#decl_id)
+        func Module_Name(Decl) -> optional Univ_String  //  full module name 
+          is import(#decl_module_name);
+        func Num_Prior_Homonyms(Decl) -> Overloading_Index
+          is import(#decl_num_prior_homonyms)
+        func Kind(Decl) -> Decl_Kind
+          is import(#decl_kind)
+        func Is_Spec(Decl) -> Boolean
+          is import(#decl_is_spec)
+        func Spec(Decl) -> Decl  // self if Is_Spec, else corresponding spec
+          is import(#decl_spec)
+        func Context(Decl) -> Decl_Context_Enum
+          is import(#decl_context)
+        func Level(Decl) -> Static_Level
+          is import(#decl_level)
+        func Convention(Decl) -> Convention_Enum
+          is import(#decl_convention)
+
+        func Location(Decl) -> Object_Locator  //  Rename routine
+          is in Object_Locator
+
+        func Component_Index(Decl) -> optional Offset_Within_Area
+          is import(#decl_component_index)
+          //  Returns offset if this is a component, otherwise null.
+
+        func Decl_Region(Decl) -> optional Region
+          is import(#decl_region)
+        func Body_Region(Decl) -> optional Region
+          is import(#body_region)
+        func Decl_Source_Pos(Decl) -> Source_Position
+          is import(#decl_source_pos)
+        func Operation_Equiv_To(Decl {Kind(Decl) == #operation})
+          -> optional Decl
+          is import(#operation_equiv_to)
+        func Routine_For_Operation(Decl {Kind(Decl) == #operation}) -> Routine
+          is import(#routine_for_operation)
+        func Descriptor_For_Type(Decl)
+          // Return type descriptor for fully-defined type
+          {Kind(Decl) == #type} 
+          {Base(Location(Decl)) == Object_Locator::Zero_Base}
+          -> Type_Descriptor
+          is import(#descriptor_for_type)
+        func Value_Of_Global_Const(Decl)
+          {Kind(Decl) == #object} 
+          {Base(Location(Decl)) == Object_Locator::Const_Area}
+          -> optional Streamable_Value
+          is import(#global_const_value)
+
+        //  Operations needed to be Hashable
+        func Hash(Val : Decl) -> Univ_Integer is import(#identity)
+        op "=?"(Left, Right : Decl) -> Ordering is
+          (Hash(Left) == Hash(Right)? #equal : #unordered)
+    end interface Decl
+
+    interface Source_Position<> is
+        func Create(File : Univ_String;
+          Line : Univ_Integer; Col : Univ_Integer) -> Source_Position
+          is import(#source_position_create)
+        func File(Source_Position) -> Univ_String
+          is import(#source_position_file)
+        func Line(Source_Position) -> Univ_Integer
+          is import(#source_position_line)
+        func Col(Source_Position) -> Univ_Integer
+          is import(#source_position_col)
+        func To_String(Source_Position) -> Univ_String
+        func From_String(Str : Univ_String) -> optional Source_Position
+        op "=?"(Left, Right : Source_Position) -> Ordering
+          is import("=?")
+        func Hash(Source_Position) -> Univ_Integer
+          is import(#identity)
+    end interface Source_Position
+
+    interface Instruction<> is
+        type Opcode_Enum is new Enum <[
+          #Skip_Op, #Call_Op, #Indirect_Call_Op, #Return_Op,
+          #Copy_Word_Op, #Copy_Address_Op, #Store_Address_Op,
+          #Create_Obj_Op, #Assign_Word_Op, #Swap_Obj_Op, 
+          #Move_Obj_Op, #Make_Copy_In_Stg_Rgn_Op,
+          #Store_Local_Null_Op, #Store_Large_Local_Null_Op,
+          #Store_Null_Of_Same_Stg_Rgn_Op,
+          #Is_Null_Op, #Not_Null_Op,
+          #Store_Int_Lit_Op, #Store_Real_Lit_Op, #Store_Char_Lit_Op,
+          #Store_Enum_Lit_Op, #Store_Str_Lit_Op,
+          #Store_Operation_Desc_Op,
+          #Store_Type_Related_Obj_Op,
+          #Store_Type_Related_Addr_Op,
+          #Start_Parallel_Op, #Start_Handled_Op, #Add_Parallel_Op, 
+          #Prepare_To_Exit_Parallel_Op, #Wait_For_Parallel_Op,
+          #Start_Parallel_Call_Op, #Add_Parallel_Call_Op,
+          #Create_Lock_For_Obj_Op, #Create_Tcb_Op,
+          #Create_Polymorphic_Obj_Op, #Unwrap_Polymorphic_Obj_Op,
+          #Select_Polymorphic_Ancestor_Part_Op, #Select_Ancestor_Part_Op,
+          #If_Op, #Call_Nested_Block_Op, #Check_Nested_Block_Op, #Exit_Op, 
+          #Begin_Nested_Block_Op, #Check_Not_Null_Op, #Case_Op, #Loop_Op,
+          #Declare_Obj_Op]> 
+            // TBD: These last two are not used yet
+            // The various op codes in the instruction set
+
+        type Code_Offset is new Integer<-2**15+1 .. 2**15-1>
+
+        type Locked_Param_Info_As_Byte_Type is new Modular<2**8>
+
+        interface Code_Block_Descriptor<> is
+           //  This describes a nested block, invoked by Start/Add_Parallel_Op,
+           //  Call_Block_Op, and Check_Block_Op
+           const Pc_Offset : Code_Offset
+           //  PC_Offset can be Unique identifier
+           //  Offset of block definition location
+           const Uses_Queuing : Boolean
+           const Uses_Stg_Rgn : Boolean
+           const Local_Area_Length : Offset_Within_Area
+           const Start_Callee_Locals : Offset_Within_Area
+           const Nesting_Level : Code_Nesting_Level
+
+           //  These operations return code-block descriptors
+           //  We declare them here so their "enclosing_type" provides
+           //  the type-descriptor we need inside the built-in op.
+           func Code_Block(Instruction) -> optional Code_Block_Descriptor
+             is import(#instruction_Code_Block)
+           func Parallel_Code_Block(Instruction)
+             -> optional Code_Block_Descriptor
+             is import(#instruction_Parallel_Code_Block)
+           func Nested_Code_Block(Instruction) 
+             -> optional Code_Block_Descriptor
+             is import(#instruction_Nested_Code_Block)
+
+           func Internal_Precond(Routine) -> optional Code_Block_Descriptor
+             is import(#routine_internal_precond)
+
+           //  For Imageable
+           func To_String(CB : Code_Block_Descriptor) -> Univ_String is
+             ("(PCO => "    | CB.Pc_Offset |
+              ", UQ => "   | CB.Uses_Queuing |
+              ", USR => "  | CB.Uses_Stg_Rgn |
+              ", LAL => "  | CB.Local_Area_Length |
+              ", SOCL => " | CB.Start_Callee_Locals |
+              ", NL => "   | CB.Nesting_Level | ")")
+           func From_String(Univ_String) -> optional Code_Block_Descriptor
+             is (null)
+           op "=?"(Left, Right : Code_Block_Descriptor) -> Ordering
+             is (Left.Pc_Offset =? Right.Pc_Offset)
+           func Hash(Val : Code_Block_Descriptor) -> Univ_Integer
+             is (Hash (Val.Pc_Offset))
+        end interface Code_Block_Descriptor
+
+        type Natural is Integer<0 .. 1_000_000>
+
+        type Condition_Bit_Mask is Enum_Mask <Modular <2 ** 4>,
+          [#compare_less => 2 ** 0,
+           #compare_equal => 2 ** 1,
+           #compare_greater => 2 ** 2,
+           #compare_unordered => 2 ** 3]>
+
+        //  When "if" condition is of type Boolean, conditions are as follows:
+        const Boolean_Is_False : Condition_Bit_Mask := #compare_less;
+        const Boolean_Is_True : Condition_Bit_Mask := #compare_equal;
+
+        // const Compare_Not_Equal : Condition_Bit_Mask :=
+        //   #compare_less | #compare_greater | #compare_unordered
+
+        //  NOTE: These components are dummies, only provided to be sure
+        //  that type desc. for Object_Locator is associated with
+        //  second component of Instruction type desc.
+        //  NEVER use these for constructing or querying an instruction.
+        const Instr_Comp_1 : Univ_Integer;
+        const Instr_Comp_2 : Object_Locator;
+
+        func Opcode(Instruction) -> Opcode_Enum
+          is import(#instruction_opcode)
+        func Source_Pos(Instruction) -> Source_Position
+          is import(#instruction_source_pos)
+        func Skip_Count(Instruction) -> Code_Offset
+          is import(#instruction_Skip_Count)
+        func Skip_Counts(Instruction) -> optional Basic_Array<Code_Offset>
+          is import (#instruction_Skip_Counts)
+        func Level_Diff(Instruction) -> Natural
+          is import(#instruction_Level_Diff)
+        func Params(Instruction) -> Object_Locator
+          is import(#instruction_Params)
+        func Static_Link(Instruction) -> Object_Locator
+          is import(#instruction_Static_Link)
+        func Call_Target(Instruction) -> Object_Locator
+          is import(#instruction_Call_Target)
+        func Target_Index(Instruction) -> Routine_Index
+          is import(#instruction_Target_Index)
+        func Locked_Param_Index(Instruction) -> Natural
+          is import(#instruction_Locked_Param_Index)
+        func Locked_Param_Info(Instruction) -> Locked_Param_Info_As_Byte_Type
+          is import(#instruction_Locked_Param_Info)
+        func Locked_Param_Is_Var(Instruction) -> Boolean
+          is import(#instruction_Locked_Param_Is_Var)
+        func Locked_Param_Is_By_Ref(Instruction) -> Boolean
+          is import(#instruction_Locked_Param_Is_By_Ref)
+        func Code_Block(Instruction) -> optional Code_Block_Descriptor
+          is in Code_Block_Descriptor
+        func Assertion_Str(Instruction) -> optional Univ_String
+          is import(#instruction_Assertion_Str)
+        func Destination(Instruction) -> Object_Locator
+          is import(#instruction_Destination)
+        func Dest_Name(Instruction) -> Univ_String
+          is import(#instruction_Dest_Name)
+        func Decl_Obj_Is_By_Ref(Instruction) -> Boolean
+          is import(#instruction_Decl_Obj_Is_By_Ref)
+        func Decl_Obj_Is_Var(Instruction) -> Boolean
+          is import(#instruction_Decl_Obj_Is_Var)
+        func Declare_Type_Info(Instruction) -> Object_Locator
+          is import(#instruction_Declare_Type_Info)
+        func Null_Type_Info(Instruction) -> Object_Locator
+          is import(#instruction_Null_Type_Info)
+        func Local_Addr(Instruction) -> Object_Locator
+          is import(#instruction_Local_Addr)
+        func Int_Value(Instruction) -> Univ_Integer
+          is import(#instruction_Int_Value)
+        func Char_Value(Instruction) -> Univ_Character
+          is import(#instruction_Char_Value)
+        func Real_Value(Instruction) -> Univ_Real
+          is import(#instruction_Real_Value)
+        func Str_Value(Instruction) -> Univ_String
+          is import(#instruction_Str_Value)
+        func Existing_Str_In_Stg_Rgn(Instruction) -> Object_Locator
+          is import(#instruction_Existing_Str_In_Stg_Rgn)
+        func Enum_Value(Instruction) -> Univ_Enumeration
+          is import(#instruction_Enum_Value)
+        func Operation_Static_Link(Instruction) -> Object_Locator
+          is import(#instruction_Operation_Static_Link)
+        func Operation_Locator(Instruction) -> Object_Locator
+          is import(#instruction_Operation_Locator)
+        func Source(Instruction) -> Object_Locator
+          is import(#instruction_Source)
+        func Might_Be_Null(Instruction) -> Boolean
+          is import(#instruction_Might_Be_Null)
+        func Type_Info(Instruction) -> Object_Locator
+          is import(#instruction_Type_Info)
+        func Existing_Obj_In_Stg_Rgn(Instruction) -> Object_Locator
+          is import(#instruction_Existing_Obj_In_Stg_Rgn)
+        func Source_Type_Info(Instruction) -> Object_Locator
+          is import(#instruction_Source_Type_Info)
+        func Ancestor_Lvalue(Instruction) -> Boolean
+          is import(#instruction_Ancestor_Lvalue)
+        func Polymorphic_Ancestor_Lvalue(Instruction) -> Boolean
+          is import(#instruction_Polymorphic_Ancestor_Lvalue)
+        func If_Source(Instruction) -> Object_Locator
+          is import(#instruction_If_Source)
+        func If_Condition(Instruction) -> Condition_Bit_Mask
+          is import(#instruction_If_Condition)
+        func Skip_If_False(Instruction) -> Code_Offset
+          is import(#instruction_Skip_If_False)
+        func Parallel_Master(Instruction) -> Object_Locator
+          is import(#instruction_Parallel_Master)
+        func Parallel_Control(Instruction) -> Object_Locator
+          is import(#instruction_Parallel_Control)
+        func Parallel_Static_Link(Instruction) -> Object_Locator
+          is import(#instruction_Parallel_Static_Link)
+        func Parallel_Code_Block(Instruction) -> optional Code_Block_Descriptor
+          is in Code_Block_Descriptor
+        func Parallel_Call_Target(Instruction) -> Object_Locator
+          is import(#instruction_Parallel_Call_Target)
+        func Parallel_Target_Index(Instruction) -> Routine_Index
+          is import(#instruction_Parallel_Target_Index)
+        func Parallel_Locked_Param_Index(Instruction) -> Natural
+          is import(#instruction_Parallel_Locked_Param_Index)
+        func Parallel_Locked_Param_Info(Instruction)
+          -> Locked_Param_Info_As_Byte_Type
+          is import(#instruction_Parallel_Locked_Param_Info)
+        func Parallel_Locked_Param_Is_Var(Instruction) -> Boolean
+          is import(#instruction_Parallel_Locked_Param_Is_Var)
+        func Parallel_Locked_Param_Is_By_Ref(Instruction) -> Boolean
+          is import(#instruction_Parallel_Locked_Param_Is_By_Ref)
+        func Parallel_Is_Queued_Call(Instruction) -> Boolean
+          is import(#instruction_Parallel_Is_Queued_Call)
+        func Num_In_Params(Instruction) -> Natural
+          is import(#instruction_Num_In_Params)
+        func Num_Out_Params(Instruction) -> Natural
+          is import(#instruction_Num_Out_Params)
+        func Case_Selector(Instruction) -> Object_Locator
+          is import(#instruction_Case_Selector)
+        // func Case_First(Instruction) -> Non_Null_Value
+        //   is import(#instruction_Case_First)
+        // func Case_Last(Instruction) -> Non_Null_Value
+        //   is import(#instruction_Case_Last)
+        func Case_Default_Skip(Instruction) -> Code_Offset
+          is import(#instruction_Case_Default_Skip)
+        func Nested_Block_Region(Instruction)
+          -> Region::Region_Index
+          is import(#instruction_Nested_Block_Region)
+        func Nested_Code_Block(Instruction) -> optional Code_Block_Descriptor
+          is in Code_Block_Descriptor
+
+        //  Instructions without a Proved field return #false
+        func Proved(Instruction) -> Boolean is import(#instruction_Proved)
+
+        func Output_Inited_Null(Instruction) -> Boolean
+          is import(#instruction_Output_Inited_Null)
+    end interface Instruction
+
+    interface Routine_Param_Info<> is
+        type Parameter_Kind_Enum is
+          Enum<[#formal_type, #formal_object, #formal_operation]>
+
+        const Kind                    : Parameter_Kind_Enum
+        const Type_Info               : Object_Locator
+        const Is_Operation_Output     : Boolean
+        const Is_Var                  : Boolean
+        const Is_Passed_By_Ref        : Boolean
+        const Is_Optional             : Boolean
+        const Is_Of_Current_Inst_Type : Boolean
+      //  If true, then this parameter is of the "current-instance" type, and
+      //  if this routine is inherited into a type extension, some number of
+      //  levels of indirection may need to be applied to this parameter.
+        const Is_Declared_Ref         : Boolean
+
+      //  for debugging only:
+        const Name      : Univ_String
+        const Type_Name : Univ_String
+        const Param_Decl : Decl
+    end interface Routine_Param_Info
+
+    type Access_Mode is
+      Enum<[#No_Access, #Read_Access, #Write_Access, #Update_Access]>
+      //  Mode of access to an (up-level) object by operation or nested block
+
+    interface Uplevel_Info<> is
+      //  Info on object referenced as an uplevel
+        const Locator : Object_Locator      //  Locator for object
+        const Level   : Code_Nesting_Level  //  Level where object resides
+        const Mode    : Access_Mode         //  Mode of uplevel access
+    end interface Uplevel_Info
+
+    interface Routine<> is
+
+        interface Convention_Descriptor<> is
+           //  Encoding of information about calling convention used
+           //  for a compiled routine
+           const Encoding : Univ_Integer
+           func New_Conv_Desc
+             (Decl::Convention_Enum;
+              Num_Inputs, Num_Outputs : Univ_Integer;
+              Output_Needs_Init, Uses_Queuing : Boolean)
+              -> Convention_Descriptor is
+             import(#new_conv_desc)
+           func Null_Conv_Desc () -> Convention_Descriptor is
+             import(#null_conv_desc)
+           func Convention(CD : Convention_Descriptor)
+             -> Decl::Convention_Enum is
+             import(#cd_convention)
+           func Num_Inputs(CD : Convention_Descriptor) -> Univ_Integer is
+             import(#cd_num_inputs)
+           func Num_Outputs(CD : Convention_Descriptor) -> Univ_Integer is
+             import(#cd_num_outputs)
+           func Output_Needs_Init(CD : Convention_Descriptor) -> Boolean is
+             import(#cd_output_needs_init)
+           func Uses_Queuing(CD : Convention_Descriptor) -> Boolean is
+             import(#cd_uses_queuing)
+
+           //  For Imageable
+           func To_String(CD : Convention_Descriptor) -> Univ_String
+             is ("(" | Convention(CD) | "," | Num_Inputs(CD) | "," |
+                 Num_Outputs(CD) | "," | Output_Needs_Init(CD) | ")")
+           func From_String(Univ_String) -> optional Convention_Descriptor
+             is (null)
+           op "=?"(Left, Right : Convention_Descriptor) -> Ordering
+             is import("=?")
+           func Hash(Val : Convention_Descriptor) -> Univ_Integer
+             is import(#identity)
+        end interface Convention_Descriptor
+
+        func Routine_At_Locator(Locator : Object_Locator;
+          Type_Desc : optional Type_Descriptor := null) -> Routine
+          is import(#routine_at_locator)
+
+        func Routine_At_Index(Index : Routine_Index) -> Routine
+          is import(#routine_at_index)
+
+        type Code_Offset is Instruction::Code_Offset
+        type Code_Length is Code_Offset {0..Code_Offset::Last()}
+        type Code_Index is Code_Offset {1..Code_Offset::Last()}
+
+        func Parameters(Routine)
+          -> Info_Array<Routine_Param_Info, Routine,
+                Indexed_By => Univ_Integer>
+          is (Routine, #routine_parameters)
+
+        func Num_Instrs(Routine) -> Code_Length
+          is import(#routine_num_instrs)
+        func Nth_Instr(Routine; Code_Index) -> Instruction
+          is import(#routine_nth_instr)
+        func Frame_Size(Routine) -> Univ_Integer
+          is import(#routine_start_callee_locals)
+        func Internal_Precond(Routine)
+          -> optional Instruction::Code_Block_Descriptor
+          is in Instruction::Code_Block_Descriptor
+        func Nesting_Level(Routine) -> Code_Nesting_Level
+          is import(#routine_nesting_level)
+        func Convention(Routine) -> Decl::Convention_Enum
+          is import(#routine_convention)
+        func Conv_Desc(Routine) -> Convention_Descriptor
+          is import(#routine_conv_desc)
+        func Module_Name(Routine) -> Univ_String
+          is import(#routine_module_name);
+        func Name(Routine) -> Univ_String
+          is import(#routine_name)
+        func Num_Prior_Homonyms(Routine) -> Decl::Overloading_Index
+          is import(#routine_num_prior_homonyms)
+        func Name_With_Overloading_Index(Routine) -> Univ_String
+          is import(#routine_name_with_overloading_index)
+        func Uses_Queuing(Routine) -> Boolean
+          is import(#routine_uses_queuing);
+        func Uses_Stg_Rgn(Routine) -> Boolean
+          is import(#routine_uses_stg_rgn);
+        func Num_VM_Regs(Routine) -> VM_Reg_Num
+          is import(#routine_num_vm_regs);
+        func Built_In_Desig(Routine) -> optional Univ_String
+          is import(#routine_built_in_desig);
+        func Enc_Type_Desc(Routine) -> optional Type_Descriptor
+          is import(#routine_enc_type_desc);
+        func Uplevel_Refs(Routine)
+          -> Info_Array<Uplevel_Info, Routine, Indexed_By => Univ_Integer>
+          is (Routine, #routine_uplevel_refs)
+          //  Array of objects uplevel referenced by this routine.
+          //  Will be an empty array for top-level operations.
+    end interface Routine
+
+    interface Element_Info<> is
+        //  Common info between Param_Info and Const_Info
+        const Type_Desc : Type_Descriptor
+        const Addr      : Univ_Integer
+        const Value     : Univ_Integer
+
+        func Large_Const_Component_Values(Info : Element_Info)
+          -> Info_Array<optional Univ_Integer, Element_Info,
+               Indexed_By => Univ_Integer>
+          is (Info, #large_const_component_values)
+    end interface Element_Info
+
+    func Interpret_As_String(optional Univ_Integer) -> optional Univ_String
+      is import(#identity);
+    //  Just reinterpret the univ-integer as a univ-string.
+    //  Note that the region is *not* adjusted.
+
+    func Interpret_As_Univ_Enum(optional Univ_Integer)
+      -> optional Univ_Enumeration
+      is import(#identity);
+    //  Just reinterpret the univ-integer as a univ-enumeration
+
+    func Interpret_As_Univ_Real(optional Univ_Integer)
+      -> optional Univ_Real
+      is import(#identity);
+    //  Just reinterpret the univ-integer as a univ-real
+ 
+    func Interpret_As_Univ_Char(optional Univ_Integer)
+      -> optional Univ_Character
+      is import(#identity);
+    //  Just reinterpret the univ-integer as a univ-char
+
+    func Const_Is_Large_Null(optional Univ_Integer)
+      -> Boolean
+      is import(#const_is_large_null);
+    //  See whether value corresponds to the representation of a large null
+
+    type Param_Kind_Enum is
+      Enum<[#formal_type, #formal_object, #formal_operation]>
+
+    interface Param_Info<> is
+        const Kind : Param_Kind_Enum
+        const Data : Element_Info  // used if formal object or formal op
+    end interface Param_Info
+
+    interface Const_Info<> is
+        const Name : optional Univ_String
+        const Data : Element_Info
+
+        func Const_Info_At_Locator (Locator : Object_Locator)
+          {Base(Locator) == Object_Locator::Const_Area}
+          -> Const_Info
+          is import (#const_info_at_locator)
+
+        func Const_Info_For_Value (Streamable_Value) -> Const_Info
+          is import (#const_info_for_value)
+    end interface Const_Info
+
+    interface Component_Info<> is
+        const Type_Desc   : Type_Descriptor
+        const Is_By_Ref   : Boolean
+        const Is_Optional : Boolean
+    end interface Component_Info
+
+    interface Routine_Info<> is
+        type Wrapper_Action_Enum is
+          Enum<[#no_action, #component_extension_action,
+                #polymorphic_type_action]>
+
+        const Index : Routine_Index
+        const Type_Desc : Type_Descriptor
+        const Action : Wrapper_Action_Enum
+        const Op_Index : Operation_Index
+        const Use_Static_Link_For_Type : Boolean
+    end interface Routine_Info
+
+    interface Type_Descriptor<> implements Streamable_Global<Univ_String> is
+        type Type_Kind_Enum is Enum<[#normal, #basic_array, #univ_integer,
+          #univ_real, #univ_string, #univ_char, #univ_enum, #unsigned_64,
+          #aliased_object]>
+
+        type Type_Index is new Integer<0..2**16-1>
+
+        func Type_Desc_At_Locator(Locator : Object_Locator)
+          -> Type_Descriptor
+          is import(#type_desc_at_locator)
+
+        func Type_Desc_At_Index(Index : Type_Index)
+          -> Type_Descriptor
+          is import(#type_desc_at_index)
+
+        func Has_Op_Map(Desc : Type_Descriptor) -> Boolean
+          is import(#type_desc_has_op_map)
+        func Corresponding_Polymorphic_Type(Desc : Type_Descriptor)
+          -> optional Type_Descriptor
+          is import(#type_desc_polymorphic_type)
+        func Name(Desc : Type_Descriptor) -> Univ_String
+          is import(#type_desc_name)
+        func Type_Decl(Desc : Type_Descriptor) -> Decl
+          is import(#type_desc_type_decl)
+
+        //  The following operations will automatically get the underlying
+        //  type descriptor if passed an op map.
+        func Index(Desc : Type_Descriptor) -> Type_Index
+          is import(#type_desc_index)
+        func Type_Kind(Desc : Type_Descriptor) -> Type_Kind_Enum
+          is import(#type_desc_kind)
+        func All_Parameters_Known(Desc : Type_Descriptor) -> Boolean
+          is import(#type_desc_all_parameters_known)
+        func Is_Small(Desc : Type_Descriptor) -> Boolean
+          is import(#type_desc_is_small)
+        func Is_Large(Desc : Type_Descriptor) -> Boolean
+          is import(#type_desc_is_large)
+        func Is_Wrapper(Desc : Type_Descriptor) -> Boolean
+          is import(#type_desc_is_wrapper)
+        func Null_Value_For_Type(Desc : Type_Descriptor)
+          -> optional Univ_Integer
+          is import(#type_desc_null_value)
+        func Parent_Type(Desc : Type_Descriptor) -> optional Type_Descriptor
+          is import(#type_desc_parent_type)
+        func Is_Abstract(Desc : Type_Descriptor) -> Boolean
+          is import(#type_desc_is_abstract)
+        func Is_Concurrent(Desc : Type_Descriptor) -> Boolean
+          is import(#type_desc_is_concurrent)
+        func Is_Polymorphic(Desc : Type_Descriptor) -> Boolean
+          is import(#type_desc_is_polymorphic)
+        func Enclosing_Type(Desc : Type_Descriptor) -> optional Type_Descriptor
+          is import(#type_desc_enclosing_type)
+        func Root_Type_Desc(Desc : Type_Descriptor)
+          -> optional Type_Descriptor
+          is import(#type_desc_root)
+
+        func Parameters(Desc : Type_Descriptor)
+          -> Info_Array<Param_Info, Type_Descriptor,
+               Indexed_By => Univ_Integer>
+          is (Desc, #type_parameters)
+
+        func Actuals_Of_Formals(Desc : Type_Descriptor)
+          -> Info_Array<Param_Info, Type_Descriptor,
+               Indexed_By => Univ_Integer>
+          is (Desc, #actuals_of_formals)
+
+        func Components(Desc : Type_Descriptor)
+          -> Info_Array<Component_Info, Type_Descriptor,
+               Indexed_By => Univ_Integer>
+          is ((Desc, #components))
+
+        func Nested_Types(Desc : Type_Descriptor)
+          -> Info_Array<Type_Descriptor, Type_Descriptor,
+               Indexed_By => Univ_Integer>
+          is ((Desc, #nested_types))
+
+        func Nested_Objs(Desc : Type_Descriptor)
+          -> Info_Array<Const_Info, Type_Descriptor,
+               Indexed_By => Univ_Integer>
+          is ((Desc, #nested_objs))
+
+        func Operations(Desc : Type_Descriptor)
+          -> Info_Array<Routine_Info, Type_Descriptor,
+               Indexed_By => Operation_Index>
+          is ((Desc, #operations))
+
+        //  Operations for Streamable_Global interface
+        
+        func Unique_Name(Type_Descriptor) -> Univ_String is Name
+        //  This name distinguishes this type desc from all others of the same
+        //  kind within the interpreter.
+
+        func Dependent_Globals(Type_Descriptor) -> Vector<Type_Descriptor>
+        //  Get vector of other type descriptors on which this depends
+
+        func Stream(Desc : Type_Descriptor; var Per_File_String_Table)
+          -> Info_Stream <Type_Descriptor>
+        //  Produce a byte-stream representation of the type descriptor
+        //  Update the Per-File string table as appropriate
+
+        //  The following operations return null if passed a Type_Descriptor
+        //  that does not have an "op map"
+
+        func Op_Map(Desc : Type_Descriptor)
+          -> optional Info_Array<Operation_Index,
+                                 Type_Descriptor,
+                                 Indexed_By => Operation_Index>
+          is ((Desc, #op_map))
+
+        func Actual_Type(Desc : Type_Descriptor)
+          -> optional Type_Descriptor
+          is import(#op_map_actual_type)
+
+        func Formal_Type_Decl(Desc : Type_Descriptor) -> optional Decl
+          is import(#op_map_formal_type_decl)
+
+    end interface Type_Descriptor
+
+    interface Streamable_Value<>
+      implements Streamable_Global<Offset_Within_Area> is
+        //  Streamable version for any value
+
+        func Const_Info_For_Value (Streamable_Value) -> Const_Info
+          is in Const_Info
+
+        func Const_Value_At_Locator (Locator : Object_Locator)
+          -> Streamable_Value
+          is import(#const_value_at_locator)
+          //  Return streamable value corresponding to given const-area locator
+
+        func Const_Value_Locator (Streamable_Value) -> Object_Locator
+          is in Object_Locator
+          //  Return const-area locator associated with streamable value
+          //  NOTE: This is declared in Object_Locator so has access to
+          //        Object_Locator type descriptor.
+
+        //  For Streamable_Global
+
+        func Unique_Name(Streamable_Value) -> Offset_Within_Area
+          is (Offset(Const_Value_Locator(Streamable_Value)))
+        //  This name distinguishes this value from all others of the same
+        //  kind within the interpreter (TBD).
+
+        func Dependent_Globals(Streamable_Value) -> Vector<Streamable_Value>
+          is ([])
+        //  Get vector of other values on which this depends (always empty)
+
+        func Stream(Val : Streamable_Value; var Per_File_String_Table)
+          -> Info_Stream <Streamable_Value>
+        //  Produce a byte-stream representation of the value
+        //  Update the Per-File string table as appropriate
+
+    end interface Streamable_Value
+
+    interface Per_File_Table<Element_Type is Streamable_Global<>> is
+       //  Table of streamable global objects
+       type Local_Index is new Integer<0 .. 2**15-1>
+
+       func Create() -> Per_File_Table
+       //  Create an empty per-file table
+
+       func Get_Local_Index
+         (var Per_File_Table; Element_Type) -> Local_Index
+       //  Return a local index to be used in LLVM code, as an index
+       //  into a run-time table which will be initialized when the compiled
+       //  module is loaded at run-time.  Indices are 1 .. Num_Elems()
+
+       func Num_Elems(Per_File_Table) -> Local_Index
+       //  Number of elements in the table
+       
+       func Nth_Elem(Per_File_Table; Local_Index) -> Element_Type
+       //  Nth element in the table
+
+    end interface Per_File_Table
+
+    interface Code_Block_Info<> is
+        const Frame_Size : Univ_Integer;
+        const Uses_Stg_Rgn : Boolean;
+        const Nested_Level : Univ_Integer;
+        const Source_Line_Number : Univ_Integer;
+    end interface Code_Block_Info;
+
+    interface Stack_Frame_Info<> is
+        //  Information about a stack frame for the current running thread
+        const Code : optional Routine;
+        const Enclosing_Type : optional Type_Descriptor;
+        const Params : optional Univ_Integer;
+        const Local_Area : optional Univ_Integer;
+        const Pc : optional Instruction::Code_Offset;
+        const Start_Pc : optional Instruction::Code_Offset;
+        const Src_Pos : optional Source_Position;
+        const Master_Id : Univ_Integer;
+        const Thread_Id : Univ_Integer;
+
+        type Single_Step_Indicator is Integer<-3 .. 100>;
+          //  Indicator returned from invocation of debugger console
+          //  to indicate what should happen upon return:
+        const Stop_Execution : Single_Step_Indicator := -3;
+          //  Exit the program upon return from the debugger.
+        const Single_Step_Into : Single_Step_Indicator := -2;
+          //  Return to the debugger as soon as leaving the current line
+          //  including by calling another routine or returning.
+        const Single_Step_Over : Single_Step_Indicator := -1;
+          //  Return to the debugger as soon as leaving the current line,
+          //  but "step over" any calls.
+        const Continue_Execution : Single_Step_Indicator := 0;
+          //  Continue until hitting a breakpoint or an assertion failure.
+        const Step_Out : Countable_Range<Single_Step_Indicator> :=
+          1 .. Single_Step_Indicator::Last();
+          //  Stop upon exiting the specified number of stack frames.
+
+        type Breakpoint_Index is Integer<0 .. 100>;
+          //  Unique index for each breakpoint
+
+        type Debugger_Reason is Integer<-8 .. [[Breakpoint_Index::Last()]]>
+          //  Indicates the reason the debugger console was invoked,
+          //  passed as a parameter to Invoke_Debugger_Console.
+        const No_Reason : Debugger_Reason := 0;
+          //  Should not occur
+        const Step_Over_Finished : Debugger_Reason := -1;
+          //  A Step-Over just completed
+        const Step_Into_Finished : Debugger_Reason := -2;
+          //  A Step-Into just completed
+        const Step_Out_Finished : Debugger_Reason := -3;
+          //  A Step-Out just complerted
+        const Step_Over_Exited_Frame : Debugger_Reason := -4;
+          //  A Step-Over exited the frame (e.g. did a "return")
+        const Step_Into_Exited_Frame : Debugger_Reason := -5;
+          //  A Step-Into exited the frame (e.g. did a "return")
+        const Assertion_Failure : Debugger_Reason := -6;
+          //  ParaSail Assertion failed
+        const Null_Check_Failure : Debugger_Reason := -7;
+          //  Null check failed
+        const Internal_Failure : Debugger_Reason := -8;
+          //  Internal failure within interpreter
+        const Breakpoint_Encountered : Countable_Range<Debugger_Reason> :=
+          1 .. Debugger_Reason::Last();
+          //  Index of breakpoint reached
+
+        func Num_Stack_Frames() -> Univ_Integer
+          is import(#num_stack_frames);
+
+        func Nth_Stack_Frame(Frame_Num : Univ_Integer) -> Stack_Frame_Info
+          is import(#nth_stack_frame);
+
+        func Nth_Frame_Type_At_Locator
+          (Frame_Num : Univ_Integer;
+           Type_Locator : Object_Locator) -> Type_Descriptor
+          is import(#nth_frame_type_at_locator);
+          //  Return type descriptor, given a locator for a type
+          //  meaningful in a given stack frame.
+
+        func Set_Breakpoint(Op : Routine; Line : Univ_Integer)
+          -> Breakpoint_Index
+          is import(#set_breakpoint);
+          //  Set a breakpoint at the given line within the given
+          //  routine; returns the index identifying the breakpoint.
+          //  If breakpoint already exists at given location,
+          //  the old breakpoint number is returned.
+
+        func Clear_Breakpoint(Index : Breakpoint_Index)
+          is import(#clear_breakpoint);
+          //  Clear the given breakpoint
+
+        func Num_Breakpoints() -> Breakpoint_Index
+          is import(#num_breakpoints);
+          //  Returns a count of the number of breakpoints set (including
+          //  those that were set once, and have since been cleared).
+
+        func Nth_Breakpoint_Routine(Index : Breakpoint_Index) -> Routine
+          is import(#nth_breakpoint_routine);
+          //  Returns the routine associated with the given breakpoint.
+
+        func Nth_Breakpoint_Line(Index : Breakpoint_Index) -> Univ_Integer
+          is import(#nth_breakpoint_line);
+          //  Returns the line# associated with the given breakpoint.
+          //  Returns 0 if breakpoint has already been cleared.
+
+        func Peek_At_Address
+          (Base : optional Univ_Integer; Offset : Offset_Within_Area)
+          -> (Result_Type is Assignable<>)
+          is import(#peek_at_address);
+          //  Return word at given base + offset location
+          //  NOTE: this is a raw fetch-word routine with no checking
+
+        func Exit_Program()
+          is import(#exit_program);
+          //  Exit the program, after shutting down the thread servers
+    end interface Stack_Frame_Info;
+
+end interface PSC::Reflection
+

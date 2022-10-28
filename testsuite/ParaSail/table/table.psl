@@ -1,0 +1,10 @@
+func Table(Num_Cubes : Univ_Integer) is
+    // Print a table of cubes
+    for I in 1..Num_Cubes loop
+	Println(I | "**3 = " | I**3);
+    end loop;
+end func Table;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Table (10);
+end func main;

@@ -1,0 +1,138 @@
+interface PSL::Containers::Two_Way_Map
+  <Key_Type is Imageable<>; Value_Type is Imageable<>>   // TBD: use Hashable
+  extends Forward : Map<Key_Type, Value_Type> is
+    type Pair2 is Key_Value<Key_Type, Value_Type>
+
+    op "[]"() -> Two_Way_Map
+
+    op "|="(var Left : Two_Way_Map; Right : Pair2)
+        // Add Key=>Value to Two_Way_Map, replacing pre-existing mapping
+        // for Key, if any.
+
+    op "|"(Left : Two_Way_Map; Right : Pair2) -> Two_Way_Map
+        // Add Key=>Value to Two_Way_Map, replacing pre-existing mapping
+        // for Key, if any in result.
+
+    op "<|="(var Left : Two_Way_Map; var Right : optional Pair2)
+        // Move Key/Value pair into Two_Way_map, leaving Right null
+
+    op "<|="(var Left : Two_Way_Map; var Right : Two_Way_Map)
+        // Move key/value pairs from Right into Left, leaving Right empty,
+        // replacing any pre-existing entries with the same key.
+
+    op "-="(var M : Two_Way_Map; Key : Key_Type)   // aka Exclude
+        // Remove mapping for Right, if present
+
+    op "var_indexing"(ref var M : Two_Way_Map; Key : Key_Type) 
+      -> ref var optional Value_Type
+        // Used for assignments to M[Key]; Key is added to M if not present
+
+    func Key_Of (M : Two_Way_Map; Value : Value_Type) -> optional Key_Type
+        // Use reverse mapping to determine key given value
+
+    func Rev_Map (M : Two_Way_Map) -> Map<Value_Type, Key_Type>
+        // Return a copy of the reverse map
+
+end interface PSL::Containers::Two_Way_Map
+
+class PSL::Containers::Two_Way_Map is
+    var Reverse : Map<Value_Type, Key_Type>
+    var Unreversed : Set<Key_Type>  //  Keys not yet in Reverse map
+
+    func Add_Unreversed(var M : Two_Way_Map) is
+      //  Add Unreversed Keys into M.Reverse
+        while not Is_Empty (M.Unreversed) loop
+            var Key := Remove_Any(M.Unreversed)
+            M.Reverse |= [M.Forward[Key] => Key]
+        end loop
+    end func Add_Unreversed
+
+  exports
+
+    op "[]"() -> Two_Way_Map is
+        return (Forward => [], Reverse => [], Unreversed => [])
+    end op "[]"
+
+    op "|="(var Left : Two_Way_Map; Right : Pair2) is
+        // Add Key=>Value to Two_Way_Map, replacing pre-existing mapping
+        // for Key, if any.
+        Add_Unreversed (Left)
+        Left.Forward |= Right
+        Left.Reverse |= [Right.Value => Right.Key]
+    end op "|="
+
+    op "|"(Left : Two_Way_Map; Right : Pair2) -> Result : Two_Way_Map is
+        // Add Key=>Value to Two_Way_Map, replacing pre-existing mapping
+        // for Key, if any in result.
+        Result := Left
+        Add_Unreversed (Result)
+        Result |= Right
+    end op "|"
+
+    op "<|="(var Left : Two_Way_Map; var Right : optional Pair2) is
+        // Move Key/Value pair into Two_Way_map, leaving Right null
+        Add_Unreversed (Left)
+        Left.Reverse |= [Right.Value => Right.Key]
+        Left.Forward <|= Right
+    end op "<|="
+
+    op "<|="(var Left : Two_Way_Map; var Right : Two_Way_Map) is
+        // Move key/value pairs from Right into Left, leaving Right empty,
+        // replacing any pre-existing entries with the same key.
+        Add_Unreversed (Left)
+        loop
+            var KV := Remove_Any(Right)
+            if KV is null then
+                exit loop
+            end if
+            Left <|= KV
+        end loop
+    end op "<|="
+
+    op "-="(var M : Two_Way_Map; Key : Key_Type) is   // aka Exclude
+        // Remove mapping for Right, if present
+        Add_Unreversed (M)
+        if Key in M.Forward then
+           M.Reverse -= M.Forward[Key]
+           M.Forward -= Key
+        end if
+    end op "-="
+
+    op "var_indexing"(ref var M : Two_Way_Map; Key : Key_Type) 
+      -> ref var optional Value_Type is
+        // Used for assignments to M[Key]; Key is added to M if not present
+        Add_Unreversed (M)
+        if Key not in M then
+            //  Don't have value of Key so can't add to M.Reverse yet
+            M.Unreversed |= Key
+        end if
+        return "var_indexing"(M.Forward, Key)
+    end op "var_indexing"
+
+    func Key_Of (M : Two_Way_Map; Value : Value_Type) -> optional Key_Type is
+        // Use reverse mapping to determine key given value
+        if Value in M.Reverse then
+           // Found in reverse mapping
+           return M.Reverse[Value]
+        else
+           // Search through Unreversed keys
+           for K in M.Unreversed loop
+               if M.Forward[K] == Value then
+                   return K
+               end if
+           end loop
+           // Not there
+           return null
+        end if
+    end func Key_Of
+
+    func Rev_Map (M : Two_Way_Map) -> Result : Map<Value_Type, Key_Type> is
+        // Return a copy of the reverse map, after adding the unreversed keys
+        var Copy for Result := M;
+        Add_Unreversed (Copy)
+        
+        Result <== Copy.Reverse
+        Copy := null
+    end func Rev_Map
+
+end class PSL::Containers::Two_Way_Map

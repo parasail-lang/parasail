@@ -1,0 +1,27 @@
+interface Simple_Fib<> is
+//    func Print(X : Integer<>);
+    func Fib(N : Integer<>) -> Result : Integer<>;
+    func Test(N : Integer<>);
+end interface Simple_Fib;
+
+class Simple_Fib is
+  exports
+//    func Print(X : Integer<>) is import("print");
+
+    func Fib(N : Integer<>) -> Result : Integer<> is
+	if N <= 1 then
+	    return N;
+	else
+	    return Fib(N-1) + Fib(N-2);
+	end if;
+    end func Fib;
+
+    func Test(N : Integer<>) is
+	Print(Fib(N));
+    end func Test;
+end class Simple_Fib;
+
+
+func main(Args : Basic_Array<Univ_String>) is
+   Simple_Fib::Test (10);
+end func main;

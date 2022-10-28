@@ -1,0 +1,129 @@
+generic
+   type Bound_Type is new Comparable
+package closed_interval is
+
+   type closed_interval is record
+      Low, High : Bound_Type
+   end record
+   
+...
+
+   subtype Element_Interval is Closed_Interval<Element_Type>
+   
+-------------
+
+package-closed-interval module interface <Bound_Type is Comparable>
+   type cur-instance of package-closed-interval
+   
+   record-closed-interval module interface
+      type cur-instance of record-closed-interval
+      
+   type closed-interval is new record-closed-interval<> is primary-nested-type
+     of package-closed-interval module
+   
+...
+
+Now we instantiate closed_interval<element_type>
+
+This creates an instance of package-closed-interval with Element_Type substituting for Bound_Type.  Because package-closed-interval has a primary nested type, at the end of Set_Type_Sem_Info we call substitute_actuals on the primary-nested-type with the instance of package-closed-interval as the type-region.  
+
+    The first step in Substitute_Actuals is to call
+    Substitute_Actuals_In_New_Type
+    That recurses with parent type, which in this case should be same
+    as current instance of record-closed-interval module,
+    and with Enclosing_Type, which should be current instance of 
+    package-closed-interval.
+    
+      The second call, calling substitute_actuals on current instance of
+      package-closed-interval, should just return the new instance of 
+      package-closed-interval.
+      
+      The first call, calling substitute actuals on the parent type,
+      should produce a new instance of the record-closed-interval with
+      a different enclosing type, namely the new instance of
+      package-closed-interval.
+      
+Performance NOTE: Might be useful to mark "original" type-sems and when passed one of those as the type_region in Substitute_actuals, return immediately as they can't provide any interesting information.
+
+--------
+
+Now what about formal types, defined as either
+   type Element_Type is new Countable
+ or
+   type Element_Type is new Countable<>
+   
+and given a call like:
+   Left, Right : Element_Type
+   ...
+   if Left <= Right then
+   
+   which expands into "to_bool"("=?"(Left, Right), 2#0010#)
+   (or something like that).
+   
+How is this supposed to work?  Let us assume that Countable defines its own "=?" operator or inherits it from Comparable.  So first we need to find one or more declarations of "=?" with an appropriate parameter of an appropriate (cur-inst or associated-with-sym) type.  That seems to work already.  But when we start checking further, we substitute actuals into the parameter type using the type_region information (is that right?)
+
+"new" types are somewhat like "current instances" when they appear as parameters.  Current instances need to be replaced by the actual instance.  A new type needs to be replaced by the new type from an actual instance.  That means replacing the enclosing type of the new type.  We replace the enclosing type if the enclosing type is a current instance, which it would be normally.  So that should work.
+
+But what if the type-region itself comes from a *different* new type?  We look for operations in the various parents, rather than inheriting them.  In general the operations of the parent can be hidden by operations defined on the child.  Not clear we are doing that anywhere.  Seems like we need a preference rule there.  I suspect we can handle operations defined directly on the new type, and ones defined in the associated module (thanks to cur-inst substitution), but what about the types in between?  These have a different new_type_count.  We need to systematically replace all of the parameter types of the same ancestor with the desired descendant.  That sounds like inheritance, rather than something done after the fact.  Also, when we call the operation, we need to have a type-region pointer for that call, and that needs to provide access to all of the relevant operations, at least when we start dealing with polymorphic operations or with generic actual types.  
+
+Currently we don't do anything special for "new" types in semantics-dynamics.  We will probably have to include all of the operations associated with it being a "new" type, or fetch them from the "enclosing" type somehow (perhaps using something analogous to the op map.  A type descriptor describes the physical layout, but also has information on the operations and on module params and nested types.  The information on module params and nested types is needed for proper execution of the code, as is information on operations in the same instance.  The type-desc on an object need not have all of this information, in general, unless it is polymorphic.  The type-desc on a non-polymorphic object is just used for physical layout.
+
+We do have a mechanism for handling inherited operations.  There are actually three mechanisms.  The most basic is that each routine in the type-desc operation table has a type-desc to use for its own call.  The other two are for the case where as part of inheriting, we also have to select the appropriate ancestor part, and for the case of calling an operation of a type that is a module parameter, and the type is polymorphic, and we need to implicitly do the work associated with a polymorphic call.
+
+So how do we want to handle calls on operations defined on "new" types?  we have two options:
+
+1) Inherit them at the point of the "new type" declaration
+
+2) Inherit them on the fly at each call.
+   This would work as follows:  For a given interpretation of the operation, we would do a substitution in each parameter type, starting from the "new" type.  This substitution would generally end up replacing the ancestor with the new type.  We would still have to deal with overriding, which could be handled in something like the "equivalence" mechanism, but that would have to be made asymmetric, so the "nearer" ones get chosen.  
+   
+   So how would the substitution work?  If we find a "new" type we would see whether it is an ancestor of the originating type, meaning it has the same originating module, and matches the New_Type_Count of one of parents of the originating type.  Solutions with higher numbered "new" are preferred.
+   
+--------
+
+How should we handle operations of "new" types?  The problem is that we might have a formal type or a polymorphic type for a "new" type which has various operations, and we need to use the equivalent of an operation index.  But the operation index is associated with an enclosing module, and we don't really have that for operations of "new" types.
+
+One possibility is to use the combination of a module and the New_Type_Counter to identify a "pseudo" module, and we would assign operation indices relative to that.  Could we avoid having multiple op_sems for the same operation, by having a map from module and new-type-counter to index?  And presumably we inherit the op index, so we don't need to do it for all descendants.
+
+A completely different approach would be to create a pseudo module for each "new" type even if it is not an extension, and then put the operations inside that module, defined as equivalent to those declared in the "real" modules.  This would be the most "canonical" representation, but would require a bunch of duplicate op-sems.
+
+---
+
+We have a more fundamental problem now.  We have calls on operations of a formal type.  These only work if the operations have a non-zero index, and if all possible instantiations implement all of the operations.  Right now types that are used as formal types will tend to be the "primary nested type" of some module, and we can presume that when they pass an actual type, we can construct an op-map for it that does the job.
+
+In Type_Implements_Type we look at operations declared in the associated module.  With "new" types as currently implemented, we will need to look at operations in the enclosing module as well as the enclosing module of the parent type.  This is getting worse...
+
+--------
+
+OK, let's think about revamping the way that "new" types are handled.  In particular, create a module for every "new" type (except formal types).  Then as we declare operations where the type is declared, we add them to the implicit module if they have an input/output of a "new" type declared in the same module.  The implicit module for the new type is initialized by inheriting from the parent type's module.  The new operations don't need to be inherited, but merely "renamed" into the implicit module's region.  For inherited operations, we set the Originating_Module and Originating_Operation.  These are only checked if context in Ancestor_Item_Contexts; we could create a new context to represent this.
+
+Question: Should the module created for a record type decl be reused? We need some indication that module or type should have operations added to it.  If we make the type the current instance of the module, that certainly simplifies things.  Perhaps even the "Treat as Type" flag will be adequate.  The type is a current instance and the module is marked "treat as type" and the current module/region is the enclosing region of the module.  Primary_Nested_Type is something else, and is more of a naming convenience.
+
+So in Operation_Action (2nd pass?), we check whether one of the parameters is one of these current-instance-of-treat-as-type-nested-in-current-region.
+
+Issues with new approach:
+   May need to recompute count of components/constructors
+   
+--------------------
+
+Trouble with abstract operations of a formal type.  The Equiv_To on the operation of the formal type causes us to set the associated type to be the enclosing package, which no longer looks like a formal type.  At some point we need to have the "right" assoc-type, for the static link, but first we need to substitute with the actual type.  How does that substitution work at run time?
+We create a type descriptor for the instantiated nested type.  Do we also create one for the instantiated enclosing type?  
+
+As things are now, the package instance type has the formal type parameter, but it refers to a type instance.  Presumably its enclosing type is the corresponding package instance.  What do we need as the assoc-type for the call on an operation of the formal type?  It needs to be a type that is accessible from the Countable_Set package instance, so it needs to have a nested type which is the enclosing type of the actual parameter.  How do we create such a thing?  We need a new base type representing this, which when passed to substitute_actuals will produce the right thing.
+
+Suppose we mark the enclosing package instance as formal?  Will that produce two formal parameters?  That is probably OK.  Or perhaps we create an encloser-of-formal notion.
+
+----------------------
+
+We are having trouble now in Basic_Map with a call on Key_Of(Elem) where Key_Of is an (abstract) operation of the formal type KV_Type which is derived from Keyed.  Elem is of type KV_Type.  The Key_Of operation returns the Key_Type which is a formal type of Keyed.  We are trying to come up with a run-time type-info for Key_Type, when referenced inside of Basic_Map.  We know that Key_Type is the first formal parameter of Keyed.  What we probably want is to use an actual-of-formal, and that seems to be what ParaSail does under the same circumstances, so the question is why doesn't Sparkel do the same thing.
+
+Formal types are marked "new" in Sparkel.  Does that have an effect?  No, hopefully that is pretty much ignored if the context indicates we are defining a formal type.
+
+So what does ParaSail do under these circumstances?  Does the call on Key_Of trigger something which produces a actual-of-formal?  Perhaps simplest would be to run it in the debugger...
+
+So the problems seems to start in Substitute_Actuals when the Param_Type is the result type of Key_Of, namely the formal Key_Type of module Keyed, which implements Hashable.  The Originating_Type is the formal type KV_Type of module Basic_Map, which implements Keyed.  We want to produce an actual-of-formal type with prefix KV_Type'Key_Type, but the problem is that the formal Key_Type is actually a formal of the package Keyed, not the type Keyed, but the package Keyed is not marked as being a formal type.  At a minimum, if we have a formal originating type that is "Treat_As_Type" and it is immediately enclosed in a module where the Param_Type is a formal, then we should create an actual-of-formal.
+
+-----
+
+We are still having problems with actuals-of-formals.  First question is what does a formal type look like?  It would be nice, probably, if both the enclosing type and the param type were marked as "Is_Formal_Type".  The enclosing type has the nested formal parameters, and that is where we will want to save the actual-of-formals (in the actual_sem_infos).  As it is now, we are creating a new actual-of-formal each time, preventing the types from matching.  Alternatively, we could create the actuals-of-formals "eagerly" rather than waiting to create them, though that could be a complete tree in some cases, and conceivably even recursive(?).
+

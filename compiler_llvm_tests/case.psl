@@ -1,0 +1,7 @@
+func Case(N : Univ_Integer) -> Boolean is
+   case N of
+      [0] => return #true;
+      [1] => return #false;
+      [..] => return #false;
+   end case;
+end func Case;

@@ -1,0 +1,580 @@
+import Queue, Node_Group::*;
+
+interface Node_Group <> is
+   //  A distributed object is conceptually an array of shards of a
+   //  particular type, with a part of the array residing at each node
+   //  within a node group.
+   //  The same part, in terms of array indices, is present for each
+   //  distributed object on a given node.  TBD: This rule could change!
+
+   type Shard_Index is new Integer<Range => 0 .. 2**31-1>
+   //  Index for individual shards.
+
+   type Shard_Set is Countable_Set<Shard_Index>
+   //  Set of shards, usable as set assigned to a given node
+   //  as set for target of an operation.
+
+   type Node_Index is new Integer<Range => 0 .. 2**31-1>
+   //  Index for nodes
+
+   interface Node_Shard_Set<> is
+      //  Information on a given node in node group
+      const Node_Ix : Node_Index
+      const Shards : Shard_Set
+   end interface Node_Shard_Set
+
+   type Distrib_Kind_Id_Type is new Univ_String<>
+   //  Unique id for each distinct kind of distributed service/abstraction/obj
+   //  This ID is chosen by the programmer.
+
+   type Distrib_Obj_Id_Type is new Integer<Range => 0 .. 2**31-1>
+   //  Id for a distributed object, unique relative to its kind
+
+   type Timestamp_Type is new Integer<Range =>0 .. 2**31-1>
+   //  Timestamp used to keep track of state of each shard
+
+   abstract interface Root_Message<> implements Assignable<> is
+      //  This is the ancestor of all message types
+
+      //  Identifying information
+      abstract func Distrib_Kind_Id(Root_Message) -> Distrib_Kind_Id_Type;
+        //  Kind of target object message applies to
+      abstract func Distrib_Obj_Id(Root_Message) -> Distrib_Obj_Id_Type;
+        //  Obj_Id of target object
+      abstract func Timestamp(Root_Message) -> Timestamp_Type;
+        //  Timestamp indicating sequence of message in overall program
+
+      abstract func Node_Apply
+        (Root_Message; var Node_Group; Shard_Index; Timestamp_Type)
+        //  This applies the message to the specified shard
+        //  of the object identified by the kind/obj-id of the message.
+        //  This needs to be specialized to a particular message type
+        //  because it "knows" the type of the shard.
+   end interface Root_Message
+
+   interface Root_Obj_Handle<> implements Hashable<> is
+     //  This is the ancestor of all distributed object handles
+      const Kind_Id : Distrib_Kind_Id_Type;
+      const Obj_Id : Distrib_Obj_Id_Type;
+      op "=?"(Left, Right : Root_Obj_Handle) -> Ordering is
+        (Left.Kind_Id == Right.Kind_Id? Left.Obj_Id =? Right.Obj_Id:
+           Left.Kind_Id =? Right.Kind_Id)
+      func Hash (Root_Obj_Handle) -> Univ_Integer is
+        (Hash (Root_Obj_Handle.Kind_Id) + Hash (Root_Obj_Handle.Obj_Id))
+   end interface Root_Obj_Handle
+
+   concurrent interface Hub<> is
+      func Create(Total_Shards : Shard_Index) -> Hub
+      //  Create a Hub for a Node_Group
+
+      func Total_Shards (locked Hub) -> Shard_Index
+      //  Number of shards in the entire node group
+
+      func Assign_Shards (locked var Hub; Num_Shards : Shard_Index)
+        -> Node_Shard_Set
+      //  Assign shards to a node
+
+      func Send (locked var Hub;
+         Msg : Root_Message+; Shard_Set; Timestamp_Type);
+      //  Send messages to given shards
+
+      func Retrieve (locked var Hub; Shard_Index) -> optional Root_Message+;
+      //  Retrieve message for given local shard
+
+   end interface Hub
+
+   func Connect (ref var Hub;
+     Name : Univ_String;
+     Num_Shards : Shard_Index) -> Node_Group;
+   //  Connect to the node group of the given Name
+   //  as part of the given Hub;
+   //  Assign Num_Shards shards to this node.
+
+   func Next_Obj_Id (var Node_Group; Kind_Id : Distrib_Kind_Id_Type;
+     Initial_State : Assignable+)
+     -> Distrib_Obj_Id_Type;
+   //  Get the next obj-id for the given kind_id
+
+   func Total_Shards (Node_Group) -> Shard_Index
+   //  Number of shards in the entire node group
+
+   func Local_Indices (Node_Group) -> Shard_Set
+   //  Index (or Indices) for the "local" shard(s)
+
+   func Local_Shard(ref Node_Group; Root_Obj_Handle+; Shard_Index)
+     -> ref Assignable+;
+   //  Return a reference to a local shard of the given object
+
+   func Remote (var Node_Group;
+      Root_Message+; Shard_Set; Timestamp_Type)
+   //  Send the given message to the given set of shards
+
+   func Listen (var Node_Group) // var Timestamp_Type; Wait : Boolean)
+   //  Apply all messages directed at this shard
+   //  TBD: only ones that have timestamp that is one more than Timestamp,
+   //       and update Timestamp to this value.
+   //       Wait until at least one message comes in if Wait is #true.
+
+   interface Message<Shard_Type is Assignable<>>
+     implements Node_Group::Root_Message<> is
+
+      abstract func Apply (Message; var Shard_Type; Timestamp_Type)
+      //  Override this to apply message to (local) shard
+
+      //  Identifying information
+      func Distrib_Kind_Id(Message) -> Distrib_Kind_Id_Type;
+        //  Kind of target object message applies to
+      func Distrib_Obj_Id(Message) -> Distrib_Obj_Id_Type;
+        //  Obj_Id of target object
+      func Timestamp(Message) -> Timestamp_Type;
+        //  Timestamp indicating sequence of message in overall program
+
+      func Create
+        (Distrib_Kind_Id_Type; Distrib_Obj_Id_Type; Timestamp_Type)
+        -> Message;
+        //  Fill in common fields of message
+
+      func Apply_Helper
+        (Msg : Message+; var Node_Group; Shard_Index; Timestamp_Type);
+        //  This applies the message to the specified shard
+        //  of the object identified by the kind/obj-id of the message.
+        //  This needs to be specialized to a particular message type
+        //  because it "knows" the type of the shard.
+
+      abstract func Node_Apply
+        (Message; var Node_Group; Shard_Index; Timestamp_Type)
+        //  This should be overridden to just call the Apply_Helper above
+        //  TBD: This should be definable in a way that a re-dispatch
+        //       happens automatically, so no need to override.
+   end interface Message
+
+end interface Node_Group
+
+class Node_Group is
+   ref var Group_Hub : Hub
+   const Node_Ix : Node_Index
+   var Local_Indices : Shard_Set
+   var Queues : Array<Queue<Root_Message+>, Indexed_By => Shard_Index>
+   var Stamps : Array<Timestamp_Type, Indexed_By => Shard_Index>
+
+   const Debug : Boolean := #false
+
+   type Local_Shards_Map is
+          Ordered_Map
+            <Key_Type => Shard_Index,
+              Value_Type => Assignable+>;
+      //  The local shards of a given distributed object are stored in a map
+
+   type Obj_Vector is Vector<Local_Shards_Map>;
+      //  The objects of a given kind_id are stored in a vector
+      //  NOTE: We presume distributed objects are *not* created
+      //        concurrently, since otherwise not all nodes would create
+      //        them in the same sequence, and we are presuming that a given
+      //        distributed object is assigned the same obj-id in each node.
+
+   var Objects : Map
+     <Key_Type => Distrib_Kind_Id_Type,
+      Value_Type => Obj_Vector> := []
+
+ exports
+
+   concurrent class Hub is
+      const Total_Shards : Shard_Index
+      var Last_Assigned_Shard : Shard_Index := 0
+      var Shards_In_Node : Vector <Shard_Set> := []
+        //  Mapping of node index to shard set
+      var Queues : Array<Queue<Root_Message+>, Indexed_By => Shard_Index>;
+    exports
+      func Create(Total_Shards : Shard_Index) -> Hub is
+      //  Create a Hub for a Node_Group
+         return (Total_Shards => Total_Shards,
+                 Queues => Create(1 .. Total_Shards, []))
+      end func Create
+
+      func Total_Shards (locked Hub) -> Shard_Index is ((Hub.Total_Shards))
+      //  Number of shards in the entire node group
+
+      func Assign_Shards (locked var Hub; Num_Shards : Shard_Index)
+        -> Result : Node_Shard_Set is
+      //  Assign shards to a node
+         var Result_Set for Result :=
+           Hub.Last_Assigned_Shard + 1 ..
+             Hub.Last_Assigned_Shard + Num_Shards
+         Hub.Last_Assigned_Shard += Num_Shards
+
+         Hub.Shards_In_Node |= Result_Set
+
+         Result := (Node_Ix => |Hub.Shards_In_Node|, Shards <== Result_Set)
+      end func Assign_Shards
+
+      func Send (locked var Hub;
+         Msg : Root_Message+; Shard_Set; Timestamp_Type) is
+      //  Send messages to given shards
+         if Debug then
+            Print("Sending msg to shards");
+         end if;
+         for S in Shard_Set loop
+            if Debug then
+               Print(" `(S)");
+            end if;
+            Hub.Queues[S].Enqueue(Msg);
+         end loop;
+         if Debug then
+            Print('\n');
+         end if;
+      end func Send;
+
+      func Retrieve (locked var Hub; Shard_Index)
+        -> Result : optional Root_Message+ is
+      //  Retrieve message for given local shard
+         Result := Hub.Queues[Shard_Index].Dequeue();
+
+         if Debug then
+            Println("Retrieving `(
+              Result is null? "null ": "")message for Shard `(Shard_Index)");
+         end if;
+      end func Retrieve;
+
+   end class Hub
+
+   func Connect (ref var Hub;
+     Name : Univ_String;
+     Num_Shards : Shard_Index) -> Node_Group is
+
+      const Assignment := Hub.Assign_Shards (Num_Shards)
+
+      return (Group_Hub => Hub,
+              Node_Ix => Assignment.Node_Ix,
+              Local_Indices => Assignment.Shards,
+              Queues => Create(1 .. Hub.Total_Shards(), []),
+              Stamps => Create(1 .. Hub.Total_Shards(), 0))
+   end func Connect
+
+   func Total_Shards (Node_Group) -> Shard_Index is
+     (Node_Group.Group_Hub.Total_Shards());
+   //  Number of shards in the entire node group
+
+   func Next_Obj_Id (var Node_Group; Kind_Id : Distrib_Kind_Id_Type;
+     Initial_State : Assignable+)
+     -> Distrib_Obj_Id_Type is
+      //  Initialize local shards
+      if Kind_Id not in Node_Group.Objects then
+         //  First object of this kind
+         Node_Group.Objects[Kind_Id] := [];
+      end if;
+
+      //  Add another object to the vector of objects of the given kind
+      Node_Group.Objects[Kind_Id] |= Local_Shards_Map::[];
+
+      //  Obj-id comes from the length of this vector
+      Next_Obj_Id := |Node_Group.Objects[Kind_Id]|;
+
+      //  Now fill in the initial state for the local shards of this new Obj
+      ref New_Obj => Node_Group.Objects[Kind_Id][Next_Obj_Id];
+      for Ix in Node_Group.Local_Indices loop
+         New_Obj[Ix] := Initial_State;
+      end loop;
+   end func Next_Obj_Id;
+
+   func Local_Indices (Node_Group) -> Shard_Set is
+   //  Index(Indices) for the "local" shard(s)
+      return Node_Group.Local_Indices;
+   end func Local_Indices
+
+   func Local_Shard(ref Node_Group; Root_Obj_Handle+; Shard_Index)
+     -> ref Assignable+ is
+   //  Return a reference to a local shard of the given object
+      return Node_Group.Objects[Root_Obj_Handle.Kind_Id]
+                                 [Root_Obj_Handle.Obj_Id]
+                                   [Shard_Index];
+   end func Local_Shard;
+
+   func Remote (var Node_Group;
+      Root_Message+; Shard_Set; Timestamp_Type) is
+      if Debug then
+         Println ("Remote called, Set = {" |
+           (for (each E of Shard_Set; Sep := "" then ",") forward =>
+              <""> | Sep | E) | "}")
+      end if;
+      //  Send a copy of the message to each shard in the Shard_Set
+      //  If it is remote, pass along to the Hub.
+      Node_Group.Group_Hub.Send
+        (Root_Message, Shard_Set - Node_Group.Local_Indices, Timestamp_Type);
+
+      //  If it is local, queue it here.
+      for Shard_Ix in Shard_Set and Node_Group.Local_Indices loop
+         Enqueue (Node_Group.Queues[Shard_Ix], Root_Message);
+      end loop
+   end func Remote
+
+   func Listen (var Node_Group) is // var Timestamp_Type; Wait : Boolean) is
+      if Debug then
+         Println ("Listen called");
+      end if;
+      //  TBD: Timestamp = `(Timestamp_Type), Wait = " |
+      //  TBD:  (if Wait then "Wait" else "Nowait"))
+      for each Shard_Ix of Node_Group.Local_Indices() forward loop
+         loop
+            var Msg :=
+               Dequeue (Node_Group.Queues[Shard_Ix]);
+            if Msg is null then
+               Msg := Node_Group.Group_Hub.Retrieve(Shard_Ix);
+               if Msg is null then
+                  exit loop
+               end if;
+               if Debug then
+                  Println("Got message from Hub for shard `(Shard_Ix)");
+               end if;
+            else
+               if Debug then
+                  Println("Got local message for shard `(Shard_Ix)");
+               end if;
+            end if
+            
+            //  Apply the message
+            Msg.Node_Apply(Node_Group, Shard_Ix, Timestamp_Type => 1);
+         end loop
+      end loop
+      
+   end func Listen
+
+   class Message is
+      const Kind_Id : Distrib_Kind_Id_Type;
+      const Obj_Id : Distrib_Obj_Id_Type;
+      const Timestamp : Timestamp_Type;
+     exports
+      //  Identifying information
+      func Distrib_Kind_Id(Message) -> Distrib_Kind_Id_Type
+        is (Message.Kind_Id);
+        //  Kind of target object message applies to
+      func Distrib_Obj_Id(Message) -> Distrib_Obj_Id_Type
+        is (Message.Obj_Id);
+        //  Obj_Id of target object
+      func Timestamp(Message) -> Timestamp_Type
+        is (Message.Timestamp);
+        //  Timestamp indicating sequence of message in overall program
+
+      func Create
+        (Distrib_Kind_Id_Type; Distrib_Obj_Id_Type; Timestamp_Type)
+        -> Message is
+        //  Fill in common fields of message
+         return (Distrib_Kind_Id_Type, Distrib_Obj_Id_Type, Timestamp_Type);
+      end func Create;
+
+      func Apply_Helper
+        (Msg : Message+; var Node_Group; Shard_Index; Timestamp_Type) is
+        //  This applies the message to the specified shard
+        //  of the object identified by the kind/obj-id of the message.
+        //  This needs to be specialized to a particular message type
+        //  because it "knows" the type of the shard.
+         ref var Shard => Node_Group.Objects
+                           [Msg.Kind_Id] [Msg.Obj_Id] [Shard_Index];
+         case Shard of
+            [S : Shard_Type] =>
+               //  Verify that it is of the correct type
+               Msg.Apply (S, Timestamp_Type);
+            [..] => {#false}
+         end case;
+      end func Apply_Helper;
+
+   end class Message
+end class Node_Group
+
+interface Node_Group::Distrib_Obj_Handle
+  <Handle_Kind_Id : Distrib_Kind_Id_Type;
+   Shard_Type is Assignable<>;
+   Root_Shard_Msg is Node_Group::Message<Shard_Type>> 
+  extends Root_Obj_Handle<> is
+   //  Given type for individual shard and type for messages
+   //  used to update shard, create distributed, sharded abstraction.
+
+   func Create
+     (var Node_Group;
+      Initial_State : Shard_Type)
+     -> Distrib_Obj_Handle
+   //  Create a new distributed object within the given Node_Group,
+   //  with the initial shard state for each shard.
+
+   func Distrib_Obj_Id (Distrib_Obj_Handle) -> Distrib_Obj_Id_Type
+     is (Distrib_Obj_Handle.Obj_Id)
+
+   func Shard(Distrib_Obj_Handle; ref Node_Group; Shard_Index)
+     -> ref Shard_Type;
+   //  Return a ref to a "local" shard of the distributed object.
+
+   type Poly_Msg_Type is Root_Shard_Msg+;
+
+   func Remote (var Node_Group; Distrib_Obj_Handle;
+                Msg: Poly_Msg_Type; Shard_Set; Timestamp_Type)
+   //  Queue an operation to update given set of possibly-remote shards of
+   //  distributed object.
+   //  If the set identifies more than one shard, then this implies
+   //  a request for a remote op might be sent via a "broadcast" mechanism.
+   //  The Timestamp reflects how the remote op fits into the overall sequence
+   //  of remote ops sent to the given distributed object.
+   //  When the remote op is received by the node where the shard resides,
+   //  the "Apply" operation of the Msg_Type will be invoked.
+   //  Note that the Msg_Type parameter is polymorphic, so the Apply operation
+   //  will be determined by the actual type of the remote op requested.
+
+end interface Node_Group::Distrib_Obj_Handle
+
+class Node_Group::Distrib_Obj_Handle is
+   
+  exports
+
+   func Create
+     (var Node_Group;
+      Initial_State : Shard_Type)
+     -> Distrib_Obj_Handle is
+      const Obj_Id := Node_Group.Next_Obj_Id
+        (Handle_Kind_Id, Initial_State);
+
+      return (Kind_Id => Handle_Kind_Id, Obj_Id => Obj_Id);
+   end func Create
+
+   func Shard(Distrib_Obj_Handle; ref Node_Group; Shard_Index)
+     -> ref Shard_Type is
+   //  Return a ref to a "local" shard of the distributed object.
+      case Node_Group.Local_Shard(Distrib_Obj_Handle, Shard_Index) of
+         [Result : Shard_Type] => return Result;
+         [..] => {#false}
+      end case
+   end func Shard
+
+   func Remote
+     (var Node_Group; Distrib_Obj_Handle;
+      Msg: Poly_Msg_Type; Shard_Set; Timestamp_Type)
+   is
+      Node_Group.Remote (Msg, Shard_Set, Timestamp_Type)
+   end func Remote
+end class Node_Group::Distrib_Obj_Handle
+
+interface Vec_Msg<Handle_Kind_Id : Distrib_Kind_Id_Type; Element is Imageable<>>
+  extends Header: Node_Group::Message<Vector<Element>> is
+
+   func Apply (Vec_Msg; var Vec : Vector<Element>; Timestamp_Type);
+
+   func Node_Apply(Vec_Msg; var Node_Group; Shard_Index; Timestamp_Type);
+
+   func Create
+     (Distrib_Kind_Id_Type; Distrib_Obj_Id_Type; Timestamp_Type)
+     -> Vec_Msg;
+   //  TBD: Should we inherit, and need to override
+   //       a constructor like this?  Is it similar to "empty"
+   //       for a set type?
+
+   func Create_Append_Msg
+     (Obj_Id : Distrib_Obj_Id_Type;
+      Data : Vector<Element>;
+      Timestamp_Type := 0) -> Vec_Msg;
+end interface Vec_Msg
+
+class Vec_Msg is
+   type Msg_Kind_Type is Enum<[#append]>
+   const Msg_Kind : Msg_Kind_Type
+   const Data : Vector<Element>
+
+   const Debug : Boolean := #false;
+
+ exports
+   func Node_Apply(Vec_Msg; var Node_Group; Shard_Index; Timestamp_Type) is
+      if Debug then
+         Println ("Vec_Msg Apply called on Node_Group[" |
+           Distrib_Kind_Id(Vec_Msg) | "][" | Distrib_Obj_Id(Vec_Msg) | "][" |
+           Shard_Index | "] at time = " | Timestamp_Type)
+      end if;
+
+      Vec_Msg::Apply_Helper(Vec_Msg, Node_Group, Shard_Index, Timestamp_Type);
+   end func Node_Apply
+
+   func Apply (Vec_Msg; var Vec : Vector<Element>; Timestamp_Type) is
+      if Debug then
+         Println ("Vec_Msg Apply called on Vector  at time = " |
+           Timestamp_Type)
+      end if;
+      case Vec_Msg.Msg_Kind of
+         //  Do the append
+        [#append] => Vec |= Vec_Msg.Data;
+      end case;
+   end func Apply
+
+   func Create_Append_Msg
+     (Obj_Id : Distrib_Obj_Id_Type;
+      Data : Vector<Element>;
+      Timestamp_Type := 0) -> Vec_Msg is
+      return (Header => Create(Handle_Kind_Id, Obj_Id, Timestamp_Type),
+              Msg_Kind => #append, Data => Data)
+   end func Create_Append_Msg
+
+   func Create
+     (Distrib_Kind_Id_Type; Distrib_Obj_Id_Type; Timestamp_Type)
+     -> Vec_Msg is
+      //  TBD: Not currently intended to be used; perhaps should create
+      //       a default sort of message?
+      {#false};
+      return null;
+   end func Create;
+end class Vec_Msg
+
+import Node_Group::*, Vec_Msg
+func Test_Distrib() is
+   const Num_Nodes := 4;
+   const Shards_Per_Node := 3;
+
+   var Distrib_Hub : Hub := Create(Num_Nodes * Shards_Per_Node)
+   
+   for Node in 1 .. Num_Nodes concurrent loop
+
+      ref var Grp : Node_Group =>
+        Distrib_Hub.Connect ("Test_Vec", Shards_Per_Node)
+
+      const Vec_Kind : Distrib_Kind_Id_Type := "Distrib_Vec_String";
+
+      type Vec_Str_Msg is Vec_Msg<Vec_Kind, Univ_String>;
+
+      type Distrib_Vec_Handle is
+        Distrib_Obj_Handle<Vec_Kind, Vector<Univ_String>, Vec_Str_Msg>
+
+      const DVec := Distrib_Vec_Handle::Create(Grp, [])
+
+      const VMsg := Vec_Str_Msg::Create_Append_Msg
+                      (DVec.Obj_Id, ["`(Node)a", "`(Node)b", "`(Node)c"]);
+      Grp.Remote(VMsg, [for I in 1 .. Num_Nodes => I * Shards_Per_Node],
+        Timestamp_Type::(1))
+
+      const Start := Grp.Local_Indices().First();
+      ref Shard1 => DVec.Shard(Grp, Start)
+      Shard1 := ["hi", "there"]
+      --  DVec.Shard(Grp, Shard_Index::(Start)) := ["hi", "there"]
+
+      ref Shard2 => DVec.Shard(Grp, Start + 1);
+      Shard2 := ["this", "is", "a", "test"]
+      --  DVec.Shard(Grp, Shard_Index::(Start + 1)) :=
+      --        ["this", "is", "a", "test"]
+
+      ref Shard3 => DVec.Shard(Grp, Start + 2);
+      Shard3 := ["good", "bye"]
+      --  DVec.Shard(Grp, Shard_Index::(Start + 2)) := ["good", "bye"]
+
+      Println ("Showing intermediate state of shards for Node `(Node)");
+      for Ix in Grp.Local_Indices() forward loop
+         ref Elem => DVec.Shard(Grp, Ix)
+         Print ("Shard`(Ix): ")
+         Println ((for (each Item of Elem; Sep := "" then "|") forward
+           => <""> | Sep | Item ))
+      end loop
+
+      Println ("Node `(Node) about to listen");
+      Grp.Listen();
+
+      Println ("Showing final state of shards for Node `(Node)");
+      for Ix in Grp.Local_Indices() forward loop
+         ref Elem => DVec.Shard(Grp, Ix)
+         Print ("Shard`(Ix): ")
+         Println ((for (each Item of Elem; Sep := "" then "|") forward
+           => <""> | Sep | Item ))
+      end loop
+
+   end loop
+end func Test_Distrib

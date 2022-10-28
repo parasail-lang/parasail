@@ -1,0 +1,163 @@
+interface PSL::Containers::Big_Array
+  <Elem_Type is Assignable<>; Indexed_By is Countable<>> 
+  implements Indexable<Elem_Type, Indexed_By> is
+  // An array abstraction where the index type is not necessarily
+  // Univ_Integer, but instead can be any Countable type (e.g. Enum<...>)
+  // and where the length can be greater than 65K
+
+    const Bounds : Countable_Range<Indexed_By>
+
+    func Create(Bounds : Countable_Range<Indexed_By>;
+      Initial_Value : optional Elem_Type)
+      -> Big_Array
+
+    func Length(Arr : Big_Array) -> Univ_Integer
+    op "magnitude"(Big_Array) -> Univ_Integer is Length
+
+    func Bounds(Arr : Big_Array) -> Countable_Range<Indexed_By>
+
+    op "indexing"(ref Arr : Big_Array; Index : Indexed_By) -> ref Elem_Type
+    op "var_indexing"(ref var Arr : Big_Array; Index : Indexed_By) 
+      -> ref var Elem_Type
+    op "index_set"(Arr : Big_Array) -> Countable_Range<Indexed_By> is Bounds
+    op "<|="(var Left : Big_Array; var Right : optional Elem_Type)
+    op "|"(Left : Big_Array; Right : Key_Value<Indexed_By, Elem_Type>) -> Big_Array
+    op "[]"() -> Big_Array
+end interface PSL::Containers::Big_Array
+
+class PSL::Containers::Big_Array is
+  // An array abstraction where the index type is not necessarily
+  // Univ_Integer, but instead can be any Countable type (e.g. Enum<...>)
+  // and where the length can be greater than 65K
+    const Chunk_Len_Bits := 15
+    const Chunk_Len := 2 ** Chunk_Len_Bits
+    type Elem_Array is Basic_Array<Elem_Type>
+    type Arr_Of_Arr is Basic_Array<optional Elem_Array>
+    var Data : Arr_Of_Arr
+  exports
+
+    func Create(Bounds : Countable_Range<Indexed_By>;
+      Initial_Value : optional Elem_Type)
+      -> Result : Big_Array is
+        const Len := Length (Bounds)
+        const Num_Chunks := (Len + Chunk_Len - 1) / Chunk_Len
+        Result := (Data => Create(Num_Chunks, null), Bounds => Bounds)
+        if Num_Chunks > 0 then
+            for I in 1 ..< Num_Chunks loop
+                Result.Data[I] := Create(Chunk_Len, Initial_Value)
+            end loop
+            Result.Data[Num_Chunks] :=
+              Create(Len - (Num_Chunks-1)*Chunk_Len, Initial_Value)
+        end if
+    end func Create
+
+    func Length(Arr : Big_Array) -> Univ_Integer is
+        return Length(Arr.Bounds)
+    end func Length
+
+    func Bounds(Arr : Big_Array) -> Countable_Range<Indexed_By> is
+        return Arr.Bounds
+    end func Bounds
+
+    op "indexing"(ref Arr : Big_Array; Index : Indexed_By) -> ref Elem_Type is
+        const Zero_Based_Index := Index - Arr.Bounds.First
+        return Arr.Data[Zero_Based_Index / Chunk_Len + 1]
+                          [Zero_Based_Index rem Chunk_Len + 1]
+    end op "indexing"
+
+    op "var_indexing"(ref var Arr : Big_Array; Index : Indexed_By) 
+      -> ref var Elem_Type is
+        if Length(Arr) == 0 then
+            // Create a one-element Big_Array
+            Arr := Create(Index .. Index, null)
+        elsif Index < Arr.Bounds.First then
+            // Extend below
+            const Old_Arr <== Arr
+            Arr := Create(Index .. Arr.Bounds.Last, null)
+            for I in Old_Arr.Bounds loop
+               "indexing"(Arr, I) := Old_Arr[I]
+            end loop
+        elsif Index > Arr.Bounds.Last then
+            // Extend above; try to move unchanged old data into new array
+            var Old_Arr <== Arr
+            const New_Bounds : Countable_Range<Indexed_By> :=
+              Old_Arr.Bounds.First .. Index;
+            const Old_Len := Length (Old_Arr.Bounds)
+            const New_Len := Length (New_Bounds)
+            const Old_Num_Chunks := Length(Old_Arr.Data)
+            const New_Num_Chunks := (New_Len + Chunk_Len - 1) / Chunk_Len
+            //  Create new array
+            Arr := (Data => Create(New_Num_Chunks, null), Bounds => New_Bounds)
+
+            //  Move over unchanged chunks
+            const Unchanged_Chunks := Old_Len mod Chunk_Len == 0?
+                                          Old_Num_Chunks : Old_Num_Chunks-1
+            for I in 1 .. Unchanged_Chunks loop
+                Arr.Data[I] <== Old_Arr.Data[I]
+            end loop
+
+            //  Fill in intervening uninitialized chunks
+            for I in Unchanged_Chunks <..< New_Num_Chunks loop
+                Arr.Data[I] := Create(Chunk_Len, null)
+            end loop
+           
+            //  Create final new chunk
+            Arr.Data[New_Num_Chunks] :=
+              Create(New_Len - (New_Num_Chunks-1)*Chunk_Len, null)
+
+            //  Copy over old data
+            if Old_Num_Chunks > Unchanged_Chunks then
+                for I in 1 .. Old_Len - Unchanged_Chunks * Chunk_Len loop
+                    Arr.Data[Old_Num_Chunks][I] <==
+                      Old_Arr.Data[Old_Num_Chunks][I]
+                end loop
+            end if
+        end if
+        return "indexing"(Arr, Index)
+    end op "var_indexing"
+
+    op "<|="(var Left : Big_Array; var Right : optional Elem_Type) is
+        // Add Right onto Big_Array
+        if Length(Left) == 0 then
+            Left :=
+              Create(Indexed_By::First() .. Indexed_By::First(), null)
+            Left[Indexed_By::First()] <== Right
+        else
+            Left[Left.Bounds.Last + 1] <== Right
+        end if
+    end op "<|="
+    
+    op "|"(Left : Big_Array; Right : Key_Value<Indexed_By, Elem_Type>) 
+      -> Result : Big_Array is
+        Result := Left
+        Result[Right.Key] := Right.Value
+    end op "|"
+
+    op "[]"() -> Result : Big_Array is
+        const First := Indexed_By::First()
+        return Create(First + 1 .. First, null)
+            // Bounds not meaningful when empty
+    end op "[]"
+
+end class PSL::Containers::Big_Array
+
+func PSL::Test::Test_Big_Array(Len : Univ_Integer) is
+   {Len > 0}
+   Println("Len = " | Len)
+   type Elem is Integer<0 .. 2**24-1>
+   var BA : Big_Array<Elem, Indexed_By => Univ_Integer> := Create(1..Len, 0)
+   BA[(Len+1)/2] := 42
+   BA[Len] := 33
+   BA[1] := 77
+   var X : Elem := 88
+   BA <|= X
+   Println("After <|= 88, len = " | |BA| | ", arr[" | |BA| | "] = " |
+     BA[|BA|])
+   {BA[(Len+1)/2] == 42}
+   {BA[Len] == 33}
+   {BA[1] == 77}
+   var Null_BA : Big_Array<Boolean, Indexed_By => Elem> := []
+   {|Null_BA| == 0}
+   {Null_BA.Bounds.First == 1}
+   {Null_BA.Bounds.Last == 0}
+end func PSL::Test::Test_Big_Array

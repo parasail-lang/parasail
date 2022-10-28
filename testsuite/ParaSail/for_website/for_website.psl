@@ -1,0 +1,58 @@
+import PSL::Short_Names::*, *
+
+func Greetings() is
+   Println("Hello, World!")
+end func Greetings
+
+func Fib(N : Int) {N >= 0} -> Int is
+   //  '{N >= 0}' is a precondition to this function
+   //  Preconditions are built in to the language and checked by the compiler
+   if N <= 1 then
+      return N
+   else
+      //  Left and right side of '+' are computed in Parallel here
+      return Fib(N - 1) + Fib(N - 2)
+   end if
+end func Fib
+
+func Increment_All(var Nums : Vector<Int>) is
+   //  This function takes a 'var' parameter.
+   //  The modifications made here will be seen by caller
+   for each Elem of Nums concurrent loop
+      //  The 'concurrent' keyword tells the compiler that
+      //  iterations of the loop can happen in any order.
+      //  It will choose the optimal number of picothreads to use
+      Elem += 1
+   end loop
+end func Increment_All
+
+func Sum_Of_Squares(N : Int) -> Int is
+   //  Built-in and inherently parallel map-reduce
+   //  Initial value is enclosed with angle brackets
+   return (for I in 1 .. N => <0> + I ** 2)
+end func Sum_Of_Squares
+
+func Sum_Of(N : Int; F : func (Int) -> Int) -> Int is
+   //  It has functional aspects as well
+   //  Here, we're taking a function as a parameter
+   return (for I in 1 .. N => <0> + F(I))
+end func Sum_Of
+
+func Run() is
+   Greetings()
+   Println(Fib(5));
+   var Vec : Vector<Int> := [0, 1, 2]
+   Increment_All(Vec)
+   Println(Vec[1] | ", " | Vec[2] | ", " | Vec[3])
+   Println(Sum_Of_Squares(0))
+   Println(Sum_Of_Squares(1))
+   Println(Sum_Of_Squares(2))
+   Println(Sum_Of_Squares(3))
+   
+   //  Sum of fibs!
+   Println(Sum_Of(10, Fib))
+end func Run
+
+func main(Args : Basic_Array<Univ_String>) is
+   Run();
+end func main;

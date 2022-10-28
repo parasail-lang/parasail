@@ -1,0 +1,42 @@
+interface Sub_Int<Default_Type is Countable<>; Default : Default_Type> is
+    func Sub(Left : Default_Type; Right : Default_Type := Default) 
+      -> Univ_Integer;
+end interface Sub_Int;
+
+class Sub_Int is
+  exports
+    func Sub(Left : Default_Type; Right : Default_Type := Default) 
+      -> Univ_Integer is
+	return Left - Right;
+    end func Sub;
+end class Sub_Int;
+
+func Named_Call(X : Univ_Integer) is
+    type Three is Sub_Int<Default_Type => Univ_Integer, Default => 3>;
+    // type Three is Sub_Int<Univ_Integer, 3>;
+
+    var A := Three::Sub(X, 2);
+    var B := Three::Sub(Right => 2, Left => X);
+    var C := Three::Sub(X);
+    var E := Three::Sub(Left => X);
+
+    Println("Three::Sub(" | X | ", 2) = " | A);
+    Println("Three::Sub(Right => 2, Left => " | X | ") = " | B);
+    Println("Three::Sub(" | X | ") = " | C);
+    Println("Three::Sub(Left => " | X | ") = " | E);
+
+    // JM: This test just reverses the order of the arguments of the test
+    //     The original test is filed under testsuite/ParaSail/named_call
+    type Four is Sub_Int<Default => 4, Default_Type => Univ_Integer>;
+
+    A := Four::Sub(X, 2);
+    B := Four::Sub(Right => 2, Left => X);
+    C := Four::Sub(X);
+    E := Four::Sub(Left => X);
+
+    Println("Four::Sub(" | X | ", 2) = " | A);
+    Println("Four::Sub(Right => 2, Left => " | X | ") = " | B);
+    Println("Four::Sub(" | X | ") = " | C);
+    Println("Four::Sub(Left => " | X | ") = " | E);
+
+end func Named_Call;

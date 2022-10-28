@@ -1,0 +1,6 @@
+Testing mod 16
+0xA + 0xA = 4
+0xA or 0x1 = 11
+0xA xor 0x2 = 8
+not 0xA = 5
+for I in Mod16 is  15 0 14 1 13 2 12 3 11 4 10 5 9 6 8 7

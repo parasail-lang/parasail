@@ -1,0 +1,273 @@
+# Example Parython program -- Directed Graph module
+
+# Copyright (C) 2011-2013, AdaCore, New York, NY
+# To be used only for Personal, Academic, or Evaluation Purposes;
+# Not for Commercial Production Use.
+# Report errors at http://groups.google.com/group/parasail-programming-language
+
+class interface DGraph<Element is Assignable<>> :
+  # Interface to a Directed-Graph module
+
+    type Node_Id is new Integer<1..10**6>
+      # A unique id for each node in the graph
+
+    type Node_Set is Countable_Set<Node_Id>
+      # A set of nodes
+
+    def Create() -> DGraph
+      # Create an empty graph
+
+    defop "[]"() -> DGraph is Create
+
+    def Add_Node(var DGraph; Element) -> Node_Id
+      # Add a node to a graph, and return its node id
+
+    defop "in"(Node_Id; DGraph) -> Boolean
+      # Return #true if Node_Id is in DGraph
+
+    defop "indexing"(ref DGraph; Node_Id) 
+      {> Node_Id in DGraph <}
+      -> ref Element
+      # Return a reference to an element of the graph
+
+    def Add_Edge(var DGraph; From, To : Node_Id)
+      {> From in DGraph; To in DGraph <}
+      # Add an edge in the graph
+
+    def Has_Edge(DGraph; From, To : Node_Id) -> Boolean
+      # Returns #true if Edge exists in graph going From to To
+
+    def Successors(ref const DGraph; Node_Id)
+      {> Node_Id in DGraph <}
+      -> ref const Node_Set
+      # The set of successors of a given node
+
+    def Predecessors(ref const DGraph; Node_Id)
+      {> Node_Id in DGraph <}
+      -> ref const Node_Set
+      # The set of predecessors of a given node
+
+    def All_Nodes(DGraph) -> Node_Set
+      # The set of all nodes
+
+    def Node_Range(DGraph) -> Countable_Range<Node_Id>
+      # The range of node-ids in use in graph
+
+    def Roots(DGraph) -> Node_Set
+      # The set of all nodes with no predecessor
+
+    def Leaves(DGraph) -> Node_Set
+      # The set of all nodes with no successor
+
+    def BFS(DGraph; Start : Node_Set;
+      Is_Target : def (DGraph; Node_Id) -> Boolean)
+      -> optional Node_Id
+      # Do a breadth-first search on graph for node that satisfies Is_Target.
+      # Start is set of nodes to start from.
+      # Return Node_Id for first node that satisfies Is_Target.  
+      # Return null if no such node.
+end interface DGraph
+
+class DGraph :
+  # Class defining the Directed-Graph module
+
+    interface Node<> :
+      # Local definition of Node structure
+        var Elem : Element
+        var Succs : Node_Set
+        var Preds : Node_Set
+    end interface Node
+
+    var G : Vector<Node>
+      # The vector of nodes, indexed by Node_Id
+
+    const Debug : Boolean = #false
+
+    def Boundary_Set(DGraph; Nodes : Countable_Range<Node_Id>;
+      Want_Roots : Boolean) -> Node_Set :
+      # Recursive helper for exported Roots and Leaves functions
+        if Debug :
+            Println("Boundary_Set for " | Nodes.First | ".." | Nodes.Last)
+        
+        const Len = Length(Nodes)
+        switch Len :
+          case 0 :
+            return []
+          case 1 :
+            if Want_Roots?
+                Is_Empty(Predecessors(DGraph, Nodes.First)):
+                Is_Empty(Successors(DGraph, Nodes.First)) :
+                # This is on the desired boundary
+                return [Nodes.First]
+            else :
+                # This is not on the desired boundary
+                return []
+            
+          else :
+            # Divide and conquer
+            const Half_Way = Nodes.First + Len / 2
+            return 
+              Boundary_Set(DGraph, 
+                Nodes.First ..< Half_Way, Want_Roots) |
+              Boundary_Set(DGraph,
+                Half_Way .. Nodes.Last, Want_Roots)
+        
+    end def Boundary_Set
+
+  exports :
+
+    def Create() -> DGraph :
+      # Create an empty graph
+        return (G => [])
+    
+
+    def Add_Node(var DGraph; Element) -> Node_Id :
+      # Add a node to a graph, and return its node id
+        DGraph.G |= (Elem => Element, Succs => [], Preds => [])
+        return Length(DGraph.G)
+    
+
+    defop "in"(Node_Id; DGraph) -> Boolean :
+      # Return #true if Node_Id is in DGraph
+        return Node_Id <= Length(DGraph.G)
+    
+
+    defop "indexing"(ref DGraph; Node_Id) -> ref Element :
+      # Return a reference to an element of the graph
+        return DGraph.G[ Node_Id ].Elem 
+    
+
+    def Add_Edge(var DGraph; From, To : Node_Id) :
+      # Add an edge in the graph
+        DGraph.G[ From ].Succs |= To
+        DGraph.G[ To ].Preds |= From
+    
+
+    def Has_Edge(DGraph; From, To : Node_Id) -> Boolean :
+      # Returns #true if Edge exists in graph going From to To
+        return From <= Length(DGraph.G) and then To in DGraph.G[From].Succs
+    
+
+    def Successors(ref const DGraph; Node_Id) -> ref const Node_Set :
+      # The set of successors of a given node
+        return DGraph.G[ Node_Id ].Succs
+    
+
+    def Predecessors(ref const DGraph; Node_Id) -> ref const Node_Set :
+      # The set of predecessors of a given node
+        return DGraph.G[ Node_Id ].Preds
+    
+
+    def All_Nodes(DGraph) -> Node_Set :
+      # The set of all nodes
+        return 1 .. Length(DGraph.G)
+    
+
+    def Node_Range(DGraph) -> Countable_Range<Node_Id> :
+      # The range of node-ids in use in graph
+        return 1 .. Length(DGraph.G)
+    
+
+    def Roots(DGraph) -> Node_Set :
+      # The set of all nodes with no predecessor
+        return Boundary_Set
+          (DGraph, 1 .. Length(DGraph.G), Want_Roots => #true)
+    
+
+    def Leaves(DGraph) -> Node_Set :
+      # The set of all nodes with no successor
+        return Boundary_Set
+          (DGraph, 1 .. Length(DGraph.G), Want_Roots => #false)
+    
+
+    def BFS(DGraph; Start : Node_Set;
+      Is_Target : def (DGraph; Node_Id) -> Boolean)
+      -> optional Node_Id :
+      # Do a breadth-first search on graph for node that satisfies Is_Target.
+      # Start is set of nodes to start from.
+      # Return Node_Id for first node that satisfies Is_Target.  
+      # Return null if no such node.
+        var Seen : Array<Atomic<Boolean>, Indexed_By => Node_Id> =
+          Create(1..Length(DGraph.G), Initial_Value => Create(#false))
+
+        # NOTE: This is only an approximate breadth-first search.
+        #       It is possible for some parts of the search to get "ahead"
+        #       of other parts in terms of depth.  A barrier would need
+        #       to be created if it was important that the result returned
+        #       represented the shallowest node that satisfied Is_Target.
+       *Outer*
+        for Next_Set => Start :  # Start with the initial set of roots
+            for N in Next_Set concurrent loop  # Look at each node in set
+                if not Value(Seen[N]) :
+                    # Not yet seen; mark it to prevent re-checking this node.
+                    # NOTE: Race condition here, but we want to avoid overhead
+                    #       of comp-and-swap, and race condition is "benign"
+                    Set_Value(Seen[N], #true)
+                    if Is_Target(DGraph, N) :
+                        # Found a node that satisfies Is_Target
+                        # This "return" will cancel other concurrent threads
+                        return N
+                    
+                    # Continue with successors of this node
+                    continue loop Outer with Next_Set => DGraph.G[N].Succs
+
+            end loop
+
+        end loop Outer
+        # No node found
+        return null
+    end def BFS
+end class DGraph
+
+def Test_Graph() :
+  # A test program that manipulates a directed graph of univ-enums
+
+    type DGE is DGraph<Univ_Enumeration>
+
+    def Build_Graph() -> New_G : DGE :
+      # A function that builds up a graph of Univ_Enumerations
+        New_G = Create();  # Create the empty graph
+
+        const Hello = New_G.Add_Node(#hello)
+        const There = New_G.Add_Node(#there)
+        const Stranger = New_G.Add_Node(#stranger)
+
+        New_G.Add_Edge(Hello, There)
+        New_G.Add_Edge(There, Stranger)
+        New_G.Add_Edge(Hello, Stranger)
+
+       
+    def Print_Nodes(DGE; Nodes : DGE::Node_Set; Indent : Univ_String = " ") :
+      # Display the elements of a node set, with the given indent
+      
+        for S in Nodes :
+            Println(Indent | DGE[S])
+        
+
+    def Print_Succs(DGE; N : DGE::Node_Id) :
+      # Display the successors of a given node
+        Println("Successors of " | DGE[N] | " (node " | N | ")")
+        Print_Nodes(DGE, DGE.Successors(N))
+    
+
+    # Now build the graph and display some info on the graph
+
+    var Gr : DGE = Build_Graph()
+
+    Println("Roots of graph:")
+    Gr.Print_Nodes(Gr.Roots())
+
+    Println("Leaves of graph:")
+    Gr.Print_Nodes(Gr.Leaves())
+    
+    Println("All nodes, and their successors:")
+    for N in All_Nodes(Gr) forward :
+        Gr.Print_Succs(N)
+    
+
+    const Strange_Id = BFS(Gr, [1], lambda (G, N) -> (G[N] == #stranger))
+
+    Println("BFS(Gr, [1], lambda (G, N) -> (G[N] == #stranger)) = "
+      | Strange_Id)
+end def Test_Graph
+

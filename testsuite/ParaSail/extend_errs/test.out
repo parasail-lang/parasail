@@ -1,0 +1,24 @@
+extend_errs.psl:78:2: Error: construct is ambiguous:
+extend_errs.psl:78:2: Info:   Println(Indent * ' ' | Image(B.Op))
+extend_errs.psl:78:25: Info: ambiguous call, one target at extend_errs.psl:25:5: is func Image(XX : Binop) -> (Univ_String)
+extend_errs.psl:78:25: Info: ambiguous call, one target at extend_errs.psl:26:5: is func Image(Op : Binop) -> (Univ_String)
+extend_errs.psl:159:17: Error: not resolved:
+extend_errs.psl:159:17: Info:   Binary::Create(#plus, Left, Right)
+extend_errs.psl:159:17: Info: Binary<> has abstract operation so does not match polymorphic type Expr<>+
+extend_errs.psl:163:17: Error: not resolved:
+extend_errs.psl:163:17: Info:   Binary::Create(#minus, Left, Right)
+extend_errs.psl:163:17: Info: Binary<> has abstract operation so does not match polymorphic type Expr<>+
+extend_errs.psl:167:17: Error: not resolved:
+extend_errs.psl:167:17: Info:   Binary::Create(#times, Left, Right)
+extend_errs.psl:167:17: Info: Binary<> has abstract operation so does not match polymorphic type Expr<>+
+extend_errs.psl:171:17: Error: not resolved:
+extend_errs.psl:171:17: Info:   Binary::Create(#divide, Left, Right)
+extend_errs.psl:171:17: Info: Binary<> has abstract operation so does not match polymorphic type Expr<>+
+extend_errs.psl:175:17: Error: not resolved:
+extend_errs.psl:175:17: Info:   Binary::Create(#pow, Left, Right)
+extend_errs.psl:175:17: Info: Binary<> has abstract operation so does not match polymorphic type Expr<>+
+extend_errs.psl:200:2: Error: use of Test_Assignment not resolved:
+extend_errs.psl:200:2: Info:   Test_Assignment(B)
+extend_errs.psl:200:18: Info: Binary<> has abstract operation so does not match polymorphic type Expr<>+
+extend_errs.psl:200:18: Info: operand B does not match E : Expr+
+ 7 semantic errors found

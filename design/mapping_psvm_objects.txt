@@ -1,0 +1,254 @@
+Here is draft of a section of this document describing
+object representation.  
+
+The ParaSail blog covers some of this in:
+ http://parasail-programming-language.blogspot.com/2012/01/implementing-polymorphic-objects.html
+
+A. Object Representation in the ParaSail VM
+
+All objects in the ParaSail VM are "identified" by a single 64-bit word.
+One reason this is important is that all modules in ParaSail are
+effectively generic templates, and to generate code for types such as
+Vector<Assignable> we need to be able to easily allocate, pass as a
+parameter, return as a result, assign, and null-out/deallocate an object
+of any arbitrary "Assignable" type (which is essentially all types in
+ParaSail that don't contain short-lived references). In some cases you
+"know" at compile-time the particular module from which an object
+arises, such as when you declare it directly as "Integer<1..10>".  In a
+case like that, you could optimize the space allocated to some degree,
+though you would probably often have to revert to passing parameters of
+the type as 64-bit integers, in cases where the called function is also
+called from contexts in which the type is not known so precisely.  This
+is analogous to the reason that in Ada, tagged types are always passed
+by reference, since there are contexts where we are passing a class-wide
+type and we don't know the specific type at compile time.
+
+In any case, here is a description of this 64-bit "identification"
+for different kinds of types:
+
+ - A "small" type is one whose objects fit entirely within
+   64 bits.  This includes the numeric types, Univ_String,
+   Univ_Character, and Univ_Enumeration.  
+
+   The "null" value for a small object is one of the 2**64 bit 
+   patterns not being used to represent a "normal" value.
+   For the integer-ish types, it is generally -2**63, while
+   for the floating-point-ish types is is generally the NaN
+   that corresponds to a bit pattern of all ones.  For small
+   integer types, it could be any value outside the range of
+   the integer type, but since we aren't currently packing
+   any data tighter than one-per-64-bit-word, we haven't
+   taken advantage of that.  In the long run you could certainly
+   imagine representing objects with multiple small components
+   as a "small" object, and in fact, you could define a type
+   in ParaSail now that would effectively provide that using
+   shifting and masking.  Eventually I would expect the
+   ParaSail compiler to provide that automatically.
+
+ - "Large" types are those that have two or more components.
+   The identification of a large object is essentially
+   a virtual address.  A virtual address consists of
+   a chunk number and an offset within a chunk.
+   The data pointed-to by the virtual address
+   consist of a 64-bit header, followed by one 64-bit
+   word per component.
+  
+   The 64-bit header includes:
+      - Size in words (including the header)
+      - Region id
+      - Lock id (or 0 if not a concurrent object)
+      - Type id (this identifies the "structural" 
+        type -- see wrapper types below)
+
+   There is a special "null-value" chunk that does not correspond to
+   "real" memory.  Instead, a virtual address that identifies the
+   "null-value" chunk is a null value.  The offset part of such an
+   address contains the region-id, where the object will live if
+   it grows beyond null-ness.  These "large" null values are used to
+   initialize the "result" object of a function, and passed into
+   the object-creation operation to identify in which region the
+   data for the object should be allocated.
+  
+ - "Wrapper" types are those that have exactly one component.
+   The identification and representation of a wrapper object 
+   is that of its single component.  In other words, at run-time,
+   a single-component object is represented identically to its
+   single component.  This means that the type-id in the header
+   if the single component is a "large" object identifies the 
+   underlying non-wrapper ("structural") type of the object.
+   What this means is that there is no space overhead to defining
+   a new module as an abstraction over some preexisting module.
+   Enumeration types, in particular, are generally wrapper types,
+   with the single component being an integer representing the
+   position within the enumeration.  (This representation approach
+   is similar to that of Ada's *untagged* record types.)
+
+ - "Type extensions" are types defined by modules which are declared
+   to "extend" some preexisting module.  A type extension is treated
+   like an object that has its parent type as its first component,
+   and any additional components following it.  If there are no
+   additional components defined as part of the type extension, then
+   this becomes a "wrapper" type, so its representation is identical
+   to that of its parent type.  
+
+ - "Polymorphic" types are used to represent objects of any
+   type in a hierarchy.  "T+" is the name for a polymorphic
+   type which encompasses the type T and every type that implements
+   T's interface.  Polymorphic objects are always large objects,
+   and the type-id in their header points to a type descriptor
+   which describes them as being a polymorphic object, and includes 
+   the "true" type-id of the object, i.e. the type used when creating 
+   the current content of the object (as opposed to the "structural" 
+   type-id appearing in object headers).  A polymorphic object has
+   a single component, which is the current content of the object
+   represented in the "normal" way.  Effectively what this means
+   is that "normal" (non-polymorphic) objects don't carry around
+   information about their "true" type, and you have to construct
+   a polymorphic object to carry that information.  So objects of
+   type "T+" and objects of type "T" don't have the same 
+   representation.
+
+A ParaSail type-id identifies a type descriptor which contains various
+information about the structural type (or the "true" type in the
+case of a polymorphic object).
+
+As a summary in Ada-speak, we can say that ParaSail objects are 
+generally "untagged"; only polymorphic ParaSail objects are "tagged."
+Large objects do have a "tag" (type-id) but it merely conveys structural
+information -- the key bit of information is which components
+are "small" and which are "large."  This structural information 
+is all the interpreter needs to copy and deallocate large objects.
+The type descriptor to use to control the equivalent of Ada 
+dispatching comes not from this "structural" type descriptor, but from 
+a "true" (operational) type-id which is either identified in the PSVM
+"call" instruction or comes from some polymorphic object.  We will 
+reserve the discussion of the use of a "true"/operational type-id
+to our section on representing calls on ParaSail operations.
+
+B. Mapping the ParaSail VM object representation to Ada
+
+In the current ParaSail interpreter, we have a 64-bit Word_Type which
+is a signed integer type.  This is used to represent virtual addresses,
+and currently also used to represent Univ_Integer and all other 
+integer types.  Eventually we will want Univ_Integer to support
+arbitrary size integers, but right now, 64-bit integers is a reasonable
+approximation to that.  We have a separate Univ_Real type, but that
+is also simply IEEE 64-bit floating point at this point, rather than
+an arbitrary-precision rational type.  CodePeer's representation for
+Big_Int and Big_Rat would probably be a good choice for ParaSail,
+though with 64 bits rather than 32 bits to play with, we could
+clearly represent many more integers as "themselves" in a Big_Int64.
+
+The ParaSail code generator will probably want to make an effort to
+track the range of values being manipulated, so even if the
+programmer uses Univ_Integer, "regular" integers can be used in
+many cases.  It would be harder for the code generator to figure out
+when it would be safe to substitute IEEE floats for Univ_Real, so 
+Univ_Real will probably have to be represented as a rational in almost 
+all cases when the ParaSail programmer uses it. 
+Nevertheless, for our first version of the code generator, I would be
+tempted to simply use a plain old 64-bit integer type for Univ_Integer
+and a plain old 64-bit IEEE float for Univ_Real.
+
+Given the above, a possible mapping-to-Ada approach is:
+
+ - type X is Integer<...> maps to "subtype X is PS_Integer"
+ - type X is new Integer<...> maps to "type X is new PS_Integer"
+ 
+ - type Y is Float<...> maps to "subtype Y is PS_Float"
+ - type Y is new Float<...> maps to "type Y is new PS_Float"
+ 
+ - type Z is Fixed<...> maps to:
+      type PS_Fixed_<delta> is delta <delta>; (only once per delta)
+      for PS_Fixed_<delta>'Small use <delta>;
+      ...
+      subtype Z is PS_Fixed_<delta>;
+ - type Z is new Fixed<...> maps to:
+      type PS_Fixed_<delta> is delta <delta>; (only once per delta)
+      for PS_Fixed_<delta>'Small use <delta>;
+      ...
+      type Z is new PS_Fixed_<delta>;
+ 
+ - type X is (new) Wrapper_Module<...>, single component type C
+     maps to:
+     
+        package Wrapper_Module is
+           type Obj is (limited) private;
+           ...
+        private
+           type Obj is new C;
+              or
+           type Obj is record
+               A : C;
+           end record;
+        end Wrapper_Module;
+        
+        ...
+        subtype(type) X is (new) Wrapper_Module.Obj;
+        
+     We make Wrapper_Module.Obj limited if C is a "large" type.
+         
+ - type X is (new) Module<...>, multiple components
+     maps to:
+                 
+        package Module is
+           type Obj is limited private;
+           ...
+           function Assign(Left : in out Obj; Right : Obj);
+        private
+           type Obj_Data is record
+               Header : PS_Obj_Header;
+               A : C1;
+               B : C2;
+               ...
+           end record;
+           
+           type Obj is new PS_Obj;
+           function Deref(O : Obj) return access Obj_Data;
+           function Create(R : PS_Region_Id) return Obj;
+        end Wrapper_Module;
+        
+        ...
+        subtype(type) X is (new) Module.Obj;
+              
+      We make Module.Obj limited private to ensure that we don't assume
+      it can be meaningfully directly copied.
+      
+C. Representing Type Descriptors in Ada
+
+As mentioned above, the type-id effectively "points to" a type
+descriptor.  A separate type descriptor is created whenever a 
+module is instantiated.  If the module has any module parameters, then
+the type descriptor holds the actual values for those parameters.  The
+type descriptor needs to contain enough information to allow objects
+of the type to be properly allocated/null-initialized, copied, and 
+deallocated.  
+
+Since normal objects don't carry the equivalent of an
+Ada "tag," the type descriptor probably needs to serve that purpose,
+so essentially all operations would be dispatching operations of
+the type descriptor.  That implies each ParSail module defines its own
+type-descriptor type, and if the module is an extension of some other
+module, then its type-descriptor type is probably an extension of
+that other module's type descriptor.  Similarly, if one module
+"implements" another module's interface, then its type-descriptor
+type could have that other module's type-descriptor type as a
+progenitor.  However, trying to use Ada's interface types adds 
+complexity and does not actually turn out to buy us much, so
+in the document on mapping operations (mapping_psvm_operations.txt)
+we describe a different approach for representing the "implements"
+relationship, using separate "op-map" type-descriptor types.
+
+Having defined the type-descriptor type, we need a function to
+construct an actual type descriptor object as part of instantiating
+the module.  At least at the moment, type-descriptor objects are
+created before execution begins, so all calls on such constructor
+functions might be dumped into a single startup routine, analogous
+to the linker-generated elaboration routine.  Alternatively, we
+could make the constructor function private, and then for each
+Ada package representing a ParaSail module, we would generate a child
+package whose spec declares all the relevant type-descriptor 
+objects for each unique instantiation of the module, and whose 
+elaboration calls the constructor function for each type descriptor with
+the corresponding set of actual module parameters.
+

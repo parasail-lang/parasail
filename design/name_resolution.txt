@@ -1,0 +1,360 @@
+-- $Revision: 1.4 $ $Date: 2011/07/19 18:01:15 $
+
+We are now attempting to assign types to expressions.
+This will allow code-gen to do something more specific.
+But it turns out this is all related to name resolution,
+since we can't really separate deciding on types from
+deciding on the meanings of operators and identifiers.
+
+The basic name/overload resolution algorithm used in most
+Ada compilers is a bottom up process.  Starting from the leaves,
+we generate a list of possible interpretations of the non-operation
+identifiers.  We start with those which are *not* operations since
+operations do not follow the "normal" lookup rule.  Operations
+are looked up in types/modules, rather than in the current region chain.
+
+An "interpretation" is probably more than just a symbol.  It might include
+the type of the symbol.  When looking up a local symbol, it will be the
+"current" instance, but when looking up a symbol in an external
+module, we might have more information.  We would presumably have some
+representation of the instance we are dealing with.  Even the current
+instance probably has some representation.
+
+The interpretation might also include some amount of implicit conversion
+or other implicit call.
+
+In the AdaMagic compiler, an interpretation of a call node includes
+the interpretations of all of the operands as well.
+
+This seems like a reasonable approach.  We will rebuild the tree 
+bottom up.  This implies the visitor object needs a place to put the
+list of interpretations.  Actually, the visitor is not a great
+place for this.  Instead, we are going to hang it off of the tree itself,
+since we want one for each operand, and we don't generally create a
+separate "visitor object" for each operand (though perhaps we should!).
+
+Should we also allow overloading of type names?  That would seem to
+add additional complexity for little benefit.  This seems related
+to the general question of what is the "complete context."  In general
+at the beginning or ending of a statement, we resolve everything preceding it.
+We resolve the case expression before we worry about the case labels.
+On the other hand, the arms of an if-expr, ?:, or case-expr might deserve
+to be treated as all part of the same context.
+
+A complete context is defined by where we force the interpretation "tree"
+to exactly one interpretation.  Multi-assignment might be a new situation,
+as these are anonymous types with no point of declaration.  They are more
+like a "tuple", though the components might have names (probably need them
+since it is only via the names that we can extract a component).
+
+ASIDE: There might be contexts where it would be nice to be
+able to iterate over the components of an object, presuming
+they are "Any+".  One could then test whether the components
+satisfy "Stringable+" or "Assignable+" or equivalent, and do
+something nice like create a default To_String operation,
+or marshalling to/from a binary stream, or copying, or
+some such thing.  We could also use them in quantified
+expressions.  Something like "object#components" might be
+simple enough.  We might also want the name and/or type of
+the components.  Perhaps object#components is actually a
+mapping of #name to Any+, and object#component_names is an
+enumeration type, or a vector of universal-enums.  object#type_name
+could produce a type name, object#type could produce a type.
+END OF ASIDE.
+
+ASIDE: given a "case" statement over a polymorphic object, what approach
+should we take to providing type-specific access to the object?  The simplest
+approach is to change the static "type" of the object in each of the
+"case" arms.  What happens if the object is reassigned during an arm
+of the case statement?  Or passed as a "mutable" parameter?  Suppose
+it is in a loop, and only gets assigned on the Nth iteration?  Or in
+an "if" statement which involves an assignment on only one "side"?
+We could introduce a new name, such as:
+
+    case N : Poly_Arr[I] of
+       [Integer+] =>
+       [Float+] => 
+       [Tree+] =>
+         ...
+    end case;
+
+or
+
+    case Poly_Arr[I] of
+       [I : Integer+] =>
+       [F : Float+] => 
+       [T : Tree+] =>
+         ...
+    end case;
+
+The latter seems more appropriate.  Or we could use the
+type name as the implicit object name, though that seems
+a bit confusing (though we do it for parameters).
+
+END OF ASIDE.
+
+So let's try to get started on name resolution.  We generally will
+start at the leaves, namely identifiers and literals.  We don't
+do lookups of operation names (including operators) at this stage,
+unless they are qualified via "XX::op" or "Obj.op".  When we encounter
+a call/unary/binary operation we should have either a literal, an
+interpretation list, or a unresolvable call.  Actually, it seems
+possible to have an interpretation list of which one element is
+an unresolvable call, or perhaps we always include an unresolved
+call as an option in an interpretation list on the off chance
+that it the operation is defined in the region associated with
+the result type.  Clearly that is what will be true for literals.
+
+How hard will we try to resolve a name?  We will never look at
+"all types."  The types must be suggested from somewhere.  Once
+we look in a module/type's region, we will consider *all* operations 
+of the given name, some of which may be generic to some degree.
+
+All interpretations with the same type can be grouped, since 
+there isn't anything that can be done from the "outside" that
+could distinguish them.  
+
+Unqualified aggregates, both class and container, need to be
+resolved from the outside, since we never want to look for
+all "visible" types, and there is no requirement for a type
+to be "directly visible" for its class or container aggregate
+to be usable.  So these are essentially like literals, or
+parameterless function calls.
+
+Locally declared operations do have some "extra" visibility.
+One ParaSail rule, however, is that you cannot declare an operation
+that hides an outer or type-associated operation of the same name 
+with the same signature.  This includes as a parameter.  
+So there is no "hiding" of operations allowed.  Of course it might
+be possible to create ambiguity by having an operation in a module
+whose formal parameter types are module type-parameters.  If two
+modules are instantiated with the same type-parameters, ambiguity
+could be created.  We could be even more rigid about no hiding,
+by disallowing two operations with the same name and the same
+*module* associated with each input and output.  In general
+at compile-time we only worry about modules.  Types are more
+run-time things.
+
+-------
+
+Let's review our current semantic analysis passes:
+  - First pass: adds symbols to symbol table
+      What about interface/class, decl/def connections?
+      That may depend on parameter types.  So when do
+      we determine parameter types?
+  - Second pass: does lookups on operators and operands
+
+  - Pre CG pass: determines slow vs. fast calls, and decides on
+                 what can/should be done in parallel
+  - Codegen pass: Generates PSVM instructions
+
+We need to know the types to do operator lookups.  It would seem
+a waste of energy to do the slow vs. fast call stuff before we
+settle on a single interpretation.  Hence this is why we are postponing
+the slow vs. fast stuff to a pre-CG pass.  Somewhere along the way we will need
+to evaluate assertions/preconditions/etc.  This also has to wait
+until we have resolved the names and types.
+
+-----------------------------------------
+
+What should be the representation for the type of an expression?
+Having just learned about type inference and unification, I wonder
+whether we need something similar.  The "wildcard" stuff in AdaMagic
+was similar, where we would combine two types to produce the type 
+intersection (or perhaps the union of type "requirements").
+
+How should we handle that with ParaSail?  Clearly each literal creates
+a "requirement" for a "from_univ" operator.  We could create interfaces
+containing only the "from_univ" operator from the appropriate literal
+type, but not clear that helps.
+
+--------------
+
+Let's take a particular example -- "Fib(N - 2)".  We presume that "N"
+has a type.  Conceivably N could be an operation name.
+
+What are some principles that determine where we search for operations?
+If there is a directly visible object with the given name, 
+then we are done.  That hides everything else.    Well, not quite.
+We still want to be able to get to the names of types/modules even
+if there is a parameter whose name is defaulted to be that of its 
+type/module, in a case like "function Foo(Input) -> Output;"
+We also might want to allow the result object to be by default called
+"Foo" instead of Output, but still be able to do a recursive call
+with "Foo := Foo(Input-1)."  So parameter names are a kind of special
+case, where they can take on a type, module, or function name by default.
+And types can take on a module name when representing the "current instance."
+
+If there is a directly visible operation with the given name (e.g. "+"), 
+should it be given any additional "weight" in the resolution?  Conceivably it 
+wouldn't be found otherwise.  Certainly if it isn't exported (including being 
+a local operation), then that would be the only way to find it.  
+If it is declared in the interface, then should it be 
+treated specially just because we happen to be inside the module
+where it is declared?  I don't see why.
+Stand-alone operations will also only be found by direct-visibility lookup.
+So the conclusion is that operations declared in an interface should
+only be discovered if one of the parameter or result types points to the
+given module.  (Perhaps this is silly.  Why not "throw in" all appropriately
+named operations from the "current" module for free?)
+Other directly visible operations are included as candidates,
+but they don't really have a "preference," they are considered along with
+operations found from the parameter/result modules.
+
+ASIDE: What about a locked/queued operation calling a queued operation?
+What about deadlock avoidance?  These are both related to passing another
+concurrent object as a parameter.  Do we want to have a "not queued"
+parameter mode?  Or allow queued and locked for parameters not of the
+enclosing module's type to indicate that such parameters may be 
+passed to a queuing or locking operation?  Or "internally queued" or
+"internally locked"?  And what about lock ordering?  Do we require some
+kind of partial ordering?  Perhaps a "=?" for concurrent objects?  Or
+a "#lock_order" property for which "=?" is defined?  If a concurrent type has
+any locked or queued operations, then its objects have a #lock_order property,
+which is checked to be certain that parameters have #lock_order greater
+than that of the primary locked/queued parameter.  If #lock_order not 
+specified, then they are incomparable and can't be passed to a locked/queued
+operation.
+
+To express that an operation does no queued operations, we could
+have a #non_blocking property.  What about a "fire and forget" mode
+for debugging?  Simplest seems to have a logging operation which, to avoid
+queuing, drops messages on the floor when there is an overflow in 
+the buffer.  Clearly only operations that take concurrent objects
+can internally involve queuing (aka blocking).
+END OF ASIDE.
+
+Back to name resolution of Fib(N-2):
+So we look up N, and get some sort of type, which might
+be a universal type if it is declared via something like 
+"const N := 33;".
+We look at 2, and conclude it is of a universal type.
+We have to decide whether we convert from a universal type
+"early" or "late."  Ada uses the "early" conversion point,
+but that is in part because universal types don't have
+operators (except via the "Root_XXX" kludge).  In ParaSail,
+I am tempted to convert "late."  That is, we only convert
+if we have to.  There might be types that have fewer operations
+defined on them than does the universal type, even though they
+provide a "from_univ" operator.  This probably implies some kind
+of "preference" for universal operations, to avoid ambiguity
+complaints.
+
+OK, so presuming not everything is universal, we have a module
+in which to look for operations.  Clearly we need a way to convert
+the operator into a string for lookup.  Just using Operator_Image
+is inadequate for certain operators, like "[[", which is operator 
+"to_univ."
+
+Having looked up the operation in a module, we need to add it to
+some kind of list, tagged with the module perhaps.  
+
+When we consider a call on an operation, the module for the type of an 
+operand should be added to those modules searched for the operand's
+operation.
+
+Ideally we will maintain a set of modules that have already been checked.
+This could be a simple list initially.  The interpretations for a call
+could be organized by which modules the operation came from, with
+a module with no interpretations meaning the module doesn't need to
+be considered again.  So this makes the set of interpretations into
+a list of lists.  Each individual interpretation is a Tree node,
+generally an invocation node.  However, since overloading is possible
+for parameters that are themselves operations, the tree might be
+an identifier node.  For any given identifier, we first look it up 
+presuming it is a directly visible object.  If we don't find anything,
+or we find only operations, then we will allow for the possibility
+that more "operation" interpretations might be found when we go
+to the enclosing operation.
+
+The actual order of processing seems to be bottom up, but 
+when we are processing an operand of an operation, if the operand
+is overloadable, meaning it is an invocation, or an identifier
+all of whose interpretations are operations (and the operand is
+expecting an operation), then we go "back down"
+to decide whether the operand is impossible, has one interp,
+or has multiple interps, when we add in the new module to the mix.
+There is no need to go "back down" if the module is already in the mix.
+Note that the expected type does not determine which module the
+operation must come from, it merely provides another place to look.
+
+There are certain operators, like "|" and "<" which can be implemented
+using other operators, such as "|=" or "=?".  We need to take that 
+into account.  Is there a preference for the directly declared operator?
+Are all of the "<op>=" operators substitutes for the "<op>"s, or
+vice-versa?  Normally the simple <op> operator would be easier to
+write, but "|=" is special in that the existing object might
+already be pre-allocated to have "room" for the new components.
+We have to be aware of the parallelism possible in the <op> operators
+which might be less available with the "<op>=" operators.
+On the other hand, the compiler can create temps as needed,
+so it is not obvious that it makes that much difference.  The
+issue with "|" is that we know creating all those temps is
+bad news, if we could instead have one large temp and fill it in.
+
+Let's not worry about these operator equivalences for now.
+
+We might want something which given a module and an invocation,
+tries to find all possible interpretations of the call using
+operations from that module.  Similar story applies to a simple
+identifier when the desired operand is an operation.
+
+Defaulted parameters are important.  (Globals are generally
+treated like defaulted "ref" parameters.)  Defaults are preferable
+to additional overloads as they define the relationship between
+the two conceptual "operations" much more completely and succinctly,
+than simply having two overloads with different numbers of parameters.
+
+ASIDE: Do we need "mutable"?  One meaning of "mutable" is that even
+the "const" components of the object could change.  Essentially we can
+assign a completely new object and we would pretty much have to finalize
+the old one before replacing it with a new one.  This is in contrast
+to performing an operation on an existing object, which might replace
+one of its components, but not reassign the object as a whole.
+END OF ASIDE.
+
+AdaMagic builds a list of interps.  It walks the list of interps
+for the operation, and then for each such meaning builds a possible
+call interp.  It has a separate "mode" where rather than building
+an interp, it tries to diagnose why there aren't any interpretations.
+So if it finds there are no interpretations, it goes back down
+in "diagnostic" mode and for each "close" interpretation (e.g.
+about the right number of parameters, etc.) tries to say why
+it doesn't match anything.  "If calling the foo on line X of blah.ada, ..."
+Alternatively, if there are multiple interpretations, it displays
+them all.  If there are other legality rules (e.g. can't pass a constant
+as a "var" parametr), errors related to some of 
+those are added to the interpretations, to be displayed only after the
+interpretation is chosen.
+
+We have proposed a tree of interps, or more precisely a list of lists,
+where the top level is the region associated with some module, and the 
+next level are the interpretations presuming an operation that is declared
+in the associated module.  The "main"/default region, perhaps indicated
+by a null region, or by some other recognizable value, is the only place
+where there would be interpretations other than overloadable invocations 
+and operation names (where invocations includes uses of unary and
+binary operators, as well as various sorts of aggregates -- it would
+*not* include module instantiation, presumably).  In other regions,
+we would have zero or more interpretations, in the case of an identifier,
+being operations declared in the region, and in the case of an invocation,
+being invocations of explicit or implicit operations declared in the
+region.  This implies that the region is "passed down" to the operation
+of an invocation.
+
+Each region is its own separate world.  When we add a region that wasn't
+in the interp tree, then we should "kick in" the whole mechanism.
+Regions come from the types of the parameters and the type of the result.
+
+Add_Region to an invocation tree, adds it to its operation.
+When expected operand is an operation, the types of the operands
+of the operation provide regions in which to look for the
+operation.  Add_Region_For_Operation.
+Add_Region_For_Typed_Operand, applied to an invocation, turns
+into an Add_Region_For_Operation for the operation.
+Add_Region_For_Typed_Operand has no effect on an identifier.
+Add_Region_For_Operation has an effect only on an identifier
+which is an operation.
+
+When we get a new region for an identifier, we look for 
+operations declared therein.

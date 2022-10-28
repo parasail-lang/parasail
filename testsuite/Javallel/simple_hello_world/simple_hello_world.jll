@@ -1,0 +1,10 @@
+void helloWorld () {
+
+    println("Hello world!");
+
+    for (I in 1..10 reverse) {
+	    println(I + " ** 3 = " + I**3);
+    }
+
+}
+

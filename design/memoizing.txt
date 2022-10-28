@@ -1,0 +1,223 @@
+"Magic" caching/memoizing/uniquifying module.
+
+User provides basic algorithm that goes from key to value.
+If key is already in cache, then either:
+
+   a) pre-computed value is returned; or
+   b) unique index is returned, which can be
+      used to retrieve the key later.
+   
+Memoizing and caching are only different in that with memoizing,
+you presume the cache grows indefinitely, whereas with caching,
+there is usually some kind of LRU replacement strategy.
+
+Ideally the user implements both the caching mechanism, and the
+value computation (as a function of the key).
+
+This is related to the "once" notion in Eiffel.
+
+However, in ParaSail, constant "once" computations
+can be done at compile-time.
+
+Presume there is a "magic" built-in module that can take a cache and
+an uncached computation module and provide a read-only object
+that can nonetheless do the cache-based computation.
+How would this look?
+
+// The following is for memoizing functions
+
+abstract interface Memoizable
+  <Input_Type is Hashable<>; Output_Type is Assignable<>> is
+  // Original uncached computation
+    func Compute(Key : Input_Type) -> Output_Type;
+end interface Uncached_Func;
+
+concurrent interface Memo_Cache
+  <Input_Type is Hashable<>; Output_Type is Assignable<>> is
+  // A (concurrent) cache to be used for saving already-computed values
+  // The default implementation of this cache uses a direct-mapped
+  // cache of specified size.  Some kind of LRU cache might be
+  // better in some cases.
+
+    func Lookup(locked C : Memo_Cache; Key : Input_Type)
+      -> optional Output_Type;
+      // Return non-null value if already in cache
+
+    func Enter
+      (locked var C : Memo_Cache; Key : Input_Type; Value : Output_Type);
+      // Enter value into cache
+
+    func Create(Size : Univ_Integer) -> Memo_Cache;
+      // Create direct-mapped cache with given number of entries.
+end interface Memo_Cache;
+
+concurrent class Memo_Cache is
+    var Keys : Basic_Array<optional Input_Type>;
+    var Values : Basic_Array<optional Output_Type>;
+
+  exports
+
+    {(for all [H => K] of Keys => (K not null ==> Values[H] not null))}
+        // If key not null, then corresponding value not null
+
+    func Lookup(locked C : Memo_Cache; Key : Input_Type)
+      -> optional Output_Type is
+      // Return non-null value if already in cache
+        const H := Hash(Key) mod Length(C.Keys) + 1;
+        if Keys[H] is null then 
+            // Not in cache
+            return null;
+        else
+            // Return saved value
+            return Values[H];
+        end if;
+    end func Lookup;
+
+    func Enter
+      (locked var C : Memo_Cache; Key : Input_Type; Value : Output_Type) is
+      // Enter value into cache
+        const H := Hash(Key) mod Length(C.Keys) + 1;
+        Keys[H] := Key;
+        Values[H] := Value;
+    end func Enter;
+
+    func Create(Size : Univ_Integer) -> Memo_Cache is
+      // Create direct-mapped cache with given number of entries.
+        return (Keys => Create(Size, null), Values => Create(Size, null));
+          // All initialized to null
+    end func Create;
+
+end class Memo_Cache;
+
+
+interface Memoized
+  <Memoizable<>;
+   Cache_Type is Memo_Cache<Memoizable::Input_Type, Memoizable::Output_Type>> is
+  // A standard module for providing cached computation
+  // The result of Create_Cache(My_Cache) would be passed as a
+  // module parameter.  It is a pseudo R/O cache.
+
+    func Compute(Memo : Memoized; Key : Memoizable::Input_Type) 
+      -> Memoizable::Output_Type;
+      // Return value, from the internal cache if present, otherwise by
+      // computing it (and saving in the cache).
+
+    func Init_Cache(Underlying_Cache : Cache_Type) -> Memoized;
+      // Init a memoized computation object based on a user-provided cache
+      // The actual R/W cache object is kept internally, identified
+      // by the value returned by Create_Cache.
+end interface Memoized;
+
+-------------------------------------
+// Usage example:
+
+interface Uncached_Trig<Float_Type is Float<>> is
+    func Sin(F : Float_Type) -> Float_Type;
+    func Cos(F : Float_Type) -> Float_Type;
+    // ...
+end interface Uncached_Trig;
+
+class Uncached_Trig is
+    func Fact(N : Univ_Integer; From : Univ_Integer := 1)
+      -> Univ_Integer is
+      // Recursive factorial, using divide and conquer
+        case N =? From of
+          [#less] => return 1;
+          [#equal] => return From;
+          [#greater] =>
+            const Mid := (N + From) / 2;
+            return Fact(N, Mid+1) * Fact(Mid, From);
+        end case;
+    end func Fact;
+
+  exports
+    func Sin(F : Float_Type) -> Float_Type is
+        return F - F**3/Fact(3) + F**5/Fact(5);
+    end func Sin;
+
+    func Cos(F : Float_Type) -> Float_Type is
+        return 1 - F**2/Fact(2) + F**4/Fact(4);
+    end func Cos;
+end class Uncached_Trig;
+
+interface Trig<Float_Type is Float<>> is
+    func Sin(F : Float_Type) -> Float_Type;
+    func Cos(F : Float_Type) -> Float_Type;
+    // ...
+end interface Trig;
+
+class Trig is
+    type Trig_Func_Name is Enum<[#sin, #cos]>;
+
+    interface Trig_Input<> is
+        const Name : Trig_Func_Name;
+        const Val : Float_Type;
+        func "=?"(Left, Right : Trig_Input) return Ordering;
+        func Hash(Inp : Trig_Input) -> Univ_Integer;
+    end Trig_Input;
+
+    interface Trig_Wrapper<> implements Memoizable<Trig_Input, Float_Type> is
+        func Compute(Input : Trig_Input) -> Float_Type;
+    end interface Trig_Wrapper;
+
+    class Trig_Wrapper is
+        type Underlying_Trig is Trig<Float_Type>;
+      exports
+        func Trig_Func(Input : Trig_Input) -> Float_Type is
+            case Input.Name of
+              [#sin] => return Underlying_Trig::Sin(Input.Val);
+              [#cos] => return Underlying_Trig::Cos(Input.Val);
+              // ...
+            end case;
+        end func Trig_Func;
+    end class Trig_Wrapper;
+        
+    type Cached_Trig is new Memoized<Trig_Wrapper, Some_Cache>
+   
+
+-------------------------------------
+
+// The following is for uniquified values, such as Univ_String,
+// bignums (e.g. Univ_Integer), etc.
+
+concurrent interface Uniquified_Index
+  <Uniquifying_Table is Table<>>
+     func 
+
+
+    func Key(ref const C : Cache; I : Index_Type) -> ref const Input_Type;
+    func Value(ref C : Cache; I : Index_Type) -> ref Output_Type;
+
+
+abstract concurrent interface Table<Input_Type is Hashable<>;
+  Index_Type is Countable<>; Bounds : Countable_Range<Index_Type>> is
+    func Lookup(locked var T : Table; Key : Key_Table_Type::Input_Type)
+      -> Uniquified;
+    func Key(locked T : Table; U : Uniqified) -> Key_Table_Type::Input_Type;
+end interface Table;
+
+interface Uniquified
+  <Key_Table_Type is Table<>;
+   Key_Table : Key_Table_Type> is
+  // Given a table mapping keys to a unique index,
+  // use it to provide
+    func Lookup(Key : Key_Table_Type::Input_Type) -> Uniquified;
+    func Key(U : Uniqified) -> Key_Table_Type::Input_Type;
+end interface Uniquified;
+
+class Uniquified is
+    Index : Key_Table_Type::Index_Type;
+  exports
+    func Lookup(Key : Key_Table_Type::Input_Type) -> Uniquified is import("");
+    func Key(U : Uniqified) -> Key_Table_Type::Input_Type is import("");
+end class Uniquified;
+
+interface Univ_String<> is
+end interface Univ_String;
+
+class Univ_String is
+    type String_Table is My_Table<Hashable_Vector<Univ_Character>>;
+    Id : Uniquified<String_Table, Create()>;
+  exports
+    ...
+end class Univ_String;

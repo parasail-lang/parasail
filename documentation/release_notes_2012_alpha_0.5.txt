@@ -1,0 +1,560 @@
+Release notes for 2014-Apr-09 ALPHA release 0.5 rev 5.3 of the
+ParaSail Prototype Compiler and Virtual Machine.
+
+All ParaSail-specific parts of this release are:
+
+   Copyright (C) 2011-2014, AdaCore, New York NY, USA
+   This program is provided "as is" with no warranty.
+
+The ParaSail parser was built using aflex and ayacc, which
+were originally developed at the University of California, Irvine.
+Aflex is in turn based on flex, which was originally developed
+at the University of California, Berkeley.
+
+Please report any errors on the ParaSail Google Group, at:
+
+   http://groups.google.com/group/parasail-programming-language
+
+There is now a home page for ParaSail, where new releases will be announced:
+
+   http://www.parasail-lang.org
+
+The binary release contains the following files:
+
+    * doc/parasail_ref_manual.pdf -- ParaSail Reference Manual
+    * doc/parasail_intro.pdf      -- Introductory article on ParaSail
+    * doc/ParaSail_Intro_Jun_2012.ppt.pdf -- Introductory powerpoint
+    * aaa.psi -- ParaSail Standard Library
+    * examples/*.psl -- Example ParaSail programs
+    * *_examples/*.??? -- Examples of programs for Javallel/Sparkel/Parython
+    * bin/*_st.exe -- Single-threaded Mac/Windows/Linux versions of compiler/VM
+    * bin/*_mt.exe -- Multi-threaded Mac/Windows/Linux versions of compiler/VM
+    * share/tools/* -- Contributed tools, highlighting configuration, etc.
+    * release_notes*.txt -- This file
+
+The source release has the following structure:
+
+    * documentation/ref_manual/parasail_ref_manual.pdf
+                                     -- ParaSail Reference Manual
+    * documentation/ref_manual/parasail_ref_manual.ltx
+                                     -- ParaSail Reference Manual latex source
+    * documentation/parasail_intro.pdf -- Introductory article on ParaSail
+    * documentation/ParaSail_Intro_Jun_2012.ppt.pdf -- Introductory powerpoint
+    * examples/aaa.psi               -- ParaSail Standard Library (PSL)
+    * examples/*.psl                 -- Example ParaSail programs
+    * sparkel_examples/*.sk?         -- Sparkel standard library and examples
+    * javallel_examples/*.jl?        -- Javallel standard library and examples
+    * parython_examples/*.pr?        -- Parython standard library and examples
+    * aflex_ayacc/aflex              -- Sources to AFlex lexer generator
+    * aflex_ayacc/ayacc              -- Sources to AYacc parser generator
+    * parser/*.l,*.y                 -- AFlex/AYacc grammars for ParaSail
+    * parser/*.ad?                   -- Handwritten skeleton for parser
+    * parser/build/Makefile          -- Makefile to build ParaSail parser
+    * *_parser/*                     -- Parsers for Sparkel, Javallel, Parython
+    * semantics/*.ad?                -- Static and Dynamic semantics phases
+    * interpreter/*.ad?              -- ParaSail virtual machine interpreter
+    * build/parasail.gpr             -- Project file for building ParaSail
+    * build/*.gpr                    -- Project files for other compilers
+    * share/tools/*                  -- Various tools, highlighting info, etc.
+    * Makefile                       -- Makefile to build executables, etc.
+
+After running the Makefile ("make"), the following will be present:
+
+    * install/bin/pslc               -- ParaSail executable will be built here
+    * install/bin/sklc               -- Sparkel executable will be built here
+    * install/bin/jllc               -- Javallel executable will be built here
+    * install/bin/pryc               -- Parython executable will be built here
+    * install/share/doc/*/*          -- Copies of documentation
+    * install/share/examples/*/*.??? -- Copies of examples and libraries
+    * install/share/tools/*/*        -- Various tools, highlighting info, etc.
+    * build/bin/*main                -- Executables for all compilers
+    * build/bin/*main_gtk            -- Executables for compilers with GTK
+
+You can test the installation by "cd examples" and then:
+
+   % ../install/bin/pslc aaa.psi drinking_phils.psl
+
+Program should produce:
+
+   ParaSail Prototype Compiler and Virtual Machine alpha 0.5 Revision: 5.x 
+   ...
+   Parsing aaa.psi
+   Parsing drinking_phils.psl
+   ---- Beginning semantic analysis ----
+    102 trees in library.
+   ...
+   Finishing type descriptors.
+
+   Command to execute: 
+
+You can then type: Test_DP 13
+
+Program should produce:
+
+   Party will go for 13.0 seconds.
+    Initializing Used_Bottles for Phil null with 2
+    Initializing Used_Bottles for Phil null with 1
+    Initializing Used_Bottles for Phil null with 1
+    Initializing Used_Bottles for Phil null with 1
+    Initializing Used_Bottles for Phil null with 0
+   Philosopher 5 arrives, with a taste for 1 5, and sits in front of 5.
+   Philosopher 5 is thinking for 5 seconds
+   Philosopher 2 arrives, with a taste for 2 3, and sits in front of 3.
+   Philosopher 2 is thinking for 4 seconds
+   Philosopher 1 arrives, with a taste for 1 2, and sits in front of 1 2.
+   ...
+   Philosopher 1 is drinking for 8 seconds
+   Philosopher 2 is thinking for 2 seconds
+    Bottle 3 about to be removed from Used_Bottles (1) of Phil 2
+    Bottle 3 borrowed from Philosopher 2
+    Bottle 3 now available to Philosopher 3
+   Drinking Party is over
+   Command to execute:
+
+And then you can type: quit
+
+You can look at the examples/drinking_phils.psl file to better understand
+what it is doing.
+
+The ParaSail reference manual (parasail_ref_manual.pdf) contains
+the description of the full ParaSail language, as well as an appendix
+with a short compiler/virtual-machine user manual.  Please READ THIS
+APPENDIX!  It has important information on usage of the compiler,
+and on the use of "vim -q" for handling compiler error messages.
+
+The introductory article (parasail_intro.pdf) is probably worth reading first.
+It was published online at embedded.com in a slightly different form:
+
+   http://www.embedded.com/design/other/4375616/ParaSail--Less-is-more-with-multicore
+
+The powerpoint presentation is one that was used at the June 2012 meeting
+of the New England Programming Languages and Systems group.
+
+More information can be found at http://www.parasail-lang.org
+
+Not all ParaSail features are currently implemented.  See the standard library
+(aaa.psi) and the example programs for illustrations of features that 
+are implemented.  The standard library (aaa.psi) contains quite a number 
+of examples of ParaSail coding, so be sure to look it over.
+See below for the list of unimplemented features.
+
+The compiler does some error recovery, but after a couple of syntax
+errors it sometimes gets totally confused.  That means you should 
+not spend too much time diagnosing syntax errors unless they are some of the
+first ones reported in a given run.  Use "vim -q" to fix the first
+few syntax errors, and then try again.
+
+The following ParaSail features are *not* yet implemented:
+
+  * infinite precision implementations of Univ_Integer and Univ_Real
+    (at the moment these are 64-bit signed integer and 64-bit IEEE Float,
+     respectively, except that -2**63 is reserved as the null value for
+     Univ_Integer, and all ones (NaN) is reserved as the null value for
+     Univ_Real)
+  * formal operation parameters of modules
+  * "optional" applied to an operation
+  * "global" mode for operation inputs
+  * a "case" statement where the choices are named polymorphic types
+  * multiple outputs from an operation (e.g. "func Foo() -> (X : Set; Y : Map)")
+  * an aggregate as the LHS of an assignment (e.g. "(X, Y) := (Y, X);")
+  * type conversions (e.g. "My_Int_Type(X)")
+  * full compile-time checking of annotations, null-ness, and aliasing
+    (simple assertions and some null-ness is checked at run-time currently)
+  * value-constraint annotations on type and object declarations
+       (e.g. "type Teens is Age { Teens in 13..19 };")
+  * generalized properties (such as Operator#identity or Enum#last)
+
+The following ParaSail features have recently been implemented:
+
+  * [rev 1.3] hierarchical module names (e.g. Project::Utils::Hash_Map)
+
+  * [rev 1.4] "forward" or "reverse" specified on individual iterators in a
+              "for" loop with multiple iterators. E.g.:
+              for (each Elem of My_Map; I in 1..1000 forward) loop ...
+                // This iterates over My_Map in an unspecified order, 
+                // but iterates over 1..1000 in the forward direction
+  * [rev 1.4] Univ_Real plus fixed-point and floating-point types
+              (using the Fixed and Float modules in aaa.psi).
+  * [rev 1.4] Named and defaulted parameters to operations and modules
+  * [rev 1.4] Use of named constants such as Time::Hour
+  * [rev 1.4] "queued" keyword for operation inputs (see locked_box.psl)
+  * [rev 1.4] Ordered_Set module (see aaa.psi)
+  * [rev 1.4] Time and Clock modules with Delay (see aaa.psi)
+  * [rev 1.4] definition of an operation by equivalence to operator in
+              another module. E.g.:
+              op "in"(Left : Fixed; Right : Ordered_Set<Fixed>) 
+                -> Boolean is in Ordered_Set<Fixed>;
+                // This says the "in" operator for "Fixed" is defined
+                // in Ordered_Set.
+
+  * [rev 1.5] Precomputation of named module-level constants 
+              (rather than reevaluating them on each use).
+  * [rev 1.5] Additional ParaSail Virtual Machine instructions specific to
+              particular kinds of literals, including Real, Char, and Enum;
+              generally more readable PSVM instruction display in ".lst" files.
+  * [rev 1.5] Fully multi-threaded virtual machine (single-threaded versions
+              still available for reduced resource usage -- see bin/*_st.exe).
+
+  * [rev 1.6] Require 'queued' on operation as a whole that calls
+              queued operations internally.  This is relevant for scheduling;
+              also, a locked operation must not called such a queued operation,
+              as it could result in an indefinite length of holding a lock.
+  * [rev 1.6] Scheduling now takes account of threads which might perform
+              queued calls internally, and avoids serving such a thread
+              from a server that is waiting for other threads to complete, so
+              as to avoid creating a deadlock situation.
+  * [rev 1.6] When a type name is used where an object is expected, see
+              whether the "[..]" operator is defined, and if so, call that
+              to produce a set of all values of the type.
+  * [rev 1.6] We no longer automatically look in Set<X> and Countable_Set<X>
+              when we see A..B where A and B are of type X.  Instead, we
+              rely on the type X to have definitions of "|", "..", etc.
+              which are "forwarded" to the appropriate Set module using
+              the "is in Set<X>" syntax for defining an operation.
+
+  * [rev 1.7] Fix problem with resolution of "T::[..]".
+  * [rev 1.7] Fix problem with annotations that involve nested parallelism.
+  * [rev 1.7] Fix problem with module instantiations where one of the
+              actual types is another complex module instantiation.
+
+  * [rev 1.8] Support "generic" operations where a type of a parameter
+              is specified as any suitable instance of a particular interface,
+              such as a "generic" concatenation operator:
+                 op "|"(X : Univ_String; Y : Y_Type is Imageable<>) 
+                   -> Univ_String;
+  * [rev 1.8] Support "generic" operations where the *value* of a parameter
+              is treated as a "generic" parameter, such as in an
+              exponentiation operator when units checking is performed:
+                 op "**"(X : Units; <Y : Univ_Integer>)
+                   -> Result_Type is Units<Dimension => Dimension * Y>;
+              The dimension exponents for the result type is produced
+              by multiplying the dimension exponents of the left operand
+              times the value of the exponent Y.
+
+  * [rev 1.9] Support more complex expressions of calls on generic operations.
+              The units.psl example now illustrates units checking.
+  * [rev 1.9] Use a simpler representation for "large" nulls, so no
+              level of indirection is required.
+
+  * [rev 2.0] Support polymorphic objects, declared, for example,
+              of type Expr+.  Support declaration, assignment,
+              and passing polymorphic objects as parameters, and
+              use run-time dispatching when applying a "primitive" operation
+              of a type to a polymorphic object.
+  * [rev 2.0] Support inheritance through module extension.
+              This includes inheriting components and operations from
+              a specified parent type.  Support both fully-abstract
+              modules, where all operations are implicitly abstract,
+              and partially-abstract modules, where some but not all
+              operations are declared explicitly abstract.
+
+  * [rev 2.1] Support type inference even when calling "generic" operations
+              such as matrix multiplication or matrix transpose.  That is,
+              allow "const TV := T(V);" where the type of TV is inferred
+              from the generic result type of the T (transpose) operation,
+              with appropriate substitutions made.
+
+  * [rev 2.2] Initial implementation of check for race conditions.  Does
+              not currently handle container indexing/slicing completely.
+
+  * [rev 2.3] Better support for hierarchies of nested modules and
+              nested polymorphic types.
+
+  * [rev 2.4] Support X?Y:Z and (if X then Y else Z)
+
+  * [rev 2.5] Support labels in annotations for documentation purposes
+              (e.g. "{*Stack_Overflow_Check*  S.Cur_Len < S.Max}").
+              Support quantified expressions using "for all" or "for some"
+              (e.g. (for all X of A => A.Max() >= X)).
+
+  * [rev 2.6] Support container aggregate with nested iterator (e.g.
+              "[for I in 1..10 => I**2]").  Also allow separate specification
+              of "key" in such an aggregate, by adding ", key =>" (e.g. 
+              "[for I in 1..10, Keys[I] => Values[I] ]").  Support nested
+              annotations (e.g. "{{X == Y**2}}").  Intent
+              is that nested annotations are not necessarily provable at
+              compile time, and are focused on functional correctness rather
+              than safety.  Might only be checkable by testing.
+
+  * [rev 2.7] Allow implicit conversion *to* universal types as well as
+              *from* universal types.  For example, if a container is
+              indexed by Univ_Integer, then any type convertible to
+              Univ_Integer (i.e., having a "to_univ" operator returning
+              Univ_Integer) can be used as an index.  This allows writing
+              simply "V[X]" rather than the more verbose "V[ [[X]] ]"
+              to index into a vector V indexed by Univ_Integer.  If this
+              implicit conversion is not desired, then the "indexing"
+              operator should have a non-universal type as its index type.
+
+  * [rev 3.0] Support exit from parallel constructs, such as a concurrent
+              loop or a block using the "||" statement separator.
+
+              The interpreter supports a "checks on" and a "checks off"
+              command to turn run-time checking on (the default) or
+              off.  These are recognized when the "Command to execute:"
+              prompt is given.  Currently only assertions are checked.  
+              Pre- and postconditions are not being checked yet.
+
+  * [rev 3.0.1] Fix bug in parallel construct exit which occurs if there
+              are multiple picothreads on the delay queue at the time of
+              exit.
+
+  * [rev 3.1] Fix issues with nested interfaces and with polymorphic
+              objects where "wrapped" value was of a "small" type.
+              Fix issues with inheriting operations that are only visible
+              for the purpose of implementing certain other interfaces.
+
+  * [rev 3.2] Improve detection of inappropriate calls on abstract operations.
+              Detect when interface of operation uses polymorphic type
+              for a parameter, while implementation uses non-polymorphic type, 
+              or vice-versa.
+
+              Support "continue" statement with named or multiple values, 
+              such as "continue loop with X => X.Left;" and 
+              "continue loop with (I => I+1, J => J-1);"
+
+              Support defining an operation with a single expression,
+              as in "func Square(X : Integer) -> Integer is (X**2);"
+
+              Support case expressions, such as:
+                (case C of [#red] => X; [#green] => Y; [#blue] => Z)
+
+              Support instantiating a module with a polymorphic actual type,
+              such as "var VP : Vector<Expr+>;"
+
+  * [rev 3.3] Initialize optional outputs to null, even if "small."
+              Properly initialize static link when calling nested
+              operations.
+
+              Add From_Vector/To_Vector operations for converting
+              Univ_String from/to a Vector of univ characters.
+              Add corresponding From_ZVector/To_ZVector for converting
+              ZStrings from/to a ZVector of univ characters.
+
+  * [rev 3.4] Implement declaring and passing operations as parameters
+              of operations (operations as parameters of modules not 
+              yet supported).  Support passing lambda expressions
+              as parameters.
+
+  * [rev 3.5] Define (if X then Y) to be equivalent to (if X then Y else null).
+              Fix bug where certain annotations were ignored if they
+              immediately preceded or followed a call on an operation.
+              Improve statistics, including computing some averages.
+              Support "stats [keep]" and "stats clear" commands.
+              Add statistics about region allocations.
+              Use "<|=" operator rather than "var_indexing" if available
+              when constructing an aggregate such as "[for I in 1..10 => I*5]".
+              Allow "reverse" (or "forward" which is the default) in aggregate
+              such as "[for in in 1..10 reverse => I*5]".
+
+  * [rev 3.5.1] Back out change preferring "<|=" over "var_indexing" 
+              when building an aggregate such as "[for I in 1..10 => #true]",
+              as this was breaking existing code using such an aggregate
+              to create an object of type "Array<Boolean, Integer>."
+              However, if "reverse" or "forward" is specified before "=>",
+              then "<|=" will still be preferred over "var_indexing".
+              Suppress interpreter statistics if any compile-time errors 
+              are detected, as they are just noise then.
+
+  * [rev 3.6] First source release.  Add "magnitude" operator (|...|)
+              as a synonym for Length or Abs or Count or ..., as appropriate.
+              Check indenting, give warnings if not using "standard" indenting.
+              Begin implementation of "import" clause, and support for
+              "significant" indenting a la Python (not completed yet).
+
+              Support a kind of "map-reduce" construct:
+                (for I in 1..10 => <0> + I**2)
+              would produce a sum of squares.  The expression in <...>
+              provides the initial result, and is replaced on each iteration
+              with the prior result.  It will normally be the identity of
+              the enclosing operation.  For example, this computes N factorial:
+                (for I in 1..N => <1> * I)
+
+  * [rev 3.7] Support filters given inside "{...}" in all for-loop constructs,
+              including container comprehensions and our new map/reduce
+              construct.  For example, this computes the sum of the
+              first N odd integers:
+                (for I in 1 ..< 2*N {I mod 2 == 1} => <0> + I)
+              This produces a vector of the elements of a vector V that
+              are less than its first element:
+                [ for I in 1 <.. |V| { V[I] < V[1] } => V[I] ]
+              which might be used as part of a QSort algorithm.
+
+              Add support for a "Python"-like syntax, using ":" instead of
+              "is"/"then"/"of"/"loop" and omitting the "end if"/"end loop"/etc.
+              Semicolons are optional at the end of lines.  Indenting is 
+              significant.  "end class"/"end interface"/"end func/op" are
+              allowed, but optional.  Currently "end if," "end case," and
+              "end loop" are not allowed if ":" is used.
+
+              We have also introduced some Python-like synonyms:
+              "def" is a synonym for "func"; "elif" is a synonym for "elsif";
+              "# " may be used to introduce a comment instead of "//" (note
+              the required space after the '#').  See examples/hippo_game.psl
+              for an example.  This variant is tentatively dupped "PARython"
+              and we may someday suggest the extension ".pry" rather than 
+              ".psl" for sources using this syntax variant.
+
+  * [rev 3.7.1] Turn off lexer debugging, inadvertently left on in rev 3.7
+
+  * [rev 3.8] Support "import" clauses for restricting visibility to
+              particular sets of stand-alone modules.  Always includes
+              PSL::Core::* and PSL::Containers::*.  In absence of explicit
+              "import" clauses, there is an additional default import of:
+                 [<prefix_of_module_if_any>::]*
+              which has the effect of making all "sibling" units visible.
+
+              Support qualified literals, such as "Boolean::#true".
+
+              Interactive commands may now include "::" in operation name,
+              and quotes are no longer required around arguments that start
+              with a letter.
+
+              Added PSL::Core::IO, PSL::Core::File_Input_Stream, and
+              PSL::Core::File_Output_Stream to standard library (aaa.psi).
+
+              Min and Max now allow a null operand, and return the
+              non-null operand.  Min and Max return null only if both operands
+              are null.  This allows null to be used as the initial value
+              when computing Max or Min over a possibly-empty sequence,
+              with null being the final result if the sequence is in fact
+              empty.  This works well for a map/reduce using Max or Min,
+              allowing null to be used as the identity value.
+
+  * [rev 3.9] More support for operations on polymorphic types, including
+              binary operations, where it is an error if the two operands
+              have different underlying types, unless the operator is "=?".
+              "=?" is a special case, where rather than an error, it returns
+              #unordered if two polymorphic operands have different 
+              underlying types.  This now allows us to define a type
+              like Set<Hashable+> and have it work as desired, that is,
+              as a Set holding (almost) any type.
+
+              We have a preference now for non-generic operations when
+              there would otherwise be ambiguity between a normal operation
+              and a generic operation of the same name.  This is relevant
+              for the "|" operator on Univ_String.  We have now added
+              To_String and From_String on Univ_String (these are identity
+              operations), which means Univ_String now implements the
+              "Imageable<>" interface.  The new preference rules prevents
+              this from creating ambiguity on <univ-string> | <univ-string>.
+ 
+              We know allow {> ... <} for annotations as a substitute
+              for { ... }.  This will allow us to eventually use { ... }
+              for Set/Map constructors in the PARython dialect.  The
+              new {> ... <} syntax makes annotations a bit more obvious, which
+              seems like a good thing.
+
+              Even when still using "then"/"is"/"loop"/"of" instead of ":",
+              we have made "end blah" optional.  Presumably project-specific
+              rules might require "end blah" if the construct is too many
+              lines long (e.g. more than 20 lines).
+   
+              Highlighting information for the ConTEXT source text editor
+              is under share/tools/... in a file named ConTEXT_ParaSail.chl
+              courtesy of ParaSail user Arie van Wingerden.  Similar
+              information for the "geshi" highlighting system (used by
+              WikiPedia) is in a file called geshi_parasail.php.
+
+  * [rev 4.0] Case statements over polymorphic objects are now supported
+              where the case choice has an associated identifier, such as in:
+
+                var E : Expr+ := ...
+                case E of
+                  [L : Leaf] => ...
+                  [U : Unary] => ...
+                  [B : Binary] => ...
+                  [..] =>
+                end case;
+
+              Note that the specified types for the case choices
+              must be non-polymorphic types at the moment.  In a later
+              release we will support having choices with polymorphic types,
+              such as:
+                [SE : Simple_Expr+] => ...
+              where presumably Simple_Expr is an extension of Expr.
+
+              We have added function types, of the form:
+                   func(X : Integer; Y : Float) -> Integer"
+              Basically the same syntax as a "func" declaration but without
+              the func's identifier.  To declare a "func" that takes
+              another "func" as a parameter, you would now use syntax like:
+                 func Apply
+                   (Op : func(X : Integer) -> Integer; S : Vector<Integer>)
+                     -> Vector<Integer>
+              rather than the former syntax:
+                 func Apply
+                   (func Op(X : Integer) -> Integer; S : Vector<Integer>)
+                     -> Vector<Integer>
+
+              The syntax for lambda expressions has been simplified, so
+              you only specify the names of the inputs, with no mention
+              of the types of the inputs or the outputs.  For example:
+                  lambda (Y) -> 2*Y
+              is a lambda expression that doubles its input.
+              A lambda expr can be passed as a parameter so long as the type
+              of the formal parameter is a compatible "func" type.  So for 
+              example, given the above definition of "Apply", you could write:
+                 Apply (lambda(Y)->2*Y, [1, 2, 3])
+              and expect to get "[2, 4, 6]" as the result (presuming "Apply"
+              does the natural thing).
+
+  * [rev 4.1] When an expression does not resolve, provide additional
+              diagnostics to help explain why.
+
+  * [rev 4.2] Share lock between a polymorphic object and the non-polymorphic
+              object it contains; share lock between object and its parent
+              part, if any.  Handle "continue loop"s that exit blocks.
+              Restructure to more easily handle new parser using same
+              underlying language semantics, to support "Parython" and
+              other language parallelization efforts.
+
+  * [rev 4.3] When a "new" type is declared (type T is new Integer<...>) allow
+              additional operations to be declared immediately thereafter
+              in the same scope, and have them be visible wherever the type
+              is later used, just as though a new module had been defined
+              as an extension of the old module, and the new operations had
+              been declared inside that new module.
+
+              Improve diagnostics further for expressions that don't resolve.
+  * [rev 4.4] Add prototype interface to GTK in gtk_cairo.psl, example
+              in nqueens_gtk.psl.
+  * [rev 4.6] Initial release of "Sparkel" compiler, parallel language
+              inspired by SPARK subset of Ada.
+  * [rev 4.9] Re-implementation of region-based storage management to minimize
+              contention between processors.  This produced an approximate
+              two times speed-up.
+              Allow packages and instantiations inside of subprograms in
+              Sparkel.
+              Allow listing to be turned on and off with "-listing on/off"
+              on the command line; default is off if "-command ..." given.
+  * [rev 5.0] Initial release of "Javallel" and "Parython" compilers, parallel
+              languages inspired by Java and Python.
+  * [rev 5.1] Provide "Dest_Name" in PSVM "Store" and "Move" Instructions
+              when used to initialize a local variable or constant, so as
+              to help in debugging.
+  * [rev 5.2] Re-implementation of work stealing to reduce contention
+              between processors.  Each server now has a private double-ended
+              queue (deque) of pico-threads, along with the shared triplet of 
+              deques which has existed before.  This produced another two
+              times speedup (in addition to the rev 4.9 improvements), thereby
+              speeding up execution by four times or more since rev 4.8.
+              The main procedures for each language (ParaSail, Sparkel, etc.)
+              have been refactored to share more common code.
+              Allow a command-line flag "-servers nnn" to specify the number
+              of heavy-weight server threads to use.  Default is 6.
+              Command can also be given interactively, as "servers nnn".
+              Interactively it only works to increase the number; there is
+              no way to shut down servers that already have been activated.
+
+We are very interested in your feedback.  Please use the ParaSail Google 
+Group (see link above) to provide whatever comments or suggestions you
+might have, as well as bug reports.  Please include a minimal self-contained
+ParaSail example program with each bug report.
+
+Sincerely,
+-Tucker Taft
+Director of Language Research
+AdaCore
+Lexington, MA  USA
+April 2014

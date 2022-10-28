@@ -1,0 +1,91 @@
+interface PSL::Core::Univ_Integer<> is
+    op "+"(Right : Univ_Integer) -> Univ_Integer
+      is import(#identity)
+
+    op "-"(Right : Univ_Integer) -> Univ_Integer
+      is import(#negate)
+
+    op "abs"(Right : Univ_Integer) -> Univ_Integer
+      is import("abs")
+
+    op "magnitude"(Univ_Integer) -> Univ_Integer is "abs"
+
+    op "+"(Left, Right : Univ_Integer) -> Result : Univ_Integer 
+      is import("+")
+
+    op "-"(Left, Right : Univ_Integer) -> Result : Univ_Integer
+      is import("-")
+
+    op "*"(Left, Right : Univ_Integer) -> Result : Univ_Integer 
+      is import("*")
+
+    op "/"(Left, Right : Univ_Integer) -> Result : Univ_Integer
+      is import("/")
+
+    op "**"(Left, Right : Univ_Integer) -> Univ_Integer
+      is import("**")
+
+    op "mod"(Left, Right : Univ_Integer) -> Univ_Integer
+      is import("mod")
+
+    op "rem"(Left, Right : Univ_Integer) -> Univ_Integer
+      is import("rem")
+
+
+    op "+="(var Left : Univ_Integer; Right : Univ_Integer) 
+      is import("+=")
+
+    op "-="(var Left : Univ_Integer; Right : Univ_Integer) 
+      is import("-=")
+
+    op "*="(var Left : Univ_Integer; Right : Univ_Integer) 
+      is import("*=")
+
+    op "/="(var Left : Univ_Integer; Right : Univ_Integer) 
+      is import("/=")
+
+    op "**="(var Left : Univ_Integer; Right : Univ_Integer) 
+      is import("**=")
+
+
+    op "=?"(Left, Right : Univ_Integer) -> Ordering
+      is import("=?")
+
+    op ">>"(Univ_Integer; Univ_Integer) -> Univ_Integer is import(">>")
+
+    op "<<"(Univ_Integer; Univ_Integer) -> Univ_Integer is import("<<")
+
+    func Min(Left, Right : optional Univ_Integer) -> optional Univ_Integer
+      is import(#min)
+    func Max(Left, Right : optional Univ_Integer) -> optional Univ_Integer
+      is import(#max)
+
+    func Hash(Val : Univ_Integer) -> Univ_Integer
+      is import(#identity)
+
+    func To_String(Val : optional Univ_Integer) -> Univ_String
+      is import(#to_string_int)
+
+    func From_String(Str : Univ_String) -> optional Univ_Integer
+      is import(#from_string_int)
+
+    func Print(X : Univ_Integer) is import(#print_int)
+    func Println(X : Univ_Integer) is (Println(To_String(X)))
+
+    func First() -> Univ_Integer is
+      import(#univ_integer_first)
+
+    func Last() -> Univ_Integer is
+      import(#univ_integer_last)
+
+    op ".."(Left, Right : Univ_Integer) -> Countable_Set<Univ_Integer>
+      is in Countable_Set<Univ_Integer>
+    op "<.."(Left, Right : Univ_Integer) -> Countable_Set<Univ_Integer>
+      is in Countable_Set<Univ_Integer>
+    op "..<"(Left, Right : Univ_Integer) -> Countable_Set<Univ_Integer>
+      is in Countable_Set<Univ_Integer>
+    op "<..<"(Left, Right : Univ_Integer) -> Countable_Set<Univ_Integer>
+      is in Countable_Set<Univ_Integer>
+    op "|"(Left, Right : Univ_Integer) -> Countable_Set<Univ_Integer>
+      is in Countable_Set<Univ_Integer>
+end interface PSL::Core::Univ_Integer

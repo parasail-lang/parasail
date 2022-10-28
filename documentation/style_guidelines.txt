@@ -1,0 +1,69 @@
+The only rule of style: be consistent
+Everything else is just a suggestion
+
+Identifiers:
+   Identifiers start with capital letters
+   Words inside indentifiers are seperated by underscores
+   each new word starts with a capital letter.
+   Example: Nth_Item
+   This is true for types, constants, and variables.
+
+Semicolons:
+   Semicolons are optional so choose your own style and be consistent
+   If you do use them, omitting them on 'end' statements is suggested.
+
+Indentation:
+   Spaces is suggested but tabs are okay. Just don't use both.
+
+   if statements should be formatted like this:
+   if Condition1 then
+      //  Then body
+   elsif Condition2 then
+      //  Elsif body
+   else
+      //  Else body
+   end if
+
+   If the conditions take up multiple lines,
+   the 'then' may be placed on the same indentation level as the 'if'
+   or at the end of last conditional.
+   Example:
+
+   if A not null and then
+      Length(A) >= 0
+   then
+      //  Then Body
+   end if
+
+   or:
+
+   if A not null and then
+      Length(A) >= 0 then
+      //  Then Body
+   end if
+
+   Indentation of if expressions is less strict.
+   All of these are acceptable
+   Max := (if X > Y then X else Y)
+   Max := (if X > Y then X
+           else Y)
+   Max := (if X > Y then
+              X
+           else
+              Y)
+
+   The exports keyword may be placed at any indentation level that is
+   less than or equal to the indentation level of the contents of the class.
+   It may even be placed at a partial indentation.
+
+Function calls and definitions:
+   Do not put a space between the identifier and the opening parenthesis
+   Example: Contains("Hello", 'l')
+   Same is true for indexing. Example: Arr[I]
+
+Line Continuation:
+   Maximum line length is 80 characters.
+   When splitting one line into two, good places to split are after
+      commas, ':='s, and operators.
+   Acceptable places to split are after
+      double semicolons, dots, function names, and object names.

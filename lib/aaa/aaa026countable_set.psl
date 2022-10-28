@@ -1,0 +1,713 @@
+class PSL::Containers::Countable_Set is
+    //  A set of values of a "countable" type (e.g. integer or enum),
+    //  where we can efficiently represent intervals (i.e. contiguous ranges)
+    //  of values of the type, allowing large sets to be handled.
+
+    type Element_Interval is Countable_Range<Element_Type>
+
+    func Saturating_Plus(Left, Right : Univ_Integer) -> Univ_Integer is
+       //  Do a "careful" plus to avoid overflow
+        const Half := Left/2 + Right/2
+        if Half >= Univ_Integer::Last()/2 then
+            return Univ_Integer::Last()
+        elsif Half <= Univ_Integer::First()/2 then
+            return Univ_Integer::First()
+        else
+            return Left + Right
+        end if
+    end func Saturating_Plus
+
+    func Len(IV : Element_Interval) -> Univ_Integer is
+       // Return length of interval (last - first + 1)
+       // but avoid returning a value > Univ_Integer::Last()
+       if IV.First + Univ_Integer::Last()/2 <=
+         IV.Last - Univ_Integer::Last()/2
+       then
+          //  Overflow -- TBD: Someday Univ_Integer will be inf. precision
+          return Univ_Integer::Last()
+       else
+          return IV.Last - IV.First + 1
+       end if
+    end func Len
+
+    var Items : optional AA_Tree<Element_Interval>
+
+    func Is_Subset(IV : Element_Interval; Set : Countable_Set) -> Boolean is
+      //  Return #true if all of IV is in Set
+       if IV.First > IV.Last then
+          //  Empty set is a subset of anything
+          return #true
+       else
+          const OV := Overlapping(Set.Items, IV)
+
+          if OV is null then
+             //  No overlapping inteval
+             return #false
+          elsif IV.First < OV.First
+            and then not Is_Subset(IV.First ..< OV.First, Set)
+          then
+             //  Part on left is not in Set
+             return #false
+          elsif OV.Last < IV.Last
+            and then not Is_Subset(OV.Last <.. IV.Last, Set)
+          then
+             //  Part on right is not in Set
+             return #false
+          else
+             //  IV is fully contained in Set
+             return #true
+          end if
+       end if
+    end func Is_Subset
+
+    func Intersect(IV : Element_Interval; Set : Countable_Set)
+      -> Result : Countable_Set is
+      //  Return intersection of interval and set as a set
+       if IV.First > IV.Last then
+          //  Empty set
+          return []
+       else
+          const OV := Overlapping(Set.Items, IV)
+
+          if OV is null then
+             //  No overlapping inteval
+             return []
+          end if
+
+          var Low := OV.First
+          var High := OV.Last
+
+          if IV.First < OV.First then
+             //  Include Left part
+             Result := Intersect(IV.First ..< OV.First, Set)
+          else
+             Result := []
+             Low := IV.First
+          end if
+
+          if OV.Last < IV.Last then
+             //  Intersect in right part
+             Result |= Intersect(OV.Last <.. IV.Last, Set)
+          else
+             High := IV.Last
+          end if
+
+          //  Include common part of IV and OV
+          Insert(Result.Items, Low .. High)
+
+       end if
+        
+    end func Intersect
+
+  exports
+    op "[]"() -> Countable_Set is
+        return (Items => [])
+    end op "[]"
+
+    op "[..]"() -> Countable_Set is
+        return Element_Type::First() .. Element_Type::Last()
+    end op "[..]"
+
+    func Singleton(Elem : Element_Type) -> Result : Countable_Set is
+        Result := []
+        Result.Items |= (First => Elem, Last => Elem)
+    end func Singleton
+
+    op ".."(Left, Right : Element_Type) -> Result : Countable_Set is
+        Result := []
+        if Left <= Right then
+            Result.Items |= (First => Left, Last => Right)
+        end if
+    end op ".."
+    
+    op "<.."(Left, Right : Element_Type) -> Result : Countable_Set is
+        Result := []
+        if Left < Right then
+            Result.Items |= (First => Left+1, Last => Right)
+        end if
+    end op "<.."
+    
+    op "<..<"(Left, Right : Element_Type) -> Result : Countable_Set is
+        Result := []
+        if Left < Right-1 then
+            Result.Items |= (First => Left+1, Last => Right-1)
+        end if
+    end op "<..<"
+    
+    op "..<"(Left, Right : Element_Type) -> Result : Countable_Set is
+        Result := []
+        if Left < Right then
+            Result.Items |= (First => Left, Last => Right-1)
+        end if
+    end op "..<"
+    
+    op "|"(Left, Right : Element_Type) -> Result : Countable_Set is
+        Result := []
+        if Left >= Right-1 and then Left <= Right + 1 then
+            // Can combine elements into a single interval
+            if Left <= Right then
+                Result.Items |= (First => Left, Last => Right)
+            else
+                Result.Items |= (First => Right, Last => Left)
+            end if
+        else
+            // Make each element its own interval
+            Result.Items |= (First => Left, Last => Left)
+            Result.Items |= (First => Right, Last => Right)
+        end if
+    end op "|"
+
+    op "|"(Left : Countable_Set; Right : Element_Type) 
+      -> Result : Countable_Set is
+        Result := Left
+        Result |= Right
+    end op "|"
+
+    op "|"(Left : Element_Type; Right : Countable_Set) -> Countable_Set is
+        return Right | Left
+    end op "|"
+
+    op "|"(Left : Countable_Set; Right : Countable_Set) 
+      -> Result : Countable_Set is
+        Result := Left
+        Result |= Right
+    end op "|"
+
+    op "|="(var Left : Countable_Set; Right : Element_Type) is
+        const Right_IV : Element_Interval := (First => Right, Last => Right)
+        const Left_IV := Overlapping(Left.Items, Right_IV)
+        if Left_IV is null then
+            // Nothing overlaps, need to add it (might want to merge someday)
+            Left.Items |= Right_IV
+        end if
+    end op "|="
+
+    op "<|="(var Left : Countable_Set; var Right : optional Element_Type) is
+        // Move element into set, leaving Right null afterward.
+        // NOTE: No copy minimization done for countable types.
+        Left |= Right
+        Right := null
+    end op "<|="
+
+    op "<|="(var Left : Countable_Set; var Right : Countable_Set) is
+        // Move all elements of Right into Left, leaving Right empty.
+        if Count(Left.Items) == 0 then
+            Left.Items <== Right.Items
+        else
+            // Iterate through the tree
+            loop
+                // Extract interval from Right
+                var Right_IV for Left := Remove_Any(Right.Items)
+
+                if Right_IV is null then
+                    return   // All done
+                end if
+
+                // See whether it overlaps with an existing interval
+                // in Left tree
+                var Left_IV for Left := Overlapping(Left.Items, Right_IV)
+                while Left_IV not null loop
+                    if Left_IV.First <= Right_IV.First and then
+                      Left_IV.Last >= Right_IV.Last then
+                        // Right_IV is subsumed; nothing to add in
+                        Right_IV := null
+                        exit loop
+                    else
+                        // Need to delete Left_IV and incorporate
+                        // into Right_IV
+                        Delete(Left.Items, Left_IV)
+                        if Left_IV.First < Right_IV.First then
+                            Right_IV :=
+                              (First => Left_IV.First, Last => Right_IV.Last)
+                        end if
+                        if Left_IV.Last > Right_IV.Last then
+                            Right_IV :=
+                              (First => Right_IV.First, Last => Left_IV.Last)
+                        end if
+
+                        // Now see if there is anything still overlapping
+                        Left_IV := Overlapping(Left.Items, Right_IV)
+                    end if
+                end loop
+
+                if Right_IV not null then
+                    // Add Right_IV
+                    Left.Items <|= Right_IV
+                end if
+
+            end loop
+        end if
+    end op "<|="
+
+    op "|="(var Left : Countable_Set; Right : Countable_Set) is
+        // Pass the buck to the "<|=" operation
+        var Right_Copy for Left := Right
+        Left <|= Right_Copy
+    end op "|="
+
+    op "-"(Left, Right : Countable_Set) -> Result : Countable_Set is
+      // Set difference
+        Result := Left
+        Result -= Right
+    end op "-"
+
+    op "-"(Left : Countable_Set; Right : Element_Type)
+      -> Result : Countable_Set is
+      // Remove one element
+        Result := Left
+        Result -= Right
+    end op "-"
+        
+    op "-="(var S : Countable_Set; Elem : Element_Type) is
+      // Remove the given element from the set, if present
+        const IV := Overlapping(S.Items, (First => Elem, Last => Elem))
+          // Get interval, if any, which overlaps given element
+
+        if IV not null then
+            // Delete interval and put back after removing Elem
+            Delete(S.Items, IV)
+            if IV.Last > IV.First then
+                // We need to put something back
+                if IV.First == Elem then
+                    S.Items |= (First => IV.First + 1, Last => IV.Last)
+                elsif IV.Last == Elem then
+                    S.Items |= (First => IV.First, Last => IV.Last-1)
+                else
+                    // Elem is in the middle, put back intervals
+                    // on either side.
+                    S.Items |= (First => IV.First, Last => Elem-1)
+                    S.Items |= (First => Elem+1, Last => IV.Last)
+                end if
+            end if
+        end if
+
+    end op "-="
+
+    op "-="(var Left : Countable_Set; Right : Countable_Set) is
+      // Remove all elements of Right from Left, if present
+        for Right_IV in Right.Items loop
+            loop
+                const IV := Overlapping(Left.Items, Right_IV)
+                  // Get next interval, if any, which overlaps Right_IV
+
+                if IV is null then
+                    exit loop
+                end if
+
+                // Delete interval and put back after removing Right_IV
+                Delete(Left.Items, IV)
+                if IV.Last > IV.First then
+                    // We need to put something back
+                    if IV.First >= Right_IV.First then
+                        //  First part of IV removed
+                        if IV.Last > Right_IV.Last then
+                            Left.Items |=
+                              (First => Right_IV.Last + 1, Last => IV.Last)
+                        end if
+                    elsif IV.Last <= Right_IV.Last then
+                        //  Last part of IV removed
+                        Left.Items |=
+                          (First => IV.First, Last => Right_IV.First - 1)
+                    else
+                        // Right_IV is in the middle, put back intervals
+                        // on either side.
+                        Left.Items |=
+                          (First => IV.First, Last => Right_IV.First - 1)
+                        Left.Items |=
+                          (First => Right_IV.Last + 1, Last => IV.Last)
+                    end if
+                end if
+            end loop
+        end loop
+
+    end op "-="
+
+    op "and"(Left, Right : Countable_Set) -> Result : Countable_Set is
+        // Intersection
+        Result := []
+        for Left_IV in Left.Items loop
+           Result |= Intersect(Left_IV, Right)
+        end loop
+    end op "and"
+
+    op "and="(var Left : Countable_Set; Right : Countable_Set) is
+        // Intersection
+        Left := Left and Right
+    end op "and="
+
+    op "xor"(Left, Right : Countable_Set) -> Result : Countable_Set is
+        // Symmetric difference
+        Result := Left
+        Result xor= Right
+    end op "xor"
+
+    op "xor="(var Left : Countable_Set; Right : Countable_Set) is
+        // Symmetric difference
+        // Want elements that are only in one of the two inputs
+        if Count(Left) > Count(Right) then
+           for Elem in Right loop
+               if Elem in Left then
+                   Left -= Elem
+               else
+                   Left += Elem
+               end if
+           end loop
+        else
+           var New_Left for Left := Right
+           for Elem in Left loop
+              if Elem in Right then
+                 New_Left -= Elem
+              else
+                 New_Left += Elem
+              end if
+           end loop
+           Left <== New_Left
+        end if
+    end op "xor="
+
+    op "in"(Left : Element_Type; Right : Countable_Set) -> Boolean is
+        return Overlapping(Right.Items, (First => Left, Last => Left)) not null
+    end op "in"
+
+    op "=?"(Left, Right : Countable_Set) -> Ordering is
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left is a proper subset of Right
+        // Return #greater if Left is a proper superset of Right
+        // Return #unordered otherwise
+        const Left_Is_Subset_Of_Right :=
+          (for all Left_IV in Left.Items => Is_Subset(Left_IV, Right))
+        const Right_Is_Subset_Of_Left :=
+          (for all Right_IV in Right.Items => Is_Subset(Right_IV, Left))
+
+        if Left_Is_Subset_Of_Right then
+           if Right_Is_Subset_Of_Left then
+              return #equal
+           else
+              return #less
+           end if
+        else
+           if Right_Is_Subset_Of_Left then
+              return #greater
+           else
+              return #unordered
+           end if
+        end if
+    end op "=?"
+
+    func Count(S : Countable_Set) -> Result : Univ_Integer is
+        // Return count of items in set
+
+        Result := 0
+
+        // Iterate through them to build up count
+        for Next_IV in S.Items loop
+            Result := Saturating_Plus(Result, Len (Next_IV))
+        end loop
+    end func Count
+
+    func Is_Empty(S : Countable_Set) -> Boolean is
+        return Is_Empty(S.Items)
+    end func Is_Empty
+
+    func First(S : Countable_Set) -> optional Element_Type is
+        const First_IV := First(S.Items)
+        if First_IV is null then
+            return null
+        else
+            return First_IV.First
+        end if
+    end func First
+
+    func Last(S : Countable_Set) -> optional Element_Type is
+        const Last_IV := Last(S.Items)
+        if Last_IV is null then
+            return null
+        else
+            return Last_IV.Last
+        end if
+    end func Last
+
+    func Any_Element(S : Countable_Set) -> optional Element_Type is
+        const Any_IV := Any_Element(S.Items)
+        if Any_IV is null then
+            return null
+        elsif (Any_IV.Last - Any_IV.First) mod 2 == 0 then
+            // Return high bound when high-low is even
+            // NOTE: We do this to avoid having algorithms become
+            //       dependent on always getting values in ascending 
+            //       or descending order.
+            return Any_IV.Last
+        else
+            // Return low bound when high-low is odd
+            return Any_IV.First
+        end if
+    end func Any_Element
+
+    op "indexing"(S : Countable_Set; Index : Univ_Integer)
+      -> optional Element_Type is
+         //  Return "Index"th element of set S, counting 1 .. Count(S)
+         if Index <= 0 then
+             return null
+         end if
+
+         var Start_Offset := Index - 1
+
+         for IV in S.Items forward loop
+             const IV_Len := Len (IV)
+             if Start_Offset < IV_Len then
+                 //  It is in this interval
+                 return IV.First + Start_Offset
+             end if
+             Start_Offset -= IV_Len
+         end loop
+
+         return null
+    end op "indexing"
+
+    op "slicing"(S : Countable_Set; 
+      Index_Set : Countable_Range<Univ_Integer>) -> Result : Countable_Set is
+         //  Return subset of set S, elements S[Index_Set.First] through
+         //  S[Index_Set.Last], counting 1 .. Count(S)
+         var Start_Offset := Index_Set.First - 1
+         var End_Offset := Index_Set.Last - 1
+
+         Result := []
+
+         if Start_Offset < 0 then
+             Start_Offset := 0
+         end if
+
+         if End_Offset < Start_Offset then
+             return
+         end if
+
+         for IV in S.Items forward loop
+             const IV_Len := Len (IV)
+             if Start_Offset < IV_Len then
+                 //  It starts in this interval
+                 if End_Offset < IV_Len then
+                     //  It ends in this interval as well
+                     Result.Items |=
+                        (First => IV.First + Start_Offset,
+                         Last => IV.First + End_Offset)
+                     return
+                 else
+                     //  It extends to the next interval
+                     Result.Items |=
+                        (First => IV.First + Start_Offset,
+                         Last => IV.Last)
+                     Start_Offset := 0
+                 end if
+             else
+                 Start_Offset -= IV_Len
+             end if
+             End_Offset -= IV_Len
+         end loop
+    end op "slicing"
+
+    op "/"(Set : Countable_Set; Num_Pieces : Univ_Integer)
+      -> Result : Vector<Countable_Set> is
+       // Divide a set into a vector of sets, each of similar size
+        {> Num_Pieces > 0 <}
+
+        if Num_Pieces <= 1 then
+            //  Return a vector of length 1 if Num_Pieces is 1 (or less)
+            return Create(1, Set)
+        end if
+
+        const Size := Count(Set)
+        const Small_Piece_Size := Size / Num_Pieces
+        const Big_Piece_Size := Small_Piece_Size + 1
+        const Num_Big_Pieces := Size rem Num_Pieces
+
+        //  Create the result
+        Result := Create(Num_Pieces, [])
+
+        //  Fill in the elements of the result vector with slices of the set.
+        var Index := 1
+
+        //  Big pieces first
+        for I in 1 .. Num_Big_Pieces forward loop
+            Result[I] := Set[Index .. Index + Big_Piece_Size - 1]
+            Index += Big_Piece_Size
+        end loop
+
+        //  Small pieces next
+        if Small_Piece_Size > 0 then
+            for I in Num_Big_Pieces + 1 .. Num_Pieces forward loop
+                Result[I] := Set[Index .. Index + Small_Piece_Size - 1]
+                Index += Small_Piece_Size
+            end loop
+        end if
+
+        {> Index == Size + 1 <}
+            
+    end op "/"
+
+    func Remove_First(var S : Countable_Set) 
+      -> Result : optional Element_Type is
+        // Return first element of set
+
+        // Get first interval in tree
+        var First_IV := Remove_First(S.Items)
+        if First_IV is null then
+            // Tree is empty
+            return null
+        end if
+
+        // See whether interval has more than one value in it
+        if First_IV.Last > First_IV.First then
+            // Need to put back the remainder
+            S.Items |= (First => First_IV.First+1, Last => First_IV.Last)
+        end if
+
+        // Return first item
+        return First_IV.First
+    end func Remove_First
+
+    func Remove_Last(var S : Countable_Set) -> Result : optional Element_Type is
+        // Remove last element of set
+
+        // Get Last interval in tree
+        var Last_IV := Remove_Last(S.Items)
+        if Last_IV is null then
+            // Tree is empty
+            return null
+        end if
+
+        // See whether interval has more than one value in it
+        if Last_IV.Last > Last_IV.First then
+            // Need to put back the remainder
+            S.Items |= (First => Last_IV.First, Last => Last_IV.Last-1)
+        end if
+
+        // Return Last item
+        return Last_IV.Last
+    end func Remove_Last
+
+    func Remove_Any(var S : Countable_Set) -> optional Element_Type is
+        // Remove any element of set
+
+        // Get any interval in tree
+        var Any_IV := Remove_Any(S.Items)
+        if Any_IV is null then
+            // Tree is empty
+            return null
+        end if
+
+        // See whether interval has more than one value in it
+        if Any_IV.Last > Any_IV.First then
+            // Need to remove one to return and put back the remainder
+            if (Any_IV.Last - Any_IV.First) mod 2 == 0 then
+                // Return high bound when high-low is even
+                // NOTE: We do this to avoid having algorithms become
+                //       dependent on always getting values in ascending 
+                //       or descending order.
+                S.Items |= (First => Any_IV.First, Last => Any_IV.Last-1)
+                return Any_IV.Last
+            else
+                // Return low bound when high-low is odd
+                S.Items |= (First => Any_IV.First+1, Last => Any_IV.Last)
+                return Any_IV.First
+            end if
+        else
+            // Return only item in interval
+            return Any_IV.First
+        end if
+
+    end func Remove_Any
+
+    func Ranges(S : Countable_Set) ->
+      Result : Ordered_Set<Countable_Range<Element_Type>> is
+        // Return set of disjoint ranges that represent the set of values in S
+        Result := []
+        var Cur_Range : Countable_Range<Element_Type> for Result := []
+        var Copy_Of_Items for Result := S.Items
+        var Next_Range for Result := Remove_First(Copy_Of_Items)
+
+        while Next_Range not null loop
+            if Cur_Range.Last < Cur_Range.First then
+                //  Was empty range, remember first range
+                Cur_Range <== Next_Range
+            elsif Cur_Range.Last+1 == Next_Range.First then
+                //  Combine contiguous ranges
+                Cur_Range :=
+                  (First => Cur_Range.First, Last => Next_Range.Last)
+            else
+                //  Discontiguous ranges, add Cur_Range to result and update
+                Result <|= Cur_Range
+                Cur_Range <== Next_Range
+            end if
+            Next_Range := Remove_First(Copy_Of_Items)
+        end loop
+
+        if Cur_Range.Last >= Cur_Range.First then
+            //  Include last range
+            Result <|= Cur_Range
+        end if
+    end func Ranges
+
+end class PSL::Containers::Countable_Set
+
+func PSL::Test::Test_Countable_Set(A, X, Y, Z : Integer) is
+    var S : Countable_Set<Integer> := X | Y..Z
+    Println(A | " in " | X | "|" | Y | ".." | Z | "=" | ( A in S ))
+
+    const Agg : Countable_Set<Integer> := [X, Y, Z]
+    const Or : Countable_Set<Integer> := Y | Z | X
+
+    Println(" [X, Y, Z] =? (Y | Z | X) --> " | ( Agg =? Or ))
+
+    for J in S loop 
+        Println("Remove_Any(S) = " | J)
+    end loop
+
+    S := []
+
+    for I in 1..10 forward loop
+        S += I
+        Println("Adding " | I | " to S, Count = " | Count(S))
+    end loop
+
+    for K in S loop 
+        Println("Remove_Any(S) = " | K)
+    end loop
+
+    Println("Count(S) = " | Count(S))
+    S -= 7
+    Println("After S -= 7, Count(S) = " | Count(S))
+
+    var Xor := S xor [2, 5, 12, 15]
+    Print("S xor [2, 5, 12, 15] = ")
+    for J in Xor forward loop
+        Print(J | " ")
+    end loop
+    Print('\n')
+
+    for I in -1 .. 11 forward loop
+       Println("S[" | I | "] = " | S[I])
+    end loop
+
+    for I in -1 .. 11 forward loop
+        for J in I-2 .. I + 5 forward loop
+            Print("S[" | I | " .. " | J | "] = ")
+            const Slice := S[I .. J]
+            for K in Slice forward loop
+                Print(K | " ")
+            end loop
+            Print('\n')
+        end loop
+    end loop
+
+    for Num in 1 .. 11 forward loop
+       Print("S / " | Num | " =")
+       for each Piece of S / Num forward loop
+          Print (" {")
+          for J in Piece forward loop
+              Print(J | " ")
+          end loop
+          Print ("}")
+       end loop
+       Print('\n')
+    end loop
+end func PSL::Test::Test_Countable_Set

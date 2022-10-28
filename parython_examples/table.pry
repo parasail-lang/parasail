@@ -1,0 +1,4 @@
+def Table(Num_Cubes : Univ_Integer) :
+    # Print a table of cubes
+    for I in 1..Num_Cubes :
+	Println(I | "**3 = " | I**3);

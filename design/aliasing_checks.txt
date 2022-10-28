@@ -1,0 +1,230 @@
+-- $Revision: $ $Date: $
+
+We want to be able to detect illegal aliasing of parameters
+as well as illegal race condition possibilities by referencing
+aliased objects on separate iterations of a loop.
+
+Referencing a variable in the body of a loop will generally
+be illegal, unless the variable is a slice or an element
+whose index makes it clearly separated from values referenced
+on other iterations.  There is some existing body of theory
+from the Fortran days that deals with this kind of data
+dependence between iterations.  See:
+
+   http://en.wikipedia.org/wiki/Loop_dependence_analysis
+   http://en.wikipedia.org/wiki/GCD_test
+   http://en.wikipedia.org/wiki/Banerjee_test
+
+The basic idea is, given index expressions of
+the form "A * I1 + B" and "C * I2+ D", determine whether
+they might be equal for some value of I1 and I2.
+if GCD(A, C) divides into B-D then there is some possibility
+of a loop dependence.  For example, given 2*I1 + 0 and 2*I2 + 1,
+there is no chance they will be equal.  But given 2*I1 + 0
+and 3*I2 + 1, they could clearly be equal (e.g. I1 = 2, I2 = 1).
+
+-----------
+
+Representing the aliasing state:
+
+We need to keep a set of variables that have been written and
+another set that have been read.  On every new "read" we make
+sure it doesn't overlap with anything being written, and
+then it is unioned into the the read-set.  On every new "write"
+we make sure it doesn't overlap with either set, and then
+we union it into the write-set.  "Overlap" needs to worry about
+slices as well as component relationships.  A slice is essentially
+equivalent to the set of container elements it represents, so it 
+isn't really a separate case.  For any container we need to keep
+track of the set of elements that have been read or written.
+The indices might not be known at compile-time, so we will need
+to keep track of them symbolically or by a worst-case set.
+
+We also need to worry about "ref"s.  These are essentially
+renames, so they should be substituted with the set they
+represent when they appear.  A function that returns a "ref"
+(unless it is "indexing" or "slicing") must be assumed to
+reference all elements of any "ref" inputs.  "Indexing" and
+"slicing" have their own special rules.  "var_indexing" is presumed
+to update the container object as a whole, so it does not get the
+same special treatment afforded to simple "indexing."
+
+The set is probably best represented as a tree,
+where the first level are stand-alone variables,
+and then below that are their components, etc.  If the
+whole object is read or written, there is no need
+to keep track of components.  We could have separate
+trees for read and written, or we could combine them
+and have a label indicating read or written.
+We might want to think of it as a map from name or
+index set to read-as-a-whole, written-as-a-whole, or similar
+nested map of components.
+
+To produce decent error messages, we may want to keep
+track of where the read or write comes from.  This is quite
+similar (not surprisingly) to what the race-condition phase
+does in CodePeer.
+
+If a container is referenced both using indexing/slicing
+and by named component, we probably need to assume
+that any named component overlaps any indexed
+component.  Similarly if two different sorts of indexing
+are performed on the same container, they overlap
+in an unspecified manner.
+
+So this implies we have:
+  read-as-a-whole, written-as-a-whole, referenced-by-named-component,
+  referenced-by-indexed-component.
+
+If it is already one of the above, a new use is either consistent
+with the above or not.  If it is consistent, then if it is a reference
+to a component and it matches the existing form of component reference,
+the new reference can be added to the subsidiary mapping.  If it is
+a reference to a component that is consistent, but not the same form
+of component reference, then the state is updated to "read as a whole"
+since we now have two different forms of component references, and that
+is inconsistent with any sort of writing.
+
+It might be worth distinguishing read-by-named/indexed-component from
+updated-by-named/indexed-component, which makes it easier to
+check for consistency.  So perhaps we have "read-only" vs
+"updated" and then "as-a-whole, by-named-component, by-indexed-component"
+as a separate indication.
+
+For named components and for stand-alone variables, the key could 
+be the Object_Sem_Ptr.  But we sometimes copy Object_Semantic_Info,
+so that might not be the best idea.  We also need to think about
+inherited components, and parameters of inherited operations.
+Let's assume we assign unique numeric ids of some sort.
+That will work better when we start bootsrapping the compiler
+anyway, since pointers as keys is not going to work then.
+
+----------
+
+Top-down view:
+
+We will be looking for aliasing when handling expressions,
+and when handling loops.  For expressions, we want to be sure
+that there are no conflicts anywhere in the expression,
+where the expression includes calls, unary and binary
+operators, and assignment statements, and the "||"
+operator.  But "||" takes two arbitrarily complicated
+sequence of statements, so we really need to worry about
+a whole sequence of statements.  We actually
+allow a sequence of statements connected by ";" or "then"
+to have conflicting accesses.  If we build up two mappings
+for the two sides of a ";", we can just "or" them together
+without worrying about conflicts.  On the other hand,
+for the two sides of a "||", we do care about conflicts.
+
+With a loop, we will build up a representation of the
+reading/writing within the loop, then we will try to
+check it against itself.  We need to handle indexed and
+sliced components, as well as the conflict associated with
+a "continue" statement, which is very much like a recursive call,
+but without the helpful "var" vs. "const" distinction.
+This will require some amount of iteration-until-fixed-point
+(uggh).  
+
+Storage management of these mappings may be painful.
+May want some kind of "destructive" merge, or destructive
+"iterate."
+
+Should this be part of the pre-code-gen pass?  Clearly we
+need to have completed name resolution.  Currently we are
+doing semantic analysis on annotations in the pre-code-gen
+pass, but I suppose we don't really need to worry about
+aliasing in annotations at the moment.  It would be possible
+for an annotation to refer to something that is being changed
+on the other "side" of a "||" conceivably, so that would
+be a bug because the value isn't well defined.  So we really
+ought to take annotations into account as well.
+
+Whatever pass we do it in, its "Visitor" object needs
+to hold the read/write mapping.
+
+------------------------------
+
+We need a way to represent the set of objects
+that correspond to the "ref" result of a call
+on a ref-returning operation.  By default
+this is the union of all of the "ref" inputs.
+A subsequent "read" or "update" of this result
+is equivalent to a "read" or "update" of all of
+these "ref" inputs.  In some special cases,
+the output "ref" is considered a subset of the
+input "ref"(s), in particular for indexing and slicing.
+In fact, we need to distinguish ref-const, ref, and ref-var.
+A ref-const and ref are first equivalent to a "read"
+since inside the operation they can be read.
+A ref-var is equivalent to an "update" for a corresponding
+reason.  But in addition, these get bundled up into something
+which can be passed around, and which can be "read" and
+"written," and also "ref"ed further.
+
+We also need to distinguish unlocked-concurrent, as these
+incur no conflicts.
+
+This interface is best defined in a top-down fashion,
+based on how it will be used:
+
+The most general operation is a call with a "ref" output and
+one or more "ref" inputs, as well as "var" and read-only (default) inputs.
+We require that the inputs can be evaluated in parallel,
+and that once we get inside, the updatable objects can be treated 
+as being unaliased with anything else.  When we are done, we
+need to keep track of what the "ref" output(s) is (are) aliased
+with.  We need to allow for the possibility of a "ref" output
+being saved indefinitely in a "ref" local variable, and periodically
+reused.
+
+The sequence of calls would be one for each input operand, and then
+extracting the result for each "ref" output.  On each input operand
+we would check for a conflict with the rw-mapping representing the 
+call as a whole with its parallel evaluation, and if it is a "ref"
+input, having it added to the set of items associated with the
+"ref" outputs.
+
+If we have the "running" total of object accesses, and then we do
+a bottom-up on each operand, which could be context-independent if
+it returns a "ref" whenever possible, then we "absorb" the
+operand's rw-mapping into the "running" total either as a simple
+read, a simple update, or a ref, ref-const, or ref-var.
+The "absorption" is either sequential, parallel, or nothing at all,
+and has an associated "mode".  Examples: statements connected by ";"
+or "then" are sequential.  A "var" or "ref" mode implies we have
+some kind of object identification which can be preserved.
+
+So we have a bag of accesses, plus an aggregate of objects or 
+object parts, some read-only, others read-write.  The same object 
+may be in the bag as well as in the aggregate.
+
+Operation names:
+
+Create_From_Obj(Object-id [, is-const]) -> rw-mapping;
+  -- when referring to a stand-alone object var or const
+
+Create_From_Ref(saved rw-mapping [, is-const]) -> rw-mapping;
+  -- when referring to a "ref" or "ref-const"
+
+Use_Expr(call/seq-rw-mapping, parallel/sequential, expr-rw-mapping, mode);
+  -- when passing an expr to a call for a parameter of the given mode
+  -- or when simply storing an expr in a local variable
+
+Selected_Component(composite-obj-rw-mapping, component-name) 
+  -> component-rw-mapping;
+  -- Create a representation of a named component of a composite obj
+
+Indexed_Component(container-rw-mapping, index type, index set) 
+  -> component-rw-mapping;
+  -- Create a representation of an indexed component (or slice of 
+  -- components) of a given container, using the given index type.
+
+Save_Ref(statement-seq-rw-mapping, expr-rw-mapping [, ref-const]) 
+  -> saved-rw-mapping;
+  -- When creating a ref to an expr, possibly a ref-const.
+  -- The bag of side effects of evaluating the expr are added to the 
+     statement-seq-rw-mapping, presumably as a sequential operation,
+     while the aggregate of refs are saved for future use.
+
+

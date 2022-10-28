@@ -1,0 +1,25 @@
+// Function to perform Map-Reduce operation.
+
+func Map_Reduce
+  (Map : func(Input is Any<>) -> (Output is Any<>);
+   Reduce : func(Left, Right : Output) -> Output;
+   Inputs : Vector<Input>)  {Length(Inputs) > 0} -> Output is
+       // Handle singleton directly, recurse for longer inputs
+       if Length(Inputs) == 1 then
+         return Map(Inputs[1]);
+       else
+         // Split and recurse
+         const Half_Length := Length(Inputs)/2;
+         return Reduce
+           (Map_Reduce(Map, Reduce, Inputs[1..Half_Length]),
+             Map_Reduce(Map, Reduce, 
+	       Inputs[Half_Length <.. Length(Inputs)]));
+       end if;
+end func Map_Reduce;
+
+func Test() is  // Test Map_Reduce function -- compute sum of squares
+    Print_Int(Map_Reduce
+      (Map => lambda(X) -> (X**2),
+       Reduce => "+",
+       Inputs => [1, 2, 3, 4, 5, 6]));
+end func Test;

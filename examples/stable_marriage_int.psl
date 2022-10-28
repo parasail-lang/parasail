@@ -1,0 +1,74 @@
+interface Stable_Marriage<Last_Id : Univ_Integer := 64> is
+
+    type Group1_Id is new Integer<1 .. Last_Id>;
+    type Group2_Id is new Integer<1 .. Last_Id>;
+    type Ranking is new Integer<1 .. Last_Id>;
+    // Ranking#first =>  most preferred, Ranking#last => least preferred
+
+    type Ranking_Of_Group1 is Array<Group1_Id, Indexed_By => Ranking>;
+    type Ranking_Of_Group2 is Array<Group2_Id, Indexed_By => Ranking>;
+
+    type Ranking_Of_Group2_By_Group1 is
+      Array<Ranking_Of_Group2, Indexed_By => Group1_Id>;
+    type Ranking_Of_Group1_By_Group2 is
+      Array<Ranking_Of_Group1, Indexed_By => Group2_Id>;
+
+    type G1_To_G2_Map is Array<Grout2_Id, Indexed_By => Group1_Id>;
+    type G2_To_G1_Map is Array<Group1_Id, Indexed_By => Group2_Id>;
+
+    func Is_Permutation_1 (R1 : Ranking_Of_Group1) -> Boolean
+      {Is_Permutation_1 == (for all G1 in Group1_Id =>
+         (for some Rank in Ranking => (R1 [Rank] == G1)))};
+
+    func Is_Permutation_2 (R2 : Ranking_Of_Group2) -> Boolean
+      {Is_Permutation_2 == (for all G2 in Group2_Id =>
+         (for some Rank in Ranking => (R2 [Rank] == G2)))};
+
+    type Inverted_Ranking_Of_Group1 is Array<Ranking, Indexed_By => Group1_Id>;
+    type Inverted_Ranking_Of_Group2 is Array<Ranking, Indexed_By => Group2_Id>;
+
+    func Invert_1 (R1 : Ranking_Of_Group1)
+      {Is_Permutation_1 (R1)}
+      -> Inv : Inverted_Ranking_Of_Group1
+      {(for all Rank in Ranking => (Inv [R1 [Rank]] == Rank)) and
+        (for all G1 in Group1_Id => (R1 [Inv [G1]] == G1))};
+
+    func Invert_2 (R2 : Ranking_Of_Group2)
+      {Is_Permutation_2 (R2)}
+      -> Inv : Inverted_Ranking_Of_Group2
+      {(for all Rank in Ranking => (Inv [R2 [Rank]] == Rank)) and
+       (for all G2 in Group2_Id => (R2 [Inv [G2]] == G2))};
+
+    func Invert_Map (G2_To_G1 : G2_To_G1_Map) 
+      {for all G1 in Group1_Id =>
+       (for some G2 in Group2_Id => (G2_To_G1 (G2) == G1))}
+      -> G1_To_G2 : G1_To_G2_Map
+      {(for all G1 in Group1_Id => (G2_To_G1 [G1_To_G2 [G1]] == G1)) and
+       (for all G2 in Group2_Id => (G1_To_G2 [G2_To_G1 [G2]] == G2))};
+
+    func Is_Preferred_1 (G1_A, G1_B : Group1_Id; R1 : Ranking_Of_Group1)
+      {Is_Permutation_1 (R1)}
+      -> Boolean
+      {Is_Preferred_1 == (Invert_1 (R1) [G1_A] <= Invert_1 (R1) [G1_B])};
+
+    func Is_Preferred_2 (G2_A, G2_B : Group2_Id; R2 : Ranking_Of_Group2)
+      {Is_Permutation_2 (R2)}
+      -> Boolean
+      {Is_Preferred_2 == (Invert_2 (R2) [G2_A] <= Invert_2 (R2) [G2_B])};
+
+    // note that Is_Prefered_x returns True if first two arguments are equal
+
+    func Matching
+      (Ranking_1 : Ranking_Of_Group2_By_Group1;
+       Ranking_2 : Ranking_Of_Group1_By_Group2)
+      {(for all G1 in Group1_Id => (Is_Permutation_2 (Ranking_1 [G1]))) and
+         (for all G2 in Group2_Id => (Is_Permutation_1 (Ranking_2 [G2])))}
+      -> Match : G2_To_G1_Map
+      {(for all G1 in Group1_Id =>
+         (for some G2 in Group2_Id => (Match [G2] == G1))) and
+       (for all G1 in Group1_Id =>
+         (for all G2 in Group2_Id =>
+           ((Is_Preferred_2 (Invert_Map (Match) [G1], G2, Ranking_1 [G1])) or
+            (Is_Preferred_1 (Match [G2], G1, Ranking_2 [G2])))))};
+
+end interface Stable_Marriage;

@@ -1,0 +1,103 @@
+// Example based on Guy Steele InfoQ lecture of January 2011
+// "Words" takes in a string and returns a vector of strings
+// representing the words separated by spaces.
+// Below, we presume that Strings and Vectors are indexed 1..Length(),
+// and even a slice is renumbered to start with index of 1.
+
+interface Tokenizer<String<>> is
+    func Words(Input : String) -> Output : Vector<String>;
+end interface Tokenizer;
+
+class Tokenizer is
+    func Join(Left, Right : String) -> Vector<String> 
+      {Length(Join) in 0..1} is
+	// Left and Right are both empty strings, return an empty vector,
+	// otherwise return a vector containing a single string,
+	// being the concatenation of Left and Right.
+	if Left == "" and then Right == "" then
+	    return [];
+	else
+	    return [Left | Right];
+	end if;
+    end func Join;
+
+    func Combine(Left, Right : Vector<String>)
+      {Length(Left) > 0; Length(Right) > 0} -> Vector<String> 
+      {Length(Combine) > 0} is
+	// Combine two non-empty vectors, using Join to combine
+	// the last element of Left with the first element of Right.
+	// If the result is empty, return a vector containing a
+	// single empty string.
+	const Result := Left[1..Length(Left)-1] |
+	  Join(Left[Length(Left)], Right[1]) |
+	  Right[2 .. Length(Right)];
+	if Length(Result) > 0 then
+	    // We have something to return
+	    return Result;
+	else
+	    // Everything was empty, so return Left which must contain
+	    // a single empty string
+	    {Length(Left) == 1; Length(Left[1]) == 0}
+	    return Left;
+	end if;
+    end func Combine;
+
+    func Words_And_Extras(Input : String) -> Vector<String> 
+      {Length(Words_And_Extras) > 0} is
+      // Return a vector of the words that make up the Input string,
+      // with empty strings as first and/or last element if Input
+      // starts and/or ends with blanks.
+	case Length(Input) of
+	  [0] => 
+	    return [""];
+	  [1] => 
+	    if Input[1] in Separator then
+		return [""];
+	    else
+		return [Input];
+	    end if;
+	  [2] =>
+	    if Input[1] in Separator then
+	        if Input[2] in Separator then
+		    // No words
+		    return [""];
+		else
+		    // One word at end
+		    return ["", Input[2..2]];
+		end if;
+	    elsif Input[2] in Separator then
+		// One word at beginning
+		return [Input[1..1], ""];
+	    else
+		// One word as a whole
+		return [Input];
+	    end if;
+	  [Len : ..] =>
+	    // Three or more characters, split it up and combine the results
+	    return Combine(Words_And_Extras(Input[1..Len/2]),
+	      Words_And_Extras(Input[Len/2 <.. Len]));
+	end case;
+    end func Words_And_Extras;
+	
+  exports
+    func Words(Input : String) -> Output : Vector<String> is
+	const Result := Words_And_Extras(Input);
+
+	// Strip off any leading or trailing empty strings
+	var First := Output#first;
+	var Last := Output#last;
+	if First <= Last and then
+	  Result[First] == "" then
+	    // First element was an empty string
+	    First += 1;
+	end if;
+	if First <= Last and then
+	  Result[Last] == "" then
+	    // Last element was an empty string
+	    Last -= 1;
+	end if;
+	// Return trimmed vector of words
+	return Result[First .. Last];
+    end func Words;
+
+end class Tokenizer;

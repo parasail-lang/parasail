@@ -1,0 +1,99 @@
+interface Integer2<> is
+    op "from_univ"(Lit : Univ_Integer) -> Integer 
+      is import(#integer_from_univ);
+
+    op "to_univ"(Val : Integer) -> Univ_Integer 
+      is import(#integer_to_univ);
+
+    op "+"(Right : Integer) -> Integer
+      is import(#identity);
+
+    op "-"(Right : Integer) -> Integer
+      is import(#negate);
+
+    op "abs"(Right : Integer) -> Integer
+      is import("abs");
+
+    op "+"(Left, Right : Integer) -> Result : Integer 
+      is import("+");
+
+    op "-"(Left, Right : Integer) -> Result : Integer
+      is import("-");
+
+    op "*"(Left, Right : Integer) -> Result : Integer 
+      is import("*");
+
+    op "/"(Left, Right : Integer) -> Result : Integer
+      is import("/");
+
+    op "mod"(Left, Right : Integer) -> Integer
+      is import("mod");
+
+    op "rem"(Left, Right : Integer) -> Integer
+      is import("rem");
+
+    op "**"(Left, Right : Integer) -> Result : Integer
+      is import("**");
+
+    op "+="(var Left : Integer; Right : Integer) 
+      is import("+=");
+
+    op "-="(var Left : Integer; Right : Integer) 
+      is import("-=");
+
+    op "*="(var Left : Integer; Right : Integer) 
+      is import("*=");
+
+    op "/="(var Left : Integer; Right : Integer) 
+      is import("/=");
+
+    op "**="(var Left : Integer; Right : Integer) 
+      is import("**=");
+
+    op "=?"(Left, Right : Integer) -> Ordering
+      is import("=?");
+
+    op ">>"(Integer; Integer) -> Integer is import(">>");
+
+    op "<<"(Integer; Integer) -> Integer is import("<<");
+
+    func Min(Left, Right : Integer) -> Integer
+      is import(#min);
+    func Max(Left, Right : Integer) -> Integer
+      is import(#max);
+
+    func Print(X : Integer) is import(#print_int);
+
+    op "|"(Left : Univ_String; Right : Integer) -> Univ_String is 
+      import(#concat_int);
+
+    op "|"(Left : Integer; Right : Univ_String) -> Univ_String is 
+      import(#concat_int_str);
+
+  implements
+  for Countable
+
+    op "+"(Left : Integer; Right : Univ_Integer) -> Result : Integer 
+      is import("+");
+
+    op "+"(Left : Univ_Integer; Right : Integer) -> Result : Integer 
+      is import("+");
+
+    op "-"(Left : Integer; Right : Univ_Integer) -> Result : Integer 
+      is import("-");
+
+    op "-"(Left, Right : Integer) -> Result : Univ_Integer
+      is import("-");
+
+  implements
+  for Comparable
+   
+    op "-"(Left, Right : Integer) -> Result : Univ_Integer
+      is import("-");
+
+end interface Integer2;
+
+
+func main(Args : Basic_Array<Univ_String>) is
+   null;
+end func main;

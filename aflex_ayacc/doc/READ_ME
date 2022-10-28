@@ -1,0 +1,10 @@
+aflex_user_man.tex
+
+    The Aflex user's manual.  Use latex and bibtex to generate the .dvi file.
+
+aflex.manpage
+    Man page for Aflex.  Use nroff and the -man macros to format.
+
+ayacc_user_man.tex
+    The current documentation for ayacc.  Run latex on it twice to
+    get the references correct.

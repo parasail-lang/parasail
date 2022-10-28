@@ -1,0 +1,153 @@
+interface PSL::Core::List<List_Elem is Assignable<>> is
+    var Elem : List_Elem
+    var Next : optional List
+
+    op "|"(Left : List_Elem; Right : List_Elem) -> List
+    op "|"(Left : List_Elem; Right : List) -> List
+    op "|"(Left : List; Right : List) -> List
+    op "|"(Left : List; Right : List_Elem) -> List
+
+    op "|="(var Left : List; Right : List)
+    op "|="(var Left : List; Right : List_Elem)
+    func Length(L : optional List) -> Univ_Integer
+    op "magnitude"(L : optional List) -> Univ_Integer is Length
+
+    op "[]"() -> optional List is (null)
+
+    func Remove_First(var L : List) -> optional List_Elem
+    func Remove_Last(var L : List) -> optional List_Elem
+    func Remove_Any(var L : List) -> optional List_Elem
+end interface PSL::Core::List
+
+class PSL::Core::List is
+  exports
+    op "|"(Left : List_Elem; Right : List_Elem) -> List is
+        return (Elem => Left, Next => (Elem => Right, Next => null))
+    end op "|"
+
+    op "|"(Left : List_Elem; Right : List) -> List is
+        return (Elem => Left, Next => Right)
+    end op "|"
+
+    op "|"(Left : List; Right : List) -> List is
+        if Left is null then
+            // Left is null, so just return Right
+            return Right
+        else
+            // Recurse with tail of left Basic_list
+            return (Elem => Left.Elem, Next => Left.Next | Right)
+        end if
+    end op "|"
+
+    op "|"(Left : List; Right : List_Elem) -> List is
+        return Left | (Elem => Right, Next => null)
+    end op "|"
+
+    op "|="(var Left : List; Right : List) is
+        if Left is null then
+            Left := Right
+        else
+            // Recurse with tail of Basic_list
+            Left.Next |= Right
+        end if
+    end op "|="
+
+    op "|="(var Left : List; Right : List_Elem) is
+        // Just pass the buck
+        Left |= (Elem => Right, Next => null)
+    end op "|="
+
+    func Length(L : optional List) -> Result : Univ_Integer is
+        Result := 0
+        for Lst := L then Lst.Next while Lst not null loop
+            Result += 1
+        end loop
+    end func Length
+
+    func Remove_First(var L : List) 
+      -> Result : optional List_Elem is
+        if L is null then
+            return null
+        else
+            Result := L.Elem
+            L <== L.Next
+              // carve off L.Next and set L to that
+        end if
+    end func Remove_First
+
+    func Remove_Last(var L : List) 
+      -> Result : optional List_Elem is
+        if L is null then
+            return null
+        elsif L.Next is null then
+            Result := L.Elem
+            L := null
+        else
+            // Recurse to remove last element
+            return Remove_Last(L.Next)
+        end if
+    end func Remove_Last
+
+    func Remove_Any(var L : List) 
+      -> Result : optional List_Elem is
+        // Easiest to remove first element
+        return Remove_First(L)
+    end func Remove_Any
+
+end class PSL::Core::List
+func PSL::Test::Test_List(X, Y : Univ_Integer) is
+    type Univ_List is List<Univ_Integer>
+
+    func Println(L : Univ_List) is
+        // Print a univ Basic_list
+        var N := L
+        while N not null loop
+            const E : Univ_Integer := N.Elem
+            Print(E)
+            N := N.Next
+            if N not null then
+                Print(", ")
+            end if
+        end loop
+
+        Print("\n")
+    end func Println
+
+    func Println_It(L : Univ_List) is
+        // Print a univ Basic_list using destructive iterator
+        Print("Forward: ")
+        var F := L
+        while F not null loop
+            const E : Univ_Integer := Remove_First(F)
+            Print(E)
+            if F not null then
+                Print(", ")
+            end if
+        end loop
+
+        Print("\n")
+
+        Print("Reverse: ")
+        var R := L
+        while R not null loop
+            const Z : Univ_Integer := Remove_Last(R)
+            Print(Z)
+            if R not null then
+                Print(", ")
+            end if
+        end loop
+
+        Print("\n")
+    end func Println_It
+
+    var L1 : Univ_List := (Elem => X, Next => null)
+    var L2 : Univ_List := (Elem => Y, Next => null)
+    var L3 := L1 | L2
+
+    Print("X = "); Println(X)
+    Print("Y = "); Println(Y)
+    Println("Combining " | X | " and " | Y | " produces ")
+    Println(L3)
+    Println("Combining X | Y | X | X | Y | Y produces ")
+    Println_It(L3 | X | L3 | Y)
+end func PSL::Test::Test_List

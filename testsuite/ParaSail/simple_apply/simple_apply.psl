@@ -1,0 +1,21 @@
+func Test_Apply() is
+     func Apply
+       (Op : func(X : Integer) -> Integer; S : Vector<Integer>)
+         -> Vector<Integer> is
+        return [for each E of S => Op(E)];
+     end func Apply;
+
+     const Result := Apply (lambda(Y)->2*Y, [1, 2, 3])
+
+     Print ("Apply (lambda(Y)->2*Y, [1, 2, 3]) = ");
+     var Sep := "["
+     for each E of Result forward loop
+        Print(Sep | E);
+        Sep := ", "
+     end loop;
+     Println("]");
+end func Test_Apply
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Apply ();
+end func main;

@@ -1,0 +1,4 @@
+proc Hello_World () is
+    Println("Hello world!");
+end func Hello_World;
+

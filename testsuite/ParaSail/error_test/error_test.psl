@@ -1,0 +1,360 @@
+import XXYZ;  // TBD: Does this precede the interface?
+              //      Any notion of "use" or "using"
+interface Hello_World <Standard_IO<>> is
+    func Main(var IO : Standard_IO);
+end interface Hello_World;
+
+// TBD: What do enumeration type declarations look like?
+//      The first parameter is an id-list type.  The other
+//      parameters might be something relating to first/last,
+//      'image, etc.
+
+// TBD: What is the comment syntax?  "//" or "--"?  
+//      Modula and ML use "(* *)" but ML folks are suggesting
+//      the use of "# " as the start of a comment that goes to the EOL.
+//      For some reason I find "#" pretty ugly, especially in the
+//      middle of a line.
+//      C#, C++, and Java all support "//", as well as the
+//      partial line '/* ... */'.  That seems error-prone,
+//      so sticking with "//" by itself seems simplest.
+//      Also "--" means decrement to half the world.
+
+// Syntax:  module::module, type::operation, type::nested_entity,
+//          object.component, object.operation [equiv to type::operation(object, ...)]
+
+// TBD: When a non-abstract interface has no module parameters, does that mean
+//      the module name can be used directly as a type name?  Or are the "<>"
+//      mandatory?  Can we say "interface Univ_Enumeration<> is ..."
+
+// TBD: Should we make aggregates usable when outside the associated class?
+//      What about "extension" aggregates?  Operator "aggregate"?
+
+// TBD: Get rid of "subtype" and just use "type Blah is ..." or "type Blah is new ..."
+//      "subtype" is a relationship, not a kind of entity.
+
+interface Std <> is
+
+    abstract interface Any<> is
+        op "end" (var Obj : Any);
+    end interface Any;
+    
+    abstract interface Assignable<> extends Any is
+        op "copy" Assignable -> Assignable;
+    end interface Assignable;
+
+    -- type Univ_Enumeration is ...; // type with all enumerals
+    
+    type Boolean is Enum <[#false, #true]>; // True or False
+    type Ordering is Enum <[#less, #equal, #greater, #unordered]>;
+
+    -- type Univ_Integer is ...; // infinite precision integers with +/- inf
+    -- type Univ_Real is ...;    // infinite precision rational numbers 
+			      // with +/- zero and inf
+    -- type Univ_Character is ...;  // ISO 10646, 31-bit character
+    -- type Univ_String is ...;  // UTF-32
+    
+    
+end interface Std;
+
+interface Std::Integer<First, Last : Univ_Integer> is
+    op "from_univ"(Univ : Univ_Integer {Univ in First .. Last}) 
+      -> Integer;
+    op "to_univ"(Int : Integer) 
+      -> Result: Univ_Integer {Result in First .. Last};
+
+    op "+"(Left, Right : Integer {[[Left]] + [[Right]] in First .. Last}) 
+      -> Result : Integer {[[Result]] == [[Left]] + [[Right]]};
+end interface Std::Integer;
+
+// [[x]] means "to_univ"(X), as a nod to the double bracket notation used in
+// denotational semantics to define the meaning of an expression in a program.
+
+
+abstract interface Std::Ref<Target_Type is Any<>> 
+is
+   func Is_Writable(R : Ref) -> Boolean;
+   func Exists(R : Ref) -> Boolean;
+   func Fetch(R : Ref {Exists(R)}) -> Target_Type;
+   func Store(R : Ref {Is_Writable(R)}; 
+     New_Contents : Target_Type) {Exists(R)};
+   func Delete(R : Ref {Is_Writable(R)}) {not Exists(R)};
+end interface Std::Ref;
+
+interface Hello_World <Context<>; Standard_IO<>> is
+    func Main(var IO : Standard_IO);
+end interface Hello_World;
+
+class Hello_World is
+  exports
+    func Main(var IO : Standard_IO) is
+	var X = 0;  -- ERROR should be ":="
+
+	if X /= 0 then  -- ERROR, should be "!="
+	    Complain();
+	elseif X = 2 then  -- ERROR, should be elsif, "=="
+	    Complain_Louder();
+	end if;
+
+        Put_Line(IO.Output, "Hello World");
+       
+    end func Main;
+end class Hello_World;
+
+interface String<Character<>; Index is Integer<>> is
+    op "in"(Lit : Univ_String) -> Boolean;
+    op "from_univ"(Lit : Univ_String {Lit in String}) 
+      -> String;
+    opertor "to_univ"(Str : String) -> Result : Univ_String -- ERROR
+      {Result in String};
+    op "|"(Left, Right : String) -> Result : String
+      {Length(Result) == Length(Left) + Length(Right)};
+end interface String;
+      
+interface Standard_IO<Context<>; Input_Stream<>; Output_Stream<>> is
+    func Output(Context) -> Output_Stream;
+    func Input(Context) -> Input_Stream;
+end interface Standard_IO;
+
+interface Output_Stream<String<>> is
+    func Put(var Output : Output_Stream; Char : String::Character);
+    func Put(var Output : Output_Stream; Message : String);
+    func Put_Line(var Output : Output_Stream; Message : String);
+end interface Output_Stream;
+
+interface Input_Stream<String<>> is
+    func Get(var Input : Input_Stream) -> String::Character;
+    func Get_Line(var Output : Input_Stream) -> String;
+end interface Input_Stream;
+
+interface Integer<First, Last : Univ_Integer> is
+    op "in"(Lit : Univ_Integer) -> Result : Boolean 
+      {Result == (Lit in First .. Last)};
+    op "from_univ"(Univ_Integer {Univ_Integer in First .. Last}) 
+      -> Integer;
+    op "to_univ"(Integer) -> Result : Univ_Integer 
+      {Result in First .. Last};
+    op "+"(Left, Right : Integer 
+      {[[Left]] + [[Right]] in First .. Last}) -> Result : Integer
+        {[[Result]] == [[Left]] + [[Right]]};
+    op "-"(Left, Right : Integer
+      {[[Left]] - [[Right]] in First .. Last}) -> Integer;
+    op "*"(Left, Right : Integer
+      {[[Left]] * [[Right]] in First .. Last}) -> Integer;
+    op "/"(Left, Right : Integer
+      {[[Left]] / [[Right]] in First .. Last}) -> Integer;
+    op "=?"(Left, Right : Integer) -> Ordering;
+end interface Integer;
+
+interface Character<> is
+    op "in"(Lit : Univ_Character) -> Boolean;
+    op "from_univ"(Lit : Univ_Character {Lit in Character}) 
+      -> Character;
+    op "to_univ"(Char : Character) -> Result : Univ_Character 
+      {Result in Character};
+end interface Character;
+
+interface Vector<Component is Assignable<>; First : Univ_Integer := 1;
+   Max_Length : Univ_Integer := +inf> is
+    func Length(Vec : Vector) -> Univ_Integer {Length in 0..Max_Length};
+    func Last(Vec : Vector) -> Univ_Integer {Last == Length(Vec) + First - 1};
+    op "[]"(ref Vec : Vector; Index : Univ_Integer {Index in First..Last(Vec)}) 
+      -> ref Component;
+    op "|"(Left, Right : Vector) -> Result : Vector 
+      {Length(Left) + Length(Right) == Length(Result)}; // "|" is pronounced "concatenate"
+                                                        // or "connect" or "tied to"
+                                                        // or "chained to" or "linked to" or ...?
+    op "|"(Left : Vector; Right : Component) -> Result : Vector
+      {Length(Left) + 1 == Length(Result)};
+    op "|"(Left : Component; Right : Vector) -> Result : Vector
+      {Length(Right) + 1 == Length(Result)};
+    op "|"(Left, Right : Component) -> Result : Vector
+      {Length(Result) == 2}; // Do we really need this one?  Is equivalent to "[Left, Right]"
+    op "null"() -> Result : Vector {Length(Result) == 0};
+    op "|="(var Vec : Vector; Value : Component)
+      {Length(Vec') == Length(Vec) + 1};
+    op "|="(var Vec : Vector; Other_Vec : Vector)
+      {Length(Vec') == Length(Vec) + Length(Other_Vec)}; // Vec' means new value
+					// do we prefer "old(...)"?
+                                        // How about post(...) and pre(...)?
+                                        // or "new(...)" and "old(...)"?
+                                        // Since these are appearing in
+                                        // a postcondition, it seems
+                                        // redundant to say "post" or "new".
+                                        // In any case "new" reads better than post.
+
+    op ":="(var Left : Vector; Right : Vector)
+      {Length(Left) == Length(Right)};
+      
+    op "<=>"(var Left, Right : Vector)
+      {Length(Left') == Length(Right) and Length(Right') == Length(Left)};
+    op "+"(Left, Right : Vector {Length(Left) == Length(Right)}) -> Result : Vector
+      {Length(Result) == Length(Left)};  // component-wise addition
+    
+end interface Vector;
+
+interface Stack<Component is Assignable<>; Size_Type is Integer<>> is
+    
+    func Max_Stack_Size(S : Stack) -> Size_Type {Max_Stack_Size > 0};
+    
+    func Count(S : Stack) -> Size_Type 
+      {Count <= Max_Stack_Size(S)};
+    
+    func Init(Max : Size_Type {Max > 0}) -> Stack 
+      {Max_Stack_Size(Init) == Max; Count(Init) == 0};
+    
+    func Is_Empty(S : Stack) -> Boolean
+      {Is_Empty == (Count(S) == 0)};
+    
+    func Is_Full(S : Stack) -> Boolean
+      {Is_Full == (Count(S) == Max_Stack_Size(S))};
+      
+    func Top(S : Stack {not Is_Empty(S)}) -> Component;
+    
+    func Pop(var S : Stack {not Is_Empty(S)}) 
+      {Count(S') == Count(S) - 1; not Is_Full(S')};
+      
+    func Push(var S : Stack {not Is_Full(S)}; X : Component)
+      {Count(S') == Count(S) + 1; not Is_Empty(S')};
+      
+end interface Stack;
+    
+    
+interface Float_With_Units<
+  Base is Float<>;
+  Name : Univ_String;
+  Short_Hand : Univ_String;
+  Unit_Dimensions : Array<
+    Element_Type => Univ_Real,
+    Index_Type => Dimension_Enum> := [.. => 0.0];
+  Scale : Univ_Real := 1.0> 
+is
+  op "from_univ"(Value : Univ_Real)
+    {Value in Base::First*Scale .. Base::Last*Scale}
+    -> Float_With_Units;
+
+  op "to_univ"(Value : Float_With_Units) -> Result : Univ_Real
+    {Result in Base::First*Scale .. Base::Last*Scale};
+
+  op "+"(Left, Right : Folat_With_Units) -> Result : Float_With_Units
+    {[[Result]] = [[Left]] + [[Right]]};  -- ERROR, should be "=="
+
+  op "=?"(Left, Right : Float_With_Units) -> Ordering;
+
+  op "*"(Left : Float_With_Units;
+    Right : Right_Type is Float_With_Units<>) 
+    -> (Result : Result_Type is Float_With_Units
+          <Unit_Dimensions => Unit_Dimensions + Right_Type.Unit_Dimensions>)
+      {[[Result]] == [[Left]] * [[Right]]};
+
+end interface Float_With_Units;
+
+func Map (
+    func Transform(Element_Input is Any<>)
+     -> (Element_Output is Assignable<>);
+    Container_Input is Container<Element_Input>)
+  -> (Container_Output is Container<Element_Output>)
+is
+ *Misspelling*
+  block
+    null;
+  end block Mispelling; -- ERROR, misspelled.
+
+ *Build*
+  for each Elem in Container_Input forward loop  -- ERROR, should be "of"
+     Container_Output |= Transform(Elem);
+  end loop Build;
+
+ *Verify*
+  block
+      var Error_Count := 0;
+
+      for Key in Container_Input.Keys loop
+	 if Container_Output[Key] != Transform(Container_Input[Key]) then 
+	     Error_Count += 1;
+	 endif;  -- ERROR, should be "end if"
+      end loop;
+      
+  end block Verify;
+
+end func Map;
+      
+func Test_Map (Inp: Vector<Univ_Integer>) -> Vector<Univ_String> is
+  ref Result => Map(Univ_Integer::To_String, Inp);
+  retrun Result;  -- ERROR
+end func Test_Map;
+
+// How do we call an operation with module parameters?
+// The '<' is ambiguous.  Move the module parameters to a point
+// *before* the operation name?
+//
+//func <func Transform(Element_Input is Any<>)
+//            -> (Element_Output is Assignable<>)> 
+//  Map (Container_Input is Container<Element_Input>)
+//     -> (Container_Output is Container<Element_Output>);
+//
+// -- and the call would look like:
+//     Result := <Combine>Map(Elem_Container);
+//
+//  or move to *inside* the parentheses:
+//func Map (<func Transform(Element_Input is Any<>)
+//            -> (Element_Output is Assignable<>)> 
+//  Container_Input is Container<Element_Input>)
+//     -> (Container_Output is Container<Element_Output>);
+//
+// -- and the call would look like:
+//     Result := Map(<Transform => Combine> Container_Input => Elem_Container);
+// -- Or do we adopt a different syntax for module instantiation? e.g.:
+//   X : Vector<:Integer:>
+//   X : Vector(:Integer:)
+//   X : Vector<-Integer->
+//   X : Vector<|Integer|>
+//   X : Vector<*Integer*>
+//   X : Vector</Integer/>
+//       Any<//>
+//     Result := Map<:Transform => Combine:>(Container_Input => Elem_Container);
+//
+// -- The best seems to be to eliminate the distinction between
+// -- module parameters and regular parameters when parameterizing
+// -- operations.  We already do that for the type of object parameters, 
+// -- so why not simply allow passing operations directly as parameters.
+// -- They can still use macro-expansion semantics for static analysis.
+// 
+//func Map (
+//    func Transform(Element_Input is Any<>) 
+//      -> (Element_Output is Assignable<>);
+//    Container_Input is Container<Element_Input>)
+//  -> (Container_Output is Container<Element_Output>);
+//
+// -- and the call would look like:
+//     Result := Map(Transform => Combine, Container_Input => Elem_Container);
+//    
+//////////////////////
+
+
+// Issues:  
+// 
+//  - Where does the original connection to the user's terminal come from?  
+//    Presumably the context.
+//  - If there are no constructors in an interface and no uses of the
+//    module name (which represents a type) inside the module
+// 
+// In formal operation parameters, the parameter name is optional so 
+// long as it is the only formal parameter of the given type.  There may
+// be a result of the same type.  The type name
+// identifies the formal parameter inside the operation.  A type name
+// never identifies a result.  Either the result is given an explicit
+// name (as in "-> Result : Integer") or the result is set using
+// a "return" statement.
+// 
+// In formal module parameters, the type name is optional, so long
+// as it is the only formal parameter that is an instance of a particular module.
+// The formal type's module name identifies the formal type inside the module.
+// 
+// ??What about defaulted parameters??
+// For module parameters, non-abstract interfaces have their own default class.
+// For other parameters, we need some way to indicate a default, either ":=" or
+// "=>" or ...  Probably ":=".
+// 
+// Should we use #optional, #locked, #queued, etc. rather than presuming these
+// are all reserved words?
+// 

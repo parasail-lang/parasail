@@ -1,0 +1,5 @@
+Initial string = "my_string"
+After converting to and from a vector of chars = "my_string"
+After replacing the third character with 'q': "myqstring"
+Str as a ZString = "my_string"
+After convert to ZVector and replacing 4th char with 'x': "my_xtring"

@@ -1,0 +1,52 @@
+package Parse_Tree is
+   type Parse_Tree is private;
+
+   proc Process_Parse_Tree(Root : Parse_Tree+);
+end Parse_Tree;
+
+package body Parse_Tree is
+   subtype T_Kind is Enum<[#leaf, #unary, #binary]>
+
+   type Parse_Tree is abstract record
+      Kind : T_Kind;
+   end record;
+
+   type Leaf_Node is new Parse_Tree with record
+      Data : Integer;
+   end record;
+
+   type Unary_Tree is new Leaf_Node with record
+      Operand : Parse_Tree;
+   end record;
+
+   type Binary_Tree is new Parse_Tree with record
+      Left    : Parse_Tree;
+      Right   : Parse_Tree;
+   end record;
+
+   proc Process (X : Integer) is
+      Print (X);
+   end proc Process;
+
+exports
+
+   proc Process_Parse_Tree(Root : Parse_Tree+) is
+     for X => Root while X not null loop
+	case X.Kind is
+	  when #leaf =>
+              Process(X.Data);
+	  when #unary =>
+	      Process(X.Data);
+	    ||
+	      continue loop with X => X.Operand;
+	  when #binary =>
+	      Process(X.Data);
+	    ||
+	      continue loop with X => X.Left;
+	    ||
+	      continue loop with X => X.Right;
+	end case;
+     end loop;
+   end proc Process_Parse_Tree;
+
+end Parse_Tree;

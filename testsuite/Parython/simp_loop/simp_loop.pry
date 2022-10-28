@@ -1,0 +1,4 @@
+def Test_Simp_Loop(X : Integer) :
+    for J in 1..X :
+	var I : Integer = J;
+	Println("I = " | I);

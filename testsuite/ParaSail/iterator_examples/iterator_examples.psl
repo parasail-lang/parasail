@@ -1,0 +1,55 @@
+interface Tree<Count_Type is Countable<>> is
+   var Count : Count_Type
+   var Left : optional Tree := null
+   var Right : optional Tree := null
+end interface Tree
+
+func Iterators() is
+   func Leaf(I : Univ_Integer) -> Tree<Univ_Integer> is ((Count => I))
+
+   const Sample : Tree<Univ_Integer> :=
+      (2, Left => (1, Leaf(0), Leaf(1)), Right => (3, Leaf(1), Leaf(3)))
+
+   Println ("Tree is (2, Left => (1, Leaf(0), Leaf(1)), " |
+      "Right => (3, Leaf(1), Leaf(3))")
+
+   const Some_Pos : Boolean :=
+     (for some P => Sample then P.Left || P.Right while P not null =>
+       P.Count > 0)
+
+   Println ("Has some positive counts = " | Some_Pos)
+
+   const Some_Neg : Boolean :=
+     (for some P => Sample then P.Left || P.Right while P not null =>
+       P.Count < 0)
+
+   Println ("Has some negative counts = " | Some_Neg)
+
+   const Flattened : concurrent Vector<Univ_Integer> :=
+     [ for P => Sample then P.Left || P.Right while P not null =>
+        P.Count ]
+
+// JM: Disabled to avoid output differences between executions
+//   Print ("Flattened: [")
+//   for each [I => E] of Flattened forward loop
+//     Print ((if I > 1 then ", " else "") | E )
+//   end loop
+//   Println ("]")
+
+   const Sum_Sqrs : Univ_Integer :=
+     (for P => Sample then P.Left || P.Right while P not null =>
+       <0> + P.Count ** 2)
+
+   Println ("Sum of squares = " | Sum_Sqrs)
+
+end func Iterators
+
+func Many_Iterators(Num : Univ_Integer) is
+   for I in 1 .. Num loop
+      Iterators()
+   end loop
+end func Many_Iterators
+
+func main(Args : Basic_Array<Univ_String>) is
+   Iterators ();
+end func main;

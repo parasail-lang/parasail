@@ -1,0 +1,104 @@
+// Example ParaSail program -- Parallel, non-recursive N_Queens solver
+
+// Copyright (C) 2011-2014, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+interface Ranges<> is
+    const Univ_Integer_Range : Countable_Range<Univ_Integer> :=
+      -(2**62-1)*2-1 .. +(2**62-1)+1;
+end interface Ranges;
+
+interface Integer_Range<Range : Countable_Range<Univ_Integer> := 
+  Ranges::Univ_Integer_Range> is
+    op "from_univ"(Univ : Univ_Integer<>) -> Integer_Range
+      is import(#integer_from_univ);
+    op "to_univ"(Val : Integer_Range) -> Univ_Integer
+      is import(#integer_to_univ);
+    op "+"(Left, Right : Integer_Range) -> Integer_Range
+      is import("+");
+    op "-"(Left, Right : Integer_Range) -> Integer_Range
+      is import("-");
+    op "=?"(Left, Right : Integer_Range) -> Ordering
+      is import("=?");
+    op "[..]"() -> Countable_Range<Integer_Range>;
+    func Hash(Val : Integer_Range) -> Univ_Integer
+      is import(#identity);
+  implements
+  for Countable
+    // These operations are needed so Integer_Range satifies
+    // requirements of "Countable" interface, but these
+    // operations are not directly callable (if they were callable,
+    // we would have ambiguity when adding an integer-range to an int-literal).
+
+    op "+"(Left : Integer_Range; Right : Univ_Integer) -> Integer_Range 
+      is import("+");
+
+    op "+"(Left : Univ_Integer; Right : Integer_Range) -> Integer_Range 
+      is import("+");
+
+    op "-"(Left : Integer_Range; Right : Univ_Integer) -> Integer_Range 
+      is import("-");
+
+    op "-"(Left, Right : Integer_Range) -> Result : Univ_Integer
+      is import("-");
+
+end interface Integer_Range;
+
+class Integer_Range is
+    var Val : Univ_Integer;
+  exports
+    op "[..]"() -> Countable_Range<Integer_Range> is
+	return Range.First .. Range.Last;
+    end op "[..]";
+end class Integer_Range;
+
+interface Array<Elem_Type is Assignable<>; Indexed_By is Countable<>> is
+    op "indexing"(ref Arr : Array; Index : Indexed_By) -> ref Elem_Type;
+    op "var_indexing"(ref var Arr : Array; Index : Indexed_By) 
+      -> ref var Elem_Type;
+    op "|"(Left : Array; Right : Key_Value<Indexed_By, Elem_Type>) -> Array;
+    op "[]"() -> Array;
+    func Create(Bounds : Countable_Range<Indexed_By>; Initial_Value : Elem_Type)
+      -> Array;
+    func Length(Arr : Array) -> Univ_Integer;
+    func Bounds(Arr : Array) -> Countable_Range<Indexed_By>;
+end interface Array;
+
+class Array is
+    var Data : Basic_Array<Elem_Type>;
+    const Bounds : Countable_Range<Indexed_By>;
+  exports
+    op "indexing"(ref Arr : Array; Index : Indexed_By) -> ref Elem_Type is
+	return Arr.Data[ Index - Arr.Bounds.First + 1 ];
+    end op "indexing";
+
+    op "var_indexing"(ref var Arr : Array; Index : Indexed_By) 
+      -> ref var Elem_Type is
+	return Arr.Data[ Index - Arr.Bounds.First + 1 ];
+    end op "var_indexing";
+
+    op "|"(Left : Array; Right : Key_Value<Indexed_By, Elem_Type>) 
+      -> Result : Array is
+	Result := Left;
+	Result[Right.Key] := Right.Value;
+    end op "|";
+
+    func Create(Bounds : Countable_Range<Indexed_By>; Initial_Value : Elem_Type)
+      -> Array is
+	return (Data => Create(Length(Bounds), Initial_Value),
+	  Bounds => Bounds);
+    end func Create;
+
+    op "[]"() -> Result : Array is
+	return Create(Indexed_By::[..], null);
+    end op "[]";
+
+    func Length(Arr : Array) -> Univ_Integer is
+	return Length(Arr.Bounds);
+    end func Length;
+
+    func Bounds(Arr : Array) -> Countable_Range<Indexed_By> is
+	return Arr.Bounds;
+    end func Bounds;
+end class Array;
+

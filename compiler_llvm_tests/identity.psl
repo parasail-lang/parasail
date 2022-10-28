@@ -1,0 +1,3 @@
+func Identity(N : Univ_Integer) -> Univ_Integer is
+   return +N;
+end func Identity;

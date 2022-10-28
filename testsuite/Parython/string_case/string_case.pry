@@ -1,0 +1,16 @@
+def Test_String_Case(S : Univ_String) :
+    switch S :
+       case "abc" :
+          Println("Found \"abc\"");
+       case "def" :
+          Println("Found \"def\"");
+       case "xx" :
+          Println("Found \"xx\"");
+       case "yy"|"zz" :
+          Println("Found \"yy\" or \"zz\"");
+       case "f"..<"h" :
+          Println("Found word starting with \"f\" or \"g\"");
+       case "abc" :
+          Println("Found \"abc\" again");  # TBD: Should be illegal
+       else :
+          Println("No special string");

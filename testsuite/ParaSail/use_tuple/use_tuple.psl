@@ -1,0 +1,9 @@
+func Use_Tuple() is
+   const A : Map<Univ_Integer, Pair<Boolean, Boolean>> := [];
+   const D : Pair<Univ_Integer, Boolean> := (3, #false);
+   Println("(" | D.First | ", " | D.Second | ")");
+end func Use_Tuple;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Use_Tuple ();
+end func main;

@@ -1,0 +1,29 @@
+
+
+10 ** 3 = 1000
+2 ** 3 = 8
+3 ** 3 = 27
+4 ** 3 = 64
+5 ** 3 = 125
+6 ** 3 = 216
+7 ** 3 = 343
+8 ** 3 = 512
+9 ** 3 = 729
+Div_Con(1, 1)!
+Div_Con(1, 10)!
+Div_Con(1, 2)!
+Div_Con(1, 3)!
+Div_Con(1, 5)!
+Div_Con(10, 10)!
+Div_Con(2, 2)!
+Div_Con(3, 3)!
+Div_Con(4, 4)!
+Div_Con(4, 5)!
+Div_Con(5, 5)!
+Div_Con(6, 10)!
+Div_Con(6, 6)!
+Div_Con(6, 7)!
+Div_Con(6, 8)!
+Div_Con(7, 7)!
+Div_Con(9, 10)!Div_Con(8, 8)!1 ** 3 = 1
+Div_Con(9, 9)!

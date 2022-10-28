@@ -1,0 +1,12 @@
+Roots of graph:
+ #hello
+Leaves of graph:
+ #stranger
+All nodes, and their successors:
+Successors of #hello (node 1)
+ #there, weight = 3.5
+ #stranger, weight = 1.1
+Successors of #there (node 2)
+ #stranger, weight = 2.2
+Successors of #stranger (node 3)
+BFS(Gr, [1], lambda (G, N) -> Boolean is (G[N] == #stranger)) = 3

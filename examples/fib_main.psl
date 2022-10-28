@@ -1,0 +1,113 @@
+// Example ParaSail program -- Recursive and iterative Fibonacci functions
+
+// Copyright (C) 2011-2014, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+    func Fib(N : Integer<>) -> Result : Integer<> is
+        // Classic recursive Fibonacci
+        if N <= 1 then
+            Result := N;
+        else
+            Result := Fib(N-1) + Fib(N-2);
+        end if;
+        // Println("Fib(" | N | ") -> " | Result)
+    end func Fib;
+
+    func Fib_Helper(I : Integer; N : Integer; 
+      Prev2 : Integer; Prev : Integer) -> Result : Integer is
+        if I >= N then
+            Result := Prev + Prev2;
+        else
+            Result := Fib_Helper(I+1, N, Prev, Prev+Prev2);
+        end if;
+    end func Fib_Helper;
+
+    func Fibit(N : Integer<>) -> Result : Integer<> is
+        // Recursive but not exponential Fibonacci
+        if N <= 1 then
+            return N;
+        else
+            return Fib_Helper(2, N, 0, 1);
+        end if;
+    end func Fibit;
+
+    func Test_Print(N : Integer<>) is
+        Print("Here is the answer:\n");
+        Print("Fib(" | N | ") = " | Fib(N) | "\n");
+    end func Test_Print;
+
+    func Minus(Left, Right : Integer) -> Result : Integer is
+        return Left - Right;
+    end func Minus;
+
+    func Fib_Slow(N : Integer<>) -> Result : Integer<> is
+        if N <= 1 then
+            return N;
+        else
+            // Println("Slower Fib_Slow(" | N | ")")
+            var Result1 : Integer<>;
+            var Result2 : Integer<>;
+            var Result3 : Integer<>;
+          then
+            Result3 := Fib_Slow(Minus(N, 2)) + Fib_Slow(Minus(N, 1));
+            // Println("N = " | N | ", Result3 = " | Result3)
+          ||
+            Result1 := Fib_Slow(Minus(N, 1));
+            Result2 := Fib_Slow(Minus(N, 2));
+            // Println("N = " | N | ", Result1 = " | Result1 | ", Result2 = " |
+            //   Result2)
+            block
+                null // Test_Print(1);
+              ||
+                null // Test_Print(2);
+            end block
+          then
+            // Println("About to return (" | Result1 | " + " |
+            //   Result2 | " + " | Result3 | ") / 2 = " |
+            //   (Result1 + Result2 + Result3 / 2))
+            return (Result1 + Result2 + Result3) / 2;
+        end if;
+    end func Fib_Slow;
+
+    func main (Args: Basic_Array <Univ_String>) is
+       Println("\nAbout to call Fib_Slow(3)")
+       Print ("Fib_Slow(3) = "); Print(Fib_Slow(3)); Print('\n');
+
+       // if #true then
+          // return
+       // end if
+
+       Println("About to call Fibit(7)")
+       Print ("Fibit(7) = "); Print(Fibit(7)); Print('\n');
+
+       Println("\nAbout to call Fib_Slow(7)")
+       Print ("Fib_Slow(7) = "); Print(Fib_Slow(7)); Print('\n');
+   
+       Println("\nAbout to call Fib(7)")
+       Print ("Fib(7) = "); Print(Fib(7)); Print('\n');
+   
+       var Repeat := (|Args| == 0? 1 : From_String(Args[1]))
+
+       if Repeat is null then
+          Repeat := 1
+       end if
+
+       if Repeat > 1 then
+          Print ("Repeating " | Repeat | " times.")
+       end if
+
+       for J in 1 .. Repeat loop
+          for I in 1 .. 10 forward loop
+             Println ("\nAbout to call Fib(" | I | ")");
+             Print ("Fib(" | I | ") = "); Print(Fib(I)); Print('\n');
+          end loop
+       end loop
+
+       Println("\n #args == 0 => " | (To_String(|Args|) == "0"));
+       if To_String(|Args|) >= "0" then
+          Println(" #args >= \"0\"");
+       else
+          Println(" #args not >= \"0\"");
+       end if;
+    end func main

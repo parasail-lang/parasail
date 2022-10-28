@@ -1,0 +1,1214 @@
+
+interface Basic_List<List_Elem is Assignable<>> is
+    var Elem : List_Elem;
+    var Next : optional Basic_List;
+
+    op "|"(Left : List_Elem; Right : List_Elem) -> Basic_List;
+    op "|"(Left : List_Elem; Right : Basic_List) -> Basic_List;
+    op "|"(Left : Basic_List; Right : Basic_List) -> Basic_List;
+    op "|"(Left : Basic_List; Right : List_Elem) -> Basic_List;
+
+    op "|="(var Left : Basic_List; Right : Basic_List);
+    op "|="(var Left : Basic_List; Right : List_Elem);
+
+    func Remove_First(var L : Basic_List) -> optional List_Elem;
+    func Remove_Last(var L : Basic_List) -> optional List_Elem;
+    func Remove_Any(var L : Basic_List) -> optional List_Elem;
+end interface Basic_List;
+
+class Basic_List is
+  exports
+    op "|"(Left : List_Elem; Right : List_Elem) -> Basic_List is
+	return (Elem => Left, Next => (Elem => Right, Next => null));
+    end op "|";
+
+    op "|"(Left : List_Elem; Right : Basic_List) -> Basic_List is
+	return (Elem => Left, Next => Right);
+    end op "|";
+
+    op "|"(Left : Basic_List; Right : Basic_List) -> Basic_List is
+	if Left is null then
+	    // Left is null, so just return Right
+	    return Right;
+	else
+	    // Recurse with tail of left Basic_list
+	    return (Elem => Left.Elem, Next => Left.Next | Right);
+	end if;
+    end op "|";
+
+    op "|"(Left : Basic_List; Right : List_Elem) -> Basic_List is
+	return Left | (Elem => Right, Next => null);
+    end op "|";
+
+    op "|="(var Left : Basic_List; Right : Basic_List) is
+	if Left is null then
+	    Left := Right;
+	else
+	    // Recurse with tail of Basic_list
+	    Left.Next |= Right;
+	end if;
+    end op "|=";
+
+    op "|="(var Left : Basic_List; Right : List_Elem) is
+	// Just pass the buck
+	Left |= (Elem => Right, Next => null);
+    end op "|=";
+
+    func Remove_First(var L : Basic_List) 
+      -> Result : optional List_Elem is
+	if L is null then
+	    return null;
+	else
+	    Result := L.Elem;
+	    L <== L.Next;
+	      // carve off L.Next and set L to that
+	end if;
+    end func Remove_First;
+
+    func Remove_Last(var L : Basic_List) 
+      -> Result : optional List_Elem is
+	if L is null then
+	    return null;
+	elsif L.Next is null then
+	    Result := L.Elem;
+	    L := null;
+	else
+	    // Recurse to remove last element
+	    return Remove_Last(L.Next);
+	end if;
+    end func Remove_Last;
+
+    func Remove_Any(var L : Basic_List) 
+      -> Result : optional List_Elem is
+	// Easiest to remove first element
+	return Remove_First(L);
+    end func Remove_Any;
+
+end class Basic_List;
+
+
+func Test_List(X, Y : Univ_Integer) is
+    type Univ_List is Basic_List<Univ_Integer>;
+
+    func Println(L : Univ_List) is
+	// Print a univ Basic_list
+	var N := L;
+	while N not null loop
+	    const E : Univ_Integer := N.Elem;
+	    Print("" | E);
+	    N := N.Next;
+	    if N not null then
+		Print(", ");
+	    end if;
+	end loop;
+
+	Print("\n");
+    end func Println;
+
+    func Println_It(L : Univ_List) is
+	// Print a univ Basic_list using destructive iterator
+	Print("Forward: ");
+	var F := L;
+	while F not null loop
+	    const E : Univ_Integer := Remove_First(F);
+	    Print("" | E);
+	    if F not null then
+		Print(", ");
+	    end if;
+	end loop;
+
+	Print("\n");
+
+	Print("Reverse: ");
+	var R := L;
+	while R not null loop
+	    const Z : Univ_Integer := Remove_Last(R);
+	    Print("" | Z);
+	    if R not null then
+		Print(", ");
+	    end if;
+	end loop;
+
+	Print("\n");
+    end func Println_It;
+
+    var L1 : Univ_List := (Elem => X, Next => null);
+    var L2 : Univ_List := (Elem => Y, Next => null);
+    var L3 := L1 | L2;
+
+    Println("Combining " | X | " and " | Y | " produces ");
+    Println(L3);
+    Println("Combining X | Y | X | X | Y | Y produces ");
+    Println_It(L3 | X | L3 | Y);
+end func Test_List;
+
+interface Closed_Interval<Bound_Type is Comparable<>> is
+    // This provides a simple "closed" interval X..Y
+    // If a type is countable, then half-open or fully open intervals
+    // can be converted into the equivalent closed interval.
+    var Low : Bound_Type;
+    var High : Bound_Type;
+    op "in"(Left : Bound_Type; Right : Closed_Interval) -> Boolean;
+    op "=?"(Left, Right : Closed_Interval) -> Ordering;
+end interface Closed_Interval;
+
+class Closed_Interval is
+  exports
+    op "in"(Left : Bound_Type; Right : Closed_Interval) -> Boolean is
+	return Left >= Right.Low and then Left <= Right.High;
+    end op "in";
+
+    op "=?"(Left, Right : Closed_Interval) -> Ordering is
+	// Compare two intervals, and consider them #unordered
+	// if they overlap at all, unless they are identical.
+	// If they don't overlap, then return #less or #greater as appropriate.
+
+	if Left.High < Right.Low then
+	    return #less;
+	elsif Left.Low > Right.High then
+	    return #greater;
+	elsif Left.Low == Right.Low and then
+	  Left.High == Right.High then
+	    return #equal;
+	else
+	    return #unordered;
+	end if;
+    end op "=?";
+
+end class Closed_Interval;
+
+interface Interval<Bound_Type is Comparable<>> is
+    // This supports closed, half-open, and open intervals.
+    // This is appropriate for uncountable types where you
+    // can't normalize all intervals into closed intervals.
+    var Low : Bound_Type;
+    var Low_Is_Open : Boolean;
+    var High : Bound_Type;
+    var High_Is_Open : Boolean;
+    op "in"(Left : Bound_Type; Right : Interval) -> Boolean;
+    op "=?"(Left, Right : Interval) -> Ordering;
+end interface Interval;
+
+class Interval is
+  exports
+    op "in"(Left : Bound_Type; Right : Interval) -> Boolean is
+	case Left =? Right.Low of
+	  [#less] => return #false;
+	  [#equal] => return not Right.Low_Is_Open;
+	  [#greater] =>
+	    case Left =? Right.High of
+	      [#less] => return #true;
+	      [#equal] => return not Right.High_Is_Open;
+	      [#greater] => return #false;
+	    end case;
+	end case;
+    end op "in";
+
+    op "=?"(Left, Right : Interval) -> Ordering is
+	// Compare two intervals, and consider them #unordered
+	// if they overlap at all, unless they are identical.
+	// If they don't overlap, then return #less or #greater as appropriate.
+	// Return #unordered if any of the comparisons return #unordered.
+
+	// First check for perfect equality
+	if Left.Low == Right.Low and then
+	  Left.High == Right.High and then
+	  Left.Low_Is_Open == Right.Low_Is_Open and then
+	  Left.High_Is_Open == Right.High_Is_Open then
+	    // NOTE: We are considering X..Y-1 != X..<Y since
+	    //       we don't require countable elements.
+	    return #equal;
+	end if;
+
+	case Left.High =? Right.Low of
+	  [#unordered] =>
+	    return #unordered;
+	  [#less] =>
+	    return #less;
+	  [#equal] =>
+	    if Left.High_Is_Open or else Right.Low_Is_Open then
+		// No overlap
+	        return #less;
+	    else
+		// We have already ruled out #equal
+		return #unordered;
+	    end if;
+	  [#greater] =>
+	    // Not clearly less, see whether clearly greater.
+	    case Left.Low =? Right.High of
+	      [#unordered] =>
+		return #unordered;
+	      [#less] =>
+		// We have already ruled out #equal
+		return #unordered;
+	      [#equal] =>
+		if Left.Low_Is_Open or else Right.High_Is_Open then
+		    // No overlap
+		    return #greater;
+		else
+		    // We have already ruled out #equal
+		    return #unordered;
+		end if;
+	      [#greater] =>
+		return #greater;
+	    end case;
+	end case;
+    end op "=?";
+
+end class Interval;
+
+func Test_Interval(X, Y, Z : Univ_Integer) is
+    var Y_Up_To_Z : Interval<Univ_Integer> := 
+      (Low => Y, Low_Is_Open => #false, High => Z, High_Is_Open => #true);
+
+    Println(X | " in " | Y | "..<" | Z | " = " | [[ X in Y_Up_To_Z ]]);
+
+    var Y_To_Z : Closed_Interval<Univ_Integer> := (Low => Y, High => Z);
+
+    Println(X | " in " | Y | ".." | Z | " = " | [[ X in Y_To_Z ]]);
+
+    var One_To_X : Closed_Interval<Univ_Integer> :=
+      (Low => 1, High => X);
+
+    Println(1 | ".." | X | "=?" | Y | ".." | Z | " = " | 
+      [[ One_To_X =? Y_To_Z ]]);
+
+end func Test_Interval;
+
+interface AA_Tree<Element is Comparable<>> is
+
+    // This module implements a balanced "AA" tree, originally
+    // described by Arne Andersson in the "Proceedings of the Workshop
+    // on Algorithms and Data Structures," pp 60-71, Springer Verlag, 1993.
+    // The following algorithm and descriptions were taken from the
+    // WikiPedia article on AA_Tree: 
+    //       http://en.wikipedia.org/wiki/AA_tree
+    // Note that various additional checks for a null tree have been added.
+
+    // Only two operations are needed for maintaining balance in an AA tree.
+    // These operations are called skew and split. Skew is a right rotation
+    // when an insertion or deletion creates a left horizontal link. Split
+    // is a conditional left rotation when an insertion or deletion creates two
+    // horizontal right links, which once again corresponds to two
+    // consecutive red links in red-black trees.
+
+    op "[]"() -> optional AA_Tree;
+	// Create an empty tree
+
+    func Insert(var T : optional AA_Tree; X : Element);
+	// input: X, the value to be inserted, and 
+	// T, the root of the tree to insert it into.
+	// output: A balanced T' including X.
+
+    func Delete(var T : optional AA_Tree; X : Element);
+	// input: X, the value to delete, and T, 
+	// the root of the tree from which it should be deleted.
+	// output: T', balanced, without the value X.
+
+    op "in"(X : Element; T : optional AA_Tree) -> Boolean;
+
+    func Overlapping(T : optional AA_Tree; X : Element) -> optional Element;
+        // input: X, the value to find, and T, 
+        // the root of the tree to be searched.
+	// output: the element equal to or "unordered" relative to X.
+
+    op "|="(var T : optional AA_Tree; X : Element);
+
+    func First(var T : optional AA_Tree) -> optional Element;
+      // Return first (smallest) element in tree
+
+    func Last(var T : optional AA_Tree) -> optional Element;
+      // Return last (greatest) element in tree
+
+    func Remove_First(var T : optional AA_Tree) -> optional Element;
+      // Remove first (smallest) element in tree
+
+    func Remove_Last(var T : optional AA_Tree) -> optional Element;
+      // Remove last (greatest) element in tree
+
+    func Remove_Any(var T : optional AA_Tree) -> optional Element;
+      // Remove some element from tree
+
+    func Count(T : optional AA_Tree) -> Univ_Integer;
+      // Return a count of the nodes in the tree
+
+end interface AA_Tree;
+
+class AA_Tree is
+    var Left : optional AA_Tree;
+    var Right : optional AA_Tree;
+    var Value : Element;
+    var Level : Univ_Integer := 0;
+
+    func Node(Value : Element; Level : Univ_Integer; Left : optional AA_Tree;
+      Right : optional AA_Tree) -> AA_Tree is
+	// Create a new tree.
+	return (Left => Left, Right => Right, Value => Value,
+	  Level => Level);
+    end func Node;
+
+    func Is_Leaf(T : optional AA_Tree) -> Boolean is
+	return T not null and then
+	  T.Left is null and then T.Right is null;
+    end func Is_Leaf;
+
+    func Leftmost(ref T : optional AA_Tree) -> ref optional AA_Tree is
+	if T not null and then T.Left not null then
+	    // Recurse with left until we reach null
+	    return Leftmost(T.Left);
+	else
+	    return T;
+	end if;
+    end func Leftmost;
+
+    func Successor(T : optional AA_Tree) -> optional Element is
+	// Return element in tree greater than but closest to T.Value
+	if T.Right not null then
+	    return Leftmost(T.Right).Value;
+	else
+	    return null;
+	end if;
+    end func Successor;
+
+    func Rightmost(ref T : optional AA_Tree) -> ref optional AA_Tree is
+	if T not null and then T.Right not null then
+	    // Recurse with right until we reach null
+	    return Rightmost(T.Right);
+	else
+	    return T;
+	end if;
+    end func Rightmost;
+
+    func Predecessor(T : optional AA_Tree) -> optional Element is
+	// Return element in tree less than but closest to T.Value
+	if T.Left not null then
+	    return Rightmost(T.Left).Value;
+	else
+	    return null;
+	end if;
+    end func Predecessor;
+
+    func Skew(var T : optional AA_Tree) is
+      // input: T, a node representing an AA tree that needs to be rebalanced.
+      // output: T' Another node representing the rebalanced AA tree.
+
+	if T not null and then
+	  T.Left not null and then
+	  T.Left.Level == T.Level then
+	    // The current T.Left becomes new root
+
+	    // Exchange value of T.Left with root
+	    T.Value <=> T.Left.Value;
+	   
+	    // Move old root and T.Left.Right over to right side of tree
+	    T.Left.Right <=> T.Right;
+	    T.Left.Left <=> T.Right;
+	    T.Left <=> T.Right;
+	end if;
+    end func Skew;
+
+    func Split(var T : optional AA_Tree) is
+	// input: T, a node representing an AA tree that needs to be rebalanced.
+	// output: T' Another node representing the rebalanced AA tree.
+
+	if T not null and then
+	  T.Right not null and then
+	  T.Right.Right not null and then
+	  T.Level == T.Right.Right.Level then
+	    // T.Right becomes the new root
+	    // Exchange value and level between root and T.Right
+	    T.Value <=> T.Right.Value;
+	    T.Level <=> T.Right.Level;
+
+	    // Move old root and T.Right.Left to left side of tree
+	    T.Left <=> T.Right.Right;
+	    T.Right.Left <=> T.Right.Right;
+	    T.Left <=> T.Right;
+
+	    // Increment level
+	    T.Level += 1;
+	end if;
+    end func Split;
+
+    func Decrease_Level(var T : optional AA_Tree) is
+	// input: T, a tree for which we want to remove links that skip levels.
+	// output: T with its level decreased.
+
+	if T is null then
+	    return;
+	end if;
+	   
+	var Should_Be : Univ_Integer := 1;
+
+	if T.Left not null then
+	    Should_Be := T.Left.Level + 1;
+	end if;
+
+	if T.Right not null then
+	    Should_Be := Min(Should_Be, T.Right.Level + 1);
+	end if;
+	    
+	if Should_Be < T.Level then
+	    T.Level := Should_Be;
+	    if T.Right not null and then
+	      Should_Be < T.Right.Level then
+		T.Right.Level := Should_Be;
+	    end if;
+	end if;
+    end func Decrease_Level;
+
+  exports
+
+    op "[]"() -> optional AA_Tree is
+	// Create an empty tree
+    	return null;
+    end op "[]";
+
+    // Insertion begins with the normal binary tree search and insertion
+    // procedure. Then, as the call stack unwinds (assuming a recursive
+    // implementation of the search), it's easy to check the validity of the
+    // tree and perform any rotations as necessary. If a horizontal left link
+    // arises, a skew will be performed, and if two horizontal right links
+    // arise, a split will be performed, possibly incrementing the level of the
+    // new root node of the current subtree. Note, in the code as given above,
+    // the increment of T.Level. This makes it necessary to continue checking
+    // the validity of the tree as the modifications bubble up from the leaves.
+    
+    func Insert(var T : optional AA_Tree; X : Element) is
+	// input: X, the value to be inserted, and 
+	// T, the root of the tree to insert it into.
+	// output: A balanced T' including X.
+
+	// Do the normal binary tree insertion procedure. 
+	// Set the result of the recursive call to the correct 
+	// child in case a new node was created or the
+	// root of the subtree changes.
+
+	if T is null then
+	    // Create a new leaf node with X.
+	    T := Node(X, 1, null, null);
+	    return;
+	end if;
+
+	case X =? T.Value of
+	  [#less] =>
+	    Insert(T.Left, X);
+	  [#greater] =>
+	    Insert(T.Right, X);
+	  [#equal | #unordered] =>
+	    // Note that the case of X == T.Value is unspecified. 
+	    // As given, an insert will have no effect. 
+	    // The implementor may desire different behavior.
+	    return;
+	end case;
+
+	// Perform skew and then split. 
+	// The conditionals that determine whether or
+	// not a rotation will occur or not are inside 
+	// of the procedures, as given above.
+
+	Skew(T);
+	Split(T);
+    end func Insert;
+
+    // As in most balanced binary trees, the deletion of an internal node can
+    // be turned into the deletion of a leaf node by swapping the internal node
+    // with either its closest predecessor or successor, depending on which are
+    // in the tree or on the implementor's whims. Retrieving a predecessor is
+    // simply a matter of following one left link and then all of the remaining
+    // right links. Similarly, the successor can be found by going right once
+    // and left until a null pointer is found. Because of the AA property of
+    // all nodes of level greater than one having two children, the successor
+    // or predecessor node will be in level 1, making their removal trivial.
+    // 
+    // To re-balance a tree, there are a few approaches. The one described by
+    // Andersson in his original paper is the simplest, and it is described
+    // here, although actual implementations may opt for a more optimized
+    // approach. After a removal, the first step to maintaining tree validity
+    // is to lower the level of any nodes whose children are two levels below
+    // them, or who are missing children. Then, the entire level must be skewed
+    // and split. This approach was favored, because when laid down
+    // conceptually, it has three easily understood separate steps:
+    // 
+    //     Decrease the level, if appropriate.
+    //     Skew the level.
+    //     Split the level.
+    // 
+    // However, we have to skew and split the entire level this time instead of
+    // just a node, complicating our code.
+
+    func Delete(var T : optional AA_Tree; X : Element) is
+	// input: X, the value to delete, and T, 
+	// the root of the tree from which it should be deleted.
+	// output: T', balanced, without the value X.
+
+	if T is null then
+	    // Not in tree -- should we complain?
+	    return;
+	end if;
+
+	case X =? T.Value of
+	  [#less] =>
+	    Delete(T.Left, X);
+	  [#greater] =>
+	    Delete(T.Right, X);
+	  [#equal] =>
+	    // If we're a leaf, easy, otherwise reduce to leaf case. 
+	    if Is_Leaf(T) then
+		T := null;
+	    elsif T.Left is null then
+		// Get successor value and delete it from right tree,
+		// and set root to have that value
+		const Succ := Successor(T);
+		Delete(T.Right, Succ);
+		T.Value := Succ;
+	    else
+		// Get predecessor value and delete it from left tree,
+		// and set root to have that value
+		const Pred := Predecessor(T);
+		Delete(T.Left, Pred);
+		T.Value := Pred;
+	    end if;
+	  [#unordered] =>
+	    // Not in tree; should we complain?
+	    return;  
+	end case;
+
+	// Rebalance the tree. Decrease the level of all nodes in this level if
+	// necessary, and then skew and split all nodes in the new level.
+
+	if T is null then
+	    return;
+	end if;
+
+	Decrease_Level(T);
+	Skew(T);
+	Skew(T.Right);
+	if T.Right not null then
+	    Skew(T.Right.Right);
+	end if;
+	Split(T);
+	Split(T.Right);
+    end func Delete;
+
+    op "in"(X : Element; T : optional AA_Tree) -> Boolean is
+	if T is null then
+	    return #false;
+	else
+	    case X =? T.Value of
+	      [#less] =>
+		return X in T.Left;
+	      [#greater] =>
+		return X in T.Right;
+	      [#equal] =>
+		return #true;
+	      [#unordered] =>
+		return #false;
+	    end case;
+	end if;
+    end op "in";
+
+    func First(var T : optional AA_Tree) -> optional Element is
+      // Return first (smallest) element in tree
+	if T is null then
+	    return null;
+	elsif T.Left is null then
+	    return T.Value;
+	else
+	    // Recurse
+	    return First(T.Left);
+	end if;
+    end func First;
+
+    func Last(var T : optional AA_Tree) -> optional Element is
+      // Return last (greatest) element in tree
+	if T is null then
+	    return null;
+	elsif T.Right is null then
+	    return T.Value;
+	else
+	    // Recurse
+	    return Last(T.Right);
+	end if;
+    end func Last;
+
+
+    func Remove_First(var T : optional AA_Tree) -> Result : optional Element is
+      // Remove first (smallest) element in tree
+	Result := First(T);
+	if Result not null then
+	    Delete(T, Result);
+	end if;
+    end func Remove_First;
+
+    func Remove_Last(var T : optional AA_Tree) -> Result : optional Element is
+      // Remove last (greatest) element in tree
+	Result := Last(T);
+	if Result not null then
+	    Delete(T, Result);
+	end if;
+    end func Remove_Last;
+
+    func Remove_Any(var T : optional AA_Tree) -> Result : optional Element is
+      // Remove some element from tree
+	if T is null then
+	    return null;
+	end if;
+	Result := T.Value;
+	if Result not null then
+	    Delete(T, Result);
+	end if;
+    end func Remove_Any;
+
+    func Count(T : optional AA_Tree) -> Univ_Integer is
+      // Return a count of the nodes in the tree
+	if T is null then
+	    return 0;
+	else
+	    return Count(T.Left) + Count(T.Right) + 1;
+	end if;
+    end func Count;
+
+    op "|="(var T : optional AA_Tree; X : Element) is
+    	Insert(T, X);
+    end op "|=";
+
+    func Overlapping(T : optional AA_Tree; X : Element) -> optional Element is
+        // input: X, the value to find, and T, 
+        // the root of the tree to be searched.
+	// output: the element equal to or "unordered" relative to X.
+	if T is null or else T.Value is null then
+	    return null;
+	else
+	    case X =? T.Value of
+	      [#less] =>
+		return Overlapping(T.Left, X);
+	      [#greater] =>
+		return Overlapping(T.Right, X);
+	      [#equal | #unordered] =>
+		// Close enough
+		return T.Value;
+	    end case;
+	end if;
+    end func Overlapping;
+
+end class AA_Tree;
+
+func Test_AA_Tree(A : Univ_Integer; B : Univ_Integer; C : Univ_Integer) is
+    type Univ_Tree is AA_Tree<Univ_Integer>;
+    var T : Univ_Tree := [];
+    var X : Univ_Integer := A;
+
+    Insert(T, A);
+    Println("Count = " | Count(T) | " after insert of " | A);
+    Insert(T, B);
+    Println("Count = " | Count(T) | " after insert of " | B);
+    Insert(T, C);
+    Println("Count = " | Count(T) | " after insert of " | C);
+
+    Insert(T, A);
+    Println("Count = " | Count(T) | " after another insert of " | A);
+
+    var E := Remove_First(T);
+    while E not null loop
+	Println("Remove_First = " | E);
+	E := Remove_First(T);
+    end loop;
+
+    Println("Count after loop : " | Count(T));
+
+    var I := 1;
+    while I <= 10 loop
+	Insert(T, I);
+	Println("Count = " | Count(T) | " after insert of " | I);
+	I += 1;
+    end loop;
+
+    var L := Remove_Last(T);
+    while L not null loop
+	Println("Remove_Last = " | L);
+	L := Remove_Last(T);
+    end loop;
+
+    Println("Count after loop : " | Count(T));
+
+    var J := 1;
+    while J <= 10 loop
+	Insert(T, J);
+	Println("Count = " | Count(T) | " after insert of " | J);
+	J += 1;
+    end loop;
+
+    Println("Count after loop : " | Count(T));
+
+    Println("Overlapping(T, 5) = " | Overlapping(T, 5));
+
+    var Z := Remove_Any(T);
+    while Z not null loop
+	Println("Remove_Any = " | Z);
+	Z := Remove_Any(T);
+    end loop;
+
+    Println("Count after loop : " | Count(T));
+
+    var K := 1;
+    while K <= 10 loop
+	Insert(T, K);
+	Println("Count = " | Count(T) | " after insert of " | K);
+	K += 1;
+    end loop;
+
+    var F := Remove_First(T);
+    while F not null loop
+	Println("Remove_First = " | F);
+	F := Remove_First(T);
+    end loop;
+
+    Println("Count after loop : " | Count(T));
+
+end func Test_AA_Tree;
+
+interface Set<Element_Type is Comparable<>> is
+    op ".."(Left, Right : Element_Type) -> Set;
+    op "<.."(Left, Right : Element_Type) -> Set;
+    op "..<"(Left, Right : Element_Type) -> Set;
+    op "<..<"(Left, Right : Element_Type) -> Set;
+
+    op "|"(Left, Right : Element_Type) -> Set;
+    op "|"(Left : Set; Right : Element_Type) -> Set;
+    op "|"(Left : Element_Type; Right : Set) -> Set;
+    op "|"(Left : Set; Right : Set) -> Set;
+
+    op "|="(var Left : Set; Right : Element_Type);
+    op "|="(var Left : Set; Right : Set);
+
+    op "in"(Left : Element_Type; Right : Set) -> Boolean;
+
+    func Remove_First(var S : Set) -> optional Element_Type;
+    func Remove_Last(var S : Set) -> optional Element_Type;
+    func Remove_Any(var S : Set) -> optional Element_Type;
+end interface Set;
+
+class Set is
+
+    type Elem_Interval is Interval<Element_Type>;
+
+    var Intervals : optional Basic_List<Elem_Interval>;
+    var Elements : optional Basic_List<Element_Type>;
+    
+  exports
+    op ".."(Left, Right : Element_Type) -> Set is
+	return 
+	  (Intervals => (Elem =>
+	    (Low => Left, Low_Is_Open => #false,
+	     High => Right, High_Is_Open => #false), Next => null),
+	   Elements => null);
+    end op "..";
+    
+    op "<.."(Left, Right : Element_Type) -> Set is
+	return 
+	  (Intervals => (Elem =>
+	    (Low => Left, Low_Is_Open => #true,
+	     High => Right, High_Is_Open => #false), Next => null),
+	   Elements => null);
+    end op "<..";
+    
+    op "<..<"(Left, Right : Element_Type) -> Set is
+	return 
+	  (Intervals => (Elem =>
+	    (Low => Left, Low_Is_Open => #true,
+	     High => Right, High_Is_Open => #true), Next => null),
+	   Elements => null);
+    end op "<..<";
+    
+    op "..<"(Left, Right : Element_Type) -> Set is
+	return 
+	  (Intervals => (Elem =>
+	    (Low => Left, Low_Is_Open => #false,
+	     High => Right, High_Is_Open => #true), Next => null),
+	   Elements => null);
+    end op "..<";
+    
+    op "|"(Left, Right : Element_Type) -> Set is
+	return 
+	  (Intervals => null,
+	   Elements => (Elem => Left, Next =>
+	     (Elem => Right, Next => null)));
+	    // TBD: Eliminate duplicates
+    end op "|";
+
+    op "|"(Left : Set; Right : Element_Type) -> Set is
+	return 
+	  (Intervals => Left.Intervals,
+	   Elements => (Elem => Right, Next => Left.Elements));
+	     // TBD: Eliminate duplicates
+    end op "|";
+
+    op "|"(Left : Element_Type; Right : Set) -> Set is
+	return 
+	  (Intervals => Right.Intervals,
+	   Elements => (Elem => Left, Next => Right.Elements));
+	     // TBD: Eliminate duplicates
+    end op "|";
+
+    op "|"(Left : Set; Right : Set) -> Set is
+	return 
+	  (Intervals => Left.Intervals | Right.Intervals,
+	   Elements => Left.Elements | Right.Elements);
+	     // TBD: Eliminate duplicates
+    end op "|";
+
+    op "|="(var Left : Set; Right : Element_Type) is
+	Left.Elements := (Elem => Right, Next => Left.Elements);
+    end op "|=";
+
+    op "|="(var Left : Set; Right : Set) is
+	Left.Intervals |= Right.Intervals;
+	Left.Elements |= Right.Elements;
+    end op "|=";
+
+    op "in"(Left : Element_Type; Right : Set) -> Boolean is
+	var Elems := Right.Elements;
+	while Elems not null loop
+	    if (Left =? Elems.Elem) == #equal then
+		return #true;
+	    end if;
+	    Elems := Elems.Next;
+	end loop;
+	var Ivals := Right.Intervals;
+	while Ivals not null loop
+	    if Left in Ivals.Elem then
+		return #true;
+	    end if;
+	    Ivals := Ivals.Next;
+	end loop; 
+	return #false;
+    end op "in";
+
+    func Remove_First(var S : Set) -> Result : optional Element_Type is
+	if S.Elements not null then
+	    if S.Intervals is null or else
+	      S.Elements.Elem <= S.Intervals.Elem.Low then
+		// Return first single element
+		return Remove_First(S.Elements);
+	    end if;
+	elsif S.Intervals is null then
+	    return null;
+	end if;
+	// Return low bound of first interval
+	if not S.Intervals.Elem.Low_Is_Open then
+	    Result := S.Intervals.Elem.Low;
+	    S.Intervals.Elem.Low_Is_Open := #true;
+	elsif S.Intervals.Elem.Low >= S.Intervals.Elem.High then
+	    S.Intervals := S.Intervals.Next;
+	    // Recurse after removing first interval
+	    return Remove_First(S);
+	else
+	    // TBD: need some way to iterate through interval
+	    Result := null;
+	end if;
+    end func Remove_First;
+
+    func Remove_Last(var S : Set) -> Result : optional Element_Type is
+	if S.Elements not null then
+	    // Return last single element
+	    // TBD: Should really see whether this is > last interval
+	    return Remove_Last(S.Elements);
+	elsif S.Intervals is null then
+	    return null;
+	end if;
+	// Return high bound of last interval
+	// TBD: We are actually returning high bound of first interval
+	if not S.Intervals.Elem.High_Is_Open then
+	    Result := S.Intervals.Elem.High;
+	    S.Intervals.Elem.High_Is_Open := #true;
+	elsif S.Intervals.Elem.High <= S.Intervals.Elem.Low then
+	    S.Intervals := S.Intervals.Next;
+	    // Recurse after removing first interval
+	    return Remove_Last(S);
+	else
+	    // TBD: need some way to iterate through interval
+	    Result := null;
+	end if;
+    end func Remove_Last;
+
+    func Remove_Any(var S : Set) -> optional Element_Type is
+	// First is most convenient
+	return Remove_First(S);
+    end func Remove_Any;
+
+end class Set;
+
+func Test_Set(A, X, Y, Z : Univ_Integer) is
+    var S : Set<Univ_Integer> := X | Y..Z;
+    if A in S then
+	Println(A | " is in " | X | "|" | Y | ".." | Z);
+    else
+	Println(A | " is *not* in " | X | "|" | Y | ".." | Z);
+    end if;
+end func Test_Set;
+
+interface Countable_Set<Element_Type is Countable<>> is
+    op "[]"() -> Countable_Set;
+
+    op ".."(Left, Right : Element_Type) -> Countable_Set;
+    op "<.."(Left, Right : Element_Type) -> Countable_Set;
+    op "..<"(Left, Right : Element_Type) -> Countable_Set;
+    op "<..<"(Left, Right : Element_Type) -> Countable_Set;
+
+    op "|"(Left, Right : Element_Type) -> Countable_Set;
+    op "|"(Left : Countable_Set; Right : Element_Type) -> Countable_Set;
+    op "|"(Left : Element_Type; Right : Countable_Set) -> Countable_Set;
+    op "|"(Left : Countable_Set; Right : Countable_Set) -> Countable_Set;
+
+    op "|="(var Left : Countable_Set; Right : Element_Type);
+    op "|="(var Left : Countable_Set; Right : Countable_Set);
+
+    op "in"(Left : Element_Type; Right : Countable_Set) -> Boolean;
+
+    func Count(S : Countable_Set) -> Univ_Integer;
+
+    func Remove_First(var S : Countable_Set) -> optional Element_Type;
+    func Remove_Last(var S : Countable_Set) -> optional Element_Type;
+    func Remove_Any(var S : Countable_Set) -> optional Element_Type;
+end interface Countable_Set;
+
+class Countable_Set is
+
+    type Element_Interval is Closed_Interval<Element_Type>;
+
+    var Items : optional AA_Tree<Element_Interval>;
+
+  exports
+    op "[]"() -> Countable_Set is
+        return (Items => []);
+    end op "[]";
+
+    op ".."(Left, Right : Element_Type) -> Result : Countable_Set is
+	Result := [];
+	Result.Items |= (Low => Left, High => Right);
+    end op "..";
+    
+    op "<.."(Left, Right : Element_Type) -> Result : Countable_Set is
+	Result := [];
+	Result.Items |= (Low => Left+1, High => Right);
+    end op "<..";
+    
+    op "<..<"(Left, Right : Element_Type) -> Result : Countable_Set is
+	Result := [];
+	Result.Items |= (Low => Left+1, High => Right-1);
+    end op "<..<";
+    
+    op "..<"(Left, Right : Element_Type) -> Result : Countable_Set is
+	Result := [];
+	Result.Items |= (Low => Left, High => Right-1);
+    end op "..<";
+    
+    op "|"(Left, Right : Element_Type) -> Result : Countable_Set is
+	Result := [];
+	if Left >= Right-1 and then Left <= Right + 1 then
+	    // Can combine elements into a single interval
+	    if Left <= Right then
+		Result.Items |= (Low => Left, High => Right);
+	    else
+		Result.Items |= (Low => Right, High => Left);
+	    end if;
+	else
+	    // Make each element its own interval
+	    Result.Items |= (Low => Left, High => Left);
+	    Result.Items |= (Low => Right, High => Right);
+	end if;
+    end op "|";
+
+    op "|"(Left : Countable_Set; Right : Element_Type) 
+      -> Result : Countable_Set is
+	Result := Left;
+	Result |= Right;
+    end op "|";
+
+    op "|"(Left : Element_Type; Right : Countable_Set) -> Countable_Set is
+	return Right | Left;
+    end op "|";
+
+    op "|"(Left : Countable_Set; Right : Countable_Set) 
+      -> Result : Countable_Set is
+	Result := Left;
+	Result |= Right;
+    end op "|";
+
+    op "|="(var Left : Countable_Set; Right : Element_Type) is
+	const Right_IV : Element_Interval := (Low => Right, High => Right);
+	const Left_IV := Overlapping(Left.Items, Right_IV);
+	if Left_IV is null then
+	    // Nothing overlaps, need to add it (might want to merge someday)
+	    Left.Items |= Right_IV;
+	end if;
+    end op "|=";
+
+    op "|="(var Left : Countable_Set; Right : Countable_Set) is
+	if Count(Left.Items) == 0 then
+	    Left := Right;
+	else
+	    // Make a copy of the tree of items of the Right set
+	    var Right_Items := Right.Items;
+
+	    // Iterate through the tree
+	    var Right_IV := Remove_Any(Right_Items);
+	    while Right_IV not null loop
+		// See whether it overlaps with an existing interval
+		// in Left tree
+		var Left_IV := Overlapping(Left.Items, Right_IV);
+		while Left_IV not null loop
+		    if Left_IV.Low <= Right_IV.Low and then
+		      Left_IV.High >= Right_IV.High then
+			// Right_IV is subsumed
+			Right_IV := null;
+			Left_IV := null;
+		    else
+			// Need to delete Left_IV and incorporate
+			// into Right_IV
+			Delete(Left.Items, Left_IV);
+			if Left_IV.Low < Right_IV.Low then
+			    Right_IV.Low := Left_IV.Low;
+			end if;
+			if Left_IV.High > Right_IV.High then
+			    Right_IV.High := Right_IV.High;
+			end if;
+
+			// Now see if there is anything still overlapping
+			Left_IV := Overlapping(Left.Items, Right_IV);
+		    end if;
+		end loop;
+
+		if Right_IV not null then
+		    // Add Right_IV
+		    Left.Items |= Right_IV;
+		end if;
+
+		// Move on to next item
+		Right_IV := Remove_Any(Right_Items);
+	    end loop;
+	end if;
+    end op "|=";
+
+    op "in"(Left : Element_Type; Right : Countable_Set) -> Boolean is
+	return Overlapping(Right.Items, (Low => Left, High => Left)) not null;
+    end op "in";
+
+    func Count(S : Countable_Set) -> Result : Univ_Integer is
+	// Return count of items in set
+
+	Result := 0;
+
+	// Copy items and then iterate through them to build up count
+        var Items := S.Items;
+	var Next_IV := Remove_Any(Items);
+	while Next_IV not null loop
+	    Result += Next_IV.High - Next_IV.Low + 1;
+	    Next_IV := Remove_Any(Items);
+	end loop;
+    end func Count;
+
+    func Remove_First(var S : Countable_Set) 
+      -> Result : optional Element_Type is
+	// Return first element of set
+
+	// Get first interval in tree
+	var First_IV := Remove_First(S.Items);
+	if First_IV is null then
+	    // Tree is empty
+	    return null;
+	end if;
+
+	// See whether interval has more than one value in it
+	if First_IV.High > First_IV.Low then
+	    // Need to put back the remainder
+	    S.Items |= (Low => First_IV.Low+1, High => First_IV.High);
+	end if;
+
+	// Return first item
+	return First_IV.Low;
+    end func Remove_First;
+
+    func Remove_Last(var S : Countable_Set) -> Result : optional Element_Type is
+	// Remove last element of set
+
+	// Get Last interval in tree
+	var Last_IV := Remove_Last(S.Items);
+	if Last_IV is null then
+	    // Tree is empty
+	    return null;
+	end if;
+
+	// See whether interval has more than one value in it
+	if Last_IV.High > Last_IV.Low then
+	    // Need to put back the remainder
+	    S.Items |= (Low => Last_IV.Low, High => Last_IV.High-1);
+	end if;
+
+	// Return Last item
+	return Last_IV.High;
+    end func Remove_Last;
+
+    func Remove_Any(var S : Countable_Set) -> optional Element_Type is
+	// Remove any element of set
+
+	// Get any interval in tree
+	var Any_IV := Remove_Any(S.Items);
+	if Any_IV is null then
+	    // Tree is empty
+	    return null;
+	end if;
+
+	// See whether interval has more than one value in it
+	if Any_IV.High > Any_IV.Low then
+	    // Need to remove one to return and put back the remainder
+	    if (Any_IV.High - Any_IV.Low) mod 2 == 0 then
+		// Return high bound when high-low is even
+		// NOTE: We do this to avoid having algorithms become
+		//       dependent on always getting values in ascending 
+		//       or descending order.
+		S.Items |= (Low => Any_IV.Low, High => Any_IV.High-1);
+		return Any_IV.High;
+	    else
+		// Return low bound when high-low is odd
+		S.Items |= (Low => Any_IV.Low+1, High => Any_IV.High);
+		return Any_IV.Low;
+	    end if;
+	else
+	    // Return only item in interval
+	    return Any_IV.Low;
+	end if;
+
+    end func Remove_Any;
+
+end class Countable_Set;
+
+func Test_Countable_Set(A, X, Y, Z : Integer) is
+    var S : Countable_Set<Integer> := X | Y..Z;
+    Println(A | " in " | X | "|" | Y | ".." | Z | "=" | [[ A in S ]]);
+
+    for J in S loop 
+	Println("Remove_Any(S) = " | J);
+    end loop;
+
+    S := [];
+
+    for I in 1..10 forward loop
+	S |= I;
+	Println("Adding " | I | " to S, Count = " | Count(S));
+    end loop;
+
+    for K in S loop 
+	Println("Remove_Any(S) = " | K);
+    end loop;
+
+end func Test_Countable_Set;
+
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Set (10, 10, 30, 40);
+   Test_Set (20, 10, 30, 40);
+   Test_Set (35, 10, 30, 40);
+   Test_Countable_Set (10, 20, 30, 40);
+end func main;

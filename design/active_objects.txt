@@ -1,0 +1,23 @@
+It is not entirely clear we need "active" objects, but
+it does seem useful sometimes to add an active object to
+a container of some sort, and have it take on a life of its
+own.  It needs to be able to be "shut down" upon scope exit,
+so it needs to count as another picothread.  Essentially you
+want a way to add some computation to an existing structure.
+One idea is to have a "begin" operator or equivalent, which
+is permitted on concurrent objects but which must *not* get
+an immediate lock on the object, so it can be shut down between
+locked/queued operations.   Note that local operations of
+a concurrent object still need to have locked/queued indicators
+on parameters.
+
+Note that we also might have an "end" operation on a concurrent object.
+
+Is a concurrent object with a "begin" operation a good construct to represent
+a "process"-like entity?  What would determine that?  Interrupt handlers
+are one important example.  In an avionics application, a process can represent
+a chunk of hardware.
+
+As an aside, should interfaces be marked "ref" to indicate they
+incorporate a view on one or more pre-existing objects.  Or should
+they be called "view" interfaces?

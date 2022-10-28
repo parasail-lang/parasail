@@ -1,0 +1,196 @@
+package Parse_Tree2 is
+   --  Illustrate use of enum types, polymorphic (aka "class-wide") types,
+   --  dispatching calls, user-defined operators used as tree constructors,
+   --  "to_univ" (aka "[[...]]") and "from_univ" doing more than just 
+   --  simple type conversions, etc.
+
+   type T_Kind is new Enum<[#leaf, #unary, #binary]>
+
+   type Parse_Tree is abstract record  --  TBD: private
+      Kind : T_Kind;
+   end record;
+
+   abstract func Evaluate (Node : Parse_Tree) return Univ_Integer
+   --  Dispatching operation to evaluate expression represented by parse tree
+
+   proc Process_Parse_Tree(Root : Parse_Tree+);
+   --  Example from old ParaSail presentations, using multi-threaded for loop
+   --  (see the body).
+
+   func "to_univ"(Root : Parse_Tree+) return Univ_Integer;
+   --  Convert parse tree to a value, by making a dispatching call to Evaluate
+
+   func "from_univ"(Univ : Univ_Integer) return Parse_Tree+
+   --  Create a parse tree representing a single literal value
+
+   --  "factory" constructors for parse trees  --
+
+   func "+"(Left, Right : Parse_Tree+) return Parse_Tree+
+   func "-"(Left, Right : Parse_Tree+) return Parse_Tree+
+
+   func "*"(Left, Right : Parse_Tree+) return Parse_Tree+
+   func "/"(Left, Right : Parse_Tree+) return Parse_Tree+
+
+   func "+"(Right : Parse_Tree+) return Parse_Tree+
+   func "-"(Right : Parse_Tree+) return Parse_Tree+
+   func "abs"(Right : Parse_Tree+) return Parse_Tree+
+end Parse_Tree2;
+
+package body Parse_Tree2 is
+   type Op_Kind is new Enum<[#plus, #minus, #times, #divide, #abs]>
+
+   --  TBD: type Parse_Tree is abstract record
+   --  TBD:    Kind : T_Kind;
+   --  TBD: end record;
+
+   --  Extensions of Parse_Tree root type  --
+
+   type Leaf_Node is new Parse_Tree with record
+      Data : Integer;
+   end record;
+
+   type Unary_Tree is new Leaf_Node with record
+      Op      : Op_Kind;
+      Operand : Parse_Tree+;
+   end record;
+
+   type Binary_Tree is new Leaf_Node with record
+      Op      : Op_Kind;
+      Left    : Parse_Tree+;
+      Right   : Parse_Tree+;
+   end record;
+
+   --  Simple procedure to be called on each node by Process_Parse_Tree
+   proc Process (X : Integer) is
+      Println (Image(X))
+   end proc Process;
+
+   --  Evaluate routine for a leaf
+   func Evaluate (Leaf_Node) return Univ_Integer is
+       return Leaf_Node.Data
+   end func Evaluate
+      
+   --  Evaluate routine for a binary node
+   func Evaluate (Binary_Tree) return Univ_Integer is
+       var Left_Val : Univ_Integer;
+       var Right_Val : Univ_Integer;
+     then
+       Left_Val := Evaluate (Binary_Tree.Left);
+     ||
+       Right_Val := Evaluate (Binary_Tree.Right);
+     then
+       case Binary_Tree.Op is
+          when #plus => return Left_Val + Right_Val;
+          when #minus => return Left_Val - Right_Val;
+          when #times => return Left_Val * Right_Val;
+          when #divide => return Left_Val / Right_Val;
+          when #abs => return null
+       end case
+   end func Evaluate
+      
+   --  Evaluate routine for a unary node
+   func Evaluate (Unary_Tree) return Univ_Integer is
+       const Operand_Val := Evaluate (Unary_Tree.Operand);
+       case Unary_Tree.Op is
+          when #plus => return Operand_Val
+          when #minus => return - Operand_Val
+          when #abs => return abs Operand_Val
+          when #times | #divide => return null
+       end case
+   end func Evaluate
+      
+exports
+
+   --  Routine to illustrate a "parallel" iteration over a tree
+   --  "||" executes two "sides" in parallel
+   --  "continue loop" starts a new iteration of the enclosing loop
+   --    with the loop parameter(s) rebound to the specified value(s)
+   proc Process_Parse_Tree(Root : Parse_Tree+) is
+     for X => Root while X not null loop
+	case X is
+	  when L : Leaf_Node =>
+              Process(L.Data);
+	  when U : Unary_Tree =>
+	      Process(U.Data);
+	    ||
+	      continue loop with X => U.Operand;
+	  when B : Binary_Tree =>
+	      Process(B.Data);
+	    ||
+	      continue loop with X => B.Left;
+	    ||
+	      continue loop with X => B.Right;
+	end case;
+     end loop;
+   end proc Process_Parse_Tree;
+
+   --  "Convert" a parse tree back to a literal value, by making
+   --  a dispatching call on Evaluate
+   func "to_univ"(Root : Parse_Tree+) return Univ_Integer is
+      return Evaluate (Root)  -- make a dispatching call
+   end func "to_univ"
+
+   --  "Convert" a literal value into a parse tree, by creating
+   --  a "leaf" node.
+   func "from_univ"(Univ : Univ_Integer) return Parse_Tree+ is
+      return Leaf_Node'(Kind => #leaf, Data => Univ);
+   end func "from_univ"
+
+   --  Various "factory" constructor routines for parse trees  --
+
+   func "+"(Left, Right : Parse_Tree+) return Parse_Tree+ is
+      return Binary_Tree'(Kind => #binary,
+         Data => [[Left]] + [[Right]], Op => #plus,
+         Left => Left, Right => Right)
+   end func "+"
+
+   func "-"(Left, Right : Parse_Tree+) return Parse_Tree+ is
+      return Binary_Tree'(Kind => #binary,
+         Data => [[Left]] - [[Right]], Op => #minus,
+         Left => Left, Right => Right)
+   end func "-"
+
+   func "*"(Left, Right : Parse_Tree+) return Parse_Tree+ is
+      return Binary_Tree'(Kind => #binary,
+         Data => [[Left]] - [[Right]], Op => #times,
+         Left => Left, Right => Right)
+   end func "*"
+
+   func "/"(Left, Right : Parse_Tree+) return Parse_Tree+ is
+      return Binary_Tree'(Kind => #binary,
+         Data => [[Left]] / [[Right]], Op => #divide,
+         Left => Left, Right => Right)
+   end func "/"
+
+   func "+"(Right : Parse_Tree+) return Parse_Tree+ is
+      return Unary_Tree'(Kind => #unary,
+        Data => [[Right]], Op => #plus, Operand => Right)
+   end func "+"
+
+   func "-"(Right : Parse_Tree+) return Parse_Tree+ is
+      return Unary_Tree'(Kind => #unary,
+        Data => -[[Right]], Op => #minus, Operand => Right)
+   end func "-"
+
+   func "abs"(Right : Parse_Tree+) return Parse_Tree+ is
+      return Unary_Tree'(Kind => #unary,
+        Data => abs [[Right]], Op => #abs, Operand => Right)
+   end func "abs"
+
+end Parse_Tree2;
+
+proc Test_Parse2() is
+   --  Simple test program for the Parse_Tree2 package
+
+   --  Use user-defined operators to build up some parse trees
+   const Tree : Parse_Tree2.Parse_Tree+ := 37 * 42 - (-6) * 7
+   const Tree2 : Parse_Tree2.Parse_Tree+ := abs (5 * -3)
+   
+   --  Walk the parse trees in parallel
+   Process_Parse_Tree (Tree);
+   --  Now evaluate the parse trees
+   Println (" Value of Tree of 37 * 42 - (-6) * 7 = " | [[Tree]]);
+
+   Process_Parse_Tree (Tree2);
+   Println (" Value of Tree2 of abs (5 * -3) = " | [[Tree2]]);
+end proc Test_Parse2

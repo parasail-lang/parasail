@@ -1,0 +1,2 @@
+C = #green
+(switch C : case #red : 1; case #green : 2; case #blue : 3) = 2

@@ -1,0 +1,866 @@
+-- $Revision: 1.4 $ $Date: 2012/01/20 22:41:27 $
+----  The ParaSail inheritance model  12/13/2013
+
+Our inheritance model is a "black box"/"delegation" model for the parent
+object.  We also allow the more conventional model, which we indicate
+by specifying a polymorphic parameter type, but "hiding" it with an
+operation that takes a more specific polymorphic type.  In this case,
+the inherited operations have polymorphic parameters, and hence will
+re-dispatch.  I suppose the key question is what happens when the actual
+operand is polymorphic.  Then the compiler is not choosing the operation,
+but instead should "dispatch" to the most-specific operation that matches.
+One difference with this kind of dispatching call is that the 
+polymorphic operand does not get "unwrapped" as a side-effect of the call,
+and inherited operations don't require the parent part to be selected out
+of the enclosing object.
+
+----- More thoughts on polymorphic case statements with poly choices -----
+----- 4/20/2015
+
+Each "normal" type-descriptor or op-map has at most one polymorphic
+type-desc associated with it.  The root_type_desc field might refer to
+a particular root type, but it doesn't really matter.  This implies
+that no change at all is necessary in the polymorphic type of the
+case-statement object, if the polymorphic types used as case choices
+implement the root type without an op map.  (Perhaps not entirely true,
+since the poly object might implement the root type with a smaller
+op-map than would be necessary to implement some descendant.)
+
+Suppose we limit this initially to "primary" ancestors/descendants?
+Does this simplify things?  Presumably it means there is no op-map
+required.  Also, we could afford to create polymorphic types for every
+(primary) ancestor of every type.  To check whether a given object is
+in a polymorphic type, we would check whether the object's nth-level ancestor
+matches the case choice, and if so, it satisfies that case.  If we limit
+this to explicit ancestors, and each ancestor has a level (one more than the
+max level of all of its ancestors, say), then we can handle interfaces
+as well by having a list of explicit ancestors at each level.
+
+The idea of keeping track of all conversions doesn't really work once we
+start doing separate compilation.  We could still do something at load time,
+conceivably, establishing some kind of matrix of ancestors, with some sort
+of "coloring" to make everything unique.
+
+The nested type table might be usable currently for polymorphic ancestors.
+Eventually we would want a more flexible structure.  But for now,
+given a polymorphic type, the number of nested types could indicate the
+number of ancestors, and the contents of the nested types could be the
+ancestor at that depth in the tree.  How would we use this table?
+In Unwrap_Polymorphic_Obj, if the destination is polymorphic, then we
+could see how many nested types *it* has, and look at that same level
+in the polymorphic object's type to see if we have a match.  How would
+we define "match"?  The destination type has an underlying type which is
+itself, stripped of the is-polymorphic flag.  To match would be for this
+underlying type to appear at the corresponding level in the poly object's
+table.  This argues for having the type itself always as the
+last element of the ancestor (aka nested-type) table.
+
+TBD: Not clear what happens when you pass a polymorphic object to
+a polymorphic parameter with a different root type.
+
+----- Converting from one polymorphic type to another ----
+----- 2/17/2013
+
+The ParaSail language includes a case statement for checking the
+type of a polymorphic object, and then converting the object to
+some other polymorphic type.  We need a way to implement this.
+One way would be to define a bunch of converter functions, each
+"named" by the type of the target polymorphic type.  These would
+eithe return null or return the converted value.
+The conversion should probably be a "ref" conversion, that is
+it should take in a ref and return a ref.
+Or perhaps better, it should take in a wrapper and return
+a different wrapper.
+
+What this means is that we need to add conversion functions
+to the set of operations defined on a given interface,
+and make sure that all types that implement the interface include
+the needed conversion functions.  These functions don't depend
+on the original polymorphic type, they only depend on the underlying
+type.  An op-map would include the mapping to these conversion functions.
+The same op-map could probably be used for multiple types, if
+that were useful.
+
+----
+
+Initially we just want to allow conversion/membership/case when
+target is non-polymorphic.  This sounds like a similar operation,
+where we have a polymorphic object, and we want null or the value
+re-represented as the specified non-polymorphic type.
+We want an instruction which takes a polymorphic object of one type, 
+and a target non-polymorphic type, and produces a ref to the
+object, or null.
+
+Would the more general operation also deserve its own instruction?
+It seems that in this case we really want the compiler to identify
+the location of the new polymorphic type in the nested type table,
+and if that entry is null, then the object is not a member of the
+target type.  This also seems like a special instruction.  Conceivably
+they could use the same one, but the more general one needs a
+nested type index, and doesn't really need the target type, though
+it would be a good check and would help static analysis.
+
+---
+
+This more general operation requires that each time we find
+a conversion from polymorphic type A+ to B+, or a membership
+test, or a case where the selector is A+ and the choice is B+,
+we remember this fact in A's module.  Ultimately every module
+has a list of all of the other modules to which it is converted
+or tested against (e.g. B and C).  When we create a polymorphic 
+type descriptor with A+ as the root, we need to create nested 
+polymorphic type descriptors with B+ and C+ (etc.) as the root,
+and create a map to where they appear (or perhaps 0 to say
+they don't appear because the given specific type can't be
+viewed as B+ or C+).  Note that if C is an extension of B,
+then presumably the C+ one can be used when B+ is needed.
+However, in some case B+ can be supported while C+ cannot,
+so whether these two can share will depend on the specific type.
+Only polymorphic type descriptors need this map, but having a
+specific type descriptor have a table of polymorphic type
+descriptors to which it can be converted seems generally useful,
+to avoid creating more than one.
+
+---
+
+Given a specific type that implements a given formal type, we already have
+a link to the corresponding polymorphic type.  So what we really
+want in the non-op-map type descriptor for a specific type
+is a table of all of the op-map type descriptors for that type,
+and then each of those can have its own polymorphic type descriptor.
+
+In the module info, we want a table of other modules whose polymorphic
+type(s) are a target of (direct) conversion from a polymorphic type
+for the given module.  Given a polymorphic type descriptor
+implementing a given formal type, we need to be able to find the
+polymorphic type descriptor for anything to which that formal type
+can be converted, by using the index in this table into a parallel
+"polymorphic-type map".  Each specific type descriptor has a table
+of op-map type descriptors whose polymorphic types are of interest.
+Note that this is a set built up based on both direct and indirect
+conversions.
+
+Note that we can have an op-map on top of a polymorphic type descriptor.
+This happens when a polymorphic type is used as an actual parameter
+in a module instantiation.  Note that in this case the polymorphic
+type is actually a "pseudo" type, in that it might not correspond
+to a polymorphic type on a "real" object.
+
+Conversion is different, in that we always have a real object to
+start with, with a "real" type descriptor.
+
+Note that an object can start in life as 
+
+----- Calling an operation on a object of a polymorphic type ----
+----- 1/28/2013
+
+The example is
+
+     Hash(Image_and_Hashable+)
+
+when the actual underlying type is Univ_Integer.
+
+But also
+    Put(X | Image_And_Hashable+)
+
+(which involves a call on the generic "|" op
+which expects an Imageable) when the underlying
+type is Univ_String, and then a call on
+To_String(Imageable<>) inside.
+
+We want to know which inputs/outputs of "Hash"/"To_String" are of the
+"cur-inst" type.  The problem is that if we look at the
+type descriptor for Univ_Integer for info on Hash, it says
+the output is of the cur-inst type.  Ditto for Univ_String
+and To_String.  We want to ask the type descriptor for Hashable 
+or Imageable itself.  However, we don't always have access to that.  
+
+The current idea is to put in every polymorphic-type descriptor a pointer to
+the type-descriptor for the "root" of the polymorphic type hierarchy.
+What we want is a type-desc where we can use the *same* operation index
+and get the appropriate param info.  A formal type isn't useful
+for that, since we don't generally have type descriptors for
+formal types.  We do have type descriptors for polymorphic
+root types, but will they use the same operation indexing as we want?
+
+We get into trouble then when we try to create a polymorphic
+type descriptor as part of a call on a generic op, when the
+actual is of a different polymorphic type (e.g. image_and_hashable)
+than the formal type used for the generic operation (e.g.
+imageable).  
+
+We also need to beware that formal types don't have their
+module parameters filled in, while polymorphic types generally
+do have their parameters filled in.
+
+When we create an op-map on top of a polymorphic type,
+this can get confusing!
+
+Perhaps we should go back to consider the idea
+of associating the info with the "op map."
+Each op-map entry would also include an array
+of is-cur-inst flags.  We could probably make it
+a packed array of bits, with an upper bound
+in number of operands, but that seems to be
+excessive optimizing at this point.
+This is the point at which we have the relevant
+information, so maybe that is the place to put
+it.  But we should check that that is convenient
+for the run-time as well.
+
+One problem is that we might not have an op-map
+at all.  A separate table hanging directly off the
+type descriptor might be better.
+
+We need some concrete examples!
+
+So given the Set_Of_Any example:
+
+   abstract interface Image_And_Hashable<> is
+       op "=?"(Left, Right : Image_And_Hashable) -> Ordering
+       func Hash(Val : Image_And_Hashable) -> Univ_Integer
+       func To_String(Val : Image_And_Hashable) -> Univ_String<>
+       func From_String(Str : Univ_String<>) -> optional Image_And_Hashable
+   end interface Image_And_Hashable
+
+   func Set_Of_Any(Str : Univ_String; Num : Univ_Integer) is
+       var S : Set<Image_And_Hashable+> := [];
+       Println("Adding " | Str | " to set");
+       S += Str;
+       Println("Adding " | Num | " to set");
+       S += Num;
+       for (I in 1..1000 forward; E in S) loop
+           Println("Hash(Element) " | I | " of set = " | Hash(E));
+           Println("Element " | I | " of set = " | E);
+       end loop;
+   end func Set_Of_Any;
+
+This fails on the call to Hash(E).  Interestingly, this
+does not have a problem with the call on "|" passing in an E
+that represents a Univ_String.  Apparently the call on To_String
+inside of "|" succeeds, and does *not* try to "wrap" the
+result.
+
+So why does the call on Hash(E) fail?  Here is the representation
+of E when it is representing the Univ_Integer value 33:
+
+    Large-obj, size = 2
+    type = Image_And_Hashable<>+(Univ_Integer<>)
+    component = Univ_Integer<> (small), value = 33.
+
+  Image_And_Hashable<>+(Univ_Integer<> (univ)): Type_Desc # 277
+    Location: (Zero_Base, 277), Is_Finished = TRUE
+    Type: Univ_Integer<> (univ)
+    Kind: NORMAL_KIND, Is_Polymorphic
+      Component  1: Univ_Integer<> (univ) # 276
+
+  Univ_Integer<> (univ): Type_Desc # 276
+   Location: (Zero_Base, 276), Is_Finished = TRUE
+   Type: Univ_Integer<> (univ)
+   Has_Op_Map for actual type Univ_Integer<> (univ) 
+     implementing formal type Image_And_Hashable<> (small)
+    1 => 17
+    2 => 22
+    3 => 24
+    4 => 25  
+
+This op-map give access to the declarations in Univ_Integer
+for Hash, "=?", etc.  Unfortunately, this version of Hash
+indicates that the output type is of the "cur-inst" type
+(which it is).  We need a param-info for a version of Hash
+which is *not* defined in Univ_Integer.
+
+There is the "self-reference" polymorphic type for Image_And_Hashable:
+
+   Image_And_Hashable<>+(Image_And_Hashable<> (small)): Type_Desc # 107
+    Location: (Zero_Base, 107), Is_Finished = TRUE
+    Type: Image_And_Hashable<> (small)
+    Kind: NORMAL_KIND, Is_Polymorphic
+     Component  1: Image_And_Hashable<> (small)
+
+and the underlying non-polymorphic, abstract type:
+   Image_And_Hashable<> (small): Type_Desc # 106
+    Location: (Zero_Base, 106), Is_Finished = TRUE
+    Type: Image_And_Hashable<> (small)
+    Polymorphic type: Image_And_Hashable<> (small) # 107
+    Kind: NORMAL_KIND, Is_Small, Is_Abstract
+    Null_Value = -16#8000_0000_0000_0000#
+    Operations:
+     Routine # 254
+     Routine # 255
+     Routine # 256
+     Routine # 257
+
+The param-infos for routine #254 has the information we want,
+namely that the input is of the cur-inst type, but the output is *not*.
+
+So if we can gain access to this underlying self-reference type when
+given a non-self-reference polymorphic type, that would be perfect.
+
+When we create a non-self-ref polymorphic type, how do we find
+the self-reference type?  If the "formal" type is in fact
+not a formal type, but is a regular type, then we have a chance
+to do this.  We need a type that has all_parameters_known.
+If the Formal_Type has all_parameters_known, then we should be
+able to get the type-desc from there.
+
+Doing this seems to solve the problem.
+
+----- A "var" parameter of a polymorphic type ------
+----- 1/9/2013 ------
+
+The question is how to pass a polymorphic parameter by reference.
+If the polymorphic parameter requires a wrapper, what happens if
+inside the operation it assigns a different value to the polymorphic
+parameter?  When we had the "mutable" keyword, we could say that
+only mutable polymorphic parameters can have their type-id changed.
+Perhaps we can use "optional" that way, to mean that you can actually
+assign to the polymorphic parameter.
+
+----- Using a polymorphic type as the actual in a module instantiation ----
+----- 8/21/2012 ------
+
+We are working to allow polymorphic types as actuals in a module
+instantiation.  This is trivial for things like Vector<T+> since
+there are no specific operations required of T+.  But suppose
+we have a formal type of "Formal_T is T1<>" and an actual type of "T2+"?
+We expect a type descriptor which can be used with calls on
+the "N"th operation of T1.  T2 needs to implement/extend T1.
+In the general case, T2+ will need an op-map to map operations
+from type-descriptors associated with polymorphic objects of
+type T2+, to T1 operation slots.  We also need to know which
+is the first polymorphic parameter for a given operation, *before*
+we have the polymorphic object.  Hence, this information needs
+to be in the type descriptor used for T2+ in this instantiation.
+
+So we have two things in the T2+ type descriptor:
+  1) An op-map mapping T1 slot numbers to T2 slot numbers (if needed)
+  2) An indication of the first cur-inst parameter for
+     each T2 (or T1) operation.
+
+The second item can be shared among all T2+ type descriptors.
+The first item is needed only if T1's slot numbers don't
+work with T2.  So this argues for using an op-map only if
+needed, as with a normal type-descriptor for a module instantiation,
+and then associating the cur-inst parameter index with T2 itself.
+
+It turns out we already anticipated this with the Polymorphic_Type_Action
+in the Routine_Info table.  This suggests having a "stub" routine
+info.  Alternatively, we could just use the "routine" index as an
+index to the first cur-inst operand (a bit groddy).
+
+[Aside: How to handle parameterless calls for polymorphic types?
+ We presumably need an extra implicit parameter that is stripped off
+ before calling the underlying operation.  The static link could
+ be referencing something in the Param_Area that extends past the
+ "normal" last parameter.  End of Aside.]
+
+It is not clear how the Polymorphic_Type_Action works with parameterless 
+operations.  Presumably it has an output.  Normally this would only
+identify the region.  In this case we would also like it
+to identify the type.  Perhaps as a special case, when we have such
+a call with a potentially-polymorphic result, we would always pass 
+an extra parameter just in case, which would identify the target
+type.
+
+If a primitive operation of the formal type has outputs, we need
+to "wrap" them on completion to make them polymorphic objects.
+This certainly adds complexity.
+
+-- Example of multiple op-mappings involving polymorphic operands
+-- Starting 8/23/2012:
+
+Working on poly_tree.psl example.  We have a call on the "generic" "|"
+operator, with the type descriptor being instantiated with
+Imageable+(Im_Count+) where the "component" type Im_Count
+has an op-map, mapping the two operations of imageable to
+the operations of Im_Count (1 => 14, 2 => 15).
+The actual operand is a polymorphic object of type
+Im_Count+(Color), where the component type Color also
+has an op-map, mapping Im_Count operations to
+Color/Enum operations (14 => 4, 15 => 5).  
+
+Inside of "|" we call To_String on the actual operand.  
+Because the actual type in the instantiation of "|"
+is polymorphic, we "unwrap" the actual operand, and
+call the appropriate To_String operation, which is the
+4th and 5th operation of Color.  There are two mappings,
+one from 1 => 14, and then one from 14 => 4.
+
+This happens as follows.  Execute_Call_Op for the call on To_String
+embedded in the generic "|" calls "Find_Routine_Context"
+using the info from the PSVM instruction.  This identifies
+Static_Link => (Type_Area, 1) and Call_Target => (Type_Area, 10001).
+The Static_Link identifies the first formal parameter of the implicit 
+module, meaning Imageable+(Im_Count+) in this case.  The Call_Target
+identifies the first "Imageable" operation To_String.
+Find_Routine_Context calls Nth_Operation_Of_Type with this info,
+and Nth_Operation_Of_Type notices that the Callee_Type_Area_Or_Map
+is polymorphic, in which case it recurses on the "component" type,
+while selecting the "Polymorphic_Type_Action" for the Action field.
+The recursive call on Nth_Operation_Of_Type notices the op-map
+in Im_Count, and recurses again with the "actual" type and the
+adjusted index (now 14).  This produces a "Routine_Info" for
+the abstract To_String operation of Im_Count; on return the 
+Polymorphic_Type_Action field is set (as mentioned above).
+
+Once back in Find_Routine_Context, we check the "Action" field.
+If it is Polymorphic_Type_Action, we determine which is the first
+cur-inst-type input parameter, and call Find_Routine_Context 
+recursively, using the appropriate Param as the static link.
+When we recurse into Find_Routine_Context with such a static link,
+we know the actual is a polymorphic object, at which point
+we get the underlying value and underlying type-desc from 
+the polymorphic object, and set the static link to point at
+the underlying type.  At this point we expect the Routine_Locator
+to be (Type_Area, 10000 + N) where N is relative to the
+polymorphic type of the object (14).  We make another call
+on Nth_Operation_Of_Type using the underlying type (which likely 
+is an op-map) and N, and This gets mapped to 4 and all is copacetic.
+The challenge is getting "N".  This probably needs to be communicated
+along with the "Polymorphic_Type_Action" flag.  
+
+We might as well add an "Op_Index" field to the Routine_Info record, 
+and it refers to itself in general, though conceivably if we interpret 
+a "renaming" in an abstract interface as an "abstract" (non-overridable) 
+renaming, then it might refer to some other operation slot.
+
+------------ Original design from 1/20/2012 ----------
+
+Polymorphic objects -- The first word header should
+identify the type and also the view of the type
+(and hence may identify a type op map rather than 
+a "normal" type).  The second word would be the
+value, as normally represented.
+
+What makes these recognizable?  Is it the fact
+that the type index identifies a type "op" map?
+Is it the fact that the size = 2?  Or do we know
+"externally" that we have a polymorphic object.
+I.e., is-small, is-large, and is-polymorphic
+as three different things?  The Is_Small question
+is asked of the type descriptor, and we can
+certainly have an "is_polymorphic" flag in
+a type descriptor.  However, do we really want
+a duplicate type descriptor, or is it more
+like a special op-map.  Or perhaps we simply
+*require* it to be an op-map, even if it is of
+the "root" type of the class, and we know that
+"normal" objects never have op-maps for their type.
+
+Here is a different approach.  Use a "regular" type
+descriptor, but set the Is_Polymorphic flag.
+Have a single "component" which is the non-polymorphic
+object.  The component *type* for this component is
+the thing that we pass as the static link.  This should
+allow copy and other low-level operations to work
+without any significant alteration.  The operation
+table would either be empty, or be a copy of the
+operation table of the "component" type.
+
+When do we need to know we have a polymorphic object?
+When copying it.  When freeing it.
+So this means that the type descriptor for a polymorphic
+object has to indicate it is a polymorphic type descriptor,
+though it should be usable as a regular type descriptor
+(or op map) for the purposes of things like the static link
+for a dynamic call and instantiating generic operations.
+
+As an aside, do we want to change "nulls" to always be 
+"small" at this point?  This would reduce locking pressure
+on regions, presumably.  See _execution/exec_model.txt
+for more thoughts on this.
+
+Note that the "generic" operations can be used
+instead of polymorphic operations in some cases,
+but only if the actual operands are of known types.
+
+Can a polymorphic type be an actual type parameter,
+when the formal type is for the root type or
+some type that is implemented by the root type?
+Another way of asking this, can a polymorphic type
+be used everywhere a non-polymorphic type can be
+used?  Can we use a polymorphic *object* somewhat
+like a type in terms of selecting information using
+the "::" operator, or identifying operations?
+We often don't know the type statically, so are
+polymorphic objects essentially the same?
+How can "::" be used?  To identify operations, 
+module parameters, nested constants, or nested modules.
+Also used to specify result type of literals and
+aggregates, though that is more of a compile-time
+thing.  But could a polymorphic type be used for
+that purpose?  E.g., a polymorphic "from_univ"?
+
+The polymorphic object type view id is used at
+the call site to select the operation, but is not 
+passed in unless the parameter is itself polymorphic.
+We need to be able to pass in a polymorphic object
+as the "type" info for a call (in other words, as
+the "static link" for a Call_Op).  We also need new
+instructions for constructing a polymorphic object,
+and for extracting the type or the data part,
+and also for checking that two objects have matching
+types.  If this instruction returns a boolean, we can use
+it in an assertion as well as in a call on "=?"
+where if the types don't match, the result is
+#unordered.
+
+Can a polymorphic object be viewed as a wrapper
+of an object of some type that implements a given
+interface?  The model doesn't quite work...
+
+What happens when a polymorphic object is passed
+as an actual to a generic operation?  The instantiation
+of the generic operation needs to be done somewhere.
+Is it part of the polymorphic type, in some sense,
+and when you call a generic operation, you add the
+operation to the set of nested types associated with
+the polymorphic type.  Then when you convert a non-polymorphic
+type to a polymorphic type, at that point you need to
+"instantiate" the implicit module associated with the
+polymorphic type, which will include instantiations of
+all generic operations called.  So to reiterate, 
+calling a generic operation with a polymorphic object
+involves adding a nested type instance to the implicit
+module associated with the polymorphic type.  Converting
+to a polymorphic type involves effectively instantiating
+this implicit module as well as creating an op-map
+for it that implements the associated interface.
+
+*IMPORTANT POINT* Polymorphic formals are not the same
+as "generic" operation formals, because a polymorphic type is
+based on a fully-instantiated type, whereas a generic formal
+is based on an uninstantiated interface.  Hence, "Set+"
+is not a legal polymorphic formal (unless inside the Set
+module, in which case it refers to the polymorphic version
+of the "current" instance), whereas "Set<>" is a legal
+generic operation formal, and can be instantiated with implementations
+of Set for a different element type.  With polymorphic formals,
+the actual object must be of a type with matching module
+actuals, whereas with a generic operation formal the actual
+operand provides the module actuals.  Now for parameterless
+interfaces, there is no significant difference.  For for
+interfaces like "Set" which have an important module parameter,
+there is a significant difference.
+
+------ Thoughts about visibility of polymorphic operations ------
+
+Based on the poly_tree.psl example, it seems useful
+to allow non-abstract operations on a polymorphic type
+even if the "defining" operations for the interface
+are all abstract.  The polymorphic operations should
+*not* need to be overridden, and probably shouldn't (need to) 
+be inherited(whatever that means).  We don't normally 
+"inherit" anything by implementing an interface -- is that
+right? -- except perhaps for "optional" operations in
+some sense.
+
+In the poly_tree.psl example, we use them as essentially
+"factory methods" which just turn around and call specific
+extensions/implementations of the abstract interface.
+We want these operations to be found automatically based
+on the type of the result, or of the operands.  These
+are very similar to the generic operations, and so we don't
+want to include these operations automatically, unless the
+operand itself is polymorphic.  Similarly, we don't want to
+include these unless the expected type is polymorphic.  In
+several ways, a polymorphic type is like a distinct type,
+but with implicit conversion *to* the polymorphic type 
+under most circumstances from any type that implements
+it (including "implicit" implementors?).  The big question,
+I suppose, is whether these operations are made visible
+by an operand of any type that implements the root
+interface of the polymorphic type.  That seems like overkill,
+though when they *explicitly* implement the interface,
+does that change things?  Probably it shouldn't, as
+we want implicit implementation to be essentially identical
+to explicit implementation, for parameterless modules.
+
+Our prior idea was that you could have a parameter that was
+both controlling dispatch and polymorphic, but that seems
+overly complex now.  But we still reject the idea that you
+can "redispatch" given a non-polymorphic object, by 
+recapturing the original type id.
+
+A polymorphic type is essentially a separate type,
+with their own operations.  What does it mean to
+"implement" a type if there are some polymorphic
+operations as well.  Those could be inherited by
+an "extender," but the usual collision problems would
+occur if they were inherited by "implementors"
+since they might be implementing multiple such
+interfaces.  Perhaps they are *only* inherited
+by extenders, and overridable if desired, and
+automatically visible to non-polymorphic extenders
+only.  In any case, we are going to postpone these
+decisions.
+
+One key question.  Given an object of type T, do the
+operations on T+ become visible?  I would say *no*
+unless they become visible for all extenders of T
+as well.  Now how about an object of type T2+, where
+T2 is an extender of T?  Do the T+ operations
+become visible?  Or are they inherited by T2 and
+in that way are visible?  If they are inherited,
+and there are multiple T+ operands, do they all 
+become T2+ operands, or do they remain T+ operands?
+This matters especially on output parameters,
+since the inherited operations will have to become
+abstract if they return T+.  Again, let's postpone
+this, and leave things where the direct visibility
+only comes from an exact match of T+ to T+.
+For inexact matches, they will be treated like
+generic operations, which aren't made visible,
+but still will match when appropriate if already
+visible for some other reason.  And for now, no
+inheritance of polymorphic operations, and no
+change in T+ to T2+ on inheritance due to other
+reasons.
+
+[One aside -- we shouldn't consider a "from_univ" interp on
+anything but a univ literal if there is another
+interpretation that already matches the same type.
+This was making the "2 + 3" ambiguous when the "+"
+was being used to construct an expression tree.
+DONE, as of 1/16/2012.]
+
+----------------
+
+Changes to semantic analysis and code generation:
+
+1) Need to allow any implementor of the polymorphic root type
+as matching the polymorphic type in Find_Interp_Of_Type (DONE 1/16/2012).
+
+2) Need to recognize when an operand is polymorphic but the
+param type is not, and extract the operand value, while using the
+type-id of the operand for the static link (rather than the "static" 
+root type).  If there are multiple such operands, the second and
+later ones need to match the first one, so a check needs to be
+generated that they match.  This might want to be a special
+instruction, rather than creating an out of line call just for
+invoking such a check.  This seems like a job for Emit_Call_Operands.
+It should perhaps augment the Call_Sem (if not done in a prior phase)
+to help with handling multiple such operands, e.g. by having
+a pointer to the first such operand.
+
+After the operands have all been evaluated, we need to strip
+the type-id from the controlling operand and use it as
+a the static link.  This could be done by making the static
+link be (Param, X).  If there are multiple polymorphic
+operands, the second and later ones need to be checked.
+The check to be sure the type-ids match needs to be followed 
+by a removal of the polymorphic type-id from the operand.
+
+Don't forget: We need to implement copy and assignment for polymorphic
+objects.  We also need to create type descriptors which are
+*forced* to be op-maps.
+
+If a component is polymorphic, we need to describe it somehow.
+We don't have an actual type behind it, so a "regular" op-map
+doesn't make sense.  We need a type descriptor which indicates
+is-polymorphic, but perhaps with a null actual type, and
+a null mapping.  Actually, we want to identify the root type,
+so probably an identity mapping and a reference to the root type's
+type descriptor.  
+
+With our "new" approach of using a "regular"
+type descriptor with the "is-polymorphic" flag set, the
+single component type would indicate the root type (which
+might be abstract).  Should we have a separate indication
+of the root type for polymorphic type descriptors, so we
+don't have to look at the component type to know what
+that is?   Or would the component type desc use an op-map, so it
+would have the formal_type_sem there?  Only if it needed one,
+presumably.  Will we try to reuse polymorphic type descriptors?
+It seems like we should *always* try to reuse type descriptors.
+
+3) Need to recognize case when an operand is not polymorphic
+and the expected type is, and add a type-id to it.  This could
+be on call, return, or assignment (including initialization of
+a declared object or a component).  This requires the construction
+of a polymorphic type-id based on the static type-id and the target
+(polymorphic) type.  This is effectively a nested type to be 
+filled in when the type descriptor for the static type is created.  
+This presumably is not permitted when initializing a "ref."  
+We could use some variant of the "Target_Object" to indicate 
+which polymorphic type is needed.
+We probably want to do that since we want it to be allocated 
+in the correct region.  Though I suppose we could do that
+after the fact.  Emit_Move_Or_Copy might be a good place to
+do some of this.  We need to be careful that even if "RHS" is
+small, the LHS is essentially considered "large" since it
+is 2-words.
+Might be useful to change the type of Target_Object to some kind
+of record containing both Object_Locator and Polymorphic type, if any.
+But what happens in cases where there is currently no Target_Object?
+Could we have just a target Polymorphic type?  Does that mean we
+want to pass them as separate parameters?
+
+4) Need to recognize case when an operand to a generic operation
+is polymorphic, and instantiate the generic operation with the type-id
+of the polymorphic operand.  This is effectively a nested type
+associated with the polymorphic type, to be created whenever
+a type descriptor for the polymorphic type is created.  This means
+that the static link in the call on the generic operation is
+extracted at run-time from the type-id of the polymorphic operand.
+Suppose there are two polymorphic operands to a generic operation?
+That can be supported without building a type-descriptor at run-time,
+I believe.  So for now we disallow it -- too dynamic!
+
+5) Need to recognize case when the generic result of a generic operation
+is "converted" to a polymorphic type.  If it is a generic result,
+then we presume it must have enough information so we can create
+a "default" instantiation (which admittedly is likely to be
+dependent on some other generic operand -- which might be polymorphic??).
+This default instantiation will need a nested type-descriptor to be
+used for the polymorphic type-id.
+
+[ASIDE: All checks, and all calls, will need some 
+kind of "Was_Proved" flag to indicate that the check can be
+ignored, or for a call, the preconditions can be ignored.  May
+want separate ones for internal and external preconditions.  Probably
+a return statement also needs a "was_proved" for the postconditions.
+END OF ASIDE.]
+
+------- code generation changes ----------
+
+* If the flag in an Operand_Sem_Info indicates a Target_Polymorphic_Type,
+  then we need to wrap the operand in a polymorphic type descriptor.
+  Visitor.Target_Object identifies the region.  Visit_Resolved
+  might be one place to do that.  We only want to do it if
+  Is_Lvalue_Context and Gen_Parallel_Invocations_Only are both False.
+  The PSVM needs a new operation for creating a polymorphic object,
+  and Run_Time_Type_Info needs a way to create the appropriate
+  polymorphic type descriptor.  It needs to take a type parameter,
+  as well as a target object for the region, and the location
+  of the value and result.
+
+  TBD: What if there is a lock on the underlying object?  That means
+       it is a concurrent object.  Can such an object be wrapped?
+       This would only be for a read-only operation, and it can't be
+       copied.
+
+* If the Polymorphic_Param_Index is non-zero, then we need to specify
+  the static link as (Param_Area, X) where X is the offset to
+  the specified parameter.  The PSVM needs to recognize this.
+
+-----------------
+
+Type descriptor features related to polymorphic objects:
+[NOTE: The need for one of these features is not known until
+the whole program has been compiled, unlike the features for
+a typical type descriptor, which are known once the 
+associated module has been compiled.]
+
+* When an object of a type based on a particular module
+is converted to a polymorphic type, that particular module
+needs to have a nested type descriptor suitable for the 
+polymorphic type.  Essentially it is instantiating a
+"polymorphic module" and the actual parameter it needs
+is an op-map/type descriptor for the originating type.
+
+* When a polymorphic object is passed to a "generic"
+operation, the op-map/type descriptor for the given
+polymorphic type will need to include an instantiation
+of the given generic operation.
+
+* When a polymorphic object is converted to another
+polymorphic type, the op-map/type-desc for the originating
+polymorphic type needs an op-map/type-desc for the target
+polymorphic type, or null if not convertible.
+
+* When a composite type has a component that is polymorphic,
+its type descriptor needs a way of representing a polymorphic
+type, but without any specific type for the component.
+
+--------
+
+In general we are now focusing on a type-descriptor representation
+that makes a polymorphic type look like a (non-wrapper) single-component
+type, but with the Is_Polymorphic flag True.  There are at least the
+following cases:
+
+  * The type-desc pointed to from the "header" word of a 2-word
+    polymorphic object.
+      + The type-desc of the only component would identify the
+        actual type of the enclosed object.  This would often
+        have an op-map since the actual type might not have
+        the same operations as the root type.
+    This type-desc of the only component would be passed as the
+    static-link in "dispatching" calls.  It would also be used
+    by copy and release to decide whether the enclosed object is
+    large or small.  It would seem there could be two kinds of null,
+    one which is a large null, representing the polymorphic object,
+    and a second where the enclosed object is null, but there
+    is a header whose only component type-desc identifies the original
+    type from which the "null" arose.
+
+  * The type-desc used inside a composite type-desc to indicate that
+    some component is polymorphic
+      + In addition to the is-polymorphic flag and the indication that the
+        component is large, probably not much else needs to be said.
+        In particular the information about the subcomponent of this
+        polymorphic component probably doesn't need to be filled in,
+        as we would always fetch the *actual* type-desc for the polymorphic
+        component during copy, release, dump, etc.  
+        Hence the subcomponent type-desc should probably never be looked at,
+        and it could be misleading, in terms of small vs. large.
+        Perhaps it should be null to avoid any confusion.
+    It sounds like we might get away with having exactly *one* such
+    polymorphic type descriptor, since it need not contain anything
+    much in the way of specifics.  The only reason to have more than
+    one might be to have a nice Name.  I suppose we might also want
+    information about module parameters, but this all seems unnecessary
+    at run-time.
+
+  * The type-desc used to describe a polymorphic actual type in a module
+    instantiation.
+      + This could be used in the case when we instantiate a container
+        module with a polymorphic type.  What would this parameter be 
+        used for?  If we call some operation on an object of the
+        parameter type, we would pass the type as the static link.
+        That could be a bit of an issue if the type contains little
+        or no information.  Do we need to create wrapper operations,
+        or at least some indication of which operand will provide the
+        "real" type-desc we need, and which itself needs to be
+        unwrapped?  For example, suppose we have a Countable_Set,
+        which relies on the "+" and "-" operators of the
+        element type, and the element is something like Countable+.
+        The "+" operator returns a result of the same type as the
+        operand.  The "-" operator requires that both operands
+        be of the same type.  How much of this happens at run-time?
+        Is it all buried in the Execute_Call_Op?  If so we will want
+        it to be *very* efficient.  Alternatively, we could create
+        wrappers for all of the Countable operators.
+
+        Suppose we *don't* create wrappers.  What kind of info would
+        we need in the type-desc to make this efficient?  This is somewhat
+        analogous to the situation where we don't *know* at compile-time
+        whether the type is small, in which case we need to emit
+        instructions that can handle large (or small) objects.  We have been 
+        envisioning that the "location" of the static link might
+        indicate that we are making a polymorphic call, and would
+        allow us to extract the actual type.  [We also need to worry
+        about null-ness, I suppose, and flags that indicate whether
+        we have proved that it is non-null, etc.]  We might also somehow
+        indicate that we need to worry about extracting and checking
+        the actual type of other controlling parameters, and perhaps
+        wrapping a controlling result in a polymorphic record.
+        This sure sounds like it could be more efficiently handled
+        by a wrapper operation, but let's keep pushing on this a bit
+        more.  If it goes in the type descriptor, indexed by the operation
+        then it is really just a tradeoff between table-driven and
+        generated-code-driven.
+
+        Overall, it seems most efficient and it keeps the virtual machine
+        simpler, to use an operation wrapper in these cases.  For now
+        we will disallow passing a polymorphic type as an actual in
+        an instantiation.
+
+  * The type-desc used to describe a polymorphic actual object in a call
+    on a generic operation
+      + In this case we could use the wrapper approach as well, or...
+      + If there is only one operand, we could pre-instantiate as
+        suggested, and put the instantiation in the polymorphic type 
+	descriptor.

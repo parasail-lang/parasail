@@ -1,0 +1,154 @@
+interface Dimensions<> is
+    type Dim_Enum is Enum<[#meters, #kilos, #seconds]>;
+    op "[]"() -> Dimensions;
+    op "+"(Left, Right : Dimensions) -> Dimensions;
+    op "*"(Left : Dimensions; Right : Univ_Integer) -> Result : Dimensions;
+    op "=?"(Left, Right : Dimensions) -> Ordering;
+    op "indexing"(ref D : Dimensions; Index : Dim_Enum) -> ref Univ_Integer;
+    op "var_indexing"(ref var D : Dimensions; Index : Dim_Enum) 
+      -> ref var Univ_Integer;
+    func To_String(Val : Dimensions) -> Univ_String;
+    func From_String(Str : Univ_String) -> Dimensions;
+end interface Dimensions;
+
+class Dimensions is
+    var Dim_Arr : Array<Univ_Integer, Indexed_By => Dim_Enum>;
+  exports
+    op "[]"() -> Dimensions is
+	return (Dim_Arr => Create(Dim_Enum, 0));
+    end op "[]";
+
+    op "+"(Left, Right : Dimensions) -> Result : Dimensions is
+	Result := Left;
+	for I in Dim_Enum loop
+	    Result[I] += Right[I];
+	end loop;
+    end op "+";
+
+    op "*"(Left : Dimensions; Right : Univ_Integer) -> Result : Dimensions is
+	Result := [];
+	for I in Dim_Enum loop
+	    Result[I] := Left[I] * Right;
+	end loop;
+    end op "*";
+
+    op "=?"(Left, Right : Dimensions) -> Ordering is
+	// Return #equal or #unordered (there is no further ordering defined)
+	for I in Dim_Enum loop
+	    case Left[I] =? Right[I] of
+	      [#equal] => null;
+	      [..] => return #unordered;
+	    end case;
+	end loop;
+	return #equal;
+    end op "=?";
+
+    op "indexing"(ref D : Dimensions; Index : Dim_Enum) 
+      -> ref Univ_Integer is
+	return D.Dim_Arr[Index];
+    end op "indexing";
+
+    op "var_indexing"(ref var D : Dimensions; Index : Dim_Enum) 
+      -> ref var Univ_Integer is
+	return D.Dim_Arr[Index];
+    end op "var_indexing";
+
+    func To_String(Val : Dimensions) -> Result : Univ_String is
+	Result := "[";
+	for I in Dim_Enum forward loop
+	    if Val[I] != 0 then
+		if Result != "[" then
+		    Result |= ", ";
+		end if;
+		Result |= I | " => " | Val[I];
+	    end if;
+	end loop;
+	Result |= "]";
+    end func To_String;
+
+    func From_String(Str : Univ_String) -> Dimensions is
+	return [];  // TBD
+    end func From_String;
+end class Dimensions;
+
+interface Units<Dimension : Dimensions> is
+    op "from_univ"(Univ : Univ_Real) -> Units;
+    op "to_univ"(Val : Units) -> Univ_Real;
+    op "+"(Left, Right : Units) -> Units;
+    op "*"(Left : Units; Right : Right_Type is Units<>)
+      -> (Result : Result_Type is Units<Dimension + Right_Type::Dimension>);
+    op "**"(Left : Units; <Right : Univ_Integer>) 
+      // -> (Result : Result_Type is Units<Dimension*Right>);
+      -> (Result : Units<Dimension*Right>);
+    func To_String(Val : Units) -> Univ_String;
+    func From_String(Str : Univ_String) -> Units;
+end interface Units;
+
+class Units is
+    const Value : Univ_Real;
+  exports
+    op "from_univ"(Univ : Univ_Real) -> Units is
+	return (Value => Univ);
+    end op "from_univ";
+
+    op "to_univ"(Val : Units) -> Univ_Real is
+	return Val.Value;
+    end op "to_univ";
+
+    op "+"(Left, Right : Units) -> Units is
+	return (Value => Left.Value + Right.Value);
+    end op "+";
+	
+    op "*"(Left : Units; Right : Right_Type is Units<>)
+      -> (Result : Result_Type is Units<Dimension + Right_Type::Dimension>) is
+	Println("About to check:");
+	Println("  " | Dimension | " + " |
+	  Right_Type::Dimension | " == " | Result_Type::Dimension);
+	{Dimension + Right_Type::Dimension == Result_Type::Dimension}
+	return (Value => Left.Value * Right.Value);
+    end op "*";
+
+    op "**"(Left : Units; <Right : Univ_Integer>) 
+      -> (Result : Units<Dimension * Right>) is
+	// {Dimension * Right == Result_Type::Dimension}
+	return (Value => Left.Value ** Right);
+    end op "**";
+
+    func To_String(Val : Units) -> Univ_String is
+	return Univ_Real::To_String([[Val]]);
+    end func To_String;
+
+    func From_String(Str : Univ_String) -> Units is
+	return Univ_Real::From_String(Str);
+    end func From_String;
+end class Units;
+
+func Test_Units() is
+    type Len is Units<Dimension => [#meters => 1]>;
+    type Tim is Units<Dimension => [#seconds => 1]>;
+    type Mass is Units<[#kilos => 1]>;
+    type Speed is Units<Dimension => [#meters => 1, #seconds => -1]>;
+    type Accel is Units<Dimension => [#meters => 1, #seconds => -2]>;
+    type Force is Units<[#meters => 1, #kilos => 1, #seconds => -2]>;
+    type Energy is Units<[#meters => 2, #kilos => 1, #seconds => -2]>;
+    type Speed2 is Units<[#meters => 2, #seconds => -2]>;
+
+    var Two : Univ_Integer := 2;
+    var L : Len;
+    const T : Tim := 3.0;
+    const S : Speed := 9.0;
+    const g : Accel := 9.0;
+
+    L := S * T;
+
+    Println("L = S * T = 9.0 * 3.0 = " | L);
+
+    const V : Speed := g * T;
+    const m : Mass := 5.0;
+    const V2 := V ** 2; // Two;
+
+    Println("V = g * T = 9.0 * 3.0 = " | V | 
+      ", V2 = V ** 2 = " | V2);
+    
+end func Test_Units;
+

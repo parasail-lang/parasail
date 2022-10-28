@@ -1,0 +1,14 @@
+func Ops() -> Univ_Integer is
+   var N := 0;
+   N := N + 1;
+   N += 1;
+   N := N * 2; //  4
+   N *= 3 //  12
+   N := N / 3; //  4
+   N /= 4; //  1
+   N := N << 3 //  8
+   N := N >> 2 //  2
+   N -= 1; //  1
+   N := N - 1; //  0
+   return N;
+end func Ops;

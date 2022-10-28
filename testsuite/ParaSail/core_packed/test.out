@@ -1,0 +1,18 @@
+Bits_Per_Elem = 9
+Elems_Per_Word = 7
+Mask = 0x1FF
+Spreader = 0x40201008040201
+Red = [#red => 51, #green => 0, #blue => 0]
+Blue = [#red => 0, #green => 0, #blue => 51]
+Yellow = [#red => 0, #green => 51, #blue => 51]
+White = [#red => 255, #green => 255, #blue => 255]
+Partial = [#red => 255, #green => 255, #blue => null]
+Arr = [#red => 119, #green => 119, #blue => 119]
+About to update Arr[#green] with 0x33 (= 51)
+About to update Arr[#blue] with 0x22*5/2 (= 85)
+  Arr[#blue] := 0x22 = 34
+  Arr[#blue] *= 5 = 170
+  Arr[#blue] /= 2 = 85
+Arr now = [#red => 119, #green => 51, #blue => 85]
+RR = [#red => 51, #green => 85, #blue => 119]
+VV = [3, 51, 23, 7, 85]

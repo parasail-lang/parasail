@@ -1,0 +1,21 @@
+Build the Ada 202x parser via:
+
+% antlr4 ada202x.g4
+% javac *.java
+
+Run the Ada 202X parser via:
+
+% grun ada202x compilation [-trace] */*.ad?
+
+-------
+
+"antlr4" and "grun" are aliases, defined as follows:
+
+alias antlr4 'java -Xmx500M -cp ~/_parasail/_antlr/antlr-4.7.2-complete.jar org.antlr.v4.Tool'
+
+alias grun 'java -Xmx500M -cp ~/_parasail/_antlr/antlr-4.7.2-complete.jar:. org.antlr.v4.gui.TestRig'
+
+To debug a failing parser at a very low level, use "grunjdb."
+But first try "grun ... -trace *.ad?".
+
+alias grunjdb 'jdb -Xmx500M -classpath ~/_parasail/_antlr/antlr-4.7.2-complete.jar:. org.antlr.v4.gui.TestRig'

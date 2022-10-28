@@ -1,0 +1,7 @@
+def Membership(X, Y, Z : Integer) :
+    if X in Y..Z :
+	Println(X | " in " | Y | ".." | Z);
+    else :
+	Println(X | " not in " | Y | ".." | Z);
+    end if;
+end def Membership;

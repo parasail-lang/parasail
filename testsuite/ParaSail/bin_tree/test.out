@@ -1,0 +1,17 @@
+bin_tree.psl:143:18: Warning: Null value not allowed for non-optional formal Value
+3 in T = #false
+T = 
+1 => #one
+1 in T = #true
+2 => #two
+2 in T = #true
+3 => #three
+3 in T = #true
+4 => #four
+4 in T = #true
+T2 = 
+19 => #nineteen
+15 => #fifteen
+11 => #eleven
+9 => #nine
+5 => #five

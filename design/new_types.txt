@@ -1,0 +1,16 @@
+-- $Revision: 1.1 $ $Date: 2012/02/06 20:04:23 $
+
+When the user declares a "new" type inside a module,
+should the operations declared on that new type
+become directly visible.  Seems reasonable.
+
+Now what about another "new" type defined in terms of a
+prior "new" type?  Do these "inherit" these operations?
+That begins to get complex, and implies we need to keep
+track of the lineage.  Preferable would be "new or
+not new."
+
+New types need conversion operations.  Can they define
+their own?  That would seem to be ambiguous, and if they
+are really that different, then they should be defined
+by different modules.

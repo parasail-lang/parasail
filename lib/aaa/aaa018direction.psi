@@ -1,0 +1,13 @@
+interface PSL::Core::Direction<> is
+    // This is passed to the "to_sequence" operator to generate
+    // appropriate direction of sequence
+    op "from_univ"(Lit : Univ_Enumeration)
+      {Lit in #unordered | #forward | #reverse | #concurrent} -> Direction 
+      is import(#direction_from_univ)
+
+    op "to_univ"(Val : Direction) -> Univ_Enumeration 
+      is import(#direction_to_univ)
+
+    op "=?"(Left, Right : Direction) -> Ordering
+      is import("=?")
+end interface PSL::Core::Direction

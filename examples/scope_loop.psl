@@ -1,0 +1,23 @@
+interface Scope_Loop<> is
+   type Short is Integer<1..10>
+   func Loop_T_Loop(M : Map<Short, Set<Univ_String>>)
+end interface Scope_Loop
+
+class Scope_Loop is
+  exports
+   func Loop_T_Loop(M : Map<Short, Set<Univ_String>>) is
+      -- for S in Short concurrent loop
+         -- {S not null}
+         var X := ""
+         for I in M[3] loop
+            {I not null}
+            X |= I
+         end loop
+
+         for J in M[4] concurrent loop
+            {J not null}
+         end loop
+      -- end loop
+
+   end func Loop_T_Loop
+end class Scope_Loop

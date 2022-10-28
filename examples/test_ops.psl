@@ -1,0 +1,63 @@
+func Print_Int(X : Integer) is
+    // Recursive routine to print an integer
+    // Check that we can add univ-integers to characters
+    // Check the "[[...]]" operator.
+    if X < 0 then 
+	Print('-');
+	Print_Int(-X);
+    else
+	if X >= 10 then
+	    Print_Int(X / 10);
+	end if;
+	Print('0' + [[X rem 10]]);
+    end if;
+
+end func Print_Int;
+
+func Test_Ops(X, Y : Integer) is
+    if X > X-1 and then X < X+1 then
+	Println("X in X-1<..<X+1");
+    else
+	Println("X not in X-1<..<X+1??");
+    end if;
+
+    if X > 9 ==> X > 8 then
+	Println("X > 9 ==> X > 8");
+    else
+	Println("not (X > 9 ==> X > 8)??");
+    end if;
+
+    if X > 9 ==> (X <= 10 ==> X == 10) then
+	Println("X > 9 ==> (X <= 10 ==> X == 10)");
+    else
+	Println("not (X > 9 ==> (X <= 10 ==> X == 10))??");
+    end if;
+
+    if Y < Y-1 or else Y > Y+1 then
+	Println("Y < Y-1 or else Y > Y+1??");
+    else
+	Println("not (Y < Y-1 or else Y > Y+1)");
+    end if;
+
+    if (Y < Y-1 or else Y > Y+1) and then Y == Y then
+	Println("(Y < Y-1 or else Y > Y+1) and then Y==Y??");
+    else
+	Println("not ((Y < Y-1 or else Y > Y+1) and then Y==Y)");
+    end if;
+
+
+    if X < Y or else X > Y then
+        Println("X < Y or else X > Y");
+    else
+        Println("not (X < Y or else X > Y)");
+    end if;
+
+    Print("X = "); Print_Int(X);
+    Print(", Y = "); Print_Int(Y);
+    Print('\n');
+
+end func Test_Ops;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Ops(3, 10);
+end func main;

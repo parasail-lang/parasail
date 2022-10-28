@@ -1,0 +1,35 @@
+func main (Args: Basic_Array <Univ_String>) is
+  var Points: Vector<Point> := []
+  if |Args| == 0 then
+    //  Generate points randomly
+    var R := Random::Start(11)
+    var S := Random::Start(12)
+    for I in 1 .. 5000 loop
+      Points |= Point::New(Next_Real(R), Next_Real(S))
+    end loop
+  else
+    //  Read in points from JSON file, and use first N points
+    const Num_Points : optional Univ_Integer := From_String(Args[1])
+    if Num_Points is null then
+       Println ("First parameter should be count of points: `(Args[1])")
+       return
+    end if
+    const All_Points := Init_Points::Points(Limit => Num_Points)
+    Points := All_Points[1..Num_Points]
+  end if
+
+  var C := Clock::Create()
+  const Start := C.Now()
+
+  const Clusters := KMeans::Run(Points, N => 10, Iters => 15)
+
+  const Elapsed_Time := C.Now() - Start
+  Println(|Points| | " points took " | Elapsed_Time | " seconds")
+
+  Println("First point: " | Points[1])
+  Println("Last point: " | Points[|Points|])
+  Println("Cluster sizes and centers:")
+  for each [I => V] of Clusters forward loop
+     Println("size = " | |V| | ", center = " | KMeans::Average(V))
+  end loop
+end func main

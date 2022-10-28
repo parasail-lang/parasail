@@ -1,0 +1,133 @@
+interface PSL::Containers::Countable_Set<Element_Type is Countable<>> is
+    //  A set of values of a "countable" type (e.g. integer or enum),
+    //  where we can efficiently represent intervals (i.e. contiguous ranges)
+    //  of values of the type, allowing large sets to be handled.
+    op "[]"() -> Countable_Set
+    op "[..]"() -> Countable_Set
+
+    func Singleton(Elem : Element_Type) -> Countable_Set
+
+    op ".."(Left, Right : Element_Type) -> Countable_Set
+    op "<.."(Left, Right : Element_Type) -> Countable_Set
+    op "..<"(Left, Right : Element_Type) -> Countable_Set
+    op "<..<"(Left, Right : Element_Type) -> Countable_Set
+
+    op "|"(Left, Right : Element_Type) -> Countable_Set
+    op "|"(Left : Countable_Set; Right : Element_Type) -> Countable_Set
+    op "|"(Left : Element_Type; Right : Countable_Set) -> Countable_Set
+    op "|"(Left : Countable_Set; Right : Countable_Set) -> Countable_Set
+
+    op "|="(var Left : Countable_Set; Right : Element_Type)
+    op "|="(var Left : Countable_Set; Right : Countable_Set)
+
+    op "<|="(var Left : Countable_Set; var Right : optional Element_Type)
+        // Move element into set, leaving Right null afterward.
+
+    op "<|="(var Left : Countable_Set; var Right : Countable_Set)
+        // Move all elements of Right into Left, leaving Right empty.
+
+    op "-"(Left, Right : Countable_Set) -> Countable_Set
+      // Set difference
+    op "-"(Left : Countable_Set; Right : Element_Type) -> Countable_Set
+      // Remove one element
+    op "-="(var S : Countable_Set; Elem : Element_Type)
+      // Remove the given element from the set, if present
+    op "-="(var Left : Countable_Set; Right : Countable_Set)
+      // Remove all elements of Right from Left, if present
+
+    op "or"(Left : Countable_Set; Right : Countable_Set) 
+      -> Countable_Set is "|"   // union
+    op "or="(var Left : Countable_Set; Right : Countable_Set) is "|="
+
+    op "+"(Left : Countable_Set; Right : Countable_Set) 
+      -> Countable_Set is "|"   // Union
+    op "+="(var Left : Countable_Set; Right : Countable_Set) is "|="
+    op "+="(var Left : Countable_Set; Right : Element_Type) is "|="
+   
+    op "and"(Left, Right : Countable_Set) -> Countable_Set
+        // Intersection
+    op "and="(var Left : Countable_Set; Right : Countable_Set)
+
+    op "xor"(Left, Right : Countable_Set) -> Countable_Set
+        // Symmetric difference
+    op "xor="(var Left : Countable_Set; Right : Countable_Set)
+
+    op "in"(Left : Element_Type; Right : Countable_Set) -> Boolean
+
+    op "=?"(Left, Right : Countable_Set) -> Ordering
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left is a proper subset of Right
+        // Return #greater if Left is a proper superset of Right
+        // Return #unordered otherwise
+
+    func Count(S : Countable_Set) -> Univ_Integer
+
+    op "magnitude"(Countable_Set) -> Univ_Integer is Count
+
+    func Is_Empty(S : Countable_Set) -> Boolean
+
+    func First(S : Countable_Set) -> optional Element_Type
+    func Last(S : Countable_Set) -> optional Element_Type
+    func Any_Element(S : Countable_Set) -> optional Element_Type
+
+    op "indexing"(S : Countable_Set; Index : Univ_Integer)
+      -> optional Element_Type
+         //  Return "Index"th element of set S, counting 1 .. Count(S)
+
+    op "slicing"(S : Countable_Set; 
+      Index_Set : Countable_Range<Univ_Integer>) -> Countable_Set
+         //  Return subset of set S, elements S[Index_Set.First] through
+         //  S[Index_Set.Last], counting 1 .. Count(S)
+
+    op "/"(Set : Countable_Set; Num_Pieces : Univ_Integer)
+      -> Vector<Countable_Set>
+        // Divide a set into a vector of sets, each of similar size
+
+    func Remove_First(var S : Countable_Set) -> optional Element_Type
+        // Remove first element of set (lowest value)
+
+    func Remove_Last(var S : Countable_Set) -> optional Element_Type
+        // Remove last element of set (highest value)
+
+    func Remove_Any(var S : Countable_Set) -> optional Element_Type
+        // Remove an arbitrary element of set
+
+    func Ranges(S : Countable_Set) ->
+      Ordered_Set<Countable_Range<Element_Type>>
+        // Return set of disjoint ranges that represent the set of values in S
+
+end interface PSL::Containers::Countable_Set
+
+abstract interface PSL::Core::Countable<> implements Ordered<> is
+    op "+"(Left : Countable; Right : Univ_Integer) -> Countable
+    op "+"(Left : Univ_Integer; Right : Countable) -> Countable
+
+    op "-"(Left : Countable; Right : Univ_Integer) -> Countable
+    op "-"(Left, Right : Countable) -> Univ_Integer
+
+    op "=?"(Left, Right : Countable) -> Ordered::Full_Ordering
+
+    func First() -> Countable
+
+    func Last() -> Countable
+
+    func Min(Left, Right : optional Countable) -> optional Countable
+    func Max(Left, Right : optional Countable) -> optional Countable
+
+    func Hash(Val : Countable) -> Univ_Integer
+
+    op ".."(Left, Right : Countable) -> Countable_Set<Countable>
+      is in Countable_Set<Countable>
+    op "<.."(Left, Right : Countable) -> Countable_Set<Countable>
+      is in Countable_Set<Countable>
+    op "..<"(Left, Right : Countable) -> Countable_Set<Countable>
+      is in Countable_Set<Countable>
+    op "<..<"(Left, Right : Countable) -> Countable_Set<Countable>
+      is in Countable_Set<Countable>
+    op "|"(Left, Right : Countable) -> Countable_Set<Countable>
+      is in Countable_Set<Countable>
+
+    //  Countable also implements Imageable
+    func To_String(Val : Countable) -> Univ_String
+    optional func From_String(Univ : Univ_String) -> optional Countable
+end interface PSL::Core::Countable

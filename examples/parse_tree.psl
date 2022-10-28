@@ -1,0 +1,28 @@
+func Process_Parse_Tree(Root : Parse_Tree) is
+    for X => Root while X not null loop
+	case X.Kind of
+	  [#leaf] => Process(X.Data);
+	  [#unary] =>
+	      Process(X.Data);
+	    ||
+	      continue loop with X => X.Operand;
+	  [#binary] =>
+	      Process(X.Data);
+	    ||
+	      continue loop with X => X.Left;
+	    ||
+	      continue loop with X => X.Right;
+	end case;
+    end loop;
+end func Process_Parse_Tree;
+
+func Search_Binary_Tree(Root : Binary_Tree; 
+  Desired_Value : Value_Type) -> optional Id_Type is
+    const Result : Id_Type; 
+    for X => Root then X.Left || X.Right while X not null concurrent loop
+	if X.Value == Desired_Value then
+	    exit loop with Result => X.Id;
+	end if;
+    end loop with Result => null;
+    return Result;
+end func Search_Binary_Tree;

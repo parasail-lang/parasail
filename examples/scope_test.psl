@@ -1,0 +1,33 @@
+func Scope_Test(X : optional Univ_Integer; Y : optional Univ_Integer)
+ -> Univ_Integer is
+   var R : Countable_Range<Univ_Integer> := X .. Y
+   R := R.First + 2 .. R.Last + 2
+
+   {R.Last - 2 == Y}  //  false positive -- needs associativity
+
+   var L : List<Univ_Integer> := (Elem => 3, Next => null)
+   const A := L.Elem
+   L.Elem := L.Elem + 5
+   const B := L.Elem + A
+   L.Next := (Elem => B, Next => null)
+
+   {L.Next.Elem == 11}
+   {B == A + 6}
+   {B > X}
+
+   if X is null then
+      return 6
+   elsif Y is null then
+      {(X not null) == #true}
+      return X
+   else
+      {X is null and Y is null}
+      if X > Y then
+         {X - Y > 0}
+         return X - Y
+      else
+         {X - Y <= 0}
+         null
+      end if
+   end if
+end func Scope_Test

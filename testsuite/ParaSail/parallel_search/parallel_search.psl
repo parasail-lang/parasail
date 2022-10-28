@@ -1,0 +1,52 @@
+interface Search_Utils <Tree is Binary_Node<Ordered<>, Comparable<>>> is
+  // <Tree_Id is Ordered<>; Tree_Value is Comparable<>> is
+  // type Tree is Binary_Node<Tree_Id, Tree_Value>;
+    type Tree_Id is Tree::Key_Type;
+    type Tree_Value is Tree::Value_Type;
+    func Search(Root : Tree; Desired_Value : Tree_Value) -> optional Tree_Id;
+end interface Search_Utils;
+
+class Search_Utils is
+  exports
+    func Search(Root : Tree; Desired_Value : Tree_Value) -> optional Tree_Id is
+    
+        var Identifier : optional Tree_Id := null;  // make into a "const"
+	
+	for T => Root then Left(T) || Right(T)
+          while T not null concurrent loop
+	
+	    if Value(T) == Desired_Value then
+	
+		// Found desired node, exit with its identifier
+	
+		exit loop with Identifier => Key(T);
+	
+	    end if;
+	
+	end loop; // with Identifier => null;
+	
+	return Identifier;
+    end func Search;
+end class Search_Utils;
+
+func Test_Search() is
+    type My_Enum is Enum<[#a, #b, #c, #d]>;
+    type Search_Tree is Binary_Node<My_Enum, Univ_String>;
+    type SU is Search_Utils<Search_Tree>;
+
+    var T : Search_Tree := Create(Key => #b, Value => "b",
+      Left => Create(Key => #a, Value => "a"),
+      Right => Create(Key => #c, Value => "c",
+        Right => Create(Key => #d, Value => "d")));
+
+    const Key := SU::Search(T, "d");
+      // SU::Search(T, Value(Right(T)));
+
+    Println ("Search for \"d\" = " | Key);
+
+    Println ("Search for \"e\" = " | SU::Search(T, "e"));
+end func Test_Search;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Search ();
+end func main;

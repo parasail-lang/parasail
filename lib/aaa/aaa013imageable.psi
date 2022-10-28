@@ -1,0 +1,14 @@
+abstract interface PSL::Core::Imageable<> is
+    func To_String(Val : Imageable) -> Univ_String<>
+
+    optional func From_String(Str : Univ_String<>) -> optional Imageable
+
+    // NOTE: We include Hashable<> operations here
+    //       so that Set<Imageable+> works nicely.
+    //       Clearly if something is Imageable it is possible
+    //       to implement "=?" and Hash using the string image,
+    //       so we might as well requires these operations too.
+
+    op "=?"(Left, Right : Imageable) -> Ordering
+    func Hash(Val : Imageable) -> Univ_Integer
+end interface PSL::Core::Imageable

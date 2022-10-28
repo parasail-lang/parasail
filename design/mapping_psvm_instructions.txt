@@ -1,0 +1,331 @@
+Mapping ParaSail VM Instructions
+
+Here we start going instruction by instruction defining the mapping
+from PSVM to Ada.
+
+Here are the relevant type declarations from interpreter.ads:
+
+-----------
+
+   --  The various op codes in the instruction set
+   type Opcode_Enum is (
+     Skip_Op,
+     Call_Op,
+     Return_Op,
+     Move_Word_Op,
+     Store_Address_Op,
+     Create_Obj_Op,
+     Assign_Word_Op,
+     Swap_Obj_Op,
+     Move_Obj_Op,
+     Make_Copy_In_Stg_Rgn_Op,
+     Store_Local_Null_Op,
+     Store_Null_Of_Same_Stg_Rgn_Op,
+     Is_Null_Op,
+     Not_Null_Op,
+     Store_Int_Lit_Op,
+     Store_Real_Lit_Op,
+     Store_Char_Lit_Op,
+     Store_Enum_Lit_Op,
+     Store_Str_Lit_Op,
+     Store_Operation_Desc_Op,
+     Start_Parallel_Op,
+     Add_Parallel_Op,
+     Prepare_To_Exit_Parallel_Op,
+     Wait_For_Parallel_Op,
+     Start_Parallel_Call_Op,
+     Add_Parallel_Call_Op,
+     Create_Lock_For_Obj_Op,
+     Create_Tcb_Op,
+     Create_Polymorphic_Obj_Op,
+     Select_Polymorphic_Ancestor_Part_Op,
+     Select_Ancestor_Part_Op,
+     If_Op,
+     Call_Block_Op,
+     Check_Block_Op,
+     Exit_Op,
+     End_Op,
+     Case_Op,
+     Loop_Op); --  TBD: These three are not used yet
+
+   --  A single (virtual) machine instruction
+   type Instruction (Op : Opcode_Enum := Skip_Op) is record
+      Source_Pos : Source_Positions.Source_Position :=
+        Source_Positions.Null_Source_Position;
+      case Op is
+         when Skip_Op | Exit_Op =>
+            Skip_Count : Code_Offset := 0;
+            --  Number of instructions to skip.  Is a No_Op if 0.
+            case Op is
+               when Exit_Op =>
+                  Level_Diff : Natural := 0;
+               --  This indicates how many nested block levels
+               --  the exit statement is exiting from.
+               when others =>
+                  null;
+            end case;
+
+         when Call_Op | Call_Block_Op | Check_Block_Op =>
+            Params : Object_Locator;
+            Static_Link : Object_Locator;
+            --  Points to enclosing local area or type area
+            case Op is
+               when Call_Op =>
+                  Call_Target : Object_Locator;
+                  Locked_Param_Index : Natural := 0;
+               --  If greater than zero, indicates which parameter
+               --  is locked during the execution of the call.
+               --  If zero, then there is no lock acquired, though it
+               --  might be a lock-free operation on a concurrent object.
+               when Call_Block_Op | Check_Block_Op =>
+                  Code_Block : aliased Code_Block_Descriptor;
+                  --  This describes the nested block of code
+                  case Op is
+                     when Check_Block_Op =>
+                        Assertion_Str : Strings.U_String_Index :=
+                          Strings.Null_U_String_Index;
+                     --  A string representation of assertion being checked
+                     when others =>
+                        null;
+                  end case;
+               when others =>
+                  null;
+            end case;
+
+         when Return_Op =>
+            null;
+
+         when Store_Int_Lit_Op                    |
+              Store_Real_Lit_Op                   |
+              Store_Str_Lit_Op                    |
+              Store_Char_Lit_Op                   |
+              Store_Enum_Lit_Op                   |
+              Store_Operation_Desc_Op             |
+              Move_Word_Op                        |
+              Store_Address_Op                    |
+              Assign_Word_Op                      |
+              Swap_Obj_Op                         |
+              Store_Local_Null_Op                 |
+              Store_Null_Of_Same_Stg_Rgn_Op        |
+              Create_Obj_Op                       |
+              Create_Lock_For_Obj_Op              |
+              Create_Polymorphic_Obj_Op           |
+              Select_Polymorphic_Ancestor_Part_Op |
+              Select_Ancestor_Part_Op             |
+              Make_Copy_In_Stg_Rgn_Op              |
+              Move_Obj_Op                         |
+              Is_Null_Op                          |
+              Not_Null_Op                         =>
+
+            Destination : Object_Locator;
+            --  For Assign_Word_Op, existing object is freed if Type_Info
+            --  implies is large
+            --  For Swap_Obj_Op, existing object is copied and then freed
+            --  if Type_Info implies is large and objects not in same region.
+            --  For Create_Polymorphic_Obj_Op, identifies object to be
+            --  replaced with a polymorphic object which wraps it.
+            case Op is
+               when Store_Local_Null_Op =>
+                  --  Type of object determines whether or not object is small,
+                  --  and specific kind of null if small.
+                  --  Stg_Rgn is the current local region.
+                  Null_Type_Info : Object_Locator;
+               when Store_Int_Lit_Op =>
+                  Int_Value : Word_Type;
+               when Store_Char_Lit_Op =>
+                  Char_Value : Word_Type;
+               when Store_Real_Lit_Op =>
+                  Real_Value : Univ_Real;
+               when Store_Str_Lit_Op =>
+                  Str_Value : Strings.U_String_Index;
+               when Store_Enum_Lit_Op =>
+                  Enum_Value : Strings.U_String_Index;
+               when Store_Operation_Desc_Op =>
+                  --  Operation_Desc includes both
+                  --  static link and routine locator.
+                  --  A "null" operation is represented by a null static link
+                  --  and a null locator.
+                  Operation_Static_Link : Object_Locator;
+                  Operation_Locator : Object_Locator;
+               when Move_Word_Op                        |
+                    Store_Address_Op                    |
+                    Assign_Word_Op                      |
+                    Swap_Obj_Op                         |
+                    Store_Null_Of_Same_Stg_Rgn_Op        |
+                    Create_Obj_Op                       |
+                    Create_Polymorphic_Obj_Op           |
+                    Select_Polymorphic_Ancestor_Part_Op |
+                    Select_Ancestor_Part_Op             |
+                    Make_Copy_In_Stg_Rgn_Op              |
+                    Move_Obj_Op                         |
+                    Is_Null_Op                          |
+                    Not_Null_Op                         =>
+
+                  Source : Object_Locator;
+                  --  For Store_Null and Create_Obj,
+                  --  determines region if non-null
+                  --  For Assign and Make_Copy, is object to be copied.
+                  --  For Select_*Ancestor_Part_Op, is object
+                  --  whose ancestor part is to be extracted.
+                  case Op is
+                     when Assign_Word_Op                      |
+                          Swap_Obj_Op                         |
+                          Move_Obj_Op                         |
+                          Store_Null_Of_Same_Stg_Rgn_Op        |
+                          Create_Obj_Op                       |
+                          Create_Polymorphic_Obj_Op           |
+                          Select_Polymorphic_Ancestor_Part_Op |
+                          Select_Ancestor_Part_Op             |
+                          Make_Copy_In_Stg_Rgn_Op              |
+                          Is_Null_Op                          |
+                          Not_Null_Op                         =>
+
+                        Type_Info : Object_Locator;
+                        --  Determines whether small or large.
+                        --  For Store_Null, determines kind of null if small.
+                        --  For Create_Obj_Op determines type of obj to create
+                        --   if large, and kind of null if small.
+                        --  For Select_*Ancestor_Part_Op, determines type of
+                        --  ancestor part to be extracted.  This becomes a
+                        --  simple
+                        --  Move_Word_Op if the component-extension levels are
+                        --  the same between the object's type-id
+                        --  and the ancestor type.
+                        case Op is
+                           when Make_Copy_In_Stg_Rgn_Op =>
+                              Existing_Obj_In_Stg_Rgn : Object_Locator;
+                           --  Determines region for Make_Copy
+                           when Select_Ancestor_Part_Op =>
+                              Source_Type_Info : Object_Locator;
+                           --  Determines type of Source object
+                           when others =>
+                              null;
+                        end case;
+                     when others =>
+                        null;
+                  end case;
+               when others =>
+                  null;
+            end case;
+
+         when If_Op =>
+            If_Source : Object_Locator;
+            If_Condition : Condition_Bit_Mask;
+            Skip_If_False : Code_Offset;  --  Number of instructions to skip
+         --  if condition not satisfied.
+         --  Negative for loop back.
+
+         when Start_Parallel_Op      |
+              Add_Parallel_Op        |
+              Wait_For_Parallel_Op   |
+              Start_Parallel_Call_Op |
+              Add_Parallel_Call_Op   |
+              Create_Tcb_Op          |
+              Prepare_To_Exit_Parallel_Op =>
+
+            Parallel_Master : Object_Locator;
+            --  This is where the count/list of subthreads hangs
+
+            case Op is
+               when Start_Parallel_Op      |
+                    Add_Parallel_Op        |
+                    Start_Parallel_Call_Op |
+                    Add_Parallel_Call_Op   |
+                    Create_Tcb_Op          =>
+
+                  Parallel_Control : Object_Locator;
+                  --  This is where the control block is stored,
+                  --  followed by the parameters, if any.
+                  Parallel_Static_Link : Object_Locator;
+                  --  Location of enclosing local area/type area
+
+                  case Op is
+                     when Start_Parallel_Op | Add_Parallel_Op =>
+
+                        Parallel_Code_Block : aliased Code_Block_Descriptor;
+                     --  This describes the nested block of code
+
+                     when Start_Parallel_Call_Op | Add_Parallel_Call_Op =>
+
+                        Parallel_Call_Target : Object_Locator;
+                        --  This identifies the operation to be called
+                        Parallel_Locked_Param_Index : Natural := 0;
+                     --  Indicates which param, if any, is locked
+                     --  during the execution of the call.
+
+                     when Create_Tcb_Op =>
+                        Num_Params : Natural;
+                     --  The total number of parameters (inputs and outputs)
+                     --  in the parallel call
+
+                     when others =>
+                        null;
+                  end case;
+
+               when others =>
+                  null;
+            end case;
+
+         when Case_Op =>
+            Case_Selector : Object_Locator;
+            Case_First : Non_Null_Value;
+            --  Skips number of instructions determined by
+            --    Case_Selector - Case_First
+            --      if Case_Selector in Case_First .. Case_Last.
+            Case_Last : Non_Null_Value;
+            Case_Default_Skip : Code_Offset;
+         --  Number of instructions to skip
+         --  if Case_Selector not in Case_First .. Case_Last.
+         --  Negative for loop back.
+
+         when End_Op =>
+            null;
+         when Loop_Op =>
+            null;
+      end case;
+   end record;
+
+-----------------
+
+     NOTE: Many of these will just call a corresponding routine
+           from the interpreter.
+
+     Skip_Op -- a goto; ideally turned into an "if" or "loop"
+     Call_Op -- a call -- parameters built up into an array first,
+     Return_Op -- a return -- result already stored,
+     Move_Word_Op -- a simple assignment,  (Local_Area should be allocated
+                  -- from the local region)
+     Store_Address_Op -- a simple assignment,
+     Create_Obj_Op -- May want to call the existing routine in the interpreter,
+     Assign_Word_Op  --  Needs to reclaim LHS and copy RHS if necessary,
+     Swap_Obj_Op    -- Pointer swap or two copies,
+     Move_Obj_Op    -- Save, Pointer transfer or copy, followed by delete,
+     Make_Copy_In_Stg_Rgn_Op  -- Copy into region
+     Store_Local_Null_Op  -- Type/region-specific null,
+     Store_Null_Of_Same_Stg_Rgn_Op type/region-specific null,
+     Is_Null_Op  -- simple test,
+     Not_Null_Op  -- simple test,
+     Store_Int_Lit_Op -- Simple assignment,
+     Store_Real_Lit_Op  -- Simple assignment,
+     Store_Char_Lit_Op  -- simple assignment,
+     Store_Enum_Lit_Op  -- one-time string lookup, simple assignment,
+     Store_Str_Lit_Op   -- one-time string lookup, simple assignment,
+     Store_Operation_Desc_Op,
+     Start_Parallel_Op,
+     Add_Parallel_Op,
+     Prepare_To_Exit_Parallel_Op,
+     Wait_For_Parallel_Op,
+     Start_Parallel_Call_Op,
+     Add_Parallel_Call_Op,
+     Create_Lock_For_Obj_Op,
+     Create_Tcb_Op,
+     Create_Polymorphic_Obj_Op,
+     Select_Polymorphic_Ancestor_Part_Op,
+     Select_Ancestor_Part_Op,
+     If_Op,
+     Call_Block_Op,
+     Check_Block_Op,
+     Exit_Op,
+     End_Op,
+     Case_Op,
+     Loop_Op); --  TBD: These three are not used yet

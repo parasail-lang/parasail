@@ -1,0 +1,47 @@
+interface parallel_stmt<> is
+    func Test(var X : Integer; var Y : Integer);
+end interface parallel_stmt;
+
+func Compute_X(N : Integer) -> Integer is
+    if N == 0 then
+	return 42;
+    else 
+	return 2*Compute_X(N-1);
+    end if;
+end func Compute_X;
+
+func Compute_Y(N : Integer) -> Integer is
+    if N == 0 then
+	return 33;
+    else 
+	return 3*Compute_Y(N-1);
+    end if;
+end func Compute_Y;
+   
+class parallel_stmt is
+  exports
+    func Test(var X : Integer; var Y : Integer) is
+       X := Compute_X(7);
+     ||
+       Y := Compute_Y(4);
+    end func Test;
+end class parallel_stmt;
+
+func Test1(Count1 : Integer; Count2 : Integer) is
+    var X : Integer := 11;
+    var Y : Integer := 22;
+    var IO := IO::Get_IO()
+  then
+    X := Compute_X(Count1);
+  ||
+    Y := Compute_Y(Count2);
+  then
+    Println (X);
+    Println (Y);
+    IO.Stdout.Flush();
+end func Test1;
+        
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test1 (2, 4);
+end func main;

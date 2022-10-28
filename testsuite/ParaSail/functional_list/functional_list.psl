@@ -1,0 +1,186 @@
+import PSL::Short_Names::*, *
+
+//  Functional List module
+//  No vars. All operations return a new list
+//  A null FList is the empty list
+
+//  Implemented in a functional style (no loops, only recursion)
+
+//  Goal: all functions tail recursive
+//  Even though ParaSail doesn't have tail-call optimizations yet (will it?)
+
+interface FList<Element_Type is Assignable<>> is
+   //  return the empty list (null)
+   op "[]"() -> optional FList;
+   //  Get the Head (the first element) of a non-empty list
+   func Head(L : FList) -> Element_Type;
+   //  Get the Tail (everything but the first element) of a non-empty list
+   func Tail(L : FList) -> optional FList;
+   //  Append an element onto the front of a list
+   op "|"(Elem : Element_Type; L : optional FList) -> FList;
+   //  Return the length of the list
+   func Length(L : optional FList) -> Int;
+   //  Reverse the list
+   func Rev(L : optional FList) -> optional FList;
+
+   //  Retrieve Nth element (Where the first element is 1)
+   func Nth(L : FList; N : Int) {N in 1 .. Length(L)} -> Element_Type;
+
+   //  Printing utility
+   interface Strings<I is Imageable<>>
+      extends FList<I> is
+      func To_String(L : optional FList<I>) -> String;
+   end interface Strings
+
+   //  Map functions
+   interface Maps<Result_Type is Assignable<>> is
+      type Mapper is func(Element_Type) -> Result_Type;
+      func Map(L : optional FList; F : Mapper) -> optional FList<Result_Type>;
+   end interface Maps;
+
+   //  Fold functions
+   interface Folds<Acc_Type is Assignable<>> is
+      type Folder is func(Acc_Type; Element_Type) -> Acc_Type;
+      func Fold_Left(L : optional FList;
+         F : Folder; Acc : Acc_Type) -> Acc_Type;
+      func Fold_Right(L : optional FList;
+         F : Folder; Acc : Acc_Type) -> Acc_Type;
+   end interface Folds;
+end interface FList;
+
+class FList is
+   const Head : Element_Type;
+   const Tail : optional FList;
+
+   exports
+
+   op "[]"() -> optional FList is
+      return null;
+   end op "[]";
+
+   func Head(L : FList) -> Element_Type is
+      return L.Head;
+   end func Head;
+
+   func Tail(L : FList) -> optional FList is
+      return L.Tail;
+   end func Tail
+
+   op "|"(Elem : Element_Type; L : optional FList) -> FList is
+      return (Head => Elem, Tail => L);
+   end op "|";
+
+   func Length(L : optional FList) -> Int is
+      //  Implemented in terms of fold left
+      //  folder function adds one for each element
+      type Acc_Is_Int is FList::Folds<Int>;
+      return Acc_Is_Int::Fold_Left(L, lambda(A, E) -> 1 + A, 0);
+   end func Length;
+
+   func Rev(L : optional FList) -> optional FList is
+      //  Implemented in terms of fold left
+      //  folder function appends to front of accumulator
+      type Acc_Is_FList is FList::Folds<optional FList>;
+      return Acc_Is_FList::Fold_Left(L, lambda(A, E) -> E | A, []);
+   end func Rev
+
+   func Nth(L : FList; N : Int) -> Element_Type is
+      type Acc_Is_Pair is FList::Folds<Pair<Int, optional Element_Type>>;
+      const Result := Acc_Is_Pair::Fold_Left(L,
+         lambda(A, E) -> (if A.Second not null then A    //  Found already
+                          elsif A.First == N then (0, E) //  Found it now
+                          else (A.First + 1, A.Second)), //  Not found yet
+         (1, null));
+      return Result.Second;
+   end func Nth
+
+   class Strings is
+      exports
+      func To_String(L : optional FList<I>) -> String is
+         type Imageable_FList is FList<I>
+         type Acc_Is_String is Imageable_FList::Folds<String>;
+         return Acc_Is_String::Fold_Left(L,
+            lambda(A, E) ->
+               (if A == "[" then A | To_String(E)
+                else A | ", " | To_String(E)), "[") | "]";
+      end func To_String
+   end class Strings
+
+   class Maps is
+      exports
+      func Map(L : optional FList; F : Mapper)
+         -> optional FList<Result_Type> is
+         //  Declare Nil's type to be a list of Result_Type
+         //  because otherwise it's assumed to be Element_Type
+         const Nil : optional FList<Result_Type> := [];
+         type Acc_Is_Map_Result is Folds<optional FList<Result_Type>>;
+         return Acc_Is_Map_Result::Fold_Right(L,
+            lambda(Acc, Elem) -> F(Elem) | Acc, Nil);
+      end func Map;
+   end class Maps;
+
+   class Folds is
+      exports
+      func Fold_Left(L : optional FList; F : Folder; Acc : Acc_Type)
+           -> Acc_Type is
+         if L is null then
+            return Acc;
+         else
+            const New_Acc := F(Acc, Head(L));
+            return Fold_Left(Tail(L), F, New_Acc);
+         end if
+      end func Fold_Left
+
+      func Fold_Right(L : optional FList; F : Folder; Acc : Acc_Type)
+           -> Acc_Type is
+         return Fold_Left(Rev(L), F, Acc);
+      end func Fold_Right
+   end class Folds
+end class FList
+  
+func Test_Nth(L : optional FList<Int>) is
+   for I in 1 .. Length(L) forward loop
+      Println("    The " | I | "th elem is " | L.Nth(I));
+   end loop
+end func Test_Nth
+
+func main(Basic_Array<String>) is
+   type Int_List is FList<Int>;
+   type String_List is FList<String>;
+
+   type Imageable_FList is Int_List::Strings<Int>;
+   const Nil : optional Int_List := [];
+   const L : Int_List := 1 | (2 | (3 | []));
+   Println("[1, 2, 3] prints as " | Imageable_FList::To_String(L));
+   Println("[] prints as " | Imageable_FList::To_String(Nil));
+   const Lle := Rev(L);
+   Println("[3, 2, 1] prints as " | Imageable_FList::To_String(Lle));
+
+   //  Test the Nth function by iterating through it and printing each
+   Println("Testing Nth on [1, 2, 3]");
+   Test_Nth(L);
+   Println("Testing Nth on []");
+   Test_Nth(Nil);
+   Println("Testing Nth on [3, 2, 1]");
+   Test_Nth(Lle);
+   Println("Testing Nth on [5]");
+   Test_Nth(5 | Nil);
+   Println("Testing Nth on [5, 6]");
+   Test_Nth(Rev(6 | (5 | Nil)));
+
+   //  To use the maps, you must instatiate a Maps type
+   //  and give the type of the result of the map function
+   type To_String_Lambda is Int_List::Maps<String>;
+   const As_Strings := To_String_Lambda::Map(L, lambda(X) -> "num" | X);
+   type For_Strings is String_List::Strings<String>;
+   Println(For_Strings::To_String(As_Strings));
+
+   //  Folds are similar. you must instatiate a Folds type
+   //  and give the type of the accumulator
+   type Int_Acc is Int_List::Folds<Int>;
+   const Sum := Int_Acc::Fold_Left(L, lambda(Acc, Elem) -> Acc + Elem, 0);
+   Println("sum of " | Imageable_FList::To_String(L) | " is " | Sum);
+   Println("length of " | Imageable_FList::To_String(L) | " is " | Length(L));
+
+   const As_Strings_No_Lambda := To_String_Lambda::Map(L, Int::To_String);
+end func main;

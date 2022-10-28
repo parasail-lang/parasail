@@ -1,0 +1,306 @@
+Mapping Operations and Calls in ParaSail VM to Ada
+
+There is a separate document that talks about representing ParaSail
+objects (mapping_psvm_objects.txt).  This document focuses on how
+ParaSail operations and calls thereof are represented in Ada, meaning 
+what is the parameter-and-result profile of the generated Ada
+subprograms, and how are calls represented, both "normal" calls and
+parallel calls.
+
+A. Mapping ParaSail operation declarations to Ada declarations:
+
+ - Operations declared in the interface of a ParaSail module become
+   subprograms declared in the visible part of a corresponding Ada
+   package.  Operations declared in the "class" defining a ParaSail 
+   module become subprograms declared in the corresponding Ada package
+   body.
+   
+ - The Ada subprograms will have at least two additional parameters:
+     - A type-descriptor object; this is the controlling parameter (see
+       below for more discussion of dispatching calls);
+     - A context parameter; this identifies the current picothread
+       and the caller's region id (and perhaps more info?)
+       
+ - If the ParaSail operation has exactly one output:
+     - The Ada subprogram will be a function, with a result type
+       corresponding to that of the ParaSail output type.
+     - If the result is potentially large, it will have an additional
+       IN parameter which is a null value of the type, which indicates 
+       the region in which to allocate the result.
+       
+ - If the ParaSail operation has multiple outputs (not currently 
+   supported by the ParaSail front end):
+     - The Ada subprogram will be a procedure with multiple
+       [IN] OUT parameters, one per ParaSail output.
+     - The parameter will be IN OUT if the corresponding ParaSail
+       output is a potentially large type, and it will be initialized
+       with a null value which will indicate its region; otherwise
+       it will be a simple OUT parameter.
+
+ - The ParaSail input/output parameters are mapped as follows:
+     - A "normal" (read-only) ParaSail input becomes an Ada "in"
+       parameter
+     - A ParaSail "var" input becomes an Ada "in out" parameter (or
+       if we are generating Ada 2005-compatible code and it is mapped
+       to an Ada function, then a <module>.Ref type)
+     - A ParaSail "ref" input becomes a <module>.Ref type.
+     - A "normal" ParaSail output becomes the function result type (or
+        an in-out parameter if there are multiple outputs).
+     - A ParaSail "ref" output becomes a result of a <module>.Ref type.
+     
+B. Type descriptors and dispatching operations
+
+  We introduce the notion of type-descriptor types and objects in our
+  "object" mapping description (see mapping_psvm_objects.txt).  We
+  will mimic ParaSail's "extend" relationship using type extension
+  of the type-descriptor type for the parent module to produce
+  the type-descriptor type for the module that extends it.
+  We considered using Ada's interface types for representing the
+  "implements" relationship, but this turned out to add complexity
+  and not buy us much, because the types of the "Obj" parameters
+  don't match anyway.  See below for more discussion of how we
+  represent the "implements" relationship using "op-map" type-
+  descriptor types.
+  
+  The ultimate goal behind this is that we want to implement our
+  "shared" generic model for ParaSail modules by using Ada tagged-type
+  dispatching.  However, instead of using the actual data types to
+  control dispatching, instead we use the type-descriptor object as
+  the controlling parameter.  For example, imagine we have the
+  following ParaSail:
+  
+      abstract interface Printable<> is
+          func Print(var IO; P : Printable);
+          func Println(var IO; P : Printable);
+          ...
+      end interface Printable;
+      
+      interface My_Data<...> implements Printable<> is
+          func Print(var IO; MD : My_Data);
+          func Println(var IO; MD : My_Data);
+          
+          func My_Operation(var IO; MD : My_Data);
+          ...
+      end interface My_Data;
+      
+      ...
+      
+      interface Report<Data is Printable<>> is
+          func Write_Report(var IO; Content : Vector<Data>);
+          ...
+      end interface Report;
+      
+  Inside Write_Report, presume we will be calling Print or Println
+  on elements of the Content vector.  So what will the spec for
+  the Ada packages corresponding to the modules Printable and
+  My_Data look like?
+  
+  Package Printable is relatively straightforward.  We have an "Obj"
+  type and a type-descriptor type, and the two (abstract) operations
+  of the interface, with two extra parameters being a type-descriptor
+  object and a context:
+  
+     package Printable is
+         type Obj is new PS_Obj;
+         type Type_Desc is abstract new PS_Type_Desc with ...;
+         
+         procedure Print(Desc : Type_Desc; Context : PS_Context;
+           IO : in out Standard.IO.Obj; P : Printable.Obj) is abstract;
+  
+         procedure Println(Desc : Type_Desc; Context : PS_Context;
+           IO : in out Standard.IO.Obj; P : Printable.Obj) is abstract;
+    
+         ...
+     end Printable;
+     
+  Now what would the package My_Data look like?  The problem we have
+  is that we will want a new "Obj" type, but we also want a new
+  type-descriptor type.  So we put the
+  declaration of the type-descriptor type in a subpackage called
+  "Ancestry," and in there we use the original "Obj" type associated
+  with the operations Print and Println (since we can't change the
+  types of the "Obj" parameters because they are not controlling 
+  parameters).  Then we will have versions following the Ancestry
+  subpackage, which use the "correct" type for the "Obj" parameters.
+  The (non-abstract) operations in the Ancestry subpackage which are
+  overriding inherited operations will be implemented by calling the 
+  "true" versions declared after the Ancestry subpackage, performing
+  any necessary conversions:  
+  
+     package My_Data is
+         type Obj is new PS_Obj;
+         
+         package Ancestry is
+
+             type Type_Desc is new Printable.Type_Desc with ...
+             
+             -- We override the inherited operations with non-abstract
+             -- implementations.  We can't use the "correct" Obj type
+             -- for the operations inherited from Printable.
+             overriding
+             procedure Print
+               (Desc : Type_Desc; Context : PS_Context;
+                IO : in out Standard.IO.Obj; P : Printable.Obj);
+             overriding
+             procedure Println
+               (Desc : Type_Desc; Context : PS_Context;
+                IO : in out Standard.IO.Obj; P : Printable.Obj);
+                
+             -- Here we add a new operation, using the correct Obj type
+             not overriding
+             procedure My_Operation
+               (Desc : Type_Desc; Context : PS_Context;
+                IO : in out Standard.IO.Obj; MD : My_Data.Obj);
+         end Ancestry;
+         
+         subtype I_Type_Desc is Ancestry.I_Type_Desc;
+         subtype Type_Desc is Ancestry.Type_Desc;
+         
+         -- Now we define the "real" versions.  Here we use
+         -- the "correct" Obj types.  The version in the Ancestry
+         -- subpackage will call these, after performing any necessary
+         -- type conversions. (For the new operations, the operations
+         -- in the Ancestry subpackage could be renamings-as-body.)
+         procedure Print
+               (Desc : Type_Desc; Context : PS_Context;
+                IO : in out Standard.IO.Obj; MD : My_Data.Obj);
+         procedure Println
+               (Desc : Type_Desc; Context : PS_Context;
+                IO : in out Standard.IO.Obj; MD : My_Data.Obj);
+         procedure My_Operation
+               (Desc : Type_Desc; Context : PS_Context;
+                IO : in out Standard.IO.Obj; MD : My_Data.Obj);
+         ...
+     end My_Data;
+     
+  Now, given a class-wide object of type Printable.Type_Desc'Class, we
+  can "reach" the Print operation in My_Data by a call of the form:
+  
+    X : Printable.Obj;
+    Data : Printable.Type_Desc'Class 
+        -- presume Data'Tag = My_Data.Type_Desc'Tag;
+    ...
+    Data.Print(Context, IO, P => X);
+
+  So where do these type descriptors come from?  As suggested in the
+  mapping_psvm_objects.txt, for each ParaSail module, we could have a 
+  child package of the associated Ada package which contains one
+  type descriptor per instance of the Module.  However, those are only
+  useful if you know the instantiation you are dealing with at compile
+  time, such as when you see "Integer<1..10>".  In many other cases,
+  the type descriptor will be a parameter to another module
+  instantiation, or it will be derived from such a parameter.  In the
+  above example, we have imagined the use of Vector<Data> where Data
+  is a parameter of the Report module.  So the type descriptor for
+  Data would be provided as part of instantiating the Report module.
+  We could think of it (and perhaps implement it) as a discriminant
+  of the Report.Type_Desc type.  The type descriptor for Vector<Data>
+  would be a component of the Report.Type_Desc type, provided when the
+  type descriptor for some particular instance of Report is constructed.
+  
+  So the above leads us to a package spec for the Report package 
+  corresponding to the ParaSail Report module as follows:
+  
+        package Report is
+            type Obj is new PS_Obj;
+          
+            type Type_Desc
+              (Data : access constant Printable.Type_Desc'Class) is
+              new PS_Type_Desc with record
+                Vector_Data : access constant Vector.Type_Desc'Class;
+                ...
+            end record;
+      
+            procedure Write_Report
+              (Desc : Report.Type_Desc; Context : PS_Context;
+               IO : in out Standard.IO.Obj; Content : Vector.Obj);
+            ...
+        end Report;
+
+B.1 "Op-Map" Type-Descriptor Types
+
+  After more thought, it does not seem worthwhile to try to exactly
+  mimic the "implements" relationships using Ada's interface-type
+  progenitors. Because we are using the type-descriptor object as the
+  controlling parameter, rather than the "obj" types, we don't get much
+  advantage from using Ada's multiple inheritance.  Furthermore,
+  ParaSail is designed so that special "op-map" type descriptors are
+  constructed for each "implements" relationship.  These op-map type
+  descriptors provide a mapping from the slot used for an operation of
+  the ancestor module that is implemented, to the slot used by the
+  descendant module that is implementing the ancestor's interface.
+
+  So this means that we can declare separate "op-map" type-descriptor
+  types in Ada, one for each "implements" relationship, which is a type
+  extension of the type descriptor for the implemented type. Along with
+  each such op-map type-descriptor type would be declarations of
+  "wrapper" routines, that when called would call the "real" operations
+  of the descendant type, after doing any needed type conversions. 
+  These op-map type-descriptor types could be declared in a child
+  package.  We could create a separate child package for each
+  "implements" relationship, or we could put them all in one child.
+
+  The "extends" relationship in ParaSail is like normal tagged-type
+  extension in Ada -- this is single inheritance, and it includes
+  inheritance of the implementation of operations and the data
+  components.  As in Ada, constructor operations are inherited as
+  abstract (analogous to functions that have a controlling result),
+  unless there are no components added as part of the extension. So the
+  "main" type-descriptor type declared in the Ada package corresponding
+  to a module that "extends" a parent module, would be declared as a
+  type extension of the parent module's type-descriptor type.
+
+  Overall, with this new approach, we have no need to use interface
+  types in the generated Ada for the type-descriptor types. In general
+  if the ParaSail module is abstract, then the type-descriptor type in
+  Ada will also be abstract.
+
+  To add a bit of a twist, ParaSail also has "partially abstract"
+  modules.  These are modules that are not declared as "abstract"
+  modules, but have one or more abstract operations.  A partially
+  abstract module PA still needs a type-descriptor object, because
+  unlike in Ada, objects of a partially abstract module PA may be
+  created.  However, they cannot be converted to the polymorphic type
+  PA+, nor can they be used as the actual parameter in a module
+  instantiation if the formal parameter is specified as "Formal_Type is
+  PA<...>", since both polymorphic types and formal types are presumed
+  to have only non-abstract operations.  So for partially abstract
+  modules we have to declare a non-abstract type-descriptor type, and
+  for abstract operations of the module, we generate Ada bodies that
+  raise Program_Error, since we can't declare them as abstract in Ada if
+  we still want to create an object of the type-descriptor type.  The
+  ParaSail compiler will prevent these "abstract" operations from being
+  called, even though they won't be "officially" abstract in the
+  generated Ada.
+
+  We will still use the idea of an "Ancestry" subpackage to handle the
+  "extends" relationship, but it will only declare a single
+  type-descriptor type.
+  
+C. Implementing Parallel Call
+
+  The ParaSail virtual machine now supports two kinds of picothread
+  "spawn" operation, one which invokes a local function to do some
+  arbitrary computation (Parallel_Block_Op), and one which invokes a
+  declared ParaSail operation passing it a vector of parameters adjoined
+  to a picothread control block (Parallel_Call_Op).  This latter is what
+  is termed a "parallel call."
+  
+  When making a parallel call, we are pretty much obliged to represent
+  the parameters in a vector, rather than passing parameters in 
+  registers, or however the normal calls are made.  This is because the
+  parallel picothread might operate on a different stack entirely, and
+  certainly will not run until a later point, at which all register
+  contents would have been lost.  
+  
+  To "receive" a parallel call, we probably need to provide a "wrapper"
+  function which takes the vector of parameters plus some kind of 
+  operation index or other operation identifier, and does a "case"
+  statement on that operation id.  In each of the "case" arms, we would
+  do the call on the "real" operation passing the parameters from the
+  parameter vector, gather up the results and put them back into the 
+  parameter vector, and then return.
+
+  This same "wrapper" function might be used in other cases where
+  we need to deal with a vector of parameters, or we no longer "know"
+  the type of what we are calling.

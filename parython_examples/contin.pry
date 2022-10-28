@@ -1,0 +1,13 @@
+def Test_Continue() :
+    for I = 1 :
+	Println("I = " | I);
+        if I == 1 :
+	    continue loop with 9;
+	Println("We skipped 1, but I still = " | I);
+	if I == 9 :
+	    continue loop with 7;
+	if I == 8 :
+	    exit loop;
+	Println("We should have just exited if I == 8");
+	if I <= 10 :
+	    continue loop with I+1;

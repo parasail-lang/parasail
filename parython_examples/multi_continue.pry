@@ -1,0 +1,27 @@
+def Multi_Continue(X, Y : Univ_Integer) :
+
+   Println("Loop with \"while\" in each iterator");
+   for (I = X while I > 0; J = Y while J > 0) :
+       Println ("I, J = " | I | ", " | J);
+       continue loop with (I => I-1, J => J-1);
+   end loop;
+
+   Println("Loop with conditional \"continue\"");
+   for (I = X; J = Y) :
+       Println ("I, J = " | I | ", " | J);
+       if I > 0 and then J > 0 :
+           continue loop with (I => I-1, J => J-1);
+       end if;
+   end loop;
+
+   Println("Loop with conditional \"exit\"");
+   for (I = X; J = Y) :
+       Println ("I, J = " | I | ", " | J);
+       if I <= 0 or else J <= 0 :
+          exit loop;
+       end if;
+       continue loop with (I => I-1, J => J-1);
+   end loop;
+
+end def Multi_Continue;
+

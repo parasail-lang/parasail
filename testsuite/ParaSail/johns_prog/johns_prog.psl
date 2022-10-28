@@ -1,0 +1,26 @@
+func johns() is
+   var Solutions : concurrent Vector<Univ_Integer> := []
+  *Outer*
+   for (Not_Used := 0..9; N := 0; I := 1) loop
+      for D in Not_Used concurrent loop
+          if (N * 10 + D) mod I == 0 then
+              if I == 10 then
+                  Println ("Answer is " | N*10 + D);
+                  Solutions |= N*10 + D
+              else
+                  continue loop Outer
+                    with (Not_Used => Not_Used - D, N => N * 10 + D, I => I+1)
+              end if
+          end if;
+      end loop;
+   end loop Outer;
+   Print("Solutions: ")
+   for each S of Solutions loop
+      Print(S | " ")
+   end loop
+   Print('\n')
+end func johns
+
+func main(Args : Basic_Array<Univ_String>) is
+   johns ();
+end func main;

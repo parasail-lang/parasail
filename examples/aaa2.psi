@@ -1,0 +1,380 @@
+interface PSL::Core::Countable_Range<Bound_Type is Countable<>> is
+    // Simple contiguous Countable_Range of integers (i.e. an interval)
+    const First : Bound_Type
+    const Last : Bound_Type
+    op ".."(Left, Right : Bound_Type) -> Countable_Range
+    op "<.."(Left, Right : Bound_Type) -> Countable_Range
+    op "..<"(Left, Right : Bound_Type) -> Countable_Range
+    op "<..<"(Left, Right : Bound_Type) -> Countable_Range
+    op "in"(Val : Bound_Type; Int : Countable_Range) -> Boolean
+    func Length(R : Countable_Range) -> Univ_Integer
+    op "magnitude"(Countable_Range) -> Univ_Integer is Length
+    op "[..]"() -> Countable_Range
+    op "[]"() -> Countable_Range
+    func Singleton(Bound : Bound_Type) -> Countable_Range
+
+--     op "/"(R : Countable_Range; Num_Pieces : Univ_Integer)
+--       -> Vector<Countable_Range>
+        // Divide a range into a vector of subranges, each of similar size
+
+    func Remove_First(var S : Countable_Range) -> optional Bound_Type
+    func Remove_Last(var S : Countable_Range) -> optional Bound_Type
+    func Remove_Any(var S : Countable_Range) -> optional Bound_Type
+end interface PSL::Core::Countable_Range
+
+class PSL::Core::Countable_Range is
+exports  // check that indent of 0 works
+    op ".."(Left, Right : Bound_Type) -> Countable_Range is
+	return (First => Left, Last => Right)
+    end op ".."
+
+    op "<.."(Left, Right : Bound_Type) -> Countable_Range is
+	return (First => Left+1, Last => Right)
+    end op "<.."
+
+    op "..<"(Left, Right : Bound_Type) -> Countable_Range is
+	return (First => Left, Last => Right-1)
+    end op "..<"
+
+    op "<..<"(Left, Right : Bound_Type) -> Countable_Range is
+	return (First => Left+1, Last => Right-1)
+    end op "<..<"
+
+    op "in"(Val : Bound_Type; Int : Countable_Range) -> Boolean is
+	return Val >= Int.First and then Val <= Int.Last
+    end op "in"
+
+    func Length(R : Countable_Range) -> Univ_Integer is
+	return R.Last - R.First + 1
+    end func Length
+
+    op "[]"() -> Countable_Range is
+	return Bound_Type::First()+1 .. Bound_Type::First()
+    end op "[]"
+
+    op "[..]"() -> Countable_Range is
+        return Bound_Type::First() .. Bound_Type::Last()
+    end op "[..]"
+
+    func Singleton(Bound : Bound_Type) -> Countable_Range is
+	return Bound .. Bound
+    end func Singleton
+
+--     op "/"(R : Countable_Range; Num_Pieces : Univ_Integer)
+--       -> Result : Vector<Countable_Range> is
+--        // Divide a range into a vector of subranges, each of similar size
+--         {> Num_Pieces > 0 <}
+-- 
+--         if Num_Pieces <= 1 then
+--             //  Return a vector of length 1 if Num_Pieces is 1 (or less)
+--             return Create(1, R)
+--         end if
+-- 
+--         const Size := Length(R)
+--         const Small_Piece_Size := Size / Num_Pieces
+--         const Big_Piece_Size := Small_Piece_Size + 1
+--         const Num_Big_Pieces := Size rem Num_Pieces
+-- 
+--         //  Create the result
+--         Result := Create(Num_Pieces, [])
+-- 
+--         //  Fill in the elements of the result vector with slices of the set.
+--         var Index := R.First
+-- 
+--         //  Big pieces first
+--         for I in 1 .. Num_Big_Pieces forward loop
+--             Result[I] := Index .. Index + Big_Piece_Size - 1
+--             Index := Index + Big_Piece_Size
+--         end loop
+-- 
+--         //  Small pieces next
+--         if Small_Piece_Size > 0 then
+--             for I in Num_Big_Pieces + 1 .. Num_Pieces forward loop
+--                 Result[I] := Index .. Index + Small_Piece_Size - 1
+--                 Index := Index + Small_Piece_Size
+--             end loop
+--         end if
+-- 
+--         {> Index == R.Last + 1 <}
+--             
+--     end op "/"
+-- 
+    func Remove_First(var S : Countable_Range) 
+      -> Result : optional Bound_Type is
+	if S.First <= S.Last then
+	    Result := S.First
+	    S := (First => S.First+1, Last => S.Last)
+	else
+	    Result := null
+	end if
+    end func Remove_First
+	
+    func Remove_Last(var S : Countable_Range) 
+      -> Result : optional Bound_Type is
+	if S.First <= S.Last then
+	    Result := S.Last
+	    S := (First => S.First, Last => S.Last-1)
+	else
+	    Result := null
+	end if
+    end func Remove_Last
+
+    func Remove_Any(var S : Countable_Range) 
+      -> Result : optional Bound_Type is
+	if S.First <= S.Last then
+	    if (S.Last - S.First) mod 2 == 0 then
+		return Remove_First(S)
+	    else
+		return Remove_Last(S)
+	    end if
+	else
+	    return null
+	end if
+    end func Remove_Any
+
+end class PSL::Core::Countable_Range
+
+func PSL::Test::Test_Countable_Range(A, X, Y : Integer) is
+    var R : Countable_Range<Integer> := X .. Y
+    Println(A | " in " | X | ".." | Y | "=" | ( A in R ))
+
+    for J in R loop 
+        Println("Remove_Any(" | X | ".." | Y | ") = " | J)
+    end loop
+
+    R := 1 .. 10
+    Println("R := 1..10");
+
+    for K in R reverse loop 
+        Println("Remove_Last(R) = " | K)
+    end loop
+
+    Println("Length(R) = " | Length(R))
+
+--     for Num in 1 .. 11 forward loop
+--        Print("R / " | Num | " =")
+--        for each Piece of R / Num forward loop
+--           if Length(Piece) == 0 then
+--              Print (" []")
+--           else
+--              Print (" " | Piece.First | ".." | Piece.Last)
+--           end if
+--        end loop
+--        Print('\n')
+--     end loop
+end func PSL::Test::Test_Countable_Range
+
+interface PSL::Core::Univ_String<> is
+    func Print(Univ_String) is import(#print_string)
+    func Println(Univ_String) is import(#println_string)
+    func Readln() -> optional Univ_String is import(#read_string)
+
+    op "*"(Left : Univ_Integer; Right : Univ_String) -> Univ_String
+	// Produce specified number of "Right" strings in a row
+    op "*"(Left : Univ_String; Right : Univ_Integer) -> Univ_String
+	// Produce specified number of "Left" strings in a row
+
+    op "|"(Left, Right : Univ_String) -> Univ_String 
+      is import(#concat_string)
+
+    op "=?"(Left, Right : Univ_String) -> Ordering
+      is import(#string_compare)
+
+    op "|="(var Left : Univ_String; Right : Univ_String)
+      is import(#assign_concat_string)
+
+    op "indexing"(Str : Univ_String; Index : Univ_Integer<>) -> Univ_Character
+      is import(#string_indexing)
+	// a "read-only" element, indexed 1 .. |Str|
+
+    op "index_set"(Str : Univ_String) -> Countable_Range<Univ_Integer>
+        // Return set of indices for string
+
+    op "slicing"(Str : Univ_String;
+      Index_Set : Countable_Range<Univ_Integer>) 
+      -> Univ_String is import(#string_slicing)
+	// a "read-only" slice
+
+    func Length(Str : Univ_String) -> Univ_Integer
+      is import(#string_length)
+
+    op "magnitude"(Univ_String) -> Univ_Integer
+      is import(#string_length)
+
+    func Hash(Val : Univ_String) -> Univ_Integer
+      is import(#identity)
+
+    op "|"(Left : Univ_String; Right : Right_Type is Imageable<>) 
+      -> Univ_String
+
+    op "|"(Left : Left_Type is Imageable<>; Right : Univ_String)
+      -> Univ_String
+
+    op "|="(var Left : Univ_String; Right : Right_Type is Imageable<>)
+
+    // Operations to convert to/from a Vector of Univ_Character's
+--    func To_Vector(Str : Univ_String) -> Vector<Univ_Character>
+--    func From_Vector(Vec : Vector<Univ_Character>) -> Univ_String
+--      is import(#string_from_vector)
+
+  implements for Imageable
+    // These operations are needed so Univ_String satifies
+    // requirements of "Imageable" interface, but these
+    // operations are not directly callable, to avoid ambiguities.
+
+    func To_String(Val : Univ_String) -> Univ_String
+      is import (#identity)
+    func From_String(Str : Univ_String) -> optional Univ_String
+      is import (#identity)
+
+end interface PSL::Core::Univ_String
+    
+class PSL::Core::Univ_String is
+  exports
+    op "index_set"(Str : Univ_String) -> Countable_Range<Univ_Integer> is
+        // Return set of indices for string
+        return 1..|Str|
+    end op "index_set"
+
+    op "*"(Left : Univ_Integer; Right : Univ_String) -> Univ_String is
+	// Produce specified number of "Right" strings in a row
+	if Left <= 0 then
+	    return ""
+	elsif Left == 1 then
+	    return Right
+	else
+	    // Recurse to produce half-length, and then combine
+	    const Partial : Univ_String := (Left/2) * Right
+	    if Left mod 2 == 1 then
+		return Partial | Partial | Right
+	    else
+		return Partial | Partial
+	    end if
+	end if
+    end op "*"
+
+    op "*"(Left : Univ_String; Right : Univ_Integer) -> Univ_String is
+	// Produce specified number of "Left" strings in a row
+	return Right * Left   // Just pass the buck to other "*"
+    end op "*"
+
+    op "|"(Left : Univ_String; Right : Right_Type is Imageable<>) 
+      -> Univ_String is
+        if Right is null then
+            return Left | "null"
+        else
+            return Left | Right_Type::To_String(Right)
+        end if
+    end op "|"
+
+    op "|"(Left : Left_Type is Imageable<>; Right : Univ_String)
+      -> Univ_String is
+        if Left is null then
+            return "null" | Right
+        else
+            return Left_Type::To_String(Left) | Right
+        end if
+    end op "|"
+
+    op "|="(var Left : Univ_String; Right : Right_Type is Imageable<>) is
+        if Right is null then
+            Left |= "null"
+        else
+            Left |= Right_Type::To_String(Right)
+        end if
+    end op "|="
+
+--    func To_Vector(Str : Univ_String) -> Vector<Univ_Character> is
+--        return [for I in 1 .. |Str| => Str[I]]
+--    end func To_Vector
+end class PSL::Core::Univ_String
+
+interface PSL::Core::Random<> is
+    func Start(Seed : Univ_Integer := 1) -> Random
+      // Start a new random number sequence with a standard multiplier/modulus
+
+    func Start(Seed : Univ_Integer;
+       Mult, Mod : Univ_Integer) -> Random
+      // Start a new random number sequence with given multiplier and modulus
+
+    func Next(var Seq : Random) -> Univ_Integer
+      // Get next value in random number sequence
+
+    func Next_Real(var Seq : Random) -> Univ_Real
+      // Get next Univ_Real value in random number sequence,
+      // in range 0.0 ..< 1.0
+end interface PSL::Core::Random
+
+class PSL::Core::Random is
+    var Last_Value : Univ_Integer
+    const Mult : Univ_Integer
+    const Mod : Univ_Integer
+    const Debugging : Boolean := #false
+exports  // check that indent of 0 works
+    func Start(Seed : Univ_Integer) -> Random is
+      // Start a new random number sequence with a standard multiplier/modulus
+	return (Last_Value => Seed,
+	  Mult => 7**5, Mod => 2**31 - 1)
+    end func Start
+
+    func Start(Seed : Univ_Integer;
+      Mult, Mod : Univ_Integer) -> Random is
+      // Start a new random number sequence with given multiplier and modulus
+	if Debugging then
+	    Println("Random: Seed = " | Seed | ", Mult = " | Mult | 
+	      ", Mod = " | Mod)
+	end if
+
+        //  We want the multiplier to be less than the Modulus,
+        //  and no less than 2
+        {> Mult in 2 ..< Mod <}
+
+	return (Last_Value => Seed, Mult => Mult, Mod => Mod)
+    end func Start
+
+    func Next(var Seq : Random) -> Result : Univ_Integer is
+      // Get next value in random number sequence
+	Result := Seq.Last_Value * Seq.Mult mod Seq.Mod
+        if Result == 0 then
+            --  Oh dear, we hit zero, return one instead
+            Result := 1
+        end if
+        Seq.Last_Value := Result;
+    end func Next
+
+    func Next_Real(var Seq : Random) -> Univ_Real is
+      // Get next Univ_Real value in random number sequence,
+      // in range 0.0 ..< 1.0
+        return (Int_To_Real (Next(Seq)) - 1.0) / Int_To_Real (Seq.Mod - 1)
+    end func Next_Real
+end class PSL::Core::Random
+
+func PSL::Test::Test_String() is
+    const U := "tab\t"
+    const T := U[4]
+    Println("U = " | U | ", |U| = " | |U| | ", U[4] = '" | T | "'")
+    const X := "this is a string"
+    const Y := X[3]
+    {Y == 'i'} // string indexing problem
+    const Z := X[6..7]
+    {Z == "is"} // string slicing problem, expected 'is', found Z 
+    Println("X = " | X | ", X[3] = " | Y | ", X[6..7] = " | Z)
+
+    Println("About to indent 4 and then print 'hello'")
+    Println(4 * " " | "hello")
+
+    const Seven_Xs := "x" * 7
+    {Seven_Xs == "xxxxxxx"} // Char multiplication check
+
+    Println("Here are seven x's: " | Seven_Xs)
+    
+    Print("Here are 6 y's: ")
+    Println('y' * 6)
+
+    Println("About to iterate over '" | X | "'")
+    for each C of X forward loop
+        Print(" " | C)
+    end loop
+    Println("")
+end func PSL::Test::Test_String
+

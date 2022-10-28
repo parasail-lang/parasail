@@ -1,0 +1,72 @@
+interface PSL::Core::Univ_Character<> is
+    op "+"(Left : Univ_Character; Right : Univ_Integer) -> Univ_Character
+      is import("+")
+    op "+"(Left : Univ_Integer; Right : Univ_Character) -> Univ_Character
+      is import("+")
+
+    op "-"(Left : Univ_Character; Right : Univ_Integer) -> Univ_Character
+      is import("-")
+    op "-"(Left, Right : Univ_Character) -> Univ_Integer
+      is import("-")
+
+    op "*"(Left : Univ_Integer; Right : Univ_Character) -> Univ_String
+        // Produce specified number of "Right" chars in a row
+    op "*"(Left : Univ_Character; Right : Univ_Integer) -> Univ_String
+        // Produce specified number of "Left" chars in a row
+
+    op "=?"(Left, Right : Univ_Character) -> Ordering
+      is import("=?")
+
+    func To_String(Val : optional Univ_Character) -> Univ_String
+      is import(#to_string_char)
+
+    func From_String(Str : Univ_String) -> optional Univ_Character
+      is import(#from_string_char)
+
+    func Print(C : Univ_Character) is import(#print_char)
+    func Println(C : Univ_Character) is (Println(To_String(C)))
+
+    func Hash(Val : Univ_Character) -> Univ_Integer
+      is import(#identity)
+
+    func First() -> Univ_Character
+
+    func Last() -> Univ_Character
+
+    func Min(Left, Right : optional Univ_Character) -> optional Univ_Character
+      is import(#min)
+    func Max(Left, Right : optional Univ_Character) -> optional Univ_Character
+      is import(#max)
+
+    op ".."(Left, Right : Univ_Character) -> Countable_Set<Univ_Character>
+      is in Countable_Set<Univ_Character>
+    op "<.."(Left, Right : Univ_Character) -> Countable_Set<Univ_Character>
+      is in Countable_Set<Univ_Character>
+    op "..<"(Left, Right : Univ_Character) -> Countable_Set<Univ_Character>
+      is in Countable_Set<Univ_Character>
+    op "<..<"(Left, Right : Univ_Character) -> Countable_Set<Univ_Character>
+      is in Countable_Set<Univ_Character>
+    op "|"(Left, Right : Univ_Character) -> Countable_Set<Univ_Character>
+      is in Countable_Set<Univ_Character>
+end interface PSL::Core::Univ_Character
+    
+class PSL::Core::Univ_Character is
+  exports
+    op "*"(Left : Univ_Integer; Right : Univ_Character) -> Univ_String is
+        // Produce specified number of "Right" chars in a row
+        return Left * To_String(Right)   // Just pass the buck to the string op
+    end op "*"
+
+    op "*"(Left : Univ_Character; Right : Univ_Integer) -> Univ_String is
+        // Produce specified number of "Left" chars in a row
+        return Right * To_String(Left)   // Just pass the buck to the string op
+    end op "*"
+
+    func First() -> Univ_Character is
+        return '\0'
+    end func First
+
+    func Last() -> Univ_Character is
+        return '\0' + 2**31-1
+    end func Last
+end class PSL::Core::Univ_Character

@@ -1,0 +1,8 @@
+X in X-1<..<X+1
+X > 9 ==> X > 8
+X > 9 ==> (X <= 10 ==> X == 10)
+not (Y < Y-1 or else Y > Y+1)
+not ((Y < Y-1 or else Y > Y+1) and then Y==Y)
+X < Y or else X > Y
+X = 3, Y = 10
+

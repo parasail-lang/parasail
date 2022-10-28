@@ -1,0 +1,18 @@
+func Test_Clock() is
+    var C := Clock::Create();
+    const Start := C.Now();
+
+    Println("About to delay 1.0 seconds");
+    C.Delay(1.0);
+
+    if C.Now() - Start >= 1.0 then
+       Println("OK")
+    else
+       Println("Failed")
+    end if
+//    Println("Elapsed time: " | [[C.Now() - Start]]);
+end func Test_Clock;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Clock ();
+end func main;

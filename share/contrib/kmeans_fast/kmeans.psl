@@ -1,0 +1,93 @@
+interface KMeans<> is
+  type Point_Vector is Vector<Point>
+
+  func Run(PS: Point_Vector; N: Univ_Integer; Iters: Univ_Integer)
+    -> Vector<Point_Vector>
+
+  func Average(PS: Point_Vector) -> Point
+end interface KMeans
+
+class KMeans is
+    func Clusters(PS: Point_Vector; Centroids: Point_Vector)
+      -> Result : Vector<Point_Vector> is
+      const Num_Points := |PS|
+      const Num_Groups := |Centroids|
+      const Null_PVector : Point_Vector := []
+
+      var Which_Group : Vector<Univ_Integer> := Create(Num_Points, 0)
+      Result := Create(Num_Groups, Null_PVector)
+      var Group_Size : Vector<Univ_Integer> := Create(Num_Groups, 0)
+
+      //  Determine which group each point belongs in, and size of each group
+      for I := Num_Points then I-1 while I > 0 loop
+         const G := Closest(PS[I], Centroids)
+         Which_Group[I] := G
+         Group_Size[G] += 1
+      end loop
+
+      const Origin : Point := New(0.0, 0.0)
+
+      //  Pre-allocate appropriate size groups
+      for G := Num_Groups then G-1 while G > 0 loop
+         Result[G] := Create(Group_Size[G], Origin)
+      end loop
+
+      //  Create index for each group
+      var Group_Index : Vector<Univ_Integer> := Create(Num_Groups, 0)
+
+      //  Add each point into appropriate group
+      for I := Num_Points then I-1 while I > 0 loop
+         const G := Which_Group[I]
+         ref Index => Group_Index[G]
+
+         Index += 1
+         const P := PS[I]
+         Result[G][Index] += P
+      end loop
+    end func Clusters
+
+    func Closest(P: Point; QS: Point_Vector) { |QS| > 0 }
+      -> Result : Univ_Integer is
+      const Num_QS := |QS|
+      Result := Num_QS
+      var m: Univ_Real := Dist(P, QS[Result])
+      for I := Num_QS-1 then I-1 while I > 0 loop
+        const d := Dist(P, QS[I])
+        if d < m then
+          m := d
+          Result := I
+        end if
+      end loop
+    end func Closest
+
+    func Take(PS: Point_Vector; N: Univ_Integer) -> Point_Vector is
+       return PS[1 .. N]
+    end func Take
+
+  exports
+
+    func Average(PS: Point_Vector) -> Point is
+      const L := |PS|
+      if L == 0 then
+         return New(0.0, 0.0)
+      end if
+      var Q := PS[L]
+      for I := L-1 then I-1 while I > 0 loop
+        Q += PS[I]
+      end loop
+      return Q / (L * 1.0)
+    end func Average
+
+    func Run(PS: Point_Vector; N: Univ_Integer; Iters: Univ_Integer)
+      -> Vector<Point_Vector> is
+      Println ("#Points = " | |PS|)
+      var Centroids := Take(PS, N)
+      for I in 1 .. Iters loop
+        Println ("#Centroids = " | |Centroids|)
+        const Groups := Clusters(PS, Centroids)
+        Println ("#Groups = " | |Groups|)
+        Centroids := [for each G of Groups => Average(G)]
+      end loop
+      return Clusters(PS, Centroids)
+    end func Run
+end class KMeans

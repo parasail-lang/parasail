@@ -1,0 +1,84 @@
+concurrent interface Queued_Box<Content_Type is Assignable<>> is
+    func Create(C : optional Content_Type) -> Queued_Box;
+	// Create a box with the given content
+    func Put(locked var B : Queued_Box; C : Content_Type);
+	// Put something into the box
+    func Put_When_Empty(queued var B : Queued_Box; C : Content_Type);
+	// Put something into the box, but wait for it to be empty
+    func Content(locked B : Queued_Box) -> optional Content_Type;
+	// Get a copy of current content
+    func Remove(locked var B : Queued_Box) -> optional Content_Type;
+	// Remove current content, leaving it null
+    func Wait_For_Content(queued var B : Queued_Box) -> Content_Type;
+	// Remove content, once it becomes non-null.
+	// Leave it null.
+end interface Queued_Box;
+
+concurrent class Queued_Box is
+    var Content : optional Content_Type;
+  exports
+    func Create(C : optional Content_Type) -> Queued_Box is
+	// Create a box with the given content
+	return (Content => C);
+    end func Create;
+
+    func Put(locked var B : Queued_Box; C : Content_Type) is
+	// Put something into the box
+	B.Content := C;
+    end func Put;
+
+    func Content(locked B : Queued_Box) -> optional Content_Type is
+	// Get a copy of current content
+	return B.Content;
+    end func Content;
+
+    func Remove(locked var B : Queued_Box) -> Result : optional Content_Type is
+	// Remove current content, leaving it null
+	Result <== B.Content;
+    end func Remove;
+
+    func Put_When_Empty(queued var B : Queued_Box; C : Content_Type) is
+	// Put something into the box, but wait for it to be empty
+      queued until B.Content is null then
+        B.Content := C
+    end func Put_When_Empty
+
+    func Wait_For_Content(queued var B : Queued_Box) -> Result : Content_Type is
+	// Remove content, once it becomes non-null.
+	// Leave it null.
+      queued until B.Content not null then
+	Result <== B.Content;
+    end func Wait_For_Content;
+
+end class Queued_Box;
+
+func Test_Box(Seed : Univ_Integer) is
+    var U_Box : Queued_Box<Univ_Integer> := Create(null);
+    var Ran := Random::Start(Seed);
+
+    Println("Starting 100 pico-threads trying to put something in the box");
+    var Ran_Vec : Vector<Univ_Integer> := [for I in 1..100 => I]
+    for I in 1..100 loop
+        const Ran1 := Next(Ran) mod 100 + 1
+        const Ran2 := Next(Ran) mod 100 + 1
+        Ran_Vec[Ran1] <=> Ran_Vec[Ran2]
+    end loop
+    for I in 1..100 concurrent loop
+        const Next_Ran := Ran_Vec[I]
+	if Next_Ran <= 50 then
+//	    Println("Putting in " | Next_Ran);
+	    Put_When_Empty(U_Box, Next_Ran);
+	else
+//            Println("Calling Wait_For_Content");
+            const Wait_Result := Wait_For_Content (U_Box);
+//	    Println("Wait_For_Content returned " | Wait_Result);
+	end if;
+    end loop;
+
+    Println("And the winner is: " | Remove(U_Box));
+    Println("And the box is now " | Content(U_Box));
+end func Test_Box;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Box (5);
+end func main;

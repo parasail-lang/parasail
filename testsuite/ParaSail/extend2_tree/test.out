@@ -1,0 +1,85 @@
+Building up polymorphic expression from -5.3 + 4 * 5.2 ** 2
+Tree with 8 nodes:
++
+  -
+    5.3
+  *
+    4.0
+    **
+      5.2
+      2.0
+Value = 102.86 of type #real
+Building up Binary expr (#plus, 4.5, 7.1/3.0)
+Displaying it before and after conversion to polymorphic type
+Tree with 5 nodes:
++
+  4.5
+  /
+    7.1
+    3.0
+Value = 6.86666666666667 of type #real
+Tree with 5 nodes:
++
+  4.5
+  /
+    7.1
+    3.0
+Value = 6.86666666666667 of type #real
+Tree with 4 nodes:
++
+  -
+    4.0
+  7.0
+Value = 3.0 of type #int
+Tree with 6 nodes:
+*
+  +
+    -
+      4.0
+    7.0
+  2.5
+Value = 7.5 of type #real
+Testing a polymorphic vector of [E, -3.1 + 4.0**2]
+Printing each element of vector
+Tree with 8 nodes:
++
+  -
+    5.3
+  *
+    4.0
+    **
+      5.2
+      2.0
+Value = 102.86 of type #real
+Tree with 6 nodes:
++
+  -
+    3.1
+  **
+    4.0
+    2.0
+Value = 12.9 of type #real
+Instantiating Use_Expr with Binary
+Tree with 5 nodes:
++
+  2.5
+  /
+    6.1
+    2.0
+Value = 5.55 of type #real
+Instantiating Use_Expr with Expr+
+Tree with 6 nodes:
++
+  -
+    3.1
+  **
+    4.0
+    2.0
+Value = 12.9 of type #real
+Converting #blue to Im_Count+:
+ Result of conversion = #blue
+Instantiating Use_Countable with Im_Count+
+Succ(#red) = #green
+Pred(#green) = #red
+Succ(#green) = #blue
+Pred(#blue) = #green

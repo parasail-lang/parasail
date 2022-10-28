@@ -1,0 +1,84 @@
+import PSL::Short_Names::*, *
+
+interface Constants<> is
+   const Greeting := "Hello, World!"
+   const Default_Args : Basic_Array<String> := ["4", "5", "not_a_number"]
+   const Pi := 3.14
+end interface Constants;
+
+interface Point<> is
+   func Create(V : Int) -> Point
+   func Get(P : Point) -> Int
+   func Set(var P : Point; X : Int)
+end interface Point
+
+class Point is
+   var X : Int;
+   var Name : String;
+
+   exports
+
+   func Create(V : Int) -> Point is
+      return (X => V, Name => "blah")
+   end func Create
+
+   func Get(P : Point) -> Int is
+      return P.X
+   end func Get
+
+   func Set(var P : Point; X : Int) is
+      P.X := X
+   end func Set
+
+end class Point
+
+func Fib(N : Int) -> Result : Int is
+    if N <= 1 then
+        return N;
+    else
+        return Fib(N - 1) + Fib(N - 2);
+    end if;
+end func Fib;
+
+func main(Args : Basic_Array<String>) is
+   var A : Basic_Array<String>;
+   if Args is null or else |Args| == 0 then
+      A := Constants::Default_Args;
+   else
+      A := Args;
+   end if;
+   var As_Nums : Basic_Array<optional Int> := Create(|A|, 0);
+   for I := 1 then I + 1 while I <= |A| loop
+      Print(A[I]);
+      Print('\n');
+      As_Nums[I] := From_String(A[I]);
+   end loop;
+   var I := 1;
+   while I <= |A| loop
+      var P : Point;
+      if As_Nums[I] not null then
+         P := Create(As_Nums[I]);
+         P.Set(P.Get() mod 2);
+         Print(P.Get());
+      end if;
+      if I != |A| then
+         Print(", ");
+      end if;
+      I := I + 3;
+      I += 1;
+      I -= 2;
+      I := I - 1;
+      I *= 2; I /= 2;
+   end loop;
+   Print('\n');
+   {(Fib(0) == 0 and Fib(1) == 1 and Fib(2) == 1 and Fib(3) == 2) and then
+    (Fib(4) == 3 and Fib(5) == 5 and Fib(6) == 8 and Fib(7) == 13)}
+   I := 1;
+   func Print_Ret_False(S : String) -> Bool is
+      Print(S);
+      Print('\n');
+      return #false;
+   end func Print_Ret_False;
+   {2**2 == 4 or else Print_Ret_False("short circuit is broken")}
+   Print("3.14 ** 4 = "); Print(Constants::Pi ** 4); Print('\n');
+end func main;

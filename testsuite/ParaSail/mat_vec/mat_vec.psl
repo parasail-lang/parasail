@@ -1,0 +1,494 @@
+// Example ParaSail modules for matrix/vector manipulation -- mat_vec.ps{i,l}
+
+// Copyright (C) 2011-2014, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+// See mat_vec.psi for interfaces
+
+class Matrix is
+  // Define a 2-dimensional (Row x Cols) matrix of Univ_Reals, 
+    var Data : Basic_Array<Scalar>;
+  exports
+
+    class Row_Col is
+      // A "countable" type used to provide sequential iteration
+      // over a 2-dimensional matrix; column varies fastest.
+      exports
+	func First() -> Row_Col is
+	    return (1,1);
+	end func First;
+	func Last() -> Row_Col is
+	    return (Rows, Cols);
+	end func Last;
+
+        func Min(Left, Right : optional Row_Col) -> optional Row_Col is
+            if Left is null then
+                return Right;
+            elsif Right is null then
+                return Left;
+            elsif Left < Right then
+                return Left;
+            else
+                return Right;
+            end if;
+        end func Min;
+
+        func Max(Left, Right : optional Row_Col) -> optional Row_Col is
+            if Left is null then
+                return Right;
+            elsif Right is null then
+                return Left;
+            elsif Left > Right then
+                return Left;
+            else
+                return Right;
+            end if;
+        end func Max;
+
+	op "=?"(Left, Right : Row_Col) -> Ordering is
+	    case Left.R =? Right.R of
+	      [#less] =>
+		return #less;
+	      [#greater] =>
+		return #greater;
+	      [#equal] =>
+		return Left.C =? Right.C;
+	    end case;
+	end op "=?";
+
+	op "+"(Left : Row_Col; Right : Univ_Integer) -> Result : Row_Col is
+	  // Advance to "Right"th subsequent cell, varying column fastest.
+	    if Right < 0 then
+		return Left - (-Right);
+	    end if;
+	    Result := Left;
+	    for I in 1..Right loop
+		if Result.C == Cols then
+		    Result.R += 1;
+		    Result.C := 1;
+		else
+		    Result.C += 1;
+		end if;
+	    end loop;
+	end op "+";
+
+	op "+"(Left : Univ_Integer; Right : Row_Col) -> Row_Col is
+	    return Right + Left;
+	end op "+";
+
+	op "-"(Left : Row_Col; Right : Univ_Integer) -> Result : Row_Col is
+	  // Go back to "Right"th prior cell, varying column fastest.
+	    if Right < 0 then
+		return Left + (-Right);
+	    end if;
+	    Result := Left;
+	    for I in 1..Right loop
+		if Result.C == 1 then
+		    Result.R -= 1;
+		    Result.C := Cols;
+		else
+		    Result.C -= 1;
+		end if;
+	    end loop;
+	end op "-";
+
+	op "-"(Left : Row_Col; Right : Row_Col) -> Result : Univ_Integer is
+	  // Number of cells separating two locations in matrix
+	    Result := 0;
+	    case Left =? Right of
+	      [#less] =>
+		var RC : Row_Col := Left;
+		while RC < Right loop
+		    Result -= 1;
+		    RC := RC + 1;
+		end loop;
+		return Result;
+	      [#greater] =>
+		var RC : Row_Col := Left;
+		while RC > Right loop
+		    Result += 1;
+		    RC := RC - 1;
+		end loop;
+		return Result;
+	      [#equal] =>
+		return 0;
+	    end case;
+	end op "-";
+
+	op "+="(var Left : Row_Col; Right : Univ_Integer) is
+           Left := Left + Right;
+        end op "+=";
+
+	op "-="(var Left : Row_Col; Right : Univ_Integer) is
+           Left := Left - Right;
+        end op "-=";
+
+	func Hash(Val : Row_Col) -> Univ_Integer is
+	    return [[Val.R-1]] * Cols + [[Val.C]];
+	end func Hash;
+
+    end class Row_Col;
+
+    func Create(Default : optional Scalar) -> Matrix is
+      // Create a Rows x Cols matrix, all initialized to "Default"
+	return (Data => Create(Rows * Cols, Default));
+    end func Create;
+
+    op "[]"(Elems : Vector<Scalar>) -> Result : Matrix is
+      // Create a Matrix given an appropriately sized vector
+	{Length(Elems) == Rows * Cols}
+	Result := Create(0.0);
+	for each [RC => E] of Result concurrent loop
+	    E := Elems[ [[RC.R-1]] * Cols + [[RC.C]] ];
+	end loop;
+    end op "[]";
+
+    op "+"(Left, Right : Matrix) -> Result : Matrix is
+      // Element-wise addition
+	Result := Create(0.0);
+	for each [RC => E] of Result concurrent loop
+	    E := Left[RC] + Right[RC];
+	end loop;
+    end op "+";
+
+    op "-"(Left, Right : Matrix) -> Result : Matrix is
+      // Element-wise subtraction
+	Result := Create(0.0);
+	for each [RC => E] of Result concurrent loop
+	    E := Left[RC] - Right[RC];
+	end loop;
+    end op "-";
+
+    op "+"(Right : Matrix) -> Matrix is
+	return Right;
+    end op "+";
+
+    op "-"(Right : Matrix) -> Matrix is
+	return -1.0 * Right;
+    end op "-";
+
+    op "*"(Left : Matrix; Right : Scalar) -> Result : Matrix is
+      // Scalar multiplication
+	Result := Left;
+	for each [RC => E] of Result concurrent loop
+	    E *= Right;
+	end loop;
+    end op "*";
+
+    op "*"(Left : Scalar; Right : Matrix) -> Matrix is
+	// Just pass the buck to the other one
+	return Right * Left;
+    end op "*";
+
+    op "/"(Left : Matrix; Right : Scalar) -> Result : Matrix is
+      // Scalar division
+	Result := Left;
+	for each [RC => E] of Result concurrent loop
+	    E /= Right;
+	end loop;
+    end op "/";
+        
+    op "*"(Left: Matrix; Right : Right_Type is Matrix<>)
+      {Cols == Right_Type::Rows}
+      -> (Result : Result_Type is 
+	    Matrix<Rows => Rows, Cols => Right_Type::Cols>) is
+      // Matrix multiplication
+
+	{Cols == Right_Type::Rows}
+	{Rows == Result_Type::Rows}
+	{Result_Type::Cols == Right_Type::Cols}
+
+	Result := Result_Type::Create(0.0);
+	for I in 1..Result_Type::Rows concurrent loop
+	    for J in 1..Result_Type::Cols concurrent loop
+		var Mac : Scalar := 0.0;
+		for K in Col loop
+		    Mac += Left[I, [[K]]] * Right[ [[K]], J];
+		end loop;
+		Result[I, J] := Mac;
+	    end loop;
+	end loop;
+
+    end op "*";
+
+    func Zeroes() -> Matrix is // All zeroes
+	return Create(0.0);
+    end func Zeroes;
+
+    func Ones() -> Matrix is // All ones
+	return Create(1.0);
+    end func Ones;
+
+    func T(M : Matrix) 
+      -> (Result : Result_Type is Matrix<Rows => Cols, Cols => Rows>) is
+      // Transpose
+	{ Result_Type::Rows == Cols; Result_Type::Cols == Rows }
+	Result := Result_Type::Create(0.0);
+	for I in 1..Rows concurrent loop
+	    for J in 1..Cols concurrent loop
+		Result[J, I] := M[I, J];
+	    end loop;
+	end loop;
+
+	// for each [RC => E] of Result concurrent loop  // TBD: Should work
+	    // E := M[ [[RC.C]], [[RC.R]] ];
+	// end loop;
+    end func T;
+
+    op "indexing"(ref M : Matrix; R : Row; C : Col) -> ref Scalar is
+	const Index := [[R-1]] * Cols + [[C]];
+	return M.Data[ Index ];
+    end op "indexing";
+
+    op "indexing"(ref M : Matrix; RC : Row_Col) -> ref Scalar is
+	return M[RC.R, RC.C];
+    end op "indexing";
+
+    op "var_indexing"(ref var M : Matrix; R : Row; C : Col) 
+      -> ref var Scalar is
+	return M.Data[ [[R-1]] * Cols + [[C]] ];
+    end op "var_indexing";
+
+    op "var_indexing"(ref var M : Matrix; RC : Row_Col) 
+      -> ref var Scalar is
+	return M[RC.R, RC.C];
+    end op "var_indexing";
+
+    op "index_set"(M : Matrix) -> Countable_Set<Row_Col> is
+	return (1,1) .. (Rows, Cols);
+    end op "index_set";
+    
+    op "=?"(Left, Right : Matrix) -> Ordering is
+        for I in 1..Rows loop
+            for J in 1..Cols loop
+                if Left[I, J] != Right[I, J] then
+                    return #unordered;
+                end if;
+            end loop;
+        end loop;
+        return #equal;
+    end op "=?"
+
+    func Hash(M : Matrix) -> Univ_Integer is
+        return Hash(M[1,1]) + Hash(M[Rows, Cols]);
+    end func Hash;
+
+    func To_String(M : Matrix) -> Result : Univ_String is
+	// Convert matrix into string with line breaks
+	var Images : Array<Univ_String, Indexed_By => Row_Col> := 
+	  Create([..], "");
+
+	var Max_Len := 0;
+	for I in 1..Rows loop
+	    for J in 1..Cols loop
+		const Image : Univ_String := To_String(M[I, J]);
+		Images[(I, J)] := Image;
+		Max_Len := Max(Max_Len, Length(Image));
+	    end loop;
+	end loop;
+
+	Result := "\n";
+	for I in 1..Rows forward loop
+	    for J in 1..Cols forward loop
+		const Image : Univ_String := Images[(I, J)];
+		const Pad : Univ_String := (Max_Len - Length(Image) + 1) * ' ';
+		
+		Result |= Pad | Image;
+	    end loop;
+	    Result |= '\n';
+	end loop;
+	
+    end func To_String;
+
+    func From_String(Str : Univ_String) -> Result : Matrix is
+	Result := Create(0.0);
+	// Rest is TBD
+    end func From_String;
+	
+    op "[]"() -> Matrix is
+	// Create a matrix of nulls
+	return Create(null);
+    end op "[]";
+
+    op "<|="(var M : Matrix; var Val : optional Univ_Real) is
+	// Fill in next null element
+	for each E of M forward loop
+	    if E is null then
+		E <== Val;
+		return;
+	    end if;
+	end loop;
+    end op "<|=";
+
+end class Matrix;
+
+class Col_Vec is
+  // A column vector, of length Elems
+  exports
+
+    op "indexing"(ref CV : Col_Vec; I : Index) -> ref Scalar is
+	return CV[ [[I]], 1];
+    end op "indexing";
+
+    func Length(CV : Col_Vec) -> Univ_Integer is
+	return Elems;
+    end func Length;
+
+    op "abs"(CV : Col_Vec) -> Scalar is
+	const Prod := T(CV) * CV;
+	return Sqrt(Prod[1,1]); 
+    end op "abs";
+
+end class Col_Vec;
+
+class Row_Vec is
+  // A row vector of length Elems
+  exports
+
+    op "indexing"(ref RV : Row_Vec; I : Index) -> ref Scalar is
+	return RV[ 1, [[I]] ];
+    end op "indexing";
+
+    func Length(RV : Row_Vec) -> Univ_Integer is
+	return Elems;
+    end func Length;
+
+end class Row_Vec;
+
+class Square_Matrix is
+  // An Elems x Elems square matrix
+  exports
+
+    func Identity() -> Result : Square_Matrix is // Identity matrix
+	Result := Create(+0.0);
+	for I in 1..Elems loop
+	    Result[I, I] := 1.0;
+	end loop;
+	return Result;
+    end func Identity;
+	
+    func Inverse(SM : Square_Matrix) -> optional Square_Matrix is
+	return SM; // TBD
+    end func Inverse;
+
+    func Determinant(SM : Square_Matrix) -> optional Scalar is
+	return SM[1, 1]; // TBD
+    end func Determinant;
+
+    func Eigenvalue(SM : Square_Matrix) -> Result : optional Scalar is
+	Result := SM[1, 1];  // TBD
+    end func Eigenvalue;
+
+    func Eigenvector(SM : Square_Matrix) -> Result : optional Col_Vec<Elems> is
+	Result := Create(1.0);  // TBD
+    end func Eigenvector;
+
+end class Square_Matrix;
+
+// interface Test_From_String<RC is Countable<>> is
+//    const First : RC := First()  // RC::First()
+//    const First_Image : Univ_String := To_String(First) // RC::To_String
+//    const First_Value : optional RC :=
+//      From_String(First_Image)  //  RC::From_String
+// end interface Test_From_String
+// 
+func Test_Mat_Vec() is
+  // Test some of the matrix operations
+    type Two_By_Two is Square_Matrix<2>;
+    type Two_By_Three is Matrix<2, 3>;
+    var I : Two_By_Two := Ident();
+    var Y := I * 2.0;
+    var One : Two_By_Two := Ones();
+
+//     type TFS is Test_From_String<Two_By_Three::Row_Col>
+//     Println("First_Image = " | TFS::First_Image)
+//     if TFS::First_Value is null then
+//        Println("First_Value is null")
+//     else
+//        // Println("First_Value = " | TFS::First_Value)
+//        Println("First_Value not null")
+//     end if
+    
+    // var Row_Col_From_String := Two_By_Three::Row_Col::From_String("[1,1]");
+
+    Println("Ident =");
+    Println(To_String(Two_By_Two::Ident()));
+
+    Println("Ones = ");
+    Println(To_String(One));
+
+    Println("Matrix Y = 2.0 * Ident():\n" | To_String(Y));
+    Println("Ones() + Y =\n" | To_String(Ones() + Y));
+
+    Y[1, 2] += 5.5;
+    Println("Y[1,2] += 5.5; Y:\n" | To_String(Y));
+
+    const M : Two_By_Three := [1.1, 2.2, 3.3, 4.4, 5.5, 6.6];
+
+    Println("Matrix M = [1.1, 2.2, 3.3, 4.4, 5.5, 6.6] = ");
+    Println(To_String(M));
+
+    Println("M*2.0 =" | M * 2.0);
+
+    Println("M/2.0 =" | M / 2.0);
+
+    Println("T(Y):" | T(Y));
+
+    Println("Y * T(Y):" | Y * T(Y));
+
+    for each [RC => E] of Y loop
+	Println("R: " | RC.R | ", C: " | RC.C | ", val = " | E);
+    end loop;
+
+    const MT := T(M); 
+
+    Println("M:" | M | "\nT(M):" | T(M));
+
+    Println("M * T(M):" | M * T(M));
+
+    var V : Col_Vec<4> := [1.1, 3.3, 5.5, 7.7];
+    V[1] += 0.01;
+    Println("V:" | V);
+
+    for J in 1..Length(V) forward loop
+	Println("V[" | J | "] = " | V[J]);
+    end loop;
+
+    const TV := T(V);
+    Println("T(V):" | TV);
+
+    const RV : Row_Vec<4> := [2.2, 4.4, 6.6, 8.8];
+    Println("RV:" | RV);
+
+    const TRV := T(RV);
+    Println("TRV:" | TRV);
+
+    const TTV : Col_Vec<4> := T(TV);
+    Println("TTV:" | TTV);
+
+    const TRVC : Col_Vec<4> := T(RV);
+    Println("TRVC:" | TRVC);
+
+    const Mag := abs(TRVC);
+    Println("abs(TRVC) = " | Mag);
+
+    type CV4 is Col_Vec<4>;
+
+    // const Mag2 := abs(CV4::T(RV));   // Should work
+    // Println("abs(CV4::T(RV)) = " | Mag2);
+
+    const Mag3 := CV4::"abs"(T(RV));
+
+    const SM2 : Square_Matrix<2> := [1.1, 3.3, 2.2, 4.4];
+    Println("\nSM2: " | SM2);
+
+    const TSM2 : Square_Matrix<2> := T(SM2);
+    Println("TSM2: " | TSM2);
+
+end func Test_Mat_Vec;
+
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Mat_Vec ();
+end func main;

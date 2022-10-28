@@ -1,0 +1,9 @@
+interface PSL::Core::Enum_Mask
+  <Base_Type is Modular<>;
+   Rep_Map : Two_Way_Map<Univ_Enumeration, Base_Type>>
+  extends PSL::Core::Enum_With_Rep<Base_Type, Rep_Map> is
+  // An enumeration type built on a modular type
+  // that supports "|" as a way to combine bits into a single value.
+    op "|"(Left, Right : Enum_Mask) -> Enum_Mask
+       is (From_Rep(To_Rep(Left) or To_Rep(Right)))
+end interface PSL::Core::Enum_Mask

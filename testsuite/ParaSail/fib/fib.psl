@@ -1,0 +1,81 @@
+// Example ParaSail program -- Recursive and iterative Fibonacci functions
+
+// Copyright (C) 2011-2014, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+    func Fib(N : Integer<>) -> Result : Integer<> is
+        // Classic recursive Fibonacci
+        // Print (N); Print (' ');
+        if N <= 1 then
+            return N;
+        else
+            return Fib(N-1) + Fib(N-2);
+        end if;
+    end func Fib;
+
+    func Fib_Helper(I : Integer; N : Integer; 
+      Prev2 : Integer; Prev : Integer) -> Result : Integer is
+        if I >= N then
+            Result := Prev + Prev2;
+        else
+            Result := Fib_Helper(I+1, N, Prev, Prev+Prev2);
+        end if;
+    end func Fib_Helper;
+
+    func Fibit(N : Integer<>) -> Result : Integer<> is
+        // Recursive but not exponential Fibonacci
+        if N <= 1 then
+            return N;
+        else
+            return Fib_Helper(2, N, 0, 1);
+        end if;
+    end func Fibit;
+
+    func Test_Print(N : Integer<>) is
+        Print("Here is the answer:\n");
+        Print("Fib(" | N | ") = " | Fib(N) | "\n");
+    end func Test_Print;
+
+    func Minus(Left, Right : Integer) -> Result : Integer is
+        return Left - Right;
+    end func Minus;
+
+    func Fib_Slow(N : Integer<>) -> Result : Integer<> is
+        if N <= 1 then
+            return N;
+        else
+            var Result1 : Integer<>;
+            var Result2 : Integer<>;
+            var Result3 : Integer<>;
+          then
+            Result3 := Fib_Slow(Minus(N, 2)) + Fib_Slow(Minus(N, 1));
+          ||
+            Result1 := Fib_Slow(Minus(N, 1));
+            Result2 := Fib_Slow(Minus(N, 2));
+            block
+                Test_Print(1);
+              ||
+                Test_Print(2);
+            end block
+          then
+            return (Result1 + Result2 + Result3) / 2;
+        end if;
+    end func Fib_Slow;
+
+    func main (Args: Basic_Array <Univ_String>) is
+       if |Args| > 0 then
+          for each Arg of Args forward loop
+             const Arg_Num : Univ_Integer := From_String(Arg)
+             if Arg_Num not null then
+                const Result := Fib(Arg_Num)
+                Println("Fib(" | Arg | ") = " | Result)
+             else
+                Println("Arg: '" | Arg | "' not numeric")
+             end if
+          end loop
+       else
+          Println ("About to call Fib(7)");
+          Print ("\nFib(7) = "); Print(Fib(7)); Print('\n');
+       end if
+    end func main

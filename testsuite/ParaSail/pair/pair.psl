@@ -1,0 +1,35 @@
+
+interface Pair<Left_Type is Any<>; Right_Type is Any<>> is
+    func Create(Left : Left_Type; Right : Right_Type) -> Pair;
+    func Left(P : Pair) -> Left_Type;
+    func Right(P : Pair) -> Right_Type;
+end interface Pair;
+
+class Pair is
+    const Left : Left_Type;
+    const Right : Right_Type;
+  exports
+    func Create(Left : Left_Type; Right : Right_Type) -> Pair is
+        return with (Left => Left, Right => Right);
+    end func Create;
+
+    func Left(P : Pair) -> Left_Type is
+        return P.Left;
+    end func Left;
+
+    func Right(P : Pair) -> Right_Type is
+        return P.Right;
+    end func Right;
+end class Pair;
+
+func Test_Pair()->Integer<> is
+    const B : Pair<Integer<>, Box<Integer<>>> := Create(1, Create(2));
+    const C : Pair<Integer<>, Box<Integer<>>> := Create(Left(B) + 2, 
+	Create(Value(Right(B)) * 3));
+    return 1000*Left(B) + 100*Value(Right(B)) + 10*Left(C) + 1*Value(Right(C));
+end func Test_Pair;
+
+func main(Args : Basic_Array<Univ_String>) is
+   const Result : Integer := Test_Pair ();
+   Println ("Result :  " | Result);
+end func main;

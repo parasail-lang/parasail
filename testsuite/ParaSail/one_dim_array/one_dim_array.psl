@@ -1,0 +1,117 @@
+interface One_Dim_Array<Element_Type is Assignable<>> is
+    const First : Univ_Integer;
+    var Last : Univ_Integer;
+    op "[]"() -> One_Dim_Array;
+    op "indexing"(ref V : One_Dim_Array; Index : Univ_Integer) -> 
+      ref Element_Type;
+    op "var_indexing"(ref var V : One_Dim_Array; Index : Univ_Integer) -> 
+      ref var optional Element_Type;
+	// Used for adding elements to a One_Dim_Array
+    op "|="(var V : One_Dim_Array; Elem : Element_Type);
+    op "<|="(var V : One_Dim_Array; var Elem : optional Element_Type);
+    op "|"(Left, Right : One_Dim_Array) -> One_Dim_Array;
+    func Length(V : One_Dim_Array) -> Univ_Integer;
+end interface One_Dim_Array;
+    
+class One_Dim_Array is
+
+    const Initial_Size := 8;
+    var Count : Univ_Integer := 0;
+    var Data : optional Basic_Array<optional Element_Type>;
+
+    func Expand_By_One(var V : One_Dim_Array) is
+	// Expand size by one
+	if V.Data is null then
+	    V.Data := Create(Initial_Size, null);
+	elsif V.Count == Length(V.Data) then
+	    // Double the size
+	    var Old_Data <== V.Data;
+	    V.Data := Create(2*V.Count, null);
+	    for I in 1..V.Count loop
+		V.Data[I] <== Old_Data[I];
+	    end loop;
+	    Old_Data := null;
+	end if;
+	V.Count += 1;
+	V.Last += 1;
+    end func Expand_By_One;
+	
+  exports
+    op "[]"() -> One_Dim_Array is
+	return (First => 1, Last => 0, Count => 0, Data => null);
+    end op "[]";
+
+    func Length(V : One_Dim_Array) -> Univ_Integer is
+        return V.Count;
+    end func Length;
+
+    op "indexing"(ref V : One_Dim_Array; Index : Univ_Integer) -> 
+      ref Element_Type is
+	{Index in 1..V.Count} // Index out of bounds
+	return V.Data[Index];
+    end op "indexing";
+
+    op "var_indexing"(ref var V : One_Dim_Array; Index : Univ_Integer) -> 
+      ref var optional Element_Type is
+	// Used for adding elements to a One_Dim_Array
+	// Add "null"s to end of One_Dim_Array until big enough
+	// TBD: Expand all at once to right size
+	for I in V.Count+1 .. Index loop
+	    V |= null;
+	end loop;
+
+	return V.Data[Index];
+    end op "var_indexing";
+
+    op "<|="(var V : One_Dim_Array; var Elem : optional Element_Type) is
+	Expand_By_One(V);
+	V.Data[V.Count] <== Elem;
+    end op "<|=";
+
+    op "|="(var V : One_Dim_Array; Elem : Element_Type) is
+	Expand_By_One(V);
+	V.Data[V.Count] := Elem;
+    end op "|=";
+    
+    op "|"(Left, Right : One_Dim_Array) -> Result : One_Dim_Array is
+	// Copy left into result, and then add in the Right elements
+	if Left.Count == 0 then
+	    // Left is null One_Dim_Array; result is determined by Right
+	    Result := Right;
+	else
+	    // Start with Left
+	    Result := Left;
+	    // Assign all elements of Right into tail of Result.
+	    // TBD: Would be more efficient to grow One_Dim_Array once and then
+	    //      copy in the contents of Result.
+	    for I in 1..Length(Right) forward loop
+		Result |= Right[I];
+	    end loop;
+	end if;
+    end op "|";
+
+end class One_Dim_Array;
+
+func Test_One_Dim_Array() is
+    var V : One_Dim_Array<Univ_Integer> := [];
+    var U : One_Dim_Array<Univ_Integer> := [];
+    V |= 23;
+    U |= 24;
+    V := V | U;
+    Println("V = " | V[1] | ", " | V[2]);
+    for I in 1..10 loop
+	V |= I;
+    end loop;
+    for I in 1..Length(V) forward loop
+	Println("V[" | I | "] = " | V[I]);
+    end loop;
+    Println("\"var_indexing\"(V, 33) := 33;");
+    "var_indexing"(V, 33) := 33;
+    for I in 1..Length(V) forward loop
+	Println("V[" | I | "] = " | V[I]);
+    end loop;
+end func Test_One_Dim_Array;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_One_Dim_Array ();
+end func main;

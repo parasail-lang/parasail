@@ -1,0 +1,12 @@
+Initial Queue: [20, 10, 30]
+Removed 20
+Queue now: [10, 30]
+Removed 10
+Queue now: [30]
+Adding back another 20
+Queue now: [30, 20]
+Removed 30
+Queue now: [20]
+Removed 20
+Queue now: []
+Removed null

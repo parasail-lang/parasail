@@ -1,0 +1,62 @@
+We propose a talk to introduce a new programming language, "ParaSail,"
+which provides a pervasively parallel programming model embedded within
+a language that provides compile-time guarantees of safety and security.
+
+Background:
+
+System security is no longer something that can be accomplished merely
+through the provision of strong network firewalls. System security is
+now largely dependent on application security, and application security
+is currently largely dependent on programmers doing the "right thing."
+It is already clear that security based on "careful programming" is not
+sustainable.  An alternative approach is needed where the programming
+tools used by the everyday programmer provide some automatic guarantees
+of security.  Providing third-party tools that will check after-the-fact
+for insecure coding is similarly not sustainable.  The only sustainable
+solution is one where the security is built into the programming
+languages being used, and the program only compiles if it meets the
+basic security requirements.
+
+At the same time that security is becoming more critical, the underlying
+hardware is going through a revolution, from a mode where single
+processor performance was doubling every two years, to a mode where no
+significant further increase in processor speed can be expected in the
+near future, and the biennial doubling in power will be based on the
+doubling in the number of processors available.  This hardware
+revolution means that the "everyday" programmer not only has to worry
+about security, but also about taking advantage of the underlying
+parallelism of the hardware.  We will soon be reaching a point where the
+typical chip will provide upwards of 100 processors, and it will simply
+be unacceptable for a typical application to remain sequential, only
+utilizing one one-hundredth of the power of the hardware.
+
+These two increasingly critical requirements, creating secure code, and
+creating parallel code, mean that we clearly need new tools for use by
+the everyday programmer.  The existing mainstream programming languages
+provide poor support for both of these requirements, and the languages
+that do offer better support for one or the other of these requirements
+tend to be difficult to use, and often end up with a tradeoff between
+security and parallelism.
+
+In an attempt to address these dual goals, we have developed a new
+programming language "ParaSail", which provides a marriage between
+parallel programming and formal methods.  ParaSail, or "Parallel
+Specification and Implementation Language," provides a pervasively
+parallel programming model, while incorporating annotations such as
+preconditions, postconditions, and invariants, directly into the syntax,
+and doing full compile-time checking against race conditions,
+precondition and invariant violations, as well as against the more basic
+run-time errors of out-of-bounds indexing, use of uninitialized or null
+data, numeric overflow, etc.  The language achieves much of its
+capability through simplification, by removing features that are
+impediments to parallelism and security, while preserving an overall
+familiar interface/class-based object-oriented programming model, making
+the language readily accessible to the everyday programmer.  Features
+removed from the language include explicit pointers, global variables,
+hidden aliasing, exceptions and run-time exception handling, and special
+syntax and semantics for builtin types. These simplifications allow the
+language to adopt a pervasively parallel execution model, to support
+expandable and shrinkable objects, to provide automatic region-based
+storage management with no need for asynchronous garbage collection,
+and to provide compile-time guarantees of safety and security.
+ 

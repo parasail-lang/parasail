@@ -1,0 +1,16 @@
+import Test_N_Queens, Place_Queens
+
+func main(Args : Basic_Array<Univ_String>) is
+   if |Args| > 0 then
+      for each A of Args forward loop
+         const Num : optional Univ_Integer := From_String (A)
+         if Num not null and then Num in 1 .. 12 then
+            Place_Queens(Num)
+         else
+            Println(A | " must be a number in range 1 .. 12")
+         end if
+      end loop
+   else
+      Test_N_Queens()
+   end if
+end func main

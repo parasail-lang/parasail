@@ -1,0 +1,24 @@
+Tree with 8 nodes:
++
+  -
+    5.3
+  *
+    4.0
+    **
+      5.2
+      2.0
+Value = 102.86
+Tree with 5 nodes:
++
+  4.5
+  /
+    7.1
+    3.0
+Value = 6.86666666666667
+Tree with 5 nodes:
++
+  4.5
+  /
+    7.1
+    3.0
+Value = 6.86666666666667

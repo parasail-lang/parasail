@@ -1,0 +1,12 @@
+//  test use of @llvm.pow.* and @llvm.round.*
+//  run with interpreter and compiler and make sure
+//  they print the same output
+func main(Args : Basic_Array<Univ_String>) is
+   Println(Round_To_Int(4.9))
+   Println(Round_To_Int(5.1))
+   Println(3.2 ** 4);
+   Println(3.8 ** 4);
+   var X := 7.3;
+   X **= 2;
+   Println(X);
+end func main

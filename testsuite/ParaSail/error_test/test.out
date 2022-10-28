@@ -1,0 +1,9 @@
+error_test.psl:90:8: Error: Use ":=" rather than "=" in ParaSail
+error_test.psl:92:8: Error: Use "!=" rather than "/=" in ParaSail
+error_test.psl:94:7: Error: Use "elsif" rather than "elseif"
+error_test.psl:94:11: Error: Use "==" rather than "=" in ParaSail
+error_test.psl:107:21: Error: Syntax Error
+error_test.psl:239:17: Error: Use "==" rather than "=" in ParaSail
+error_test.psl:252:39: Error: Syntax Error
+error_test.psl:274:5: Error: Use "end if" rather than "endif"
+error_test.psl:283:15: Error: Syntax Error

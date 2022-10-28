@@ -1,0 +1,36 @@
+#
+../build/bin/parasail_main -listing off \
+../lib/aaa.psi units.psl qsort6.psl n_queens3.psl drinking_phils.psl \
+simp_fib3.psl locked_box.psl expr_tree.psl \
+mat_vec.psi mat_vec.psl apply_op.psl char_vec2.psl cond_exprs.psl \
+dgraph.psl double_gen.psl memoizing.psl agg_with_iterator.psl \
+bottles_on_wall.psl locked_exit.psl case_expr.psl multi_continue.psl \
+test_univ_integers.psl cube_puzzle.psl hippo_game.psl << 'HERE'
+Test_Enum
+Test_Packed
+PSL::Test::Test_IO hello there 42
+some input
+Test_Units
+Test_Sort 100
+Fib 15
+Test_Box 6
+Test_Extend
+Test_Mat_Vec
+Test_Trig
+Test_Graph
+Test_DG 42
+Agg_With_Iterator
+Cond_Exprs 3 7
+Case_Expr 2 5 7
+Multi_Continue 3 5
+Test_Apply 7
+Char_Vec2 "this is a test"
+Drink 5
+Locked_Exit
+Place_Hippos
+Cube_Puzzle
+Test_Univ_Integers
+Test_N_Queens
+Test_DP 13
+quit
+'HERE'

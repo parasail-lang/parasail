@@ -1,0 +1,8 @@
+// When you link a ParaSail compiled program with the ParaSail front end,
+// the ParaSail front end gets control initially.  You can use it to
+// load additional ParaSail source code into the interpreter,
+// and then invoke the compiled main program with appropriate arguments.
+// e.g. prog_with_frontend xyz.psl abc.psl compiled_main.psl -command
+//          Compiled_Main arg1 arg2 arg3
+func Compiled_Main(Args : PSL::Containers::Basic_Array<PSL::Core::Univ_String>)
+  is import(#call_compiled_main)

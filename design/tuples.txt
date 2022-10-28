@@ -1,0 +1,25 @@
+Design for supporting tuple types -- started 16-Feb-2019
+
+Tuple types are distinguished by their component names and component types.
+Tuple *modules* should be distinguished only by their component *names*,
+and then the component types would be provided via module parameters.
+Their canonical names might want to have a special syntax, corresponding
+to the syntax used to declare them.  Hence:
+
+   (X:T; Y:Z)
+
+Conceivably they could have default values, but would those be determined
+by the "module" or the "instance."  If it is just a question of being
+"optional" that could be part of the module.  Defaults seem to add
+unnecessary complexity at this point...
+
+Tuples have no operations, so they really don't need any code.  We could
+think of them a bit like Univ_Enumeration, in that all possible tuple modules
+already exist, we just need a way to identify them.
+
+Should tuple components be "const" or "var"s?  Making them "const"s can
+be confusing (e.g. Pair<> was confusing that way.  We could allow
+the use of (const X:T; var Y:Z) is suppose, but what would be the
+default?  It seems clear the "const" and "var"ness is part of the module,
+not the type.
+

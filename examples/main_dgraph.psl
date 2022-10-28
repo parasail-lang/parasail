@@ -1,0 +1,4 @@
+import Test_Graph
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Graph()
+end func main

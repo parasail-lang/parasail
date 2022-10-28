@@ -1,0 +1,601 @@
+Reference objects are interesting beasts.  A "slice" is the canonical reference
+object.  Even simpler is the ref-object returned by the indexing operation.
+Currently indexing returns a "simple" ref, but for packed arrays, indexing
+might have to return a more complex ref.  
+
+A critical issue with a "ref" is that it may need some cleanup, especially if it
+supports writing.  Thanks to the lack of exceptions, the only concern is
+thread death.  If we ensure that the only objects that are updatable by
+a potentially-abortable thread, and which can outlive the thread, are
+concurrent objects, then we can essentially ignore thread death as well.
+
+So if we ignore both exceptions and multi-thread exit, then the compiler
+can invoke the cleanup activities required when a "ref" goes away.
+One of the key features of a "ref" is that it may do some caching.  For example
+for a ref representing an element or slice of a packed array, we clearly
+want to be able to read and write the element without having to repeatedly
+deal with unpacking and repacking the value.  Thanks to the "hand-off"
+semantics, this should be no problem.  
+
+References are essentially "capabilities" but with some value caching
+possibly added in.
+
+------  27 Feb 2014
+
+So now that we are trying to implement packed arrays, how should this work?
+We want a called routine expecting a "var" or a "ref" to work properly, even
+if we pass it a ref to a packed array element.  So if we fetch the packed
+element when we create the ref, and then any assignments update that object,
+and then when the ref "goes away" we re-pack the value, that should work.
+What exactly does this look like?  What does the "indexing" operator specify?
+Where does the "ref" live?  What does the compiler do, and what does the
+implementor of the "ref" do?
+
+For a packed array, the ref returned by "indexing" should contain
+the actual value, and an operation that returns a reference to that value,
+as well as a finish operation that stores the value back into the array.
+This finish operation could perhaps bypass the store if the value has not been
+updated since the "ref" was created (how would we know? the compiler would 
+know).  We have "var" indexing vs. indexing.   Would these operate differently?
+The difference is supposed to be that var_indexing has read/write access to
+the underlying container, and could expand it.
+
+  interface Packed_Array_Ref<> is
+      func Create(ref Arr : Packed_Array; Index : Index_Type)
+        -> ref Packed_Array_Ref
+      op ":="(var Packed_Array_Ref; New_Val : Elem_Type)
+      op "ref"(ref Packed_Array_Ref) -> ref Elem_Type
+      op "end"(var Packed_Array_Ref)
+  end interface Packed_Array_Ref
+  class Packed_Array_Ref is
+      ref Arr : Packed_Array;
+      const Index : Index_Type;
+      var Elem : Elem_Type;
+    exports
+      func Create(ref Arr : Packed_Array; Index : Index_Type)
+        -> ref Packed_Array_Ref is
+          return (Arr, Index, Elem => Arr[Index])
+      end func Create
+      op ":="(var Packed_Array_Ref; New_Val : Elem_Type) is
+          Packed_Array_Ref.Elem := New_Val
+      end op ":="
+      op "ref"(ref Packed_Array_Ref) -> ref Elem_Type is
+          return Packed_Array_Ref.Elem
+      end op "ref"
+      op "end"(var Packed_Array_Ref) is
+          Set(Packed_Array_Ref.Arr, Packed_Array_Ref.Index,
+            New_Val => Packed_Array_Ref.Elem)
+      end op "end"
+  end class Packed_Array_Ref
+      
+  op "indexing"(ref Arr : Packed_Array; Index : Index_Type)
+    -> ref Packed_Elem_Ref
+
+----------- 28 Feb 2014
+
+So we have a working model.  The ":=" operator is not really needed, since you can just call the "ref" operator and then assign to that.  And move and swap would not be able to use the ":=" operator, so perhaps we should forget about it.  No need to call the "end" operator if no update was performed.
+
+So what does the compiler do?  It needs to create a temporary object to hold
+ref "object" and then call the "ref" operator to generate the actual value.
+If we have several calls on "ref-object" returning functions, we need to
+flatten these.  But suppose one takes the other as input?  We can't just
+pull them all out, or at least not in some random order.  We need to go
+depth first.
+
+We could conceivably allocate space for the "ref" objects
+when generating calls on parallel code.  We don't need to actually
+initialize the "ref" objects before spawning the parallel blocks.
+They could do it themselves.  We need to postpone the "end" calls 
+so they are done in sequential code after all of the parallel blocks
+are complete.
+
+"var_indexing" is only used for LHS of assignment and the "move" operation,
+when Context = Mutable_Context.
+Regular "var" parameters are presumed to be already initialized, and
+so regular "indexing" is called.  So we need "indexing" to support update.
+Just supporting updating with "var_indexing" is not enough.
+
+The Pre_Codegen pass could be used to decide whether a given "ref" might be
+updated, and hence whether the "end" operator needs to be called.
+What happens when someone "holds onto" the result of calling "indexing":
+
+   ref Xyz => Packed[I]
+
+Is Xyz of type Ref_Packed_Elem or a simple "ref Elem_Type"?
+It would seem to be more efficient to call "ref" only once.
+Does this imply that as long as this "ref" exists, all of Packed is read-only?
+Seems draconian.  Probably only need to make sure that no other concurrent
+references to Packed[I] are made, and that the "end" calls do not overlap.
+
+So Pre_Codegen could decide whether a given ref is written or only read,
+and mark the computation-sem/declared-ref appropriately.
+In regular codegen, we could allocate space for the ref objects, but
+this seems to require an extra pass.  Alternatively, we can sum up the
+number of ref objects produced in an expression, and then allocate space for
+them in a single block.  Or we can start at zero for each statement and assign
+offsets as well as count the total, and then on the codegen pass, the offsets
+are added to some base offset for the block as a whole.  Now what about
+compound statements, like "if" or "case", where we want to "end" the
+refs before we branch.  Can we put the "end" calls before the "skip"
+statement occurs?    This is the beginning of "finalization" actions.
+Clearly those want to be done as early as possible.
+Short-circuit operations have a similar problem to if statements.
+There is no notion of a "current" accumulator or condition code, so we
+should always have a place to perform an "end" operation.
+But what about a short-circuit that appears inside a parallel construct?
+If it is explicitly parallel, then this would be illegal.  But what about
+parallelism we insert?  We require that it always be possible to evaluate
+in parallel, so that implies that it would be illegal to have conflicting
+uses of components of the same object.  The only real problem comes from
+multiple *updaters*.  There is no harm if a read is occuring while a
+write is being performed to a different component, even if in the same
+word, since we are not changing any of the bits that matter.  So this is
+a different case, where we allow simultaneous read and write to different
+components of a packed container, but not simultaneous writes.
+
+It would be nice if at the point of the "ref" call we
+knew whether we were going to emit an "end," because suppose this was
+a ref used to implement persistence.  We need to know when the ref goes
+away, even if it is read only.  That argues for *always* invoking an end,
+or having two operations, one for a read-only "end" and one for a read-write
+"end," and the read-only "end" could be omitted if there is no need to
+call it.  Presumably we also want a read-only vs. read-write "ref" option.
+"rw_ref" and "ro_ref", "rw_end" and "ro_end"
+A null ro_end would be specified by: func "ro_end"(..) is (null)
+Or just omitted?  If there is an "ro_ref" but no "ro_end" then the presumption
+is that you don't need to call it.  If there is no "ro_ref" then "rw_ref"
+would be used for everything.
+Or "var_ref" and "var_end" and then plain-old "ref" and "end"?
+Can omit "end" if you have "var_ref" and "var_end".
+
+Note that we might have an "end" or a "var_end" even if there was
+no need for a "ref" or a "var_ref."  This could happen for a slice,
+where the caller expects the whole ref-object, but there still might
+be a desire for a "var_end" if the slice is updated.  This could happen
+for a packed slice.  Note that presumably for a packed slice, there would
+have to be calls on "indexing" applied to the slice, which might return
+packed_array_ref's, which need "end"ing.  But as long as the slice ref
+remains, we might still need some kind of "end."  Or the individual 
+"indexing" calls could be where the actual updates take place.  But that
+would imply that divide-and-conquer would *not* be safe using packed
+slices.  We could make them safer by deferring any updates to parts of
+the slice that might be in a shared word, but then the slice-ref would
+need to be "end"ed.  Conceivably we could initialize ref objects to null,
+and before calling "end" we would always check for not null.  Of course
+that requires another temp to record the is-null state, but that is
+probably OK.
+
+So if we go with this "null" initialization for ref objects that might
+be conditionally initialized, we can handle short-circuits, and other
+conditional expressions (if and case exprs) with no problem.
+We would hoist the "end"s to after the parallelized code.
+Eventually we could do the same thing for explicit parallel blocks, but
+probably not for parallel loops -- just too complex, would need a parallel
+vector of refs, and it would be more efficient to simply unpack the
+array before doing things in parallel, and then repack it afterward.
+
+Note that packed arrays would not really implement the "indexable" interface,
+because they don't provide an "indexing" operator that returns a "ref"
+directly.  Conceivably we could add a "ref" operation which is an
+identity operation on a simple ref, with a no-op for "end".
+
+So back to allocating offsets for the ref objects.  We need separate ones
+for each iteration of a loop, so we can't really allocate these at too high
+a level.  For example, suppose we have a quantified expression that uses
+packed-array indexing:
+  (for I in 1..10 => Packed_Arr[I] > 0)
+we want this to allow parallel execution, so we need a separate ref object
+for each iteration, implying we want it to be very local.
+It seems like the ref-object wants to be as local as possible.
+But it has to live as long as the it is in use.
+Each call might have multiple "ref"-object results which need saving
+and conversion.
+
+There is a semantic analysis issue here as well, since we need to insert
+the "ref" calls as appropriate so the types match up.  When we do this, we
+could perhaps also keep a count of the number of such calls in a given.
+In Check_One inside of Find_Interp_Of_Type, we should notice that the
+Opnd_Type is a ref object type, and we should check whether it has a
+"ref" operation (or "var_ref") and if so we could set a flag, similar to the
+univ-type flags.  We do *not* do it this way because of the combination
+effects possible, where a polymorphic type or a generic operation or a 
+universal target, or for that matter, a universal operand, is present.
+Also, there is no need to wait for a more perfect match to replace the
+"ref"-based match, since the target type is not changing in this case,
+and it would be much too ambiguous to have an overloading where one
+returned a simple ref and the other a ref object with the same type
+as the simple ref after implicit de-ref.
+
+We have to insert a call on "ref" similar to what we do for "from_univ."
+Should we notice when a type is declared that it has a "ref" operation,
+and record what type it returns?  Contains_Ref_Component is set
+if module defines a "ref-object" type.
+
+We need a list of ref objects which need finalization.  How should this list
+be managed?  We can't do at the end of every call.  We have to wait for a
+call that does *not* return a ref before we "end" and overwrite the ref
+objects needed for a tree of calls.  A list can be propagated up from the
+parameters for most operations, but not all.  Short-circuit, and conditional
+expressions, should be handled as separate expressions.  Hmmm, but what
+if we have an "if" expression where one or both of the "arms" return
+a ref object?  Clearly these need to live until the result of the "if"
+expression is consumed.  Here again, we could use nullness to know there
+is no cleanup to be performed.
+
+We might want to integrate this with a general "finalization" system.
+For declared objects with a region specification, we will want to set
+them null (with the implied space reclamation) prior to scope exit, or
+at least if the region doesn't match the local region.  This might argue
+for another PSVM instruction: "set null and reclaim if non-local region."
+Declared refs will also need to be "end"ed if they are defined by
+ref objects.  All declared objects get "syms" and are placed in regions.
+It would make sense to iterate through the syms of a region when exiting it.
+we need to handle exits from the middle of a region as well.
+Note that there are compile-time (symbol) regions, and run-time storage regions.
+We don't always create a new run-time storage region for each compile-time
+region.  Whenever we *don't* create a storage region for a given symbol
+region, we might want to set *all* of the objects to null, so the space can be
+reclaimed immediately.  Certainly for "while" loops, we would want to do that
+to avoid overrunning storage, though I suppose if the local objects reuse
+the same offsets on each iteration, there is no great problem, unless we use
+"move_word" instead of "assign_obj" or "move_obj" (which we probably do --
+so there is a problem!).
+
+-----  10 Mar 2014
+
+So where do we mark finalization?  We can put it on every sym.  But we also
+need to do it on expressions as well.  That means on trees.  How are objects
+created?  Clearly the outputs of a call on an operation are "new" objects.
+What if we create an object and pass it as a parameter, rather than store
+it into a variable.  When will it be reclaimed?  The Computation_Semantic_Info
+structure has a field called "Parallel_Result_Offset," Slow_Calls, etc.
+We could add info to the comp-sem info for finalization.  Conceivably this is
+where the info for each sym could go as well.  The only confusion might be
+for finalization associated with the expression used to initialize the sym.
+
+Note that for ref-objects appearing as an intermediate in an expression
+defining a ref object, we have to defer the finalization of these
+intermediates until the ultimate ref-object is finalized.  In general, if
+any finalization is required, we will want to compute into a temp and
+then load/deref the temp.  A flag on a comp-sem might want to indicate we
+have associated it with a temp.  
+
+We need to reserve space for the temps in a separate pass --
+could this be the same pass that checks for parallel
+calls?  One concern is that this part of the code is complex and delicate.
+It might not be wise to layer yet another job onto it.  Furthermore,
+if we create a parallel block, we probably want the temp to be outside it,
+since it may need to live longer than the parallel block.
+Ideally we can walk an expression tree using Num_Operands/Nth_Operand, etc.
+Note that we need to remember that the temp may need to be finalized in
+the middle of a quantified-expression loop.
+
+------- 13 March 2014 ----------
+
+Ok, so let's suppose we are trying to use this information.
+Where would that happen?  In Binary_Action we deal with ";", "||",
+and calls.  In Assign_Stmt_Action we deal with move, swap, and assign.
+In Invocation_Action, we deal with other calls, and aggregates.
+In For_Loop_Construct we deal with quantified exprs and map/reduce exprs.
+
+Which of these have regions which need walking before exiting?
+Which of these might have results that need to be placed in a temp?
+We should certainly have the goal that we reclaim the storage allocated
+in a loop body/expression before we go onto the next iteration.  Since the
+body can be a single expression, we pretty much need to have info on
+each expression.  What information do we need?  We need to know how many
+slots to reserve for temps, we need to know when we need to copy a value into
+a temp, and which temp, we need to know when and what to finalize, and what
+operation to apply to it.  We could propagate all of this information up
+to every expression, or we could propagate up a flag that says there is
+something to be finalized, and to walk the tree for the details (seems more
+reasonable).  Or perhaps we could propagate a sum of the number of temps
+that might need finalization, and when this is zero, there is nothing to do.
+If we propagate up this sum, we need to propagate back down a base address
+for using the temps.  That would seem to be just another field in the
+Visitor structure.  When we use the temp, we should save its location
+in the tree so on the finalization pass we know where it is.
+
+We could use the Pre_Visit or Post_Visit to handle some of these operations.
+At the moment the only think handled by these are pre/post annotations.
+
+As far as leaving room for temps on the stack, there is no problem doing that
+at statement boundaries.  If we do it in the middle of an expression, we may
+have to do extra moves after finalizing the temps.  Potentially any expression
+that returns a large (or not-known-to-be-small NKTBS) value could benefit
+from finalization, though we could certainly defer it a bit.  Note that
+we have to synchronize when freeing individual objects, so it is better
+to wait for the region to end if possible.
+
+We have not yet implemented the use of "for X" region specifiers for
+parameters, but once implemented, these should be nulled out by the
+called routine.  The caller should "move" the parameter into the
+parameter slot to avoid having a duplicate copy, and then presumably
+the called routine moves the value out of the parameter, leaving it null.
+Note that "for X" specifiers imply that the "X" parameter must be evaluated
+first to determine its region, so this creates some serialization.
+
+Top priority: ref objects returned by calls.  When can they be finalized?
+When we have a non-ref result.  Note that if a map/reduce expression is
+returning (references to) large objects, they might be moved into the final
+result, but in any case, after doing the reduction, we can finalize the
+reference (which might now be referring to a null object).  
+
+When *must* a ref object be finalized?  Before we exit the scope of the temp
+or the object it refers to, and before we loop around for another iteration
+of a loop.  When must a ref object *not* be finalized?  Before a ref derived
+from it is done being used.  Hence if a subexpression returns a ref object,
+and the ref is passed to an enclosing call, and the result of the call is
+captured in a declared, named ref, we mustn't finalize the ref object
+until the named ref is done.  
+
+At a declaration, we might have some finalizations that could be done
+right away, and some that must be deferred until the declaration's scope
+ends.  What is an example of that?  We might have some ref objects used
+and then not aliased with the final result.  Those can, and probably should,
+be finalized before proceeding to the next declaration, to avoid introducing
+possible race conditions.  We also want to finalize ref-objects before
+creating conflicting ref objects, which implies that a construct whose
+result is known to be unaliased with a parameter should finalize that
+parameter before proceeding.  This implies that at the end of any construct
+with inputs, we want to finalize the unaliased inputs.  So we should
+distinguish aliased inputs from unaliased inputs, and count them
+separately, and finalize all unaliased inputs after evaluating a construct.
+The total number of temps is used when leaving room for temps, but otherwise
+aliased and unaliased inputs are counted separately.  A construct can only
+have aliased inputs if it itself returns a ref or ref object.
+
+It turns out the Pre-Codegen phase already checks for aliasing problems,
+and so it seems clear that we should integrate the counting of temps
+and deciding where to do finalizations with these checks.  Everything is
+kept in the Pre-Cg Visitor structure right now and/or passed as an extra
+parameter to Pre_Cg[_List], but we will want to leave something behind
+on the tree itself for use during code-gen.
+
+When a func call is done, we should finalize all ref object temps of parameters
+that are themselves calls that return a ref, but where the corresponding
+formal parameter is *not* a ref.  Note that it should probably be an error
+to have a formal input parameter that is a ref, but which does not have an
+output that is a ref.  If we allow that, then we should finalize all parameters
+even if they are refs.
+
+As far as aliasing and race-condition detection, parameters that are
+calls that do not return refs should be treated in parallel with other
+parameters, but sequentially relative to the enclosing call.
+How does that work?  First we combine all the parameters which are calls
+in parallel with each other.  Then we combine the reads and updates represented
+by the calls that return refs, and the non-call parameters (that are not
+known to be small) in parallel.  Then we combine these two sequentially.
+
+Should parentheses be adequate to prevent using as a var, and force a copy?
+Seems a lot of semantics for a parenthesis!  In current ParaSail,
+a parenthesized expression is equiv to the unparen'ed expression semantically.
+Syntactically it looks like an aggregate, and it can have a type prefix
+to help with the resolution.
+
+"Update_First(A, -A)" should be allowed, even though "Update_First(A, A)"
+is not, because "-A" always returns a new object.  If A were known to
+be small, then "Update_First(A, A)" is also safe.  "Known to be small" might
+better be semantically "immutable," meaning that "var" mode does not allow
+changing component of existing object, only allows replacing with wholly new
+object.
+
+Current algorithm just goes through the input parameters and calls Pre_Cg
+on each, with How_Combined => Parallel and Mode => Access_Map(Param_Kind).
+The mode of the output, if any, is not checked.  Pre_Cg calls Visit_Resolved
+on the parameter, and then combines the resulting visitor R/W map into
+the passed-in (Visitor) R/W map.
+
+----------- 3/28/2014 -----------
+
+We have significantly enhanced the race-condition detection mechanism.
+It now goes in three passes:
+  1) Union the effects of evaluating the inputs, not worrying about
+     the modes of the inputs, while checking for read/write conflicts,
+     presuming the inputs are evaluated in parallel.
+  2) Check for aliasing conflicts between the inputs that have any
+     "refs" in their read/write mapping, taking the modes into account.
+     NOTE: Mode "ref" is ambiguous since it implies no immediate update
+          is performed, but it might be updated later, so having two
+          different "ref" inputs which refer to the same object would be
+          trouble, so we treat it as a "write."
+  3) Combine effects to produce overall effect of the call.  No conflicts
+     are of concern here, we are simply building up the set of effects,
+     so we pretend this is all Sequential.  The overall effect includes
+     "ref"s if any of the input parameter have a "ref *" mode.
+
+For ref-object temp finalization, when a call completes, we want to
+finalize the temps associated with the inputs which do *not* have
+a "ref" mode.  The inputs that have temps are those that are themselves
+calls which return a ref-object which is then implicitly dereferenced.
+Other sorts of finalization might include setting temp large objects to null
+which are not marked as "for X."  So again, after a call, we would finalize
+the large results of inputs that are calls where the mode of the input
+is not a "ref".
+
+To finalize a normal non-ref-object temp, we could perhaps just set the
+input parameter to null.  That might prevent us from using a more optimized
+parameter passing mechanism in the future, but we can probably deal with
+that then.  For "ref-object" temps, we will want to allocate some additional
+space for them, in part because we cannot always end them immediately after
+return from the call the had them as an input.  If the ref-object, or
+the "ref" to it, is passed as a "ref" then it lives longer.
+After we "end" a ref-object temp, we will also want to set it to null.
+When we finalize a ref-object temp, we recurse down through all inputs
+of mode "ref*", finalizing as we go down.
+
+When we finalize a declared ref, we look at its initializing expression, 
+and recurse down as described above.  Calls need temps.  It is not clear
+what else does.  If we have an expression inside a loop, the temp needs
+to be inside the loop as well so we have one per iteration.
+
+First we need to count the total number of temps, so we can allocate that
+number before beginning evaluation.  Then we need to pass down a level/offset
+within the temps in the Visitor which we can bump up as we descend.
+Then we need to walk after generating code for a call to finalize the inputs.
+
+During code generation for:
+  Assign/Move/Swap
+    LHS is evaluated with Is_Lvalue_Context true,
+    causing Visitor.Lvalue_Location to be filled in,
+    and Target_Local_Offset to be bumped.
+    if LHS returns a ref object, we count that in the total number of temps
+    needed for the statement, and move the result to that temp (or from it?)
+    and then call the "var_ref" operation to produce a simple ref.
+    If RHS returns a ref object, that is also counted, and copied, and "ref"
+    called.  If RHS returns a large object, we presume it will be implicitly
+    "moved" -- we use assign_word which doesn't null out the RHS, just
+    reuses it, without any sort of deep copy -- perhaps should use Move_Object
+    instead for safety.
+    Note that if RHS is not a computation, but rather just an identifier,
+    then inside Identifier_Action we use Emit_Move_Or_Copy, which notices
+    the presence of a target_object, and does a copy_object or move_word
+    accordingly.  Note that "move_word" moves a word into an uninitialized
+    space, while "assign_word" looks at target and effectively sets it
+    to null first.  So assign_word takes dest as "in out" while move_word
+    takes dest as merely "out."  Copy_Object assumes its dest is unit'ed
+    as well; target_object provides the region.
+    --
+    Change to assign_action -- allocate temps before evaluations, set up
+    visitor to have pointer to temps.  After performing assignment,
+    rewalk LHS and RHS to release temps.  An operation frees its own
+    temp before freeing any ref-temps of its operands.  Some sort of
+    "Finalize(subtree)" procedure should be provided which looks at kind
+    of node and finalizes its own result temp, and then for each input
+    of "ref" mode, calls Finalize on that.  Since this might generate code,
+    Finalize needs a Code_Gen_Visitor parameter.  It also needs information
+    on the Sem_Info for the node which indicates where is its temp, and
+    it needs to be able to find the inputs which might need recursive
+    Finalization.  Finalization might as well be sequential, so it will
+    be safe for packed arrays.  Does that imply we *don't* want to finalize
+    ref objects right away?  Won't this conflict with parallel loops?
+    Yes, it would seem so.   So we need to disallow the iterations of a
+    parallel loop from updating a packed array, it seems.  That doesn't
+    seem to be the end of the world!  On the other hand, we could allow
+    different sub-expressions to be updating different packed-array elements,
+    but that would imply we have to avoid doing some finalizations right
+    away.  Simplest seems to treat an "indexing" operation that returns
+    a ref object rather than a simple ref as *not* looking like a special
+    indexing operation, but rather like a whole-array reference/update.
+  Operation_Call with no outputs
+    No temp of its own, but its inputs might have temps.
+  Operation_Call with "ref" output
+    Has a potentially long-lived temp of its own, and its inputs
+    might have long-lived temps as well.
+  Operation_Call with known-to-be-small output
+    Similar to no outputs.
+  Operation_Call with not known-to-be-small output
+    Might have a short-lived temp, but it depends on how the result is
+    used, that is it used in an implicit "moving" assign or a "for X" input,
+    in which case it is presumed finalized as part of the enclosing
+    operation.
+  if statement/expression
+    The condition never returns a large object, though it could be
+    an implicit deref of a ref object (e.g. elem of a packed boolean array).
+    In an "if" expression, the expressions might return arbitrarily large
+    objects.  It would be nice if they shared a temp, so we don't have
+    to re-test the "if" condition.  However, what if it returns a "ref",
+    perhaps to an array, which we then select from?  This implies a tree
+    of finalizations might be required, so how would we know which subtree
+    to descend?  Should the two sides share temps, or have non-overlapping
+    ones?  
+  case statement/expression
+    The case expression could be a large object, or could be a deref of
+    a ref-object (e.g. elem of packed array).  
+    In the case of a "case" expression, it would seem we would
+    want to share temps, but we might not know at compile-time which
+    one we are handling, and we need to know the type.  This argues for
+    initializing to null, and applying "end" only to the non-null ones.
+    If they are "ref" objects, are they necessarily large?  What if the
+    ref object is just a wrapper of a simple ref?  What could it possibly
+    do as part of finalization?  We could always use a "large" null for
+    null refs, but the important thing to know is that we are *not*
+    pointing at a header in general, we are pointing directly at a
+    component or object, possibly sitting on a stack.  It could have a
+    region-id of null/zero to indicate it is not a "normal" large null.
+  Conclusion: No sharing of temps for "if"/"case" expressions, if the
+    temps might not be immediately finalizable.
+
+---------- packed_array parallelization 3/31/2014 ------
+
+It is probably too difficult to allow parallel updates of potentially
+neighboring packed array elements.  This implies that the "indexing"
+operator that returns a ref-object rather than a simple ref should not
+be given "special" handling, but rather be seen as a ref to the whole array.
+
+One alternative is to have a "slicing" operator which returns an 
+unpacked slice given a packed array, which then you can
+do "normal" indexing into, and get parallelism within the slice.
+The "end" operator on the slice would re-pack the slice into the
+underlying packed array.  Of course simpler would be to explicitly
+unpack, manipulate, and then repack.  We could see this as similar
+to the slicing, but it returns a ref object that when deref'ed gives
+a whole unpacked array.   Slicing seems somewhat nicer, since we may
+often want to start slicing the object.  On the other hand, the "end"
+operation would be quite different after an unpacking slice than after
+a slice of a slice.
+
+
+---------- Ref-Object implementation 4/3/2014 -------
+
+We should allocate finalizable temps at the statement level, and in the
+body of each for-loop construct even if it is not a statement.  The
+statements of interest are:
+
+  Simple statements:
+    Assign_Stmt
+      allocate all temps for LHS and RHS
+      generate code
+      finalize all temps
+    Invocation that is a call on an output-less Operation
+      allocate all temps for operation
+      generate code
+      finalize all temps
+    Invocation that has an output
+      allocate temps for non-ref operands
+      generate code
+      finalize non-ref operands
+    Control_Stmt's: Return ..., Continue with ..., Exit with ...
+      continue statement is a challenge, if is a "ref" iterator.
+      Must pass the temp as an extra loop parameter.  
+      Compute next element, finalize temp and set to null, 
+
+  Declarations:
+    var|const Id := ...
+       allocate slot for object
+       if has initial value
+          allocate slots for temps
+          generate code for initial value
+          assign initial value into object
+          finalize temps
+    ref Id => ... (finalize temps before proceeding, finalize ref at end)
+       allocate slot for object and temps
+       generate code to 
+    type S is T<X>;
+    
+  Compound statements:
+    if/elsif ... (finalize temps in condition before branching)
+    for ...  (finalize temps in iterators before starting loop, finalize
+              ref to element at end of each iteration, after computing
+              next element for a value iterator.  Pass temp as extra loop
+              parameter.
+    while ... (finalize temps before starting loop)
+    case ... (finalize temps before branching)
+
+  Sequence of statements:
+    X ; Y  -- Finalize decls of Y and then of X
+    X || Y  -- Finalize decls local to each sub-sequence
+    X then Y -- Finalize decls of Y and then of X
+    
+--------- 5/4/2014 var_indexing resolution -----------
+
+The following doesn't work for a packed array:
+
+   Pack_Arr[I] += 2
+
+The problem is that we don't set up the LHS as a "mutable" or "ref-obj" context
+and so "var_indexing" isn't considered.  We now have the mechanism in place
+to impose a preference when there is ambiguity, but it may be too early since
+we don't check parameter mode mapping until later.  But I suppose we could do
+it earlier.  We would have to wait until we had multiple interpretations in
+Find_Interp_Of_Type.

@@ -1,0 +1,762 @@
+ParaSail Prototype Compiler and Virtual Machine alpha 0.5 Revision: 5.5 
+Copyright (C) 2011-2014, AdaCore, New York NY, USA
+This program is provided "as is" with no warranty.
+Report problems at http://groups.google.com/group/parasail-programming-language
+
+Parsing aaa.psi
+Parsing units.psl
+Parsing qsort6.psl
+Parsing n_queens3.psl
+Parsing drinking_phils.psl
+Parsing simp_fib3.psl
+Parsing locked_box.psl
+Parsing expr_tree.psl
+Parsing mat_vec.psi
+Parsing mat_vec.psl
+Parsing apply_op.psl
+Parsing char_vec2.psl
+Parsing cond_exprs.psl
+Parsing dgraph.psl
+Parsing double_gen.psl
+Parsing memoizing.psl
+Parsing agg_with_iterator.psl
+Parsing bottles_on_wall.psl
+Parsing locked_exit.psl
+Parsing case_expr.psl
+Parsing multi_continue.psl
+Parsing hippo_game.psl
+---- Beginning semantic analysis ----
+ 228 trees in library.
+Done with First pass.
+Done with Second pass.
+Done with Pre codegen pass.
+Done with Code gen.
+Evaluating global constants.
+Finishing type descriptors.
+Next color = #red
+Next color = #green
+Next color = #blue
+Prev color = #blue
+Prev color = #green
+Prev color = #red
+Random day of week = #Monday
+Random day of week = #Sunday
+Random day of week = #Tuesday
+Random day of week = #Saturday
+Random day of week = #Wednesday
+Random day of week = #Friday
+Random day of week = #Thursday
+Bits_Per_Elem = 9
+Elems_Per_Word = 6
+Mask = 511
+Red = [#red => 51, #green => 0, #blue => 0]
+Blue = [#red => 0, #green => 0, #blue => 51]
+Yellow = [#red => 0, #green => 51, #blue => 51]
+White = [#red => 255, #green => 255, #blue => 255]
+Partial = [#red => 255, #green => 255, #blue => null]
+Arr = [#red => 119, #green => 119, #blue => 119]
+About to update Arr[#green] with 0x33 (= 51)
+About to update Arr[#blue] with 0x55 (= 85)
+Arr now = [#red => 119, #green => 51, #blue => 17]
+RR = [#red => 51, #green => 17, #blue => 119]
+VV = [3, 51, 23, 7, 17]
+Pi = 3.14159265358979, True prints as #true
+X = "hello", Y = "there", Z = 42
+Give me somethin: You gave me: "some input"
+This is going to standard output
+About to flush stderr and stdout
+About to print out imageable vector
+[1, 3, 5, 7, 9]
+L = S * T = 9.0 * 3.0 = 27.0
+V = g * T = 9.0 * 3.0 = 27.0, E = 0.5 * m * V**2 = 0.5 * 5.0 * 27.0**2 = 1822.5
+F = E / L = 1822.5 / 27.0 = 67.5
+F2 = 0.5 * m * V ** 2 / L = 1822.5 / 27.0 = 67.5
+Force_Diff = 0.5 * m * V ** 2 / L - m*g = 1822.5 / 27.0 - 5.0 * 9.0 = 22.5
+Seed = 100, Mult = 16807, Mod = 2147483647
+Before sort, Vec = 
+ 0, 89, 75, 85, 9, 13, 12, 51, 51, 29,
+ 14, 3, 99, 59, 65, 56, 51, 0, 14, 18,
+ 73, 4, 74, 29, 52, 56, 77, 45, 73, 10,
+ 23, 28, 78, 12, 69, 96, 39, 75, 47, 8,
+ 72, 94, 16, 75, 45, 71, 39, 64, 31, 79,
+ 28, 91, 19, 31, 55, 48, 44, 17, 70, 18,
+ 70, 50, 3, 43, 94, 97, 78, 77, 82, 71,
+ 50, 14, 31, 23, 56, 38, 82, 65, 28, 81,
+ 46, 36, 53, 4, 58, 86, 69, 16, 47, 64,
+ 19, 90, 55, 3, 27, 52, 73, 52, 78, 73
+After sort, Vec = 
+ 0, 0, 3, 3, 3, 4, 4, 8, 9, 10,
+ 12, 12, 13, 14, 14, 14, 16, 16, 17, 18,
+ 18, 19, 19, 23, 23, 27, 28, 28, 28, 29,
+ 29, 31, 31, 31, 36, 38, 39, 39, 43, 44,
+ 45, 45, 46, 47, 47, 48, 50, 50, 51, 51,
+ 51, 52, 52, 52, 53, 55, 55, 56, 56, 56,
+ 58, 59, 64, 64, 65, 65, 69, 69, 70, 70,
+ 71, 71, 72, 73, 73, 73, 73, 74, 75, 75,
+ 75, 77, 77, 78, 78, 78, 79, 81, 82, 82,
+ 85, 86, 89, 90, 91, 94, 94, 96, 97, 99
+After 2nd sort, Vec2 = 
+ 0, 0, 3, 3, 3, 4, 4, 8, 9, 10,
+ 12, 12, 13, 14, 14, 14, 16, 16, 17, 18,
+ 18, 19, 19, 23, 23, 27, 28, 28, 28, 29,
+ 29, 31, 31, 31, 36, 38, 39, 39, 43, 44,
+ 45, 45, 46, 47, 47, 48, 50, 50, 51, 51,
+ 51, 52, 52, 52, 53, 55, 55, 56, 56, 56,
+ 58, 59, 64, 64, 65, 65, 69, 69, 70, 70,
+ 71, 71, 72, 73, 73, 73, 73, 74, 75, 75,
+ 75, 77, 77, 78, 78, 78, 79, 81, 82, 82,
+ 85, 86, 89, 90, 91, 94, 94, 96, 97, 99
+Result :  610
+Starting 100 pico-threads trying to put something in the box
+ or take something out.
+Putting in 100
+Getting out 100
+Putting in 99
+Getting out 99
+Putting in 98
+Getting out 98
+Putting in 97
+Getting out 97
+Putting in 96
+Getting out 96
+Putting in 95
+Getting out 95
+Putting in 94
+Getting out 94
+Putting in 93
+Getting out 93
+Putting in 92
+Getting out 92
+Putting in 91
+Getting out 91
+Putting in 90
+Getting out 90
+Putting in 89
+Getting out 89
+Putting in 88
+Getting out 88
+Putting in 87
+Getting out 87
+Putting in 86
+Getting out 86
+Putting in 85
+Getting out 85
+Putting in 84
+Getting out 84
+Putting in 83
+Getting out 83
+Putting in 82
+Getting out 82
+Putting in 81
+Getting out 81
+Putting in 80
+Getting out 80
+Putting in 79
+Getting out 79
+Putting in 78
+Getting out 78
+Putting in 77
+Getting out 77
+Putting in 76
+Getting out 76
+Putting in 75
+Getting out 75
+Putting in 74
+Getting out 74
+Putting in 73
+Getting out 73
+Putting in 72
+Getting out 72Putting in 30
+
+Putting in 71
+Putting in 31
+Putting in 70
+Putting in 32
+Putting in 69
+Putting in 33
+Putting in 68
+Putting in 34
+Putting in 67
+Putting in 35
+Putting in 66
+Putting in 36
+Putting in 65
+Putting in 37
+Putting in 64
+Putting in 38
+Putting in 63
+Putting in 39
+Putting in 62
+Putting in 40
+Putting in 61
+Putting in 41
+Putting in 60
+Putting in 42
+Putting in 59
+Putting in 43
+Putting in 58
+Putting in 44
+Putting in 57
+Putting in 45
+Putting in 56
+Putting in 46
+Putting in 55
+Putting in 47
+Putting in 54
+Putting in 48
+Putting in 53
+Putting in 49
+Putting in 52
+Putting in 51
+Putting in 50
+And the winner is: 50
+And the box is now null
+Building up polymorphic expression from -5.3 + 4 * 5.2 ** 2
+Tree with 8 nodes:
++
+  -
+    5.3
+  *
+    4.0
+    **
+      5.2
+      2.0
+Value = 102.86 of type #real
+Building up Binary expr (#plus, 4.5, 7.1/3.0)
+Displaying it before and after conversion to polymorphic type
+Tree with 5 nodes:
++
+  4.5
+  /
+    7.1
+    3.0
+Value = 6.86666666666667 of type #real
+Tree with 5 nodes:
++
+  4.5
+  /
+    7.1
+    3.0
+Value = 6.86666666666667 of type #real
+Tree with 4 nodes:
++
+  -
+    4.0
+  7.0
+Value = 3.0 of type #int
+About to set type of B1 to #int
+Managed to set type of B1 to #int
+About to (re)set type of Int_E to #int in case stmt
+Tree with 6 nodes:
+*
+  +
+    -
+      4.0
+    7.0
+  2.5
+Value = 7.5 of type #real
+Testing a polymorphic vector of [E, -3.1 + 4.0**2, 7.1, -33]
+Printing each element of vector
+Tree with 8 nodes:
++
+  -
+    5.3
+  *
+    4.0
+    **
+      5.2
+      2.0
+Value = 102.86 of type #real
+Kind = #binary
+Tree with 8 nodes:
++
+  -
+    5.3
+  *
+    4.0
+    **
+      5.2
+      2.0
+Value = 102.86 of type #real
+Tree with 2 nodes:
+-
+  33.0
+Value = -33.0 of type #int
+Kind = #unary
+Tree with 2 nodes:
+-
+  33.0
+Value = -33.0 of type #int
+Tree with 6 nodes:
++
+  -
+    3.1
+  **
+    4.0
+    2.0
+Value = 12.9 of type #real
+Kind = #binary
+Tree with 6 nodes:
++
+  -
+    3.1
+  **
+    4.0
+    2.0
+Value = 12.9 of type #real
+7.1
+Kind = #leaf
+7.1
+Instantiating Use_Expr with Binary
+Tree with 5 nodes:
++
+  2.5
+  /
+    6.1
+    2.0
+Value = 5.55 of type #real
+Instantiating Use_Expr with Expr+
+Tree with 6 nodes:
++
+  -
+    3.1
+  **
+    4.0
+    2.0
+Value = 12.9 of type #real
+Converting #blue to Im_Count+:
+ Result of conversion = #blue
+Instantiating Use_Countable with Im_Count+
+Succ(#red) = #green
+Pred(#green) = #red
+Succ(#green) = #blue
+Pred(#blue) = #green
+Ident =
+
+ 1.0 0.0
+ 0.0 1.0
+
+Ones = 
+
+ 1.0 1.0
+ 1.0 1.0
+
+Matrix Y = 2.0 * Ident():
+
+ 2.0 0.0
+ 0.0 2.0
+
+Ones() + Y =
+
+ 3.0 1.0
+ 1.0 3.0
+
+Y[1,2] += 5.5; Y:
+
+ 2.0 5.5
+ 0.0 2.0
+
+Matrix M = [1.1, 2.2, 3.3, 4.4, 5.5, 6.6] = 
+
+ 1.1 2.2 3.3
+ 4.4 5.5 6.6
+
+M*2.0 =
+  2.2  4.4  6.6
+  8.8 11.0 13.2
+
+M/2.0 =
+ 0.55  1.1 1.65
+  2.2 2.75  3.3
+
+T(Y):
+ 2.0 0.0
+ 5.5 2.0
+
+Y * T(Y):
+ 34.25  11.0
+  11.0   4.0
+
+R: 1, C: 1, val = 2.0
+R: 2, C: 2, val = 2.0
+R: 1, C: 2, val = 5.5
+R: 2, C: 1, val = 0.0
+M:
+ 1.1 2.2 3.3
+ 4.4 5.5 6.6
+
+T(M):
+ 1.1 4.4
+ 2.2 5.5
+ 3.3 6.6
+
+M * T(M):
+ 16.94 38.72
+ 38.72 93.17
+
+V:
+ 1.11
+  3.3
+  5.5
+  7.7
+
+V[1] = 1.11
+V[2] = 3.3
+V[3] = 5.5
+V[4] = 7.7
+T(V):
+ 1.11  3.3  5.5  7.7
+
+RV:
+ 2.2 4.4 6.6 8.8
+
+TRV:
+ 2.2
+ 4.4
+ 6.6
+ 8.8
+
+TTV:
+ 1.11
+  3.3
+  5.5
+  7.7
+
+TRVC:
+ 2.2
+ 4.4
+ 6.6
+ 8.8
+
+abs(TRVC) = 12.0498962651137
+
+SM2: 
+ 1.1 3.3
+ 2.2 4.4
+
+TSM2: 
+ 1.1 2.2
+ 3.3 4.4
+
+ Hash: using float = 1.5707963267949, operation_id = #sin
+ Compute: Hash(Key) = 4609753056924677058
+Pi = 3.14159265358979, Sin(Pi/2) = 1.00000354258429
+
+ Hash: using float = 1.5707963267949, operation_id = #cos
+ Compute: Hash(Key) = 4609753056924677059
+ Cos(Pi/2) = 2.47372763646945E-5
+Roots of graph:
+ #hello
+Leaves of graph:
+ #stranger
+All nodes, and their successors:
+Successors of #hello (node 1)
+ #there
+ #stranger
+Successors of #there (node 2)
+ #stranger
+Successors of #stranger (node 3)
+BFS(Gr, [1], lambda (G, N) -> (G[N] == #stranger)) = 3
+X = 42
+[X, X+1, X+2] = [42, 43, 44]
+X : Countable_Set := [1, 3, 5]
+Squares := [for I in X => I**2]
+Squares[1] = 1
+Squares[2] = 9
+Squares[3] = 25
+M := [for I in X, I*2 => I**2]
+M[2] = 1
+M[6] = 9
+M[10] = 25
+M2 := [for I in X => I**2]
+M2[3] = 9
+M2[1] = 1
+M2[5] = 25
+N := [for each [I => S] of M, I => S**2]
+N[2] = 1
+N[6] = 81
+N[10] = 625
+N2 := [for each S of M => S**2]
+N2[2] = 1
+N2[6] = 81
+N2[10] = 625
+V1 := [for I in 0..5 reverse => I**3] = 125 64 27 8 1 0 
+X = 3, Y = 7
+Sign(3) = 1
+X > Y = #false
+Bigger is 7
+Smaller is 3
+not X < Y is #false
+(if X > Y then X) = null
+Vec: [10, 17, 24, 31, 38, 45, 52, 59, 66, 73]
+All_Small = #false
+Some_Even = #true
+Double of Vec: [20, 34, 48, 62, 76, 90, 104, 118, 132, 146]
+C = #blue
+(case C of [#red] => 2; [#green] => 5; [#blue] => 7) = 7
+Loop with "while" in each iterator
+I, J = 3, 5
+I, J = 2, 4
+I, J = 1, 3
+Loop with conditional "continue"
+I, J = 3, 5
+I, J = 2, 4
+I, J = 1, 3
+I, J = 0, 2
+Loop with conditional "exit"
+I, J = 3, 5
+I, J = 2, 4
+I, J = 1, 3
+I, J = 0, 2
+Input = [1, 4, 9, 16, 25, 36, 49]
+Doubled: [2, 8, 18, 32, 50, 72, 98]
+Negated: [-1, -4, -9, -16, -25, -36, -49]
+Tripled+N: [4, 14, 30, 52, 80, 114, 154]
+Initial string = "this is a test"
+After converting to and from a vector of chars = "this is a test"
+After replacing the third character with 'q': "thqs is a test"
+Str as a ZString = "this is a test"
+After convert to ZVector and replacing 4th char with 'x': "thix is a test"
+5 bottles of beer on the wall.
+5 bottles of beer.
+Take one down, pass it around.
+4 bottles of beer on the wall.
+
+4 bottles of beer on the wall.
+4 bottles of beer.
+Take one down, pass it around.
+3 bottles of beer on the wall.
+
+3 bottles of beer on the wall.
+3 bottles of beer.
+Take one down, pass it around.
+2 bottles of beer on the wall.
+
+2 bottles of beer on the wall.
+2 bottles of beer.
+Take one down, pass it around.
+One bottle of beer on the wall.
+
+One bottle of beer on the wall.
+One bottle of beer.
+Take one down, pass it around.
+No bottles of beer on the wall.
+
+
+ That's all she wrote...
+About to Waste_Time(2)
+Looping 1 .. 20
+About to Waste_Time(5)
+Looping 1 .. 50
+ Iteration 10
+Looping 11 .. 20 Iteration 10
+
+Looping 11 .. 50
+ Iteration 20
+ Iteration 20
+Looping 21 .. 20
+Looping 21 .. 50
+Done with Waste_Time(2)
+ Iteration 30
+Looping 31 .. 50
+ Iteration 40
+Looping 41 .. 50
+ Iteration 50
+Looping 51 .. 50
+And the Winner is 2
+Piece 5,2 is at 12,13
+Piece 4,3 is at 11,21
+Piece 5,3 is at 23,34
+Piece 3,2 is at 32,31
+Piece 5,4 is at 14,24
+Piece 4,2 is at 33,22
+Number of results with 8 queens = 92
+Result #1 8 3 1 6 2 5 7 4
+Result #2 7 3 8 2 5 1 6 4
+Result #3 5 3 1 7 2 8 6 4
+Result #4 6 3 7 2 4 8 1 5
+Result #5 3 6 2 7 1 4 8 5
+Result #6 6 3 7 2 8 5 1 4
+Result #7 4 7 5 2 6 1 3 8
+Result #8 3 6 4 2 8 5 7 1
+Result #9 4 6 8 2 7 1 3 5
+Result #10 4 6 1 5 2 8 3 7
+Result #11 3 5 2 8 1 7 4 6
+Result #12 3 6 8 2 4 1 7 5
+Result #13 5 7 1 4 2 8 6 3
+Result #14 6 8 2 4 1 7 5 3
+Result #15 7 2 6 3 1 4 8 5
+Result #16 5 7 2 6 3 1 4 8
+Result #17 8 2 5 3 1 7 4 6
+Result #18 8 4 1 3 6 2 7 5
+Result #19 5 7 2 6 3 1 8 4
+Result #20 4 8 1 3 6 2 7 5
+Result #21 5 7 2 4 8 1 3 6
+Result #22 4 7 3 8 2 5 1 6
+Result #23 1 7 5 8 2 4 6 3
+Result #24 7 4 2 5 8 1 3 6
+Result #25 4 2 8 6 1 3 5 7
+Result #26 7 4 2 8 6 1 3 5
+Result #27 6 3 1 8 4 2 7 5
+Result #28 6 3 1 8 5 2 4 7
+Result #29 5 3 1 6 8 2 4 7
+Result #30 3 7 2 8 5 1 4 6
+Result #31 4 2 7 5 1 8 6 3
+Result #32 3 6 2 5 8 1 7 4
+Result #33 3 5 2 8 6 4 7 1
+Result #34 6 4 1 5 8 2 7 3
+Result #35 3 6 2 7 5 1 8 4
+Result #36 4 8 1 5 7 2 6 3
+Result #37 4 7 1 8 5 2 6 3
+Result #38 4 8 5 3 1 7 2 6
+Result #39 6 3 7 4 1 8 2 5
+Result #40 6 3 5 7 1 4 2 8
+Result #41 3 7 2 8 6 4 1 5
+Result #42 6 3 5 8 1 4 2 7
+Result #43 4 2 8 5 7 1 3 6
+Result #44 4 2 5 8 6 1 3 7
+Result #45 3 5 8 4 1 7 2 6
+Result #46 1 7 4 6 8 2 5 3
+Result #47 2 4 6 8 3 1 7 5
+Result #48 6 3 1 7 5 8 2 4
+Result #49 6 4 2 8 5 7 1 3
+Result #50 4 2 7 3 6 8 5 1
+Result #51 7 3 1 6 8 5 2 4
+Result #52 3 8 4 7 1 6 2 5
+Result #53 5 2 4 7 3 8 6 1
+Result #54 1 6 8 3 7 4 2 5
+Result #55 2 6 8 3 1 4 7 5
+Result #56 4 2 7 3 6 8 1 5
+Result #57 5 2 4 6 8 3 1 7
+Result #58 1 5 8 6 3 7 2 4
+Result #59 2 5 7 4 1 8 6 3
+Result #60 2 7 5 8 1 4 6 3
+Result #61 2 6 1 7 4 8 3 5
+Result #62 4 7 5 3 1 6 8 2
+Result #63 4 6 8 3 1 7 5 2
+Result #64 5 3 8 4 7 1 6 2
+Result #65 3 5 7 1 4 2 8 6
+Result #66 5 7 1 3 8 6 4 2
+Result #67 2 7 3 6 8 5 1 4
+Result #68 5 7 4 1 3 8 6 2
+Result #69 6 1 5 2 8 3 7 4
+Result #70 5 8 4 1 7 2 6 3
+Result #71 6 4 7 1 8 2 5 3
+Result #72 3 6 8 1 4 7 5 2
+Result #73 3 6 4 1 8 5 7 2
+Result #74 6 2 7 1 3 5 8 4
+Result #75 4 1 5 8 6 3 7 2
+Result #76 2 8 6 1 3 5 7 4
+Result #77 2 5 7 1 3 8 6 4
+Result #78 5 2 8 1 4 7 3 6
+Result #79 5 1 4 6 8 2 7 3
+Result #80 8 2 4 1 7 5 3 6
+Result #81 7 2 4 1 8 5 3 6
+Result #82 5 1 8 6 3 7 2 4
+Result #83 5 1 8 4 2 7 3 6
+Result #84 6 2 7 1 4 8 5 3
+Result #85 7 1 3 8 6 4 2 5
+Result #86 3 1 7 5 8 2 4 6
+Result #87 4 1 5 8 2 7 3 6
+Result #88 5 2 6 1 7 4 8 3
+Result #89 5 8 4 1 3 6 2 7
+Result #90 3 6 8 1 5 7 2 4
+Result #91 6 4 7 1 3 5 2 8
+Result #92 7 5 3 1 6 8 2 4
+Number of results with 6 queens = 4
+Result #1 2 4 6 1 3 5
+Result #2 3 6 2 5 1 4
+Result #3 5 3 1 6 4 2
+Result #4 4 1 5 2 6 3
+Number of results with 4 queens = 2
+Result #1 3 1 4 2
+Result #2 2 4 1 3
+Party will go for 13.0 seconds.
+ Initializing Used_Bottles for Phil null with 2
+ Initializing Used_Bottles for Phil null with 1
+ Initializing Used_Bottles for Phil null with 1
+ Initializing Used_Bottles for Phil null with 1
+ Initializing Used_Bottles for Phil null with 0
+Philosopher 3 arrives, with a taste for 3 4, but sits where there are none.
+Philosopher 3 is thinking for 1 seconds
+Philosopher 2 arrives, with a taste for 2 3, and sits in front of 3.
+Philosopher 4 arrives, with a taste for 4 5Philosopher 2 is thinking for 4 seconds, and sits in front of 4.
+
+Philosopher 4 is thinking for 8 seconds
+Philosopher 1 arrives, with a taste for 1 2, and sits in front of 1 2.
+Philosopher 1 is thinking for 7 seconds
+Philosopher 5 arrives, with a taste for 1 5, and sits in front of 5.
+Philosopher 5 is thinking for 5 seconds
+ Bottle 3 about to be removed from Used_Bottles (1) of Phil 2
+ Bottle 3 borrowed from Philosopher 2
+ Bottle 3 now available to Philosopher 3
+ Bottle 4 about to be removed from Used_Bottles (1) of Phil 4
+ Bottle 4 borrowed from Philosopher 4
+ Bottle 4 now available to Philosopher 3
+ About to remove 0 bottles from Used_Bottles (0) of Phil 3
+Philosopher 3 is drinking for 4 seconds
+ Bottle 2 about to be removed from Used_Bottles (2) of Phil 1
+ Bottle 2 borrowed from Philosopher 1
+ Bottle 2 now available to Philosopher 2
+ Bottle 1 about to be removed from Used_Bottles (1) of Phil 1
+ Bottle 1 borrowed from Philosopher 1
+ Bottle 1 now available to Philosopher 5
+ About to remove 1 bottles from Used_Bottles (1) of Phil 5
+Philosopher 5 is drinking for 3 seconds
+ Adding 2 Clean bottles to 0 Used_Bottles of Phil 3
+Philosopher 3 is thinking for 3 seconds
+ Bottle 3 about to be removed from Used_Bottles (2) of Phil 3
+ Bottle 3 borrowed from Philosopher 3
+ Bottle 3 now available to Philosopher 2
+ About to remove 0 bottles from Used_Bottles (0) of Phil 2
+Philosopher 2 is drinking for 6 seconds
+ Bottle 4 about to be removed from Used_Bottles (1) of Phil 3
+ Bottle 4 borrowed from Philosopher 3
+ Bottle 4 now available to Philosopher 4
+ Adding 2 Clean bottles to 0 Used_Bottles of Phil 5
+ Bottle 5 about to be removed from Used_Bottles (2) of Phil 5
+ Bottle 5 borrowed from Philosopher 5
+ Bottle 5 now available to Philosopher 4
+Philosopher 5 is thinking for 8 seconds
+ Bottle 1 about to be removed from Used_Bottles (1) of Phil 5
+ Bottle 1 borrowed from Philosopher 5
+ Bottle 1 now available to Philosopher 1
+ About to remove 0 bottles from Used_Bottles (0) of Phil 4
+Philosopher 4 is drinking for 5 seconds
+ Adding 2 Clean bottles to 0 Used_Bottles of Phil 2
+Philosopher 2 is thinking for 2 seconds
+ Bottle 2 about to be removed from Used_Bottles (2) of Phil 2
+ Bottle 2 borrowed from Philosopher 2
+ Bottle 2 now available to Philosopher 1
+ Bottle 3 about to be removed from Used_Bottles (1) of Phil 2
+ Bottle 3 borrowed from Philosopher 2
+ Bottle 3 now available to Philosopher 3
+ About to remove 0 bottles from Used_Bottles (0) of Phil 1
+Philosopher 1 is drinking for 8 seconds
+Drinking Party is over
+
+Stg_Rgn Statistics:
+ New allocations by owner:       108391  = 53%
+ Re-allocations by owner:        34662  = 16%
+ Total allocations by owner:     143053  = 69%
+
+ New allocations by non-owner:   47898  = 23%
+ Re-allocations by non-owner:    13525  = 6%
+ Total allocations by non-owner: 61423  = 30%
+
+ Total allocations:              204476
+
+Threading Statistics:
+ Num_Initial_Thread_Servers : 1 + 1
+ Num_Dynamically_Allocated_Thread_Servers : 4
+ Max_Waiting_Shared_Threads (on all servers' queues): 59
+ Average waiting shared threads: 4.49
+ Max_Waiting_Unshared_Threads (on any one server's queue): 12
+ Average waiting unshared threads: 0.40
+ Max_Active (threads): 6
+ Average active threads: 3.70
+ Max_Active_Masters : 56
+ Max_Subthreads_Per_Master : 65
+ Max_Waiting_For_Subthreads : 12
+ Num_Thread_Steals : 11163 out of 26355 + 13400 (U+S) thread initiations = 28%
+

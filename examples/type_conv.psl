@@ -1,0 +1,12 @@
+func Type_Conv() is
+    var X : Set<Univ_Integer> := [1, 2, 3];
+    type My_Set is new Set<Univ_Integer>;
+    var Y := My_Set(X);
+
+    Print("Conversion of [1, 2, 3] to My_Set = ");
+    for Elem in Y loop
+	Print(Elem | " ");
+    end loop;
+    Print('\n');
+end func Type_Conv;
+    

@@ -1,0 +1,7 @@
+interface Car<> is
+   const Weight := 100;
+   const Color := #Red;
+   const Name := "The Little Red Sports Car"
+   const Drivers : Basic_Array <Univ_Enumeration> :=
+     [#Justin, #Tuck, #Mireille, #Mahua, #Sheri, #Mike]
+end interface Car

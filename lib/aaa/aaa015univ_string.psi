@@ -1,0 +1,366 @@
+
+interface PSL::Core::Univ_String<> is
+    func Print(Univ_String) is import(#print_string)
+        //  Print string on standard output
+    func Println(Univ_String) is import(#println_string)
+        //  Print string, followed by a newline, on standard output
+    func Readln() -> optional Univ_String is import(#read_string)
+        //  Read input up to a newline, from standard input.
+        //  Return null value when reaching end of file of standard input
+        //  (which can happen when standard input is coming from a file,
+        //   or when user types control/D on a Unix-like platform).
+
+    op "*"(Left : Univ_Integer; Right : Univ_String) -> Univ_String
+        // Produce specified number of "Right" strings in a row
+    op "*"(Left : Univ_String; Right : Univ_Integer) -> Univ_String
+        // Produce specified number of "Left" strings in a row
+
+    op "|"(Left, Right : optional Univ_String) -> Univ_String 
+      is import(#concat_string)
+
+    op "=?"(Left, Right : Univ_String) -> Ordering
+      is import(#string_compare)
+
+    op "|="(var Left : Univ_String; Right : optional Univ_String)
+      is import(#assign_concat_string)
+
+    op "indexing"(Str : Univ_String; Index : Univ_Integer<>) -> Univ_Character
+      is import(#string_indexing)
+        // a "read-only" element, indexed 1 .. |Str|
+
+    op "index_set"(Str : Univ_String) -> Countable_Range<Univ_Integer>
+        // Return set of indices for string
+
+    op "slicing"(Str : Univ_String;
+      Index_Set : Countable_Range<Univ_Integer>) 
+      -> Univ_String is import(#string_slicing)
+        // a "read-only" slice
+
+    func Length(Str : Univ_String) -> Univ_Integer
+      is import(#string_length)
+
+    op "magnitude"(Univ_String) -> Univ_Integer
+      is import(#string_length)
+
+    func Hash(Val : Univ_String) -> Univ_Integer
+      is import(#hash_string)
+
+    op "|"(Left : optional Univ_String;
+           Right : optional Right_Type is Imageable<>) 
+      -> Univ_String
+
+    op "|"(Left : optional Left_Type is Imageable<>;
+           Right : optional Univ_String)
+      -> Univ_String
+
+    op "|="(var Left : Univ_String;
+            Right : Right_Type is Imageable<>)
+
+    // Operations to convert to/from a Vector of Univ_Character's
+    func To_Vector(Str : Univ_String) -> Vector<Univ_Character>
+    func From_Vector(Vec : Vector<Univ_Character>) -> Univ_String
+
+    func Replace(Orig : Univ_String;
+      Char : Univ_Character; With : Univ_Character) -> Univ_String
+    //  Replace each appearance of Char with "With"
+
+    func Replace(Orig, Str, With : Univ_String) -> Univ_String
+     //  Replace any slice matching Str with "With"
+     //  Overlapping matches will be replaced only once. Example:
+     //    Replace(":::", "::", ".") -> ".:"
+
+    func Hex_Image(Val : optional Univ_Integer) -> Univ_String
+      //  Return a base-16 image of Val
+
+  implements for Imageable
+    // These operations are needed so Univ_String satifies
+    // requirements of "Imageable" interface, but these
+    // operations are not directly callable, to avoid ambiguities.
+
+    func To_String(Val : Univ_String) -> Univ_String
+      is import (#identity)
+    func From_String(Str : Univ_String) -> optional Univ_String
+      is import (#identity)
+
+end interface PSL::Core::Univ_String
+    
+class PSL::Core::Univ_String is
+    type Substr_Array is Basic_Array<Univ_String>
+
+    var Parts : optional Substr_Array
+
+    type Field is Enum<[#Hash, #Length, #Kind]>
+      //  Low 32 bits = hash
+      //  Next 24 bits = length (total number of characters)
+      //  Next 3 bits select 0 = array of 8-bit chars,
+      //                     1 = array of 16-bit chars,
+      //                     2 = array of 31-bit chars,
+      //                     3 = array of substrs (Max num sub-strs = 16)
+      //                     4 = array of substrs (all sub-strs 8*256 chrs)
+      //                     5 = array of substrs (all substrs 8*256^2 chrs)
+      //                     6 = array of substrs (all substrs 8*256^3 chrs)
+
+    //  Enumeration of kind of array
+    type Kind_Enum is Enum<[#Array_8, #Array_16, #Array_31, #Array_Substr,
+      #Array_2K_Substr, #Array_512K_Substr, #Array_128M_Substr]>
+    
+    //  Number of characters per substr
+    const Array_2K_Multiplier := 2**11
+    const Array_512K_Multiplier := 2**19
+    const Array_128M_Multiplier := 2**27
+
+    //  Packed representation
+    type Info_Type is
+      Packed_Word<Field, [#Hash => 32, #Length => 24, #Kind => 3]>
+
+    var Info : Info_Type
+
+    const Hash_Modulus := 2**32
+
+    //  (unchecked) conversion routines to array of 8/16/31-bit chars
+    func To_Int_Array(ref Substr_Array)
+      -> ref Basic_Array<Univ_Integer> is import(#identity)
+
+    type Int8 is Integer<0 .. 2**8-1>
+    type Int8_Array is Basic_Packed_Array<Int8>
+
+    func To_Int8_Array(ref Substr_Array) -> ref Int8_Array
+      is import(#identity)
+
+    func From_Int8_Array(ref Int8_Array) -> ref Substr_Array
+      is import(#identity)
+
+    type Int16 is Integer<0 .. 2**16-1>
+    type Int16_Array is Basic_Packed_Array<Int16>
+
+    func To_Int16_Array(ref Substr_Array) -> ref Int16_Array
+      is import(#identity)
+
+    func From_Int16_Array(ref Int16_Array) -> ref Substr_Array
+      is import(#identity)
+
+    type UChar_Array is
+      Basic_Packed_Array<Univ_Character>
+
+    func To_UChar_Array(ref Substr_Array) -> ref UChar_Array
+      is import(#identity)
+
+    func From_UChar_Array(ref UChar_Array) -> ref Substr_Array
+      is import(#identity)
+
+    const Char_First := Univ_Character::First()
+
+    func Hash_Vec(Vec : Vector<Univ_Character>) -> Univ_Integer is
+       return (for I in 1 .. |Vec| reverse =>
+         (<0> * 127 + (Vec[I] - Char_First)) mod Hash_Modulus)
+    end func Hash_Vec
+
+  exports
+    op "index_set"(Str : Univ_String) -> Countable_Range<Univ_Integer> is
+        // Return set of indices for string
+        return 1..|Str|
+    end op "index_set"
+
+    op "*"(Left : Univ_Integer; Right : Univ_String) -> Univ_String is
+        // Produce specified number of "Right" strings in a row
+        if Left <= 0 then
+            return ""
+        elsif Left == 1 then
+            return Right
+        else
+            // Recurse to produce half-length, and then combine
+            const Partial : Univ_String := (Left/2) * Right
+            if Left mod 2 == 1 then
+                return Partial | Partial | Right
+            else
+                return Partial | Partial
+            end if
+        end if
+    end op "*"
+
+    op "*"(Left : Univ_String; Right : Univ_Integer) -> Univ_String is
+        // Produce specified number of "Left" strings in a row
+        return Right * Left   // Just pass the buck to other "*"
+    end op "*"
+
+    op "|"(Left : optional Univ_String;
+           Right : optional Right_Type is Imageable<>) 
+      -> Univ_String is
+        if Right is null then
+            return Left | "null"
+        else
+            return Left | Right_Type::To_String(Right)
+        end if
+    end op "|"
+
+    op "|"(Left : optional Left_Type is Imageable<>;
+           Right : optional Univ_String)
+      -> Univ_String is
+        if Left is null then
+            return "null" | Right
+        else
+            return Left_Type::To_String(Left) | Right
+        end if
+    end op "|"
+
+    op "|="(var Left : Univ_String; Right : Right_Type is Imageable<>) is
+        if Right is null then
+            Left |= "null"
+        else
+            Left |= Right_Type::To_String(Right)
+        end if
+    end op "|="
+
+    func To_Vector(Str : Univ_String) -> Vector<Univ_Character> is
+        return [for I in 1 .. |Str| => Str[I]]
+    end func To_Vector
+
+    func From_Vector(Vec : Vector<Univ_Character>) -> Result : Univ_String is
+        Result := "";
+        for each C of Vec forward loop
+            Result |= C;
+        end loop;
+    end func From_Vector;
+
+    func Replace(Orig : Univ_String;
+      Char : Univ_Character; With : Univ_Character) -> Result : Univ_String is
+    //  Replace each appearance of Char with "With"
+
+       Result := ""
+
+       var Prev_Match := 0
+       for each [I => C] of Orig forward loop
+          //  Look for a match
+          if C == Char then
+             // Concatenate on unchanged part and replacement character
+             Result |= Orig[Prev_Match <..< I] | With
+             Prev_Match := I;
+          end if
+       end loop
+
+       if Prev_Match == 0 then
+          Result := Orig
+       elsif Prev_Match < |Orig| then
+          Result |= Orig[Prev_Match <.. |Orig|]
+       end if
+    end func Replace
+
+    func Replace(Orig, Str, With : Univ_String) -> Univ_String is
+     //  Replace any slice matching Str with "With"
+     //  Overlapping matches will be replaced only once. Example:
+     //    Replace(":::", "::", ".") -> ".:"
+       const Len_Str  := |Str|;
+       const Len_With := |With|;
+
+       case Len_Str of
+        [0] =>
+          //  Treat this as a no-op
+          return Orig;
+
+        [1] =>
+          //  Replacing single characters
+          if Len_With == 1 then
+             //  Replace Char with Char
+             return Replace(Orig, Str[1], With[1]);
+          else
+             //  Replace Char with String of any Length
+             var Result : Vector<Univ_Character> := [];
+             const Str_Char := Str[1];
+             for I in 1 .. |Orig| forward loop
+                if Orig[I] == Str_Char then
+                   //  Matches
+                   Result |= To_Vector(With);
+                else
+                   //  Does not match
+                   Result |= Orig[I];
+                end if
+             end loop
+             return From_Vector(Result);
+          end if
+
+        [..] =>
+          //  Replace String of Length >= 2 with String of any Length
+          var Result : Vector<Univ_Character> := [];
+          const Len_Orig := |Orig|;
+          for I := 1 while I <= Len_Orig loop
+             if I + Len_Str <= Len_Orig + 1
+               and then Orig[I ..< I + Len_Str] == Str
+             then
+                //  Matches
+                Result |= To_Vector(With);
+                //  Overlapping matches replaced only once
+                //  Skip past end of this match
+                continue loop with I + Len_Str;
+             else
+                //  Does not match just add Ith character to Result
+                Result |= Orig[I];
+                continue loop with I + 1;
+             end if
+          end loop
+          return From_Vector(Result)
+       end case
+    end func Replace
+ 
+    func Hex_Image(Val : optional Univ_Integer) -> Univ_String is
+       const Word_Size := 64
+       const Max_Digits := Word_Size / 4
+       if Val is null then
+          return '8' | ((Max_Digits-1)*'0')
+       elsif Val == 0 then
+          return "0"
+       else
+          var Vec : Vector<Univ_Character> := Create(Max_Digits, ' ')
+          for (V := Val while V != 0;
+               Index in 1..Max_Digits reverse)
+          loop
+             const Digit := V mod 16
+             if Digit >= 10 then
+                Vec[Index] := 'A' + (Digit-10)
+             else
+                Vec[Index] := '0' + Digit
+             end if
+    
+             if V == Digit then
+                return From_Vector(Vec[Index .. Max_Digits])
+             else
+                continue loop with V => (V - Digit) / 16
+             end if
+          end loop
+          return From_Vector(Vec)
+       end if
+    end func Hex_Image
+    
+end class PSL::Core::Univ_String
+
+func PSL::Test::Test_String() is
+    const U := "tab\t"
+    const T := U[4]
+    Println("U = " | U | ", |U| = " | |U| | ", U[4] = '" | T | "'")
+    const X := "this is a string"
+    const Y := X[3]
+    {Y == 'i'} // string indexing problem
+    const Z := X[6..7]
+    {Z == "is"} // string slicing problem, expected 'is', found Z 
+    Println("X = " | X | ", X[3] = " | Y | ", X[6..7] = " | Z)
+
+    Println("About to indent 4 and then print 'hello'")
+    Println(4 * " " | "hello")
+
+    const Seven_Xs := "x" * 7
+    {Seven_Xs == "xxxxxxx"} // Char multiplication check
+
+    Println("Here are seven x's: " | Seven_Xs)
+    
+    Print("Here are 6 y's: ")
+    Println('y' * 6)
+
+    Println("About to iterate over '" | X | "'")
+    for each C of X forward loop
+        Print(" " | C)
+    end loop
+    Println("")
+
+    Println("X.Replace('s', With => 'x') = " | X.Replace('s', With => 'x'))
+    Println("X.Replace(\"is\", With => \"at\") = " |
+      X.Replace("is", With => "at"))
+end func PSL::Test::Test_String

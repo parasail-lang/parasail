@@ -1,0 +1,18 @@
+func Para_Hello() is
+    Print("Hello ") || Print("World ");
+    Println("");
+end func Para_Hello;
+
+func Slow_Print(S : Univ_String) is
+    Print(S);
+end func Slow_Print;
+
+func Para_Hello2() is
+    Slow_Print("Hello ") || Slow_Print("World ")
+  then
+    Println("");
+end func Para_Hello2;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Para_Hello2 ();
+end func main;

@@ -1,0 +1,8 @@
+func Recurse(I : Univ_Integer) is
+    Print(I);
+    Print('\n');
+    if I > 0 then
+        Recurse(I-1)
+    end if
+end func Recurse
+

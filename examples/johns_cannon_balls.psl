@@ -1,0 +1,22 @@
+func johns_cannon_balls() is
+   var square_root := 1 
+   var num_cannon_balls := 0;
+
+   for Levels in 1..10_000 forward loop
+      if Levels mod 100 == 0 then
+         Println("trying " | Levels | " levels")
+      end if
+      num_cannon_balls := num_cannon_balls + Levels**2
+      const computed := Levels * (2*Levels**2 + 3*Levels + 1)
+      {computed mod 6 == 0}
+      {computed/6 == num_cannon_balls}
+      while num_cannon_balls > square_root**2 loop
+         square_root += 1
+      end loop
+      if num_cannon_balls > 1 and then num_cannon_balls == square_root**2 then
+         Println("first stack that is a perfect square has " | Levels |
+           " levels")
+         exit loop
+      end if
+   end loop
+end func johns_cannon_balls

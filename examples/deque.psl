@@ -1,0 +1,157 @@
+interface Basic_Deque<Element_Type is Assignable<>> is
+    func Create() -> Basic_Deque;
+    func Add_First(var Q : Basic_Deque; Elem : Element_Type);
+    func Add_Last(var Q : Basic_Deque; Elem : Element_Type);
+    func Remove_First(var Q : Basic_Deque) -> optional Element_Type;
+    func Remove_Last(var Q : Basic_Deque) -> optional Element_Type;
+    func Length(Q : Basic_Deque) -> Univ_Integer;
+end interface Basic_Deque;
+
+class Basic_Deque is
+    const Initial_Length := 4;
+
+    type Data_Type is Basic_Array<optional Element_Type>;
+    var Data : optional Data_Type;
+    var First : Univ_Integer := 1;
+    var Last : Univ_Integer := 0;
+    var Count : Univ_Integer := 0;
+
+    func Double_In_Size(Q : Basic_Deque) {Length(Q.Data) > 0}
+      -> Result : Basic_Deque 
+	{Length(Result.Data) == 2*Length(Q.Data)} is
+	// Return Result with a new "Data" array, double in size of original
+	Result := (Data => Create(Length(Q.Data)*2, null),
+	  First => 1, Last => Q.Count, Count => Q.Count);
+	var L := Q.Last;
+	var C := Q.Count;
+	// Move contents of Q.Data into Result.Data, and pack it into 
+	// beginning of Result.Data.
+	while C > 0 loop
+	    if L == 0 then
+		L := Length(Q.Data);
+	    end if;
+	    // Exchange null with Q.Data contents
+	    Result.Data[C] <=> Q.Data[L];
+	    C -= 1;
+	    L -= 1;
+	end loop;
+    end func Double_In_Size;
+  exports
+
+    func Create() -> Basic_Deque is
+        return (Data => null, First => 1, Last => 0, Count => 0);
+    end func Create;
+
+    func Add_First(var Q : Basic_Deque; Elem : Element_Type) is
+	if Q.Data is null then
+	    // Initial content
+	    Q.Data := Create(Initial_Length, null);
+	elsif Q.Count == Length(Q.Data) then
+	    // Need to extend Data
+	    Q := Double_In_Size(Q);
+	      // Data is moved down to beginning as part of expansion
+	end if;
+	// Write element into first slot
+	
+	// Bump count and decrement first index
+	Q.Count += 1;
+	if Q.First == 1 then
+	    // Wrap around
+	    Q.First := Length(Q.Data);
+	else
+	    Q.First -= 1;
+	end if;
+	Q.Data[Q.First] := Elem;
+    end func Add_First;
+
+    func Add_Last(var Q : Basic_Deque; Elem : Element_Type) is
+	if Q.Data is null then
+	    // Initial content
+	    Q.Data := Create(Initial_Length, null);
+	elsif Q.Count == Length(Q.Data) then
+	    // Need to extend Data
+	    Q := Double_In_Size(Q);
+	      // Data is moved down to beginning as part of expansion
+	end if;
+	// Write element into last slot
+	
+	// Bump count and increment last index
+	Q.Count += 1;
+	if Q.Last == Length(Q.Data) then
+	    // Wrap around
+	    Q.Last := 1;
+	else
+	    Q.Last += 1;
+	end if;
+	Q.Data[Q.Last] := Elem;
+    end func Add_Last;
+
+    func Remove_First(var Q : Basic_Deque) 
+      -> Result : optional Element_Type is
+	if Q.Count == 0 then
+	    // Empty ==> return null
+	    return null;
+	end if;
+
+	Result <=> Q.Data[Q.First];
+	  // Exchange since we don't need to copy
+	// Decrement count and increment first index
+	Q.Count -= 1;
+	if Q.First == Length(Q.Data) then
+	    // Wrap around
+	    Q.First := 1;
+	else
+	    Q.First += 1;
+	end if;
+    end func Remove_First;
+	
+    func Remove_Last(var Q : Basic_Deque) 
+      -> Result : optional Element_Type is
+	if Q.Count == 0 then
+	    // Empty ==> return null
+	    return null;
+	end if;
+	Result <=> Q.Data[Q.Last];
+	  // Exchange since we don't need to copy
+	// Decrement count and last index
+	Q.Count -= 1;
+	if Q.Last == 1 then
+	    // Wrap around
+	    Q.Last := Length(Q.Data);
+	else
+	    Q.Last -= 1;
+	end if;
+    end func Remove_Last;
+
+    func Length(Q : Basic_Deque) -> Univ_Integer is
+        return Q.Count;
+    end func Length;
+end class Basic_Deque;
+
+func Test_Deque(X, Y, Z : Univ_Integer) is
+    var Q : Basic_Deque<Univ_Integer> := Create();
+    Add_Last(Q, Y);
+    Add_Last(Q, Z);
+    Add_First(Q, X);
+    Println("Length = " | Length(Q));
+    const A := Remove_First(Q);
+    Println("Remove_First = " | A);
+    Println("Remove_Last = " | Remove_Last(Q));
+    Println("Remove_First = " | Remove_First(Q));
+    Println("Length = " | Length(Q));
+    Println("Remove_First now returns " | Remove_First(Q));
+    var I := 1;
+    while I <= 10 loop
+	Add_First(Q, I);
+	Add_Last(Q, I + 10);
+	I += 1;
+    end loop;
+    I := 1;
+    while I <= 10 loop
+	Println("Elem " | I | " = " | Remove_First(Q));
+	Println("Elem " | 21-I | " = " | Remove_Last(Q));
+	I += 1;
+    end loop;
+    Println("Length = " | Length(Q));
+    Println("Remove_First now returns " | Remove_First(Q));
+end func Test_Deque;

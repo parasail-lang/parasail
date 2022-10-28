@@ -1,0 +1,7 @@
+func Is_Null(N : optional Univ_Integer) -> Univ_Integer is
+   var G := 0
+   if N not null then
+      G += 1;
+   end if;
+   return G;
+end func Is_Null;

@@ -1,0 +1,7 @@
+def Test_Move() :
+    var Z : Basic_Array<Univ_Integer> = Create(10, 0);
+    Println("Length(Z) = " | Length(Z));
+    var V <== Z;
+    Println("After V <== Z, Z is null = " | [[Z is null]]);
+    Println("Length(V) = " | Length(V));
+end def Test_Move;

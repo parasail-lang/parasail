@@ -1,0 +1,26 @@
+func Test_Annotations() is
+    type Short is Univ_Integer {Shorty in -128 .. +127};
+    var ZZ : Short := 0;
+    ZZ := 200;  //  Should fail
+
+    var AB : Univ_Integer {AB > 0};
+    AB := -2;  // Should fail
+
+    var X := 3;
+    {X == 3}
+
+    func Ada_Conv(Z : Integer) -> Integer {convention => #ada} is
+       X += [[Z]] * 2;
+       return X + 2;
+    end func Ada_Conv;
+
+    var Y := X * 2;
+    {*ok* Y == X * 2}
+    {*"not ok"* Y == X * 2 + 1}  //  Assertion will fail
+    Println("X = " | X | ", Y = " | Y);
+
+    Y := Ada_Conv(3);
+
+    Println("After \"Y := Ada_Conv(3)\", X = " | X | ", Y = " | Y);
+
+end func Test_Annotations;

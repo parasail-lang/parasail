@@ -1,0 +1,9 @@
+proc Test_Annotations() is
+    var X := 3;
+    assert X = 3
+    var Y := X * 2;
+    subtype Short is Univ_Integer {Short in -128 .. +127};
+    assert Y = X * 2
+    assert Y = X * 2 + 1, "this one should fail";
+    Println("X = " | X | ", Y = " | Y);
+end proc Test_Annotations;

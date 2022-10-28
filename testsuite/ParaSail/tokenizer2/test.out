@@ -1,0 +1,8 @@
+splitting "This is:a simple test" into words using spaces produces
+This
+is:a
+simple
+test
+splitting "This is:a simple test" into words using ':' produces
+This is
+a simple test

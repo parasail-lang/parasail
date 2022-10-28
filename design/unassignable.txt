@@ -1,0 +1,40 @@
+-- $Revision: 1.1 $ $Date: 2011/07/22 20:42:55 $
+
+A ParaSail type is an assignable type unless
+it has a constructor that takes a "ref" or a "ref const" parameter.
+A "ref" or "ref const" component may be initialized from such
+a parameter when constructing the object.  A "ref" component
+is a variable if and only if the enclosing object is a 
+variable.  This implies we need to expand the syntax
+for a component to allow "ref X : T;" and "ref const X : T;"
+
+This makes it more obvious that parameters and objects use
+a different syntax.  Dare we shift the parameter syntax to require
+the parameter name and ":" after the "ref/var/const"?
+Parameter *names* are optional, whereas object *types* are optional.
+Components are somewhere between parameters and objects.
+Components need a type.  Constants, which are declared
+in the same place as components, do not need a type.
+Objects generally just use "=>" to indicate a reference.
+
+[ref] var|const id [: [optional|mutable|concurrent] T] [=> obj|:= val]
+
+
+Component decl:
+   ref id : T;
+   [ref] const id : T;
+   var id : T [ := default ];
+
+Global constant decl:
+   const id [ : T ] := val;
+
+Local obj decl
+   [ref] var id [ : T ] => obj;
+   ref id [ : T ] => obj;
+
+Parameter decl
+   [const] id : T [ := obj ];
+
+
+
+

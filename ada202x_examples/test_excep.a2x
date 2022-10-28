@@ -1,0 +1,22 @@
+procedure Test_Excep is
+   My_Exception : exception;
+   
+begin
+   Put_Line ("About to raise My_Exception");
+
+   raise My_Exception with "this is only a test"
+
+   Put_Line ("After raise exception -- should NOT get here");
+
+exception
+   when Exceptions.Tasking_Error | Exceptions.Constraint_Error =>
+      Put_Line ("Tasking_Error or C_E raised");
+   when E : My_Exception =>
+       Put_Line ("Got into handler for My_Exception");
+       Put_Line ("Exception_Name: " & Exception_Name (E));
+       Put_Line ("Exception_Message: " & Exception_Message (E));
+   when E : others =>
+       Put_Line ("Got into exception handler");
+       Put_Line ("Exception_Name: " & Exception_Name (E));
+       Put_Line ("Exception_Message: " & Exception_Message (E));
+end Test_Excep;

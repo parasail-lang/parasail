@@ -1,0 +1,14 @@
+3.0 in 1.0|3.0..4.0=#true
+ [X, Y, Z] =? (Y | Z | X) --> #equal
+Adding 1.0 to S, Is_Empty(S) = #false
+Adding 2.0 to S, Is_Empty(S) = #false
+Adding 3.0 to S, Is_Empty(S) = #false
+Adding 4.0 to S, Is_Empty(S) = #false
+Adding 5.0 to S, Is_Empty(S) = #false
+Adding 6.0 to S, Is_Empty(S) = #false
+Adding 7.0 to S, Is_Empty(S) = #false
+Adding 8.0 to S, Is_Empty(S) = #false
+Adding 9.0 to S, Is_Empty(S) = #false
+Adding 10.0 to S, Is_Empty(S) = #false
+S xor [2.0, 5.0, 12.0, 15.0] = 1.0 3.0 4.0 6.0 7.0 8.0 9.0 10.0 12.0 15.0 
+

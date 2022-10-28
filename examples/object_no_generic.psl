@@ -1,0 +1,46 @@
+import PSL::Short_Names::*, *
+
+concurrent class Point is
+   var X : Int;
+   var Name : String;
+
+   exports
+
+   func Create(V : Int) -> Point is
+      return (X => V, Name => "blah")
+   end func Create
+
+   func Get(P : Point) -> Int is
+      return P.X
+   end func Get
+
+   func Set(locked var P : Point; X : Int) is
+      P.X := X
+   end func Set
+
+end class Point
+
+func main(Args : Basic_Array<String>) is
+   var P1 : Point := Create(0);
+   Print(P1.Get()); Print('\n');
+   var P2 : Point := Create(0);
+   var I := 1
+   var A : Basic_Array<String>;
+   if Args is null or else |Args| == 0 then
+      A := Create(2, "2");
+   else
+      A := Args;
+   end if;
+   while I <= Length(A) loop
+      Print(I); Print(", ");
+      if I rem 2 == 1 then
+         P1.Set(From_String(A[I]));
+      else
+         P2.Set(From_String(A[I]));
+         P2.Set(P1.Get() + P2.Get())
+         Print(P2.Get())
+         Print('\n')
+      end if
+      I += 1;
+   end loop
+end func main

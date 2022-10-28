@@ -1,0 +1,21 @@
+procedure Sum_Odds_B (Max : Univ_Integer) is
+   N : constant := abs Max;
+   Debug : constant Boolean := Max < 0;
+   Sum : Univ_Integer := 0;
+   C : Clock := Create;
+   Start : constant Time := C.Now();
+   Finish : Time;
+begin
+   parallel (10)
+   for I in 1 .. N when I mod 2 = 1 loop
+      Sum := Sum + I;
+      if Debug and then I/2 mod (N/30 + 1) = 0 then
+          Put_Line ("Reached " & I'Image);
+      end if;
+   end loop;
+   Finish := C.Now();
+   Put_Line ("Sum of odds up to " & N'Image & " = " & Sum'Image);
+   Put_Line ("Elapsed time: " & Time.Time_Interval'Image (Finish - Start));
+   pragma Assert (Sum = ((N + 1)/2)**2);
+end Sum_Odds_B;
+   

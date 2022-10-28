@@ -1,0 +1,36 @@
+How to build sal_annotator :
+
+cd tools_paging/java_parser 
+../utils/GNAT/build.sh sal_annotator.exe
+
+sal_annotator will be built in /home/build/ada/user/tools_paging/GNAT
+(e.g. in same place where inspector.exe gets built).
+Note: You would need aflex and ayacc to build sal_annoator.
+To build aflex and ayacc do the following
+cd tools_paging/aflex_ayacc
+../utils/GNAT/build.sh test
+The aflex and ayacc would be built in ../bld/GNAT.
+Copy aflex.exe and ayacc.exe to wherever you want
+to invoke from. The regular version is in
+/opt/sofcheck/adamaigc/bin directory.
+The aflex and ayacc don't need to be built daily.
+
+How to run :
+First run the inspector in the regular way
+e.g. inspector -all -lib switch_test.library ...
+
+Then run the sal_annotator as follows:
+sal_annotator switch_test.output
+
+The listing file for the SAL annotations will be in
+switch_test.output/list directory and will be named as
+switch_test.java.sal.txt. For each source file, there will be
+a listing file with SAL annotations.
+
+There are a couple of simple tests in java2il/salannotator_tests.
+cd java2il/salannotator_tests
+Run inspector -all -lib testref.library
+Then run sal_annotator testref.output
+The sal listings will be in list testref.output/list directory.
+
+

@@ -1,0 +1,46 @@
+interface New_T<> is
+   type T is new Integer<1..10>;
+   func Fun(X : T) -> T;
+end interface New_T;
+
+class New_T is
+  exports
+    func Fun(X : T) -> T is
+        Println("Fun(" | X | ") is returning " | X | " + 1 = " | X+1);
+        return X+1;
+    end func Fun;
+end class New_T;
+
+interface New_New_T<> is
+   type T2 is new New_T::T;
+   func Fun2(X : T2) -> T2;
+end interface New_New_T;
+
+class New_New_T is
+  exports
+    func Fun2(X : T2) -> T2 is
+        const FX : T2 := Fun(X)
+        Println("Fun2(" | X | ") is returning Fun(" | X | ") * 2 = " | FX * 2);
+        return FX * 2;
+    end func Fun2;
+end class New_New_T
+
+func Test_New(U : Univ_Integer) is
+    var Y : New_T::T := U;
+    Println ("calling Fun(" | Y | ")");
+    var Z := Fun(Y);
+
+    var Q : New_New_T::T2 := U;
+    Println ("calling Fun2(" | Q | ")");
+    var R := Fun2(Q);
+end func Test_New;
+
+    
+
+
+
+ 
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_New (10);
+end func main;

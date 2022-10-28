@@ -1,0 +1,16 @@
+with "shared";
+project Ada202x is
+
+   for Object_Dir use "obj";
+   for Exec_Dir use "bin";
+   package Builder renames Shared.Builder;
+   package Compiler renames Shared.Compiler;
+   package Linker renames Shared.Linker;
+
+   for Source_Dirs use ("../ada202x_parser", "../ada202x_parser/gen",
+     "../parser", "../parser/gen", "../semantics", "../interpreter");
+
+   for Main use
+     ("ada202x_main.adb");
+
+end Ada202x;

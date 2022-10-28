@@ -1,0 +1,261 @@
+-------- Thoughts on multi-threaded exit/return starting 7/19/2012: ---------
+
+We are finally getting around to implementing multi-threaded exit/return.
+An additional instruction, "Prepare_To_Exit_Parallel_Op" has been
+added.  This attempts to kill off all other threads associated
+with the given master (and their subthreads).  It should not
+interrupt threads inside of a locked call for now (may
+do this some day).  If the attempt fails (because some other
+thread got there first), then the thread attempting
+to do the prepare-to-exit will exit immediately.
+
+A master will need to be marked to indicate that it is in
+the process of performing a prepare-to-exit, either killing off
+all threads, or all but one thread.
+
+Each subthread will be marked that it should "kill itself as
+soon as possible."  If a thread is so marked, it should not
+spawn any new threads, and it should kill itself after successfully
+waiting for its subthreads to exit.  No new threads should be
+spawned.  If the master specified is the master of the spawning
+thread, then the thread spawning thread should immediately
+kill itself.  If the spawning thread is not a subthread
+of the master, then it should not spawn the new thread, and
+instead wait on the master, and then kill itself.
+
+A caller on "wait_for_parallel" should wait for the subthreads,
+and then terminate itself.
+
+Now what happens if we are deep within several levels of calls,
+when we detect that it is time to exit?  Can we keep doing 
+"return"s until we return from the outer call on Execute_For_Thread?
+We can check the "Exit_Requested" flag.  But which flag, and how
+often?  One associated with the Server_Index would be cheapest
+to check.  There is a race condition, however, if a call on
+"Wait_For_Parallel" gets bypassed, and we exit while other
+threads are still running.  Masters have a non-zero index
+while they are active.  However, an uninitialized master
+might also have a non-zero index.  
+
+Conceivably we could have a count of active masters associated 
+with a given server index; this presumes that the thread that 
+initializes a master also waits for it, on the same server.  
+That is currently true, but if we ever get to the point that
+a thread can be passed from one thread to another, then
+this will be a problem.  That is pretty far off, presumably,
+and the count of active masters could be transfered as
+well.
+
+Note that a server, while waiting for a master, can pick
+up other threads to execute.  These should still be
+cancellable, so long as they don't represent a thread
+caught between Start_Parallel and Wait_For_Parallel.
+So associating it with a server is a bit bogus, except
+perhaps as a more efficient "cache" of the relevant
+thread situation.  However, there are many fewer servers
+than threads, so we don't really want to add a counter
+to every thread.
+
+So the question is when do we mark a thread as "Exit_Requested."
+We can do it when inside some Thread_Manager routine, and
+not worry about doing it sooner than that.  But even
+in one of these routines, we need to be sensitive to the
+possibility that we are between a Start and a Wait, and
+that implies some kind of count.  This brings up an 
+interesting point.  A thread could start a master, then
+call a routine which internally started another master,
+before it waited for the outer master.  In this case,
+the "Master_Of_Spawner" would *not* reflect the immediately
+enclosing master, but instead a master potentially multiple 
+levels above.  In some sense these two masters are
+"siblings," but clearly the one started second will be 
+awaited first, and the one started first will not be
+awaited until the second one is completely gone.  This
+certainly shows a down-side of doing any work on the
+"parent" thread.
+
+So let's be conservative for now.  If there is an "open"
+master (meaning one that has been started but not yet
+awaited), then the owner of the master should not be
+disrupted entirely, but we don't really want it to
+spawn a whole lot of other stuff either.  When can
+we safely force a "return" or "exit" on it?  If the
+call is initiated when the master is open, then it can
+safely be returned from.  We can't return from a routine
+that contains an open master.  How do we know that?
+It could be in the context.  When we execute a Start_Parallel
+we could set a flag in the context, and then clear it when we 
+execute a Wait_Parallel.  We don't really need to even
+use the context -- a local variable in "Execute" would
+do.  However, that isn't so good once we start having
+compiled code, since we might not have visibility
+on a local variable of the compiled routine, whereas
+presumably the context will be passed around.
+
+OK, we have added "Open_Master" to the context (forcing the
+Context parameter to Execute to be "in out" rather than "in").
+We now have the option of using it to Wait just prior to
+exiting from Execute, rather than suppressing "abrupt"
+exit/returns when there is an open master.
+This means that we can safely interrupt a thread pretty
+much anywhere.
+
+So how does Prepare_To_Exit work?  It starts with the
+current master and sees whether it is already marked for exit.
+If not, it marks it for exit and then keeps going up the 
+chain of enclosing masters until reach the one being
+prepared for exit.  Now how do we mark the subthreads?
+They are hanging off the master.  But do they have a record
+of any open masters?  When a task is waiting for a
+master, we could record the master in the TCB.  We could
+also record the master when first initialized, though
+another master might be started before the first one
+is awaited.  We can save/restore the "open-master"
+field of the TCB when we start/await a new master.
+But this wouldn't actually give us access to the other
+master unless we somehow link them together.
+Simpler might be to temporarily make the open master
+be the master of the TCB that started it.  Then the
+Enclosing_Master chain would include other open masters
+started by this same TCB.  And we could use some kind
+of flag to know whether this is the starter of the
+master or simply a thread dependent on the master.
+Note that we would never finish a thread which has
+an open master, so we wouldn't be confused by this
+when finishing a thread.
+
+This does mean that a subthread of a master might identify
+a different master as its "current" master.  This would
+be its innermost "open" master.  This gives us access to
+the whole tree of masters.  Note that the "open" masters
+would form a chain, not a tree.
+
+We will probably need to add a map from Master_Index to
+Master_Address.  We have -- it is called Master_Addresses.
+
+NOTE: The spawner's master might not match the 
+master of the newly spawned thread, but still
+be a sibling, because a "continue" can be performed
+from a nested block.  But our new scheme which does
+the "wait" just prior to returning from "Execute"
+eliminates this concern.
+
+Another challenge: How to wake up and force exit for
+threads queued on a concurrent object.  Does the
+thread TCB have the lock object id stored within it?
+Yes, it is stored in its header.  So if we can
+work our way down to the relevant tcb, then we can
+discover that it is queued, presuming we start using
+the Tcb_Was_Queued flag even for non-imported
+queuing calls.
+
+So how would this actually work?  For a non-imported
+routine, we have the lock object, so we know where it
+is queued, and we could just invoke a "Dequeue_Tcb"
+operation of some sort on the lock object, given the
+Tcb of interest.  For an imported routine, we would 
+have to record something when we find out that the
+Tcb was queued so we can dequeue it.  Perhaps an imported
+routine that does queuing internally needs to have
+a flag that if set when called, means "dequeue me."
+Conceivably it could be the "Tcb_Was_Queued" flag
+itself.  It should normally be set to False on
+a locked call.  If it is True on call, it could
+mean "release this Tcb."  But that is a bit weird.
+Perhaps it could record something in the lock object,
+such as a dequeuing operation.  We could do this for
+regular queuing operations as well.  This would only
+need to be set once, presumably, for a given lock.
+It should be reset when the lock goes away, of course.
+The Tcb_Was_Queued flag could be reset once the task
+actually starts running, so we would know not to
+try to dequeue it.  OK, we now have a mechanism for setting
+a "special" dequeue routine for a lock.  If it is set,
+then that routine is used rather than the "normal"
+dequeuing from the list associated with the concurrent object.
+
+Yet another challenge: We don't want to force an
+abrupt exit for a thread that is inside a locked
+operation on a concurrent object.  We can tell
+that has happened if the TCB has a lock object
+that doesn't match that of it's enclosing master.
+So what do we do?  We probably want to mark the
+outermost lock to indicate that when it is released,
+the releaser should be forced to exit.
+
+Is there any way to cause a partial unwinding
+of a thread which started a master and is doing
+some work before waiting for the master, where
+we don't want to kill off the thread completely,
+just want it to jump to the "wait" operation?
+Answer for now: No.  That is probably just too
+delicate.  Problem: what about the threads it
+spawns which will not be run?  Might it be assuming
+they did run, so it will be assuming that certain
+things are initialized?  We don't want to kill off
+some but not all of a computation, as the remnants
+left might go haywire.  So we have to wait until
+it reaches the "Wait" on its own.  That means
+we should minimize the amount of work done on
+the spawning thread in the presence of multi-thread
+exit/returns.  So even though a spawning thread
+will temporarily set its master to that of
+the master it started, it will not put itself
+on the list of subthreads, so it won't be killed
+off, though it won't spawn any new threads off
+of the master that is being exited, hopefully,
+since it wouldn't see any of the effects of those
+until after the "wait".
+it must be 
+
+-------- Thoughts on multi-threaded exit/return starting 10/24/2010: ---------
+
+Side note on multi-threaded exit/return: We may want to
+run everything on a sub-thread in this case, rather than
+doing one of the threads on the "master" thread, since
+killing a whole thread is much simpler than doing the
+setjmp/longjmp kind of thing.  The master thread
+would then simply wait for the multi-thread exiter
+or for all of the sub-threads to complete.
+
+All the multi-thread exiters would attempt to gain exclusive
+control of the master.  Only one would succeed.  The others
+would get the "abort-thread" indicator.  The basic Execute
+procedure of the ParaSail VM (PSVM) interpreter will need
+to check for an "abort-thread" indicator.  We would like this
+check to be efficient.  The multi-threaded exit would need
+to propagate the exit down the sub-thread tree.  It is OK if
+it takes a little while, though we don't want to throw away
+the enclosing scope until all of the threads have stopped.
+So the master thread could notify the winning thread so it
+can proceed to do its thing while it goes about killing
+of all of the other threads.  It would then come around
+and wait for the threads to finish up, including the "winning"
+thread.  
+
+Threads could be given the job of killing other
+threads.  A thread whose immediate master is killing off
+all other threads should notice that, and if it itself has
+one or more masters inside itself, it should go about 
+killing off each of them bottom up, waiting for each one
+on the way up.  It sounds like each chunk used to contain local
+areas will need a pointer to a master/thread-control-block.
+If an additional chunk is allocated for local areas, it should 
+point back to the original master/thread-control-block
+
+-------- regions and multi-thread exit ----
+
+Maybe we do want to have a tree of regions, and each region has its own
+list of chunks that it owns.  Somehow we will make sure that
+if a thread is killed, first we harvest all of its region chunks.
+The whole list of chunks associated with a given region should be
+appended to the list of the encloser upon return from a call.
+
+As far as "abrupt" multi-thread exit, let us presume that
+with normal calls we can unwind from the innermost region
+(there is only one per thread), while when there are multiple
+subthreads, the master keeps track of them and can find the
+innermost region of each.
+
+The local list of free parts can be discarded.
+

@@ -1,0 +1,5 @@
+value(X) = 2
+After setValue(21), value(X) = 3
+testAndSet(X, 4) = 3
+compareAndSwap(X, 1, 3) = 4, value(X) = 4
+compareAndSwap(X, 4, 2) = 4, value(X) = 2

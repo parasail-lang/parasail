@@ -1,0 +1,72 @@
+// This computes the cumulative sum of an array, using a "chunked" parallel
+// loop.
+
+func Scan(Histo : Vector<Univ_Real>; N : Univ_Integer)
+  -> Result : Vector<Univ_Real> is
+    var Partial_Sum : Vector<Univ_Real> := Create(N, 0.0);
+    var Adjust : Vector<Univ_Real> := Create(N, 0.0);
+    const Histo_Parts : Vector<Countable_Range<Univ_Integer>> :=
+      Histo.Bounds() / N
+
+    Result := Create(|Histo|, 0.0)
+
+    //  Produce cumulative sums within chunks
+    for each [P => Part] of Histo_Parts concurrent loop
+       for I in Part forward loop
+          Partial_Sum[P] += Histo[I];
+          Result[I] := Partial_Sum[P];
+       end loop
+    end loop;
+
+    //  Compute adjustment for each chunk
+    for J in 1 .. N-1 forward loop
+      Adjust[J+1] := Adjust[J] + Partial_Sum[J];
+    end loop;
+
+    //  Adjust elements of each chunk appropriately
+    for each [P => Part] of Histo_Parts concurrent loop
+       for I in Part forward loop
+          Result[I] += Adjust[P];
+       end loop
+    end loop;
+
+    //  Display result
+    Println("Histo, Result for num chunks = " | N);
+    for I in Result.Bounds() forward loop
+       Println(Histo[I] | ", " | Result[I]);
+    end loop;
+end func Scan
+
+func Vec_Image(Vec : Vector<Univ_Real>) -> Result : Univ_String is
+   Result := ""
+   for (each Elem of Vec; Sep := "[" then ", ") forward loop
+      Result |= Sep | Elem
+   end loop
+   Result |= "]"
+end func Vec_Image
+
+func Cum_Sum (Histo_Arr : Basic_Array<Univ_Real>) is
+   const Histo : Vector<Univ_Real> := [for each X of Histo_Arr => X]
+   Println ("Histo = " | Vec_Image(Histo))
+
+   const Result := Scan(Histo, 3)
+   Println ("Result = " | Vec_Image(Result))
+
+end func Cum_Sum
+
+func Ran_Sum (N : Univ_Integer) is
+   var Ran := Random::Start()
+   var Big_Histo : Vector<Univ_Real> :=
+     [for I in 1..N => 1.0 * Round_To_Int(100.0 * Ran.Next_Real())]
+   Println ("Big_Histo = " | Vec_Image(Big_Histo))
+
+   const Big_Result := Scan(Big_Histo, Min(N/2, 8))
+   Println ("Big_Result = " | Vec_Image(Big_Result))
+end func Ran_Sum
+
+func main(Args : Basic_Array<Univ_String>) is
+   const Histo_Arr : Basic_Array<Univ_Real> :=
+                       [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
+
+   Cum_Sum (Histo_Arr);
+end func main;

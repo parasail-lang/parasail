@@ -1,0 +1,58 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+// ParaSail higlighter written by Arie van Wingerden
+//
+// Please relate any errors to xapwing AT gmail DOT com
+//
+//////////////////////////////////////////////////////////////////////////////
+
+Language:               ParaSail
+Filter:                 ParaSail files (*.psi,*.psl)|*.psi;*.psl
+
+HelpFile:
+CaseSensitive:          1
+
+LineComment:            //
+
+IdentifierBegChars:     a..z A..Z
+IdentifierChars:        a..z A..Z 0..9 _
+
+NumConstBegChars:       0..9 $
+NumConstChars:          0..9 abcdefABCDEF #
+
+EscapeChar:             \
+
+KeyWords1:              all block case continue each else elsif exit for forward if loop return reverse some then until while with
+
+KeyWords2:              abs and in mod not null or rem xor
+
+KeyWords3:              abstract class concurrent const end extends exports func global implements import interface is lambda locked new of op optional private queued ref separate type var
+
+KeyWords4:
+
+KeyWords5:
+
+StringBegChar:          "
+StringEndChar:          "
+MultilineStrings:       0
+UsePreprocessor:        0
+CurrLineHighlighted:    0
+SpaceCol:               clWindowText clWhite
+Keyword1Col:            $00007f clWhite
+Keyword2Col:            $0000ff clWhite
+Keyword3Col:            $46aa03 clWhite
+IdentifierCol:          clBlue clWhite
+CommentCol:             $adadad clWhite
+NumberCol:              $C000C0 clWhite B
+StringCol:              $7f007f clWhite
+SymbolCol:              $783C00 clWhite
+PreprocessorCol:        clBlue clWhite
+SelectionCol:           clWhite clNavy
+CurrentLineCol:         clBlack clYellow
+OverrideTxtFgColor:     0
+BlockAutoindent:        0
+BlockBegStr:            [(<
+BlockEndStr:            ])>
+Keyword4Col:            clRed clWhite
+Keyword5Col:            $00C0C000 clWhite B
+MatchedBracesCol:       $0000FFC6 $00004000

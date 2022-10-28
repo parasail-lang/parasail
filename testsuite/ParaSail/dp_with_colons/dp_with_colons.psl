@@ -1,0 +1,488 @@
+# Drinking philosophers
+# There is a group of philosophers, numbered 1 to Num_Phils
+# There is some number of bottles with distinct contents,
+# numbered 1 to Num_Bottles.
+# A philosopher thinks for a while, and then gets thirsty
+# and sits down, then picks up one or more bottles to mix a drink.
+# The philosopher drinks for a while, and then puts back the bottles.
+# The algorithm used to supply the bottles avoids deadlock
+# and "starvation" (perhaps better called "parched mouth"),
+# and is based on the 1984 ACM TOPLAS paper by Chandy and Misra.
+
+interface Drinking_Philosophers
+  <Num_Phils : Univ_Integer := 5; 
+   Num_Bottles : Univ_Integer := 5>:
+    type Philosopher_Index is new Integer<1..Num_Phils>
+    
+    type Bottle_Index is new Integer<1..Num_Bottles>
+
+    type Bottle_Set is Countable_Set<Bottle_Index>
+        
+    type Phil_To_Bottle_Map is Array<Bottle_Set, 
+      Indexed_By => Philosopher_Index>
+      # This array is used to specify which set of bottles
+      # is of interest to a particular philosopher.
+
+    queued def Drinking_Party
+      (Length_Of_Party : Time::Time_Interval; 
+       Who_Drinks_What : Phil_To_Bottle_Map)
+      # Get this party going ...
+    
+    concurrent interface Bar_Stool<>:
+      # At each bar stool there is a collection of bottles.
+      # A philosopher sits down at their bar stool when they
+      # are thirsty, and proceeds to try to ensure the
+      # desired set of bottles they need for their next drink
+      # is available.
+
+        def Bottles_To_Borrow
+          (queued var S : Bar_Stool; 
+           Desired_Bottles : Bottle_Set) -> Bottle_Set
+          # Return set of bottles needed to satisfy overall set
+          # of desired bottles.  Returns empty set if Philosopher already
+          # has all the desired bottles at their Bar_Stool, in which
+          # case the Philosopher may start drinking.
+          # Remains queued if in the middle of borrowing bottles,
+          # and there are no additional ones that need to be borrowed.
+
+        def Add_Bottle
+          (locked var S : Bar_Stool;
+           Index : Bottle_Index)
+          # Indicate that Philosopher successfully borrowed specified
+          # bottle, and it is now available for their use.
+
+        def Remove_Bottle
+          (queued var S : Bar_Stool;
+           Index : Bottle_Index)
+          # Remove bottle from collection at given bar stool.
+          # Will be queued while philospher is drinking.
+
+        def Finished_Drinking
+          (locked var S : Bar_Stool)
+          # Philosopher indicates they are finished drinking,
+          # meaning that all of the bottles they were using
+          # are now considered "used".
+
+        def Create(Initial_Bottles : Bottle_Set) -> Bar_Stool
+          # Create a bar stool.
+          # Initial_Bottles is the set of bottles initially in front
+          # of the new bar stool.
+
+        def Initialize_Bottle_Set(locked var S : Bar_Stool;
+          Initial_Bottles : Bottle_Set;
+	  Occupant : Philosopher_Index)
+          # Initialize a bar stool for given Philosopher
+
+	def Occupant(locked S : Bar_Stool) -> optional Philosopher_Index
+	  # Indicate who is occupying the bar stool
+
+	def Bottles_At_Stool(locked S : Bar_Stool)
+          -> Bottle_Set
+	  # Indicate which bottles are currently at the given bar stool
+
+    end interface Bar_Stool
+
+    concurrent interface Bottle<>:
+      # Each bottle keeps track of who will get it next,
+      # and whether it can be borrowed at the current moment.
+
+        def Borrow_Bottle
+          (queued var B : Bottle; 
+           Phil : Philosopher_Index) -> Who_Has_It_Now : Philosopher_Index
+          # Ask for a bottle from its current owner
+
+        def Release_Bottle
+          (locked var B : Bottle)
+          # Indicate bottle is now available for borrowing
+          # (meaning it has been used at least once by owner).
+
+        def Create(Initial_Owner : Philosopher_Index) -> Bottle
+          # Create a bottle with given initial owner
+
+	def Initialize_Bottle(locked var B : Bottle; 
+	  Initial_Owner : Philosopher_Index)
+	  # Initialize owner of bottle
+
+    end interface Bottle
+
+end interface Drinking_Philosophers
+
+class Drinking_Philosophers:
+
+    def Eliminate_Duplicates(Bottle_Map : Phil_To_Bottle_Map) 
+      -> Result : Phil_To_Bottle_Map
+        {(for all P1 in Philosopher_Index =>
+             for all P2 in Philosopher_Index => 
+                P1 != P2 ==> (Result[P1] and Result[P2]) == [])}
+        # Ensure that there are no duplicates in resulting mapping
+        {(for all B in Bottle_Index => 
+	     for some P in Philosopher_Index => B in Result[P])}:
+        # Ensure that every bottle is somewhere
+        var Earlier_Bottles : Bottle_Set := []
+	Result := Create(1..Num_Phils, Initial_Value => [])
+
+        for Phil in Philosopher_Index:
+            # Remove bottles assigned to earlier philosophers
+            # NOTE: We don't actually need a "forward loop" here
+            #       so long as the loop runs sequentially.
+            #       "Earlier" bottles merely means earlier iterations,
+            #       independent of the order in which they are performed.
+            Result[Phil] := Bottle_Map[Phil] - Earlier_Bottles
+            Earlier_Bottles += Result[Phil]
+
+        if Count(Earlier_Bottles) != Num_Bottles:
+            # Some bottles not assigned to anyone
+            # Give them to Philosopher 1
+            Result[1] += (1..Num_Bottles) - Earlier_Bottles
+
+    end func Eliminate_Duplicates
+
+    type Bottle_To_Phil_Mapping is Array<Philosopher_Index,
+      Indexed_By => Bottle_Index>
+        # Mapping that indicates where bottles start out
+
+    def Invert_Bottle_Map(Initial_Bottles : Phil_To_Bottle_Map) 
+          {(for all P1 in Philosopher_Index =>
+             for all P2 in Philosopher_Index => 
+                P1 != P2 ==>
+                  (Initial_Bottles[P1] and Initial_Bottles[P2]) == [])}
+      -> Result : Bottle_To_Phil_Mapping:
+        # Invert the mapping from Philospher to Bottles
+        Result := Create(1..Num_Bottles, 1)
+        for Phil in Philosopher_Index concurrent:
+            for B in Initial_Bottles[Phil] concurrent:
+                Result[B] := Phil
+
+    def Initial_Bottle_Array(Where_Bottles_Start : Bottle_To_Phil_Mapping) 
+      -> Result : Array<Bottle, Indexed_By => Bottle_Index>:
+	Result := Create(Bounds => [..], Initial_Value => Create(1))
+	for BB in Bottle_Index:
+	    Initialize_Bottle(Result[BB], Where_Bottles_Start[BB])
+
+    def Initial_Bar_Stool_Array(Initial_Bottles : Phil_To_Bottle_Map)
+      -> Result : Array<Bar_Stool, Indexed_By => Philosopher_Index>:
+	Result := Create(Philosopher_Index, Initial_Value => Create([]))
+	for PhilX in Philosopher_Index:
+	    Initialize_Bottle_Set(Result[PhilX], Initial_Bottles[PhilX],
+	      PhilX)
+
+  exports
+
+    queued def Drinking_Party
+      (Length_Of_Party : Time::Time_Interval; 
+       Who_Drinks_What : Phil_To_Bottle_Map):
+
+	var Timer := Clock::Create()
+
+      then
+
+	Println("Party will go for " | Length_Of_Party | " seconds.")
+
+        # Put an overall timer on the party
+        Delay(Timer, Length_Of_Party)
+        # Time to go home!
+        Println("Drinking Party is over")
+
+        return  # We are out of here -- this will kill off the other threads
+        
+      ||
+        # Get the party going
+
+        const Initial_Bottles := Eliminate_Duplicates(Who_Drinks_What)
+          # Which bottles a philosopher should start with
+
+        const Where_Bottles_Start := Invert_Bottle_Map(Initial_Bottles)
+          # Where each bottle starts
+
+        var Bottles : Array<Bottle, Indexed_By => Bottle_Index> :=
+	  Initial_Bottle_Array(Where_Bottles_Start)
+
+        var Bar_Stools : Array<Bar_Stool, Indexed_By => Philosopher_Index> :=
+	  Initial_Bar_Stool_Array(Initial_Bottles)
+        
+        # Now start the philosophers drinking
+        for Phil in Philosopher_Index concurrent:
+	    var Ran := Random::Start(Seed => [[Phil]]*101)
+        
+            ref My_Bar_Stool => Bar_Stools[Phil]
+
+            ref My_Bottles => Who_Drinks_What[Phil]
+           
+	    var Likes_Bots := ""
+	    for B in My_Bottles:
+		Likes_Bots |= (" " | B)
+
+	    var Has_Bots := ""
+	    for B in Bottles_At_Stool(My_Bar_Stool):
+		Has_Bots |= (" " | B)
+
+       // JM: Outputs disabled to avoid differences between executions
+	    // Print("Philosopher " | Phil | 
+	    //   " arrives, with a taste for" | Likes_Bots)
+
+	    if Has_Bots != "":
+	        null; // Println(", and sits in front of" | Has_Bots | ".")
+	    elif #false:
+                null
+            else:
+		null; // Println(", but sits where there are none.")
+
+            loop:
+	      # Until overall timer exits
+
+		const Time_To_Think := Next(Ran) mod 10
+
+                // JM: Output disabled to avoid differences between executions
+                // Println("Philosopher " | Phil | " is thinking for " |
+		          //         Time_To_Think | " seconds")
+                Delay(Timer, Time_To_Think * 1.0)  # Think
+
+                # Philosopher is thirsty.
+                # Find out which, if any, bottles they need.
+
+               *Gather_Bottles*
+                loop:
+		  # until we have all the bottles we need or end of party
+                    const Needed_Bottles := 
+                      Bottles_To_Borrow(My_Bar_Stool, My_Bottles)
+
+                    if Needed_Bottles == []:
+                        # We have all the bottles we need
+                        exit loop Gather_Bottles
+
+                    # Go get the bottles we need
+                    for B in Needed_Bottles concurrent:
+
+                        # Borrow it from its current owner 
+                        const Who_Has_It_Now := Borrow_Bottle(Bottles[B], Phil)
+
+                        # Take it from current owner
+                        Remove_Bottle(Bar_Stools[Who_Has_It_Now], B)
+
+                        # Add it to the collection at our bar stool
+                        Add_Bottle(My_Bar_Stool, B)
+
+                    # Go back for the next batch of bottles, if any
+                    # (in case one of the bottles we had left over
+                    #  from our prior drinking session got borrowed).
+
+                end loop Gather_Bottles
+
+                # OK, we have all the bottles we need 
+                # for our drinking session
+
+                const Time_To_Drink := Next(Ran) mod 10
+ 
+// JM: Output disabled to avoid differences between executions
+//                Println("Philosopher " | Phil | " is drinking for " |
+//                  Time_To_Drink | " seconds")
+                Delay(Timer, Time_To_Drink * 1.0)  # Drink
+
+                # Indicate that the Philosopher is done drinking
+                Finished_Drinking(My_Bar_Stool)
+
+                # Allow the bottles to be borrowed
+                for B in My_Bottles concurrent:
+                    Release_Bottle(Bottles[B])
+
+    end func Drinking_Party
+
+    concurrent class Bar_Stool<>:
+      # At each bar stool there is a collection of bottles.
+      # A philosopher sits down at their bar stool when they
+      # are thirsty, and proceeds to try to ensure the
+      # desired set of bottles they need for their next drink
+      # is available.
+
+        var Used_Bottles : Bottle_Set
+          # Bottles used by Philosopher at this bar stool
+
+        var Clean_Bottles : Bottle_Set
+          # Bottles not yet used by Philosopher at this bar stool
+
+        var Being_Borrowed : Bottle_Set
+          # Bottles in the process of being borrowed.
+
+	var Occupant : optional Philosopher_Index
+	  # Current occupant
+
+        // JM: Output disabled to avoid differences between executions
+        // const Debug : Boolean := #true
+        const Debug : Boolean := #false
+
+      exports
+
+        def Bottles_To_Borrow
+          (queued var S : Bar_Stool; 
+           Desired_Bottles : Bottle_Set) -> Bottle_Set:
+          # Return set of bottles needed to satisfy overall set
+          # of desired bottles.  First return the set of bottles
+          # not held by the Philosopher.  Then return the set of
+          # bottles already held, but not yet reserved for the
+          # the next round of drinking.
+          # Returns empty set if Philosopher has reserved
+          # all the desired bottles for this round, in which
+          # case the Philosopher may start drinking.
+
+          queued while S.Being_Borrowed != [] and then
+            Desired_Bottles <=
+              S.Used_Bottles + S.Clean_Bottles + S.Being_Borrowed:
+              # Remain queued while we are in the middle of borrowing 
+              # bottles, and there are no other bottles needed
+
+            if Desired_Bottles <= S.Used_Bottles + S.Clean_Bottles:
+                # We have all the bottles we need.
+                # Mark them all clean so they won't get removed
+                # before we are done.
+
+                const To_Be_Cleaned := Desired_Bottles - S.Clean_Bottles
+
+                if Debug:
+                    Println(" About to remove " | Count(To_Be_Cleaned) |
+                      " bottles from Used_Bottles (" | Count(S.Used_Bottles) |
+                      ") of Phil " | S.Occupant)
+
+                S.Used_Bottles -= To_Be_Cleaned
+                S.Clean_Bottles += To_Be_Cleaned
+
+                # Return an empty set to indicate no more bottles to get.
+                # Time to start drinking...
+                return []
+            else:
+                # There are some bottles we don't already have
+                const To_Be_Borrowed := Desired_Bottles - 
+                  (S.Used_Bottles + S.Clean_Bottles + S.Being_Borrowed)
+
+                {To_Be_Borrowed != []}  # Our queuing condition ensures this
+
+                S.Being_Borrowed += To_Be_Borrowed
+
+                return To_Be_Borrowed
+
+        end func Bottles_To_Borrow
+
+        def Add_Bottle
+          (locked var S : Bar_Stool;
+           Index : Bottle_Index):
+          # Indicate that Philosopher successfully borrowed specified
+          # bottle, and it is now available for their use.
+// JM: Output disabled to avoid differences between executions
+//	    Println(" Bottle " | Index | " now available to Philosopher " |
+//	      S.Occupant)
+            S.Being_Borrowed -= [Index]
+            S.Clean_Bottles += [Index]
+
+        def Remove_Bottle
+          (queued var S : Bar_Stool;
+           Index : Bottle_Index):
+          # Remove bottle from collection at given bar stool.
+          # Will be queued while philospher is drinking.
+          queued until Index in S.Used_Bottles:
+            if Debug:
+                Println(" Bottle " | Index | 
+                  " about to be removed from Used_Bottles (" |
+                  Count(S.Used_Bottles) | ") of Phil " | 
+                  S.Occupant)
+            end if
+
+            S.Used_Bottles -= [Index]
+// JM: Output disabled to avoid differences between executions
+//	    Println(" Bottle " | Index | " borrowed from Philosopher " |
+//	      S.Occupant)
+
+        def Finished_Drinking
+          (locked var S : Bar_Stool):
+          # Philosopher indicates they are finished drinking,
+          # meaning that all of the bottles they were using
+          # are now considered "used".
+            if Debug:
+                Println(" Adding " | Count(S.Clean_Bottles) | 
+                  " Clean bottles to " | Count(S.Used_Bottles) |
+                  " Used_Bottles of Phil " |
+                  S.Occupant)
+
+            S.Used_Bottles <|= S.Clean_Bottles
+
+        def Create(Initial_Bottles : Bottle_Set) -> Bar_Stool:
+          # Create a bar stool for given Philosopher
+            return (Used_Bottles => Initial_Bottles,
+              Clean_Bottles => [], Being_Borrowed => [],
+	      Occupant => null)
+
+        def Initialize_Bottle_Set(locked var S : Bar_Stool;
+          Initial_Bottles : Bottle_Set;
+	  Occupant : Philosopher_Index):
+          # Initialize a bar stool for given Philosopher
+            if Debug:
+                Println(" Initializing Used_Bottles for Phil " | S.Occupant |
+                  " with " | Count(Initial_Bottles))
+
+	    S.Used_Bottles := Initial_Bottles
+	    S.Occupant := Occupant
+
+	def Occupant(locked S : Bar_Stool) 
+	  -> optional Philosopher_Index:
+	  # Indicate who is occupying the bar stool
+	    return S.Occupant
+
+	def Bottles_At_Stool(locked S : Bar_Stool)
+          -> Bottle_Set:
+	  # Indicate which bottles are currently at the given bar stool
+	    return S.Used_Bottles | S.Clean_Bottles
+
+    end class Bar_Stool
+
+    concurrent class Bottle<>:
+      # Each bottle keeps track of who will get it next,
+      # and whether it can be borrowed at the current moment.
+
+        var Who_Gets_It : Philosopher_Index
+        var Can_Be_Borrowed : Boolean
+
+      exports
+
+        def Borrow_Bottle
+          (queued var B : Bottle; 
+           Phil : Philosopher_Index) -> Who_Has_It_Now : Philosopher_Index:
+          # Ask for a bottle from its current owner
+          queued until B.Can_Be_Borrowed:
+
+            Who_Has_It_Now := B.Who_Gets_It
+
+            B.Can_Be_Borrowed := #false  # Can't be borrowed again until used
+            B.Who_Gets_It := Phil  # This philosopher will have it next
+
+        def Release_Bottle
+          (locked var B : Bottle):
+          # Indicate bottle is now available for borrowing
+          # (meaning it has been used at least once by owner).
+            B.Can_Be_Borrowed := #true
+            
+        def Create(Initial_Owner : Philosopher_Index) -> Bottle:
+          # Create a bottle with given initial owner
+            return (Can_Be_Borrowed => #true, Who_Gets_It => Initial_Owner)
+
+	def Initialize_Bottle(locked var B : Bottle; 
+	  Initial_Owner : Philosopher_Index):
+	  # Initialize owner of bottle
+	    B.Who_Gets_It := Initial_Owner
+
+    end class Bottle
+
+end class Drinking_Philosophers
+
+def Test_DP(Length_Of_Party : Univ_Integer):
+    type DP is Drinking_Philosophers<5,5>
+
+    const Who_Drinks_What : DP::Phil_To_Bottle_Map :=
+      [1=>1..2, 2=>2..3, 3=>3..4, 4=>4..5, 5=>1|5]
+
+    DP::Drinking_Party(
+      Length_Of_Party => Length_Of_Party * 1.0, 
+	Who_Drinks_What => Who_Drinks_What)
+
+end func Test_DP
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_DP (5);
+end func main;

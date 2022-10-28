@@ -1,0 +1,36 @@
+{ if (FILENAME != savedfn) {
+    base = NR-1
+    savedfn = FILENAME
+  }
+}
+/^[ 	]*([Pp]rivate  *)?([Pp]rocedure|[Ff]unction|[Tt]ask|[Pp]rotected|[Pp]ackage|[Tt]ype|[Ss]ub[Tt]ype|[Ee]ntry|[Aa]ccept)[^a-zA-Z_]/ {
+  if ($1 ~ /^[Pp]rivate$/) {
+    id = $3
+  } else if ($2 ~ /^[Tt]ype$/ || $2 ~ /^[Bb]ody$/) {
+    id = $3
+  } else {
+    id = $2
+  }
+
+  # remove trailing '(' and ';'
+  split(id, idar, "(");
+  id = idar[1];
+  split(id, idar, ";");
+  id = idar[1];
+  # if a child unit (e.g. "a.b.c") get just the last id (e.g. "c")
+  numids = split(id, idar, ".");
+  id = idar[numids];
+
+  # ignore if not a legal identifier
+  if (id ~ /["A-Za-z].*/) {
+    x = $1" "$2
+    front = sprintf("%-15s %4d %-16s", id, NR-base, FILENAME);
+    max = 78 - length(front);
+    for (i = 3; i <= NF; i++) {
+      y = x" "$i
+      if (length(y) > max) break;
+      x = y
+    }
+    print front, x;
+  }
+}

@@ -1,0 +1,38 @@
+How to implement a delay queue in ParaSail?
+
+What is the problem?  Where does the queue live,
+and how do we get it updated when the clock ticks?
+Ultimately this is clearly something where we will
+need to pass in the Context object.  The clock could
+retain a "ref" to the Context object, conceivably.
+You couldn't assign to the clock, but presumably
+that is OK.
+
+Ignoring this issue for now, we want a queue
+sorted by wakeup time.  We want something to 
+make a call on the clock with an updated time,
+which will cause the queued delay callers to
+have their dequeue condition reevaluated.
+We can have an imported routine which is queued.
+It should only be called by the tcb on the front
+of the delay queue.  Suppose a new tcb comes
+along with a shorter delay? What happens then?
+Normally queued calls are performed by the "convenient"
+TCB.  How does that work for calls from the virtual machine?
+This isn't a big problem if the queued call is on an
+imported routine.  But this would never have an internal
+precondition/dequeue condition, so how would it decide
+the TCB should be queued?
+
+What we really want is a way to associate an operation with
+interrupts.  But before we do that, perhaps it is simpler
+to presume that an imported constructor function for a 
+concurrent module can create objects that are somehow tied
+into the external environment.  When a concurrent object
+is created, a lock-obj-index is assigned.  To be more
+precise, when declaring a concurrent object, or initializing 
+a concurrent component via a class aggregate, Create_Lock_For_Obj
+is used to ensure that the object has a lock.  Note that the
+constructor itself doesn't allocate the lock, meaning that the
+object is not considered locked inside the constructor 
+(output parameters are never considered unlocked-concurrent).

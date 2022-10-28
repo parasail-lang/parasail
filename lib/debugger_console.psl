@@ -1,0 +1,1805 @@
+import PSC::Reflection::*, PSC::Debugging::*;
+
+func PSC::Debugging::Console(Reason : Stack_Frame_Info::Debugger_Reason)
+  -> Stack_Frame_Info::Single_Step_Indicator is
+//  An interactive debugging console for the ParaSail Interpreter
+//  This is invoked automatically when an assertion fails or the
+//  interpreter encounters some sort of internal error.
+//  The result indicates what action should taken upon returning
+//  to the interpreter
+
+   var IO := IO::Get_IO();
+   const Debug : Boolean := #false;
+   const Increment := 10;  // Number of lines to move up or down
+   const Default_Line_Limit := 40;  //  Limit on line limit in Display_One_Obj
+   const Default_Indent_Limit := 10;  //  Limit on indent in Display_One_Obj
+
+   var Frame_Num := 2;
+   var Cur_Command : optional Vector<Univ_String> := ["continue"];
+   var Cur_Frame := Stack_Frame_Info::Nth_Stack_Frame(Frame_Num);
+
+   var Cur_Line : optional Univ_Integer := null;
+   var Cur_File : optional Univ_String := null;
+
+   var All_Source_File_Names : optional Ordered_Set<Univ_String> := null;
+     //  Set of all source file names in environment, if non-null
+
+   var Break_Line_To_File_Map : Map<Univ_Integer, Set<Univ_String>> := [];
+      //  Mapping from lines to file(s) in which that line is a breakpoint.
+
+   func Are_Same_Op(Left, Right : Reflection::Routine) -> Boolean is
+     //  Return #true if Left and Right refer to the same Routine
+     //  TBD: Should add a "Index_Of_Routine" function to simplify this.
+      return Name_With_Overloading_Index(Left) ==
+               Name_With_Overloading_Index(Right)
+           and then
+             Module_Name(Left) == Module_Name(Right);
+   end func Are_Same_Op;
+               
+   func List_File(File_Name : Univ_String;
+     var Center_Line : Univ_Integer;
+     Highlight_Line : Univ_Integer := 0;
+     Num_Lines_Of_Context : Univ_Integer := Increment) is
+     //  List specified line from file plus "Increment" lines of context
+     //  Update Center_Line if it seems to be getting out of range
+      const Line_Range : Countable_Range<Univ_Integer> :=
+        Center_Line - Num_Lines_Of_Context/2 ..
+          Center_Line + Num_Lines_Of_Context/2;
+      var File := File_Input_Stream::Open(IO, File_Name);
+      var File_Length : optional Univ_Integer := null;
+
+      if File is null then
+         IO.Stderr.Println("Cannot open: `(File_Name)");
+      else
+         for I in 1 ..< Line_Range.First forward loop
+            const Ignore := File.Readln();
+            if Ignore is null then
+               //  Reached end of file
+               File_Length := I - 1;
+               exit loop;
+            end if;
+         end loop;
+
+         for I in Line_Range forward loop
+            if I <= 0 then
+               //  Ignore line#s <= 0
+               continue loop;
+            end if;
+
+            const Line := File.Readln();
+
+            if Line is null then
+               //  Reached last line of file
+               if File_Length is null then
+                  File_Length := I - 1;
+               end if;
+               exit loop;
+            end if;
+
+            const Is_Break_Line := 
+              I in Break_Line_To_File_Map
+                and then File_Name in Break_Line_To_File_Map[I];
+            const Line_Num := (Is_Break_Line? "*" : "") | To_String(I);
+            const Highlight_Char := I == Highlight_Line? '>' : ' ';
+
+            //  Pad line number up to 7 characters, followed by space, '>',
+            //  or '*'.
+            Println((7 - |Line_Num|)* " " | Line_Num | Highlight_Char | Line);
+         end loop;
+      end if;
+      File.Close();
+
+      if Center_Line <= 0 then
+         //  Reset Center_Line if it goes negative
+         Center_Line += Increment;
+      elsif File_Length not null and then Line_Range.First >= File_Length then
+         //  Reset Center_Line so we show at least one line.
+         Center_Line -=
+           Increment * ((Center_Line - File_Length)/Increment);
+
+         //  Try again with more reasonable Center_Line
+         List_File (File_Name, Center_Line => Center_Line,
+            Highlight_Line => Highlight_Line,
+            Num_Lines_Of_Context => Num_Lines_Of_Context);
+      end if;
+
+   end func List_File;
+
+   func Strip_Name_Prefix (Full_Name : Univ_String) -> Univ_String is
+     //  From "X::Y::Z" strip off the "X::Y::" part
+     //  Do the same for each param within <...>
+      var Bracket_Nesting := 0;
+      var Bracketed_Part := "";
+      var End_Name := |Full_Name|;
+      var End_Bracket := 0;
+
+      for each [I => C] of Full_Name reverse loop
+         case C of
+          [':'] =>
+            if Bracket_Nesting == 0 then
+               //  Found the prefix; return what follows it.
+               return Full_Name [I+1 .. End_Name] | Bracketed_Part;
+            end if;
+          ['>'] =>
+            //  Handle bracketed part separately
+            if Bracket_Nesting == 0 then
+               End_Bracket := I;
+               Bracketed_Part := ">";
+            end if;
+            Bracket_Nesting += 1;
+          [','] =>
+            //  Handle each type-parameter separately
+            if Bracket_Nesting == 1 then
+               // Recurse with following parameter, and prepend
+               // on Bracketed_Part
+               Bracketed_Part := "," |
+                 Strip_Name_Prefix(Full_Name [I+1 .. End_Bracket-1]) |
+                   Bracketed_Part;
+               End_Bracket := I;
+            end if;
+          ['<'] =>
+            Bracket_Nesting -= 1;
+            if Bracket_Nesting == 0 then
+               //  Recurse with following parameter, and prepend
+               //  on Bracketed_Part
+               Bracketed_Part := "<" |
+                 Strip_Name_Prefix(Full_Name [I+1 .. End_Bracket-1]) |
+                   Bracketed_Part;
+               End_Bracket := 0;
+               End_Name := I-1;
+            end if;
+          [..] =>
+            null;
+         end case;
+      end loop;
+      //  No prefix to strip
+      return Full_Name;
+   end func Strip_Name_Prefix;
+
+   func Hex_Literal (Val : optional Univ_Integer;
+                     Underscores_Every : Univ_Integer := 4;
+                     Prefix : Univ_String := "0x";
+                     Suffix : Univ_String := "")
+     -> Univ_String is
+     //  Return Val as an unsigned base-16 literal with
+     //  underscores, prefix, and suffix as specified.
+      if Val not null and then Val == 0 then
+         //  Special case
+         return "0";
+      end if;
+
+      const Every := Underscores_Every;
+      var Img : Univ_String := Hex_Image (Val);
+
+      //  Pad out (on left) to multiple of "Every" in length
+      if |Img| mod Every != 0 then
+         Img := (Every - (|Img| mod Every)) * "0" | Img;
+
+         {|Img| mod Every == 0}
+      end if;
+      return (for (I in 1 .. |Img|/Every;
+                   Sep := Prefix then "_") forward =>
+                     <""> | Sep | Img[(I-1)*Every <.. I*Every]) | Suffix;
+   end func Hex_Literal;
+
+   func Is_Large_Null (Obj_Base : optional Univ_Integer) -> Boolean is
+     //  Return #true if Obj_Base is a "large" null value.
+     //  TBD: Certain string values will also satisfy the following
+      return Obj_Base not null
+        and then Obj_Base < 0 and then Obj_Base mod 2 == 1
+        and then Obj_Base / 2**32 == 1 - 2**25;
+   end func Is_Large_Null;
+
+   func Is_Bad_Address (Obj_Base : optional Univ_Integer) -> Boolean is
+     //  Return #true if Obj_Base is not an address for "peeking" at.
+      return Obj_Base is null
+        or else Obj_Base <= 0  //  TBD: Presuming addresses are never negative
+        or else Obj_Base mod 2 == 1;
+   end func Is_Bad_Address;
+
+   func Same_Ignoring_Case (S : Univ_Character; P : Univ_Character)
+     -> Boolean is
+     //  Return #true if S is same char as P, ignoring upper/lower case
+      const Diff := S - P;
+
+      return Diff == 0
+        or else
+          (Diff == ('a' - 'A') and then S in 'a'..'z')
+        or else
+          (Diff == ('A' - 'a') and then S in 'A'..'Z');
+   end func Same_Ignoring_Case;
+
+   func Match_Ignoring_Case
+     (Str : Univ_String; Pattern : Univ_String) -> Boolean is
+     //  Return #true if Str matches Pattern, using "grep" notation
+     //  and ignoring upper/lower case distinctions.
+      var I := 1;
+
+      for each [J => C] of Pattern forward loop
+         case C of
+          ['*'] =>
+            if J == |Pattern| then
+               //  This is last char of pattern, so we have a match
+               return #true;
+            end if;
+            // Try various lengths to match the "*" and recurse on rest
+            const Rest_Of_Pattern := Pattern[J <.. |Pattern|];
+
+            return (for some K in I .. |Str| + 1 =>
+              Match_Ignoring_Case (Str[K .. |Str|], Rest_Of_Pattern));
+          ['?'] =>
+            if I > |Str| then
+               // Did not match
+               return #false;
+            end if;
+            //  Advance by one character
+            I += 1;
+          [..] =>
+            if I > |Str|
+              or else not Same_Ignoring_Case(Str[I], C)
+            then
+               //  Did not match
+               return #false;
+            end if;
+            //  Advance by one character
+            I += 1;
+         end case;
+      end loop;
+      //  Reached end of pattern
+      //  We matched if we have used up all chars of Str
+      return I > |Str|;
+   end func Match_Ignoring_Case;
+
+   func Find_Op_Of_Type
+     (Type_Region : optional Reflection::Region;
+      Name : Univ_String) -> optional Decl is
+      //  Look through Type_Region for operation with given name.
+      //  Return Decl for operation, if found.
+      if Type_Region is null then
+         return null;
+      end if;
+
+      for I in 1 .. Num_Items (Type_Region) forward loop
+         const Item := Nth_Item (Type_Region, I);
+
+         if Id (Item) == Name then
+            --  Found it
+            return Item;
+         end if;
+      end loop;
+
+      //  No decl with given Id found
+      return null;
+   end func Find_Op_Of_Type;
+
+   func Display_One_Obj
+     (Base : optional Univ_Integer;
+      Offset : Offset_Within_Area;
+      Type : optional Type_Descriptor;
+      Indent : Univ_Integer := 0;
+      Orig_Type_Name : optional Univ_String := null;
+      Prefix : Univ_String := "";
+      var Line_Count : Univ_Integer;
+      Line_Limit : Univ_Integer := Default_Line_Limit;
+      Indent_Limit : Univ_Integer := Default_Indent_Limit) is
+     //  Dump one object using type descriptor
+     //  Orig_Type_Name, if non-null, is name of type of original object,
+     //  before any "unwrapping"
+     //  Bump Line_Count by total count of lines produced.
+     //  Use an ellipsis if Line_Count would exceed Line_Limit or
+     //  Indent would exceed Indent_Limit.
+
+      if Debug then
+         Println
+           ("Display_One_Obj(`(Base), `(Offset), Prefix => \"`(Prefix)\")");
+      end if;
+
+      const Type_Name :=
+        Orig_Type_Name not null?
+          Orig_Type_Name : Strip_Name_Prefix (Type.Name());
+
+      func Fallback() is
+         //  Fall back to hex display
+         if Type not null then
+            Print(Indent * " " | Prefix | Type_Name | "::(" |
+              Hex_Literal (Stack_Frame_Info::Peek_At_Address(Base, Offset)) |
+              ")");
+         else
+            Print(Indent * " " | Prefix | Hex_Literal
+              (Stack_Frame_Info::Peek_At_Address(Base, Offset)));
+         end if;
+      end func Fallback;
+
+      if Type is null then
+         //  Fall back to hex display
+         Fallback();
+      else
+         //  Display object, given Type
+         if Type.Is_Wrapper() then
+            const Components := Type.Components();
+
+            if Components is null then
+               Fallback();
+            else
+               --  Is a wrapper, recurse with only component
+               Display_One_Obj
+                 (Base, Offset,
+                  Components[1].Type_Desc, Indent,
+                  Orig_Type_Name => Type_Name,
+                  Prefix => Prefix,
+                  Line_Count => Line_Count,
+                  Line_Limit => Line_Limit,
+                  Indent_Limit => Indent_Limit);
+            end if;
+            return;
+         end if;
+
+         if Type.Is_Small() then
+            const Int_Val : optional Univ_Integer :=
+              Stack_Frame_Info::Peek_At_Address(Base, Offset)
+            if (Type.Null_Value_For_Type() not null
+                   and then
+                Int_Val not null
+                   and then
+                Type.Null_Value_For_Type() == Int_Val)
+              or else
+                (Type.Null_Value_For_Type() is null
+                   and then
+                 Int_Val is null)
+            then
+               //  This is the null value for the type.
+               Print(Indent * " " | Prefix | "null");
+            else
+               case Type.Type_Kind() of
+                [#normal] =>
+                  //  Print in hex (these are typically "faked" types
+                  //  which are actually integers internally).
+                  Fallback();
+                [#univ_integer] =>
+                  const Val : Univ_Integer := 
+                    Stack_Frame_Info::Peek_At_Address(Base, Offset);
+                  Print(Indent * " " | Prefix | Type_Name | "::(`(Val))");
+                [#univ_real] =>
+                  const Val : Univ_Real := 
+                    Stack_Frame_Info::Peek_At_Address(Base, Offset);
+                  Print(Indent * " " | Prefix | Type_Name | "::(`(Val))");
+                [#univ_enum] =>
+                  const Val : Univ_Enumeration :=
+                    Stack_Frame_Info::Peek_At_Address(Base, Offset);
+                    Print(Indent * " " | Prefix | Type_Name | "::`(Val)");
+                [#univ_char] =>
+                  const Val : Univ_Character :=
+                    Stack_Frame_Info::Peek_At_Address(Base, Offset);
+                    Print(Indent * " " | Prefix | Type_Name | "::\'`(Val)\'");
+                [#basic_array] =>
+                  {*"arrays are not small"* #false}
+                  //  Print in hex
+                  Fallback();
+                [#univ_string] =>
+                  {*"strings are not small"* #false}
+                  //  Print in hex
+                  Fallback();
+               end case;
+            end if;
+         elsif Type.Type_Kind() == #univ_string then
+            const Val : optional Univ_String :=
+              Stack_Frame_Info::Peek_At_Address(Base, Offset);
+            Print(Indent * " " | Prefix | Type_Name | "::\"`(Val)\"");
+         elsif Indent > Indent_Limit or else Line_Count > Line_Limit then
+            //  Don't show a large object beyond this indent
+            Print(Indent * " " | Prefix | Type_Name | "::(...)");
+         elsif Type.Type_Kind() == #basic_array then
+            //  Basic Array
+            const Type_With_Params := (if |Type.Parameters()| > 0 then Type
+                                       else Type.Enclosing_Type());
+            const Comp_Type := Type_With_Params.Parameters()[1].Data.Type_Desc;
+            const Obj_Base : optional Univ_Integer :=
+              Stack_Frame_Info::Peek_At_Address(Base, Offset);
+            const Max_Array_Len := 10;  //  Max # of array components to show
+
+            if Is_Large_Null (Obj_Base) then
+               Print(Indent * " " | Prefix | "null");
+            elsif Is_Bad_Address (Obj_Base) then
+               Print(Indent * " " | Prefix |
+                 "has bad address `(Hex_Image(Obj_Base))");
+            else
+               const Len : Univ_Integer :=
+                 Stack_Frame_Info::Peek_At_Address(Obj_Base, 1);
+
+               Println(Indent * " " | Prefix | Type_Name | "::[");
+               Line_Count += 1;
+               for I in 1 .. Len forward loop
+                  Display_One_Obj (Obj_Base, I + 1, Comp_Type,
+                    Indent => Indent + 2,
+                    Line_Count => Line_Count,
+                    Line_Limit => Line_Limit,
+                    Indent_Limit => Indent_Limit);
+                  Println("");
+                  Line_Count += 1;
+                  if I < Len
+                    and then
+                      (I == Max_Array_Len
+                         or else Line_Count > Line_Limit)
+                  then
+                     //  Too many components to show
+                     Println(Indent * " " |
+                       "  ... // total of `(Len) components");
+                     Line_Count += 1;
+                     exit loop;
+                  end if;
+               end loop;
+               Print(Indent * " " | "]");
+            end if;
+         else
+            //  Normal large object
+            {*"must be normal kind"* Type.Type_Kind() == #normal}
+            const Obj_Base : optional Univ_Integer :=
+              Stack_Frame_Info::Peek_At_Address(Base, Offset);
+
+            if Debug then
+               Println("Peek(`(Base), `(Offset)) = `(Obj_Base)");
+            end if;
+
+            if Is_Large_Null (Obj_Base) then
+               Print(Indent * " " | Prefix | "null");
+            elsif Is_Bad_Address (Obj_Base) then
+               Print(Indent * " " | Prefix |
+                 "has bad address `(Hex_Image(Obj_Base))");
+            elsif Is_Polymorphic(Type) then
+               //  Polymorphic object, just display indented
+               //  First need to get "actual" type of polymorphic
+               //  object, since that has the "actual" type of the
+               //  enclosed object.
+               const Poly_Header : optional Univ_Integer :=
+                 Stack_Frame_Info::Peek_At_Address(Obj_Base, 0);
+               const Type_Index := Poly_Header mod 2**48 / 2**32;
+               const Poly_Type : Type_Descriptor :=
+                 Type_Desc_At_Index(Type_Index);
+               
+               Println(Indent * " " | Prefix | Type_Name | "::(");
+               Line_Count += 1;
+               Display_One_Obj
+                 (Obj_Base, 1, Poly_Type.Components()[1].Type_Desc,
+                   Indent => Indent + 2,
+                   Prefix => "",
+                   Line_Count => Line_Count,
+                   Line_Limit => Line_Limit,
+                   Indent_Limit => Indent_Limit);
+               Println("");
+               Line_Count += 1;
+               Print(Indent * " " | ")");
+            else
+               //  Non-polymorphic, non-null normal "large" object
+               const Components := Type.Components();
+               const Decl_Of_Type := Type_Decl(Type);
+               const Type_Region := Decl_Of_Type not null?
+                 Decl_Region(Decl_Of_Type) : null;
+               const Num_In_Type_Region := Type_Region not null?
+                 Num_Items(Type_Region) : 0;
+
+               --  Look for useful operations on type
+               --  TBD: Use these to produce nicer output.
+               const To_String_Op :=
+                 Find_Op_Of_Type (Type_Region, "to_string");
+               const Index_Set_Op :=
+                 Find_Op_Of_Type (Type_Region, "\"index_set\"");
+               const Remove_First_Op :=
+                 Find_Op_Of_Type (Type_Region, "Remove_First");
+               const Remove_Any_Op :=
+                 Find_Op_Of_Type (Type_Region, "Remove_Any");
+               const Indexing_Op :=
+                 Find_Op_Of_Type (Type_Region, "\"indexing\"");
+
+               if Decl_Of_Type is null then
+                  Println("Type_Decl(`(Type.Name())) is null");
+               elsif Type_Region is null then
+                  Println("Type region is null for `(Id(Decl_Of_Type))");
+               end if;
+               Println(Indent * " " | Prefix | Type_Name | "::(");
+               Line_Count += 1;
+               for (each C of Components;
+                    Comp_Offs in 1 .. |Components|)
+                 forward loop
+
+                  var Comp_Prefix := "";
+
+                  for Item_Index in 1 .. Num_In_Type_Region loop
+                     const Decl_In_Region :=
+                       Nth_Item(Type_Region, Item_Index);
+
+                     if Kind(Decl_In_Region) == #object then
+                        const Comp_Index := Component_Index(Decl_In_Region);
+
+                        if Comp_Index not null
+                          and then [[Comp_Index]] == Comp_Offs
+                        then
+                           Comp_Prefix := Id(Decl_In_Region) | " => ";
+                           exit loop;
+                        end if;
+                     end if;
+                     //  Keep looking for matching component decl
+                  end loop;
+                  if Debug and then Comp_Prefix == "" then
+                     Println
+                       ("No component matching `(Obj_Base)[`(Comp_Offs)]");
+                  end if;
+
+                  Display_One_Obj
+                    (Obj_Base, Comp_Offs, C.Type_Desc,
+                      Indent => Indent + 2,
+                      Prefix => Comp_Prefix,
+                      Line_Count => Line_Count,
+                      Line_Limit => Line_Limit,
+                      Indent_Limit => Indent_Limit);
+                  Println("");
+                  Line_Count += 1;
+               end loop;
+               Print(Indent * " " | ")");
+            end if;
+         end if;
+      end if;
+   end func Display_One_Obj;
+
+   func Trim(S : Univ_String) -> Univ_String is
+   //  Remove leading/trailing spaces
+      for each [I => C] of S forward loop
+         if C != ' ' then
+            //  Found first non-space
+            for each [J => D] of S reverse loop
+               if D != ' ' then
+                  //  Found last non-space
+                  return S[I..J];
+               end if;
+            end loop;
+            //  S[I] is only non-space character
+            return S[I..I];
+         end if;
+      end loop;
+      //  All characters are spaces
+      return "";
+   end func Trim;
+
+   func Split (S : Univ_String;
+               Separators : Set<Univ_Character> := [' ', '\t'])
+     -> Result : Vector<Univ_String> is
+   //  Split S into lexemes, at given separators
+      var Start : optional Univ_Integer := null;
+
+      Result := [];
+
+     *Outer*
+      for I := 1 while I <= |S| loop
+         const C := S[I];
+
+         if C in Separators then
+            if Start not null then
+               //  Add next word to Result
+               Result |= S[Start .. I-1];
+               Start := null;
+            end if;
+            continue loop Outer with I => I + 1;
+         end if;
+
+         case C of
+          ['\\'] =>
+            // Treat next character as a "normal" non-space character
+            if Start is null then
+               Start := I;
+            end if;
+            continue loop Outer with I+2;
+          ['"'|'\''] =>
+            if Start is null then
+               //  Start a new word if not in middle of word
+               Start := I;
+            end if;
+            const Quote := C;
+
+            //  Find matching un-escaped quote
+            for J in I+1 .. |S| loop
+               const D := S[J];
+
+               if D == C
+                 and then S[J-1] != '\\'
+               then
+                  //  Found matching quote, continue normal processing
+                  continue loop Outer with J + 1;
+               end if;
+            end loop;
+            //  Unterminated string; add trailing quote and finish
+            Result |= S[Start .. |S|] | Quote;
+            Start := null;
+            //  Exit loop
+            exit loop Outer;
+
+          [..] =>
+            if Start is null then
+               //  Start a new word
+               Start := I;
+            end if;
+         end case;
+
+         //  By default, just continue with next character
+         continue loop Outer with I => I + 1;
+      end loop Outer;
+
+      if Start not null then
+         //  Add last word to Result
+         Result |= S[Start .. |S|];
+      end if;
+   end func Split;
+
+   func Frame_Name
+     (Info : Reflection::Stack_Frame_Info) -> Result : Univ_String is
+      if Info.Start_Pc > 1 then
+         Result := "nested block at line " |
+           Nth_Instr(Info.Code, Info.Start_Pc).Source_Pos().Line() | " of ";
+      else
+         Result := "";
+      end if;
+      if Info.Code is null then
+         Result |= "[unknown func]";
+      else
+         Result |= "func " | Info.Code.Name();
+      end if;
+   end func Frame_Name
+
+   func Display_Stack_Frame
+     (Caller_Frame_Num : Univ_Integer;
+      Info : Reflection::Stack_Frame_Info;
+      Verbose : Boolean := #false) is
+      const Mod_Name := Info.Code not null? Info.Code.Module_Name() : "";
+
+      Println("Stack frame #`(Caller_Frame_Num):");
+
+      if Info.Code not null then
+         const Params := Parameters(Info.Code);
+
+         if Mod_Name != "" and then Mod_Name != "null" then
+            Print("  func `(Mod_Name)::");
+         else
+            Print("  func ");
+         end if;
+         Println(Info.Code.Name() | (|Params| == 0? "()" : " ("));
+         var Output_Param  : optional Routine_Param_Info := null;
+
+         //  Print input params
+         for each P of Params forward loop
+            if P.Is_Operation_Output then
+               Output_Param := P;
+            else
+               Println
+                 ("    `(P.Is_Var? "var ": "")`(P.Name) : `(
+                     Strip_Name_Prefix(P.Type_Name))");
+            end if;
+         end loop;
+
+         if Output_Param not null then
+            //  Print output parameter
+            Println("  ) -> " |
+                (Output_Param.Name != ""
+                  and then Output_Param.Name != Info.Code.Name()?
+                Output_Param.Name | " : " : "") |
+                  Strip_Name_Prefix(Output_Param.Type_Name));
+         elsif |Params| > 0 then
+            Println("  )");
+         end if;
+      end if;
+      if Info.Enclosing_Type not null
+        and then
+          (Mod_Name is null
+           or else Mod_Name | "<>" != Info.Enclosing_Type.Name())
+      then
+         Println("  Enclosing_Type : `(Info.Enclosing_Type.Name())");
+      end if;
+      if Verbose then
+         Println("  Params : `(Hex_Literal (Info.Params))");
+         Println
+           ("  Local_Area : `(Hex_Literal  (Info.Local_Area))");
+      end if;
+      Println("  Src_Pos : `(Info.Src_Pos) (Pc : `(Info.Pc))");
+      if Info.Start_Pc > 1 then
+         Println("    within block starting at line " |
+           Nth_Instr(Info.Code, Info.Start_Pc).Source_Pos().Line() |
+           " (Start_Pc: `(Info.Start_Pc))");
+      end if;
+      if #false and then Info.Code not null then
+         IO.Stdout.Dump_One_Instr (Nth_Instr (Info.Code, Info.Pc),
+                                   Indent => 4);
+      end if;
+   end func Display_Stack_Frame
+
+   func Display_Params
+     (Caller_Frame_Num : Univ_Integer;
+      Info : Reflection::Stack_Frame_Info;
+      Pattern : optional Univ_String := null) is
+     //  Display the parameters for the given stack frame, if any
+
+      var Displayed_One_Param : Boolean := #false;
+      const Adjusted_Frame_Num := Caller_Frame_Num + 1;
+
+      if Info.Code is null then
+         Println("No current routine.");
+         return;
+      elsif Info.Start_Pc > 1 then
+         //  TBD: Display parameters to nested block
+         Println("Within nested block.");
+         return;
+      end if;
+
+      const Params := Parameters(Info.Code);
+
+      func Display_One_Param
+        (Param_Index : Univ_Integer; Prefix : Univ_String) is
+        //  Call Display_One_Obj for given param,
+        //  after inserting a level of indirection if passed by ref.
+         const P := Params[Param_Index];
+         var Base := Info.Params;
+         var Offset : Offset_Within_Area := Param_Index - 1;
+         var Line_Count := 0;
+
+         if P.Is_Passed_By_Ref then
+            //  Level of indirection
+            Base := Stack_Frame_Info::Peek_At_Address (Base, Offset);
+            Offset := 0;
+         end if;
+
+         Display_One_Obj
+           (Base, Offset,
+            Stack_Frame_Info::Nth_Frame_Type_At_Locator
+              (Adjusted_Frame_Num + 1, P.Type_Info),
+                //  Need to bump Adjusted_Frame_Num again since we are now in
+                //  a nested routine.
+            Indent => 2,
+            Prefix => Prefix,
+            Line_Count => Line_Count,
+            Line_Limit => Default_Line_Limit/2);  //  Shorten display a bit
+
+         Displayed_One_Param := #true;
+      end func Display_One_Param;
+        
+      if |Params| == 0 then
+         Println("`(Info.Code.Name()) has no parameters.");
+         return;
+      end if;
+
+      if Debug then
+         Display_Stack_Frame (Caller_Frame_Num, Info, Verbose => #true);
+      end if;
+
+      Println("Params of `(Info.Code.Name())" |
+        (Pattern not null? " matching \"`(Pattern)\"" : "") | ":");
+
+      var Output_Param  : optional Univ_Integer := null;
+
+      //  Print input params
+      for each [I => P] of Params forward loop
+         if P.Is_Operation_Output then
+            Output_Param := I;
+         elsif Pattern is null
+           or else Match_Ignoring_Case (P.Name, Pattern => Pattern)
+         then
+            Display_One_Param (I, Prefix => "`(P.Name) => ");
+            Println("");
+         end if;
+      end loop;
+
+      if Output_Param not null then
+         //  Print output parameter
+         const P := Params[Output_Param];
+         const Prefix := "-> " |
+             (P.Name != ""
+               and then P.Name != Info.Code.Name()?
+             P.Name | " => " : "");
+
+         if Pattern is null
+           or else
+             (P.Name != ""
+               and then Match_Ignoring_Case (P.Name, Pattern => Pattern))
+         then
+            Display_One_Param (Output_Param, Prefix);
+            Println("");
+         end if;
+      end if;
+      if Pattern not null and then not Displayed_One_Param then
+         Println("No parameter matched \"`(Pattern)\".");
+      end if;
+   end func Display_Params;
+
+   func Display_Locals
+     (Caller_Frame_Num : Univ_Integer;
+      Info : Reflection::Stack_Frame_Info;
+      var Num_Displayed : Univ_Integer;
+      Pattern : optional Univ_String := null) is
+     //  Display the local variables for the given stack frame, if any
+
+      const Adjusted_Frame_Num := Caller_Frame_Num + 1;
+
+      if Info.Code is null then
+         Println("No current routine.");
+         return;
+      end if;
+
+      //  Walk backward through the code from the current PC,
+      //  looking for "declare_obj_op" instructions
+      //  that use a sufficiently "shallow" local offset
+      //  such that they still apply at the current PC.
+      //  TBD: Alternatively, we could try to walk the program tree
+      //  and the associated declarative regions to try to find
+      //  relevant object decls, and then get their assigned offsets.
+      //  This would require full access to the program tree and
+      //  declarative regions, but currently that is assumed for the 
+      //  the "params" command also.  Eventually we would probably
+      //  want to produce more "stand-alone" debugging information.
+
+      var Stack_Depth : Offset_Within_Area := Offset_Within_Area::Last();
+
+      func Note_Offset (Loc : Object_Locator) is
+         //  Remember minimum stack depth
+         if Base (Loc) == Object_Locator::Param_Area
+           and then Offset (Loc) < Stack_Depth
+         then
+            Stack_Depth := Offset (Loc);
+            if Debug then
+               Println("Stack_Depth = `(Stack_Depth)");
+            end if;
+         end if;
+      end func Note_Offset;
+
+      func Display_One_Local (Instr : Instruction) is
+         const Dest_Name := Instr.Dest_Name();
+         var Line_Count := 0;
+
+         if Dest_Name not null and then Dest_Name != ""
+           and then
+             (Pattern is null
+              or else Match_Ignoring_Case (Dest_Name, Pattern => Pattern))
+         then
+            const Loc := Instr.Destination();
+            var Base_Area := Base(Loc);
+            var Base_Addr := Info.Local_Area;
+            var Offset := Offset(Loc);
+
+            if Base_Area == Object_Locator::Param_Area then
+               Base_Addr := Info.Params;
+            elsif Base_Area != Object_Locator::Local_Area then
+               Println("Declared obj not a local: `(Dest_Name) => `(Loc)");
+               return;  --  Don't know how to display
+            end if;
+
+            if Instr.Decl_Obj_Is_By_Ref() then
+               //  Level of indirection
+               Base_Addr :=
+                 Stack_Frame_Info::Peek_At_Address (Base_Addr, Offset);
+               Offset := 0;
+            end if;
+
+            Display_One_Obj
+              (Base_Addr, Offset,
+               Stack_Frame_Info::Nth_Frame_Type_At_Locator
+                 (Adjusted_Frame_Num + 1, Instr.Declare_Type_Info()),
+                   //  Need to bump Adjusted_Frame_Num again since
+                   //  we are now in a nested routine.
+               Indent => 2,
+               Prefix => "`(Dest_Name) => ",
+               Line_Count => Line_Count);
+            Println("");
+            Num_Displayed += 1;
+         elsif Debug then
+            Println("Local with null name at `(Instr.Destination())");
+         end if;
+      end func Display_One_Local;
+
+      for I in 1 .. Info.Pc reverse loop
+         const Instr := Nth_Instr (Info.Code, I);
+
+         if Debug and then I mod 5 == 0 then
+            Println("PC == `(I), Opcode == `(Instr.Opcode())");
+         end if;
+         case Instr.Opcode() of
+          [#Call_Op | #Indirect_Call_Op
+           | #Call_Nested_Block_Op
+           | #Check_Nested_Block_Op] =>
+            //  This is the most important way that new objects are
+            //  created on the stack.
+            Note_Offset (Instr.Params());
+
+          [#Copy_Word_Op
+           | #Copy_Address_Op
+           | #Store_Address_Op
+         
+           | #Create_Obj_Op
+           | #Assign_Word_Op
+           | #Swap_Obj_Op
+          
+           | #Move_Obj_Op
+           | #Make_Copy_In_Stg_Rgn_Op] =>
+            //  Ignore these, since the destination might be a pre-existing
+            //  object.
+            null;
+
+         
+          [#Store_Local_Null_Op
+           | #Store_Large_Local_Null_Op
+         
+           | #Store_Null_Of_Same_Stg_Rgn_Op
+         
+           | #Is_Null_Op
+           | #Not_Null_Op
+         
+           | #Store_Int_Lit_Op
+           | #Store_Real_Lit_Op
+           | #Store_Char_Lit_Op
+         
+           | #Store_Enum_Lit_Op
+           | #Store_Str_Lit_Op
+         
+           | #Store_Operation_Desc_Op
+         
+           | #Store_Type_Related_Obj_Op
+           | #Store_Type_Related_Addr_Op
+         
+           | #Create_Lock_For_Obj_Op
+         
+           | #Create_Polymorphic_Obj_Op
+           | #Unwrap_Polymorphic_Obj_Op
+         
+           | #Select_Polymorphic_Ancestor_Part_Op
+           | #Select_Ancestor_Part_Op
+           | #Check_Not_Null_Op] =>
+         
+            Note_Offset (Instr.Destination());
+         
+          [#If_Op] =>
+            //  Instr.If_Source might be a pre-existing object
+            null;
+
+          [#Declare_Obj_Op] =>
+            if Instr.Destination().Offset() <= Stack_Depth then
+               Display_One_Local (Instr);
+
+               //  Don't redisplay a local with the same stack offset
+               Stack_Depth := Instr.Destination().Offset() - 1;
+            end if;
+
+          [#Begin_Nested_Block_Op] =>
+            //  We were in a nested block.
+            //  Cannot go back any further.
+            exit loop;
+          [..] =>
+            //  Ignore this instruction
+            null;
+         end case;
+      end loop;
+
+   end func Display_Locals;
+
+   func Build_File_Name_Set() is
+     // Initialize All_Source_File_Names set, if not already initialized
+      if All_Source_File_Names is null then
+         var Env := Environment::Get_Current_Env();
+
+         All_Source_File_Names := [];
+
+         if Env not null then
+            //  Scan environment for first matching filename
+            for I in 1 .. Num_Library_Items(Env) loop
+               const Item := Nth_Library_Item(Env, I);
+               All_Source_File_Names |= Decl_Source_Pos(Item).File();
+            end loop;
+         end if;
+      end if;
+   end func Build_File_Name_Set;
+
+   func Find_Source_File(File_Pat : Univ_String) -> optional Univ_String is
+   //  Find a file among the set of source files that matches the given
+   //  pattern.
+
+      //  Build up the set of filenames
+      Build_File_Name_Set();
+
+      //  Find first one that matches given pattern
+      for each FN of All_Source_File_Names forward loop
+         const Split_Filename := Split(FN, ['/']);
+
+         if Match_Ignoring_Case
+             (Split_Filename[|Split_Filename|], File_Pat)
+         then
+            //  Found it
+            return FN;
+         end if;
+      end loop;
+
+      return null;
+   end func Find_Source_File;
+
+   func Find_Op_By_Name(Op_Name_Pat : Univ_String;
+                        File_Name : optional Univ_String := null)
+     -> Result : optional Reflection::Routine is
+     //  Find outermost declaration of an operation whose name matches the
+     //  Op_Name_Pat.  If File_Name is given, look only in that file.
+     //  Otherwise look in all source files loaded.
+
+      func Find_Outermost_Op
+        (Within : Reflection::Region;
+         Less_Nested_Than : optional Code_Nesting_Level)
+        -> optional Reflection::Routine is
+        //  Find outermost operation whose name matches Op_Name_Pat
+        //  somewhere within the given region.
+        //  If Less_Nested_Than is non-null, only interested
+        //  operations that have Nesting_Level < Less_Nested_Than.
+
+         func Is_Matching_Op(Item : Decl) -> Boolean is
+           //  Return #true if Item is an operation that has a matching name
+            return Item not null
+              and then Kind(Item) not null
+              and then Kind(Item) == #operation
+              and then not Is_Spec(Item)
+              and then Operation_Equiv_To(Item) is null
+              and then Match_Ignoring_Case(Id(Item), Op_Name_Pat);
+         end func Is_Matching_Op;
+
+         var Min_Nesting_Level := Less_Nested_Than;
+
+         const Item := Associated_Decl(Within);
+
+         if Item is null then
+            //  Shouldn't happen?
+            return null;
+         end if;
+
+         if Min_Nesting_Level not null
+           and then Level(Item) >= Min_Nesting_Level
+         then
+            //  Already too deep
+            return null;
+         end if;
+
+         if File_Name not null
+           and then Decl_Source_Pos(Item).File() not null
+           and then File_Name != Decl_Source_Pos(Item).File()
+         then
+            //  Wrong file
+            return null;
+         end if;
+
+         if Is_Matching_Op(Item) then
+            //  Found it
+            return Routine_For_Operation(Item);
+         end if;
+
+         var Outermost_Op : optional Reflection::Routine := null;
+
+         if Min_Nesting_Level is null
+           or else Level(Item) < Min_Nesting_Level-1
+         then
+            //  Look at items declared in region
+            for I in 1 .. Num_Nested_Regions(Within) forward loop
+               const Inner := Nth_Nested_Region(Within, I);
+
+               if Inner is null then
+                  continue loop;
+               end if;
+
+               const Op := Find_Outermost_Op(Inner, Min_Nesting_Level);
+
+               if Op not null then
+                  Min_Nesting_Level := Nesting_Level(Op);
+                  if Min_Nesting_Level == Level(Item) + 1 then
+                     //  Found op at outermost level of inner region
+                     //  so we don't need to keep looking.
+                     return Op;
+                  end if;
+                  //  Found a new less-nested match
+                  Outermost_Op := Op;
+               end if;
+            end loop;
+         end if;
+
+         //  Return the least-nested match
+         return Outermost_Op;
+
+      end func Find_Outermost_Op;
+
+      ////
+
+      var Min_Nesting : optional Reflection::Code_Nesting_Level := null;
+
+      Result := null;
+
+      if File_Name is null then
+         //  Recurse with each file of system
+        
+         //  Make sure All_Source_File_Names set is initialized
+         Build_File_Name_Set();
+
+         //  Look for outermost op
+         for each FN of All_Source_File_Names forward loop
+            const Op := Find_Op_By_Name(Op_Name_Pat, FN);
+
+            if Op not null then
+               //  Found a matching operator in this file.
+               if Min_Nesting is null
+                 or else Nesting_Level(Op) < Min_Nesting
+               then
+                  //  Remember it if it is at a lower nesting level
+                  Result := Op;
+                  Min_Nesting := Nesting_Level(Op);
+               end if;
+            end if;
+         end loop;
+      else
+         //  File is specified; look only in items from that file
+         var Env := Environment::Get_Current_Env();
+
+         if Env not null then
+            //  Scan environment for items from given file
+            for I in 1 .. Num_Library_Items(Env) loop
+               const Item := Nth_Library_Item(Env, I);
+               if Decl_Source_Pos(Item).File() == File_Name then
+                  //  Found declaration from given file
+                  //  Look for outermost op matching name within this file.
+                  const Op := Find_Outermost_Op
+                    (Decl_Region(Item), Less_Nested_Than => Min_Nesting);
+
+                  if Op not null then
+                     Min_Nesting := Nesting_Level(Op);
+                     Result := Op;
+                  end if;
+               end if;
+            end loop;
+         end if;
+      end if;
+   end func Find_Op_By_Name;
+
+   func Find_Op_By_Source_Pos(File_Name : Univ_String; Line : Univ_Integer)
+     -> Result : optional Reflection::Routine is
+     //  Find operation within specified file that encloses the given line.
+     //  Return null if no such operation found.
+
+      func Is_Op_With_Code(Item : Decl) -> Boolean is
+        //  Return #true if Item is an operation that actually has code
+         return Kind(Item) == #operation
+           and then not Is_Spec(Item)
+           and then Operation_Equiv_To(Item) is null;
+      end func Is_Op_With_Code;
+
+      func Find_Closest_Preceding_Op
+        (Within : Reflection::Region; Greater_Than : Univ_Integer)
+        -> optional Reflection::Routine is
+        //  Find Op with starting Line in Greater_Than >.. Line
+        //  that is closest to Line.
+
+         var Max_Not_Greater_Than := Greater_Than;
+
+         const Item := Associated_Decl(Within);
+
+         const Region_Start_Line := Decl_Source_Pos(Item).Line();
+
+         if Region_Start_Line > Line then
+            //  Already past desired line
+            return null;
+         end if;
+
+         var Closest_Preceding_Op : optional Reflection::Routine := null;
+
+         if Region_Start_Line == Line
+           and then Is_Op_With_Code(Item)
+         then
+            //  Can't do better than an exact match
+            Closest_Preceding_Op := Routine_For_Operation(Item);
+         else
+            //  Look at items declared in region
+            for I in 1 .. Num_Nested_Regions(Within) forward loop
+               const Inner := Nth_Nested_Region(Within, I);
+
+               if Inner is null then
+                  continue loop;
+               end if;
+
+               //  Recurse on this nested region
+               const Op :=
+                 Find_Closest_Preceding_Op(Inner, Max_Not_Greater_Than);
+
+               if Op not null then
+                  //  Found a new later match
+                  Closest_Preceding_Op := Op;
+                  Max_Not_Greater_Than := Nth_Instr(Op, 1).Source_Pos().Line();
+                  if Max_Not_Greater_Than == Line then
+                     //  Exact match
+                     exit loop;
+                  end if;
+               end if;
+            end loop;
+
+            if Closest_Preceding_Op is null
+              and then Region_Start_Line > Max_Not_Greater_Than
+              and then Is_Op_With_Code(Item)
+            then
+               //  Operation associated with this region is the best we can do
+               Closest_Preceding_Op := Routine_For_Operation(Item);
+            end if;
+         end if;
+
+         //  Return the closest preceding op in the region
+         return Closest_Preceding_Op;
+      end func Find_Closest_Preceding_Op;
+
+      ////
+
+      var Env := Environment::Get_Current_Env();
+      var Max_Line_Not_Greater : Univ_Integer := 0;
+
+      if Env not null then
+         //  Scan environment for items from given file
+         for I in 1 .. Num_Library_Items(Env) loop
+            const Item := Nth_Library_Item(Env, I);
+            if Decl_Source_Pos(Item).File() == File_Name then
+               //  Found declaration from given file
+               //  Look for op that comes closest in initial line number
+               //  to desired line, while remaining less than or equal to it.
+               const Op := Find_Closest_Preceding_Op
+                 (Decl_Region(Item), Greater_Than => Max_Line_Not_Greater);
+
+               if Op not null then
+                  Max_Line_Not_Greater := Nth_Instr(Op, 1).Source_Pos().Line();
+                  Result := Op;
+                  if Max_Line_Not_Greater == Line then
+                     //  Can't do better than an exact match
+                     exit loop;
+                  end if;
+               end if;
+            end if;
+         end loop;
+      end if;
+   end func Find_Op_By_Source_Pos;
+
+   func Get_File_And_Line(Command : Vector<Univ_String>) -> Boolean is
+   //  Extract line and/or filename from Command[2], and optionally Command[3].
+   //  and set Cur_File and Cur_Line appropriately.
+   //  Returns #true if file and line were properly specified.
+   //  Otherwise, returns False and leaves Cur_File and Cur_Line
+   //  unchanged.
+      {|Command| >= 2}
+      var Line_Request := Command[2];
+      var New_Line := Cur_Line;
+
+      if New_Line is null then
+         New_Line := Cur_Frame.Src_Pos.Line();
+      end if;
+      case Line_Request[1] of
+       ['+'] =>
+         New_Line += Increment;
+       ['-'] =>
+         New_Line -= Increment;
+       ['0' .. '9'] =>
+         New_Line := From_String(Line_Request);
+       ['*' | '?' | 'a' .. 'z' | 'A' .. 'Z' | '/' | '.' | '_'] =>
+         //  Presume they have specified a file name
+         const File_Pat := Line_Request;
+         const New_File := Find_Source_File(File_Pat);
+
+         if New_File is null then
+            Println("File not found: `(File_Pat)");
+            return #false;
+         end if;
+
+         if |Command| > 2 then
+            //  File name optionally followed by a line number
+            Line_Request := Command[3];
+            New_Line := From_String(Line_Request);
+         else
+            New_Line := 1;
+         end if;
+         if Cur_Line not null then
+            //  Set the new file
+            Cur_File := New_File;
+            Println("Listing file: `(Cur_File)");
+         end if;
+       [..] =>
+         New_Line := null;
+      end case;
+      if New_Line is null then
+         Println("Syntax error in line number: `(Line_Request)");
+         return #false;
+      else
+         Cur_Line := New_Line;
+         return #true;
+      end if;
+   end func Get_File_And_Line;
+
+   func Init_Break_Line_Mapping() is
+     //  Init the Break_Line_To_File_Map
+      for BN in 1 .. Stack_Frame_Info::Num_Breakpoints()
+        {Stack_Frame_Info::Nth_Breakpoint_Line(BN) != 0}
+        forward loop
+         const BOp := Stack_Frame_Info::Nth_Breakpoint_Routine(BN);
+         const BLine := Stack_Frame_Info::Nth_Breakpoint_Line(BN);
+         const BOp_File := BOp.Nth_Instr(1).Source_Pos().File();
+
+         if BLine not in Break_Line_To_File_Map then
+            //  First file for given line.
+            Break_Line_To_File_Map[BLine] := [BOp_File];
+         else
+            //  Another breakpoint at this line, in another file.
+            Break_Line_To_File_Map[BLine] |= BOp_File;
+         end if;
+      end loop;
+   end func Init_Break_Line_Mapping;
+
+   func Tcb_Id() -> Univ_String is
+     //  Produce an identifier for the current tcb
+      return Cur_Frame.Master_Id / 2**16 | "." |
+        Cur_Frame.Master_Id mod 2**16 | "." |
+        Cur_Frame.Thread_Id/64 mod 101;
+   end func Tcb_Id;
+
+   ////
+
+   const Num_Frames := Stack_Frame_Info::Num_Stack_Frames();
+
+   //  Check the "reason" we entered the debugger.
+   case Reason of
+    [Stack_Frame_Info::Step_Into_Finished |
+     Stack_Frame_Info::Step_Into_Exited_Frame] =>
+      //  We just finished a "step into"
+      Cur_Command := ["step"];
+      if Cur_Frame.Pc == 1
+        or else Reason == Stack_Frame_Info::Step_Into_Exited_Frame
+      then
+         //  Must have entered a new frame
+         Display_Stack_Frame (Frame_Num, Cur_Frame);
+      end if;
+
+    [Stack_Frame_Info::Step_Over_Finished |
+     Stack_Frame_Info::Step_Over_Exited_Frame] =>
+      //  We just finished a "step over" (aka "next")
+      Cur_Command := ["next"];
+      if Cur_Frame.Pc == 1
+        or else Reason == Stack_Frame_Info::Step_Over_Exited_Frame
+      then
+         //  Must have entered a new frame
+         Display_Stack_Frame (Frame_Num, Cur_Frame);
+      end if;
+
+    [Stack_Frame_Info::Step_Out_Finished] =>
+      //  We just finished a "step out" (aka "finish")
+      Cur_Command := null;  //  No default command
+      //  We will now be in a new frame
+      Display_Stack_Frame (Frame_Num, Cur_Frame);
+
+    [Stack_Frame_Info::Assertion_Failure |
+     Stack_Frame_Info::Null_Check_Failure |
+     Stack_Frame_Info::Internal_Failure |
+     Stack_Frame_Info::No_Reason] =>
+      //  We had some kind of failure, or the user requested entry
+      //  into the debugger.
+      Println(">> ParaSail Debugger");
+      Display_Stack_Frame (Frame_Num, Cur_Frame);
+      case Reason of
+       [Stack_Frame_Info::Assertion_Failure] =>
+         Println("  Assertion failure:");
+       [Stack_Frame_Info::Null_Check_Failure] =>
+         Println("  Null not allowed here:");
+       [Stack_Frame_Info::Internal_Failure] =>
+         Println("  Illegal value in operation:");
+       [Stack_Frame_Info::No_Reason] =>
+         //  Entered because of user request (typically at start of session).
+         //  No saved command.
+         Cur_Command := null;
+       [..] =>
+         null;
+      end case;
+
+    [Stack_Frame_Info::Breakpoint_Encountered.First ..
+       Stack_Frame_Info::Breakpoint_Encountered.Last] =>
+      const Index : Stack_Frame_Info::Breakpoint_Index := [[Reason]];
+
+      Println(">> ParaSail Debugger");
+      Display_Stack_Frame (Frame_Num, Cur_Frame);
+      Println("Stopped at breakpoint #`(Index):");
+
+    [..] =>
+      Println(">> Entering ParaSil Debugger for Reason: `(Reason)");
+   end case;
+
+   //  Init Break_Line_To_File_Map
+   Init_Break_Line_Mapping();
+
+   //  Show current line only
+   var Line_To_Show := Cur_Frame.Src_Pos.Line();
+
+   List_File (Cur_Frame.Src_Pos.File(), Line_To_Show,
+     Highlight_Line => Cur_Frame.Src_Pos.Line(),
+     Num_Lines_Of_Context => 0);
+
+   loop
+      Print("(tcb:`(Tcb_Id())) (psldb) ");
+      var Command_Input := Univ_String::Readln();
+
+      while |Command_Input| > 0
+        and then Command_Input[|Command_Input|] == '\\'
+      loop
+         //  Escaped end-of-line becomes a space followed by
+         //  next line.
+         Print(": ");
+         const More_Input := Univ_String::Readln();
+
+         Command_Input := Command_Input[1 .. |Command_Input|-1] |
+           " " | More_Input;
+      end loop;
+
+      //  Split into words
+      const Command := Split(Command_Input);
+
+      if |Command| > 0 then
+         Cur_Command := Command;
+      elsif Cur_Command is null then
+         Println("No saved command");
+         continue loop;
+      end if;
+
+      case Cur_Command[1] of
+       ["quit"|"q"|"exit"] =>
+         Println("Exiting.");
+         return Stack_Frame_Info::Stop_Execution;
+
+       ["continue"|"c"|"con"|"cont"] =>
+         Println("Continuing.");
+         return Stack_Frame_Info::Continue_Execution;
+
+       ["step"|"s"] =>
+         //  Println("Single step, will step into calls.");
+         return Stack_Frame_Info::Single_Step_Into;
+
+       ["next"|"n"] =>
+         //  Println("Single step, will step over calls.");
+         return Stack_Frame_Info::Single_Step_Over;
+
+       ["finish"|"fin"] =>
+         Println("Stop upon exit from `(Frame_Name(Cur_Frame))");
+         return Stack_Frame_Info::Step_Out.First + Max(Frame_Num - 2, 0);
+
+       ["up"|"u"] =>
+         if Frame_Num >= Num_Frames then
+            Println("Already at outermost frame.");
+         else
+            Frame_Num += 1;
+            Cur_Frame := Stack_Frame_Info::Nth_Stack_Frame(Frame_Num);
+            Cur_Line := null;
+            Cur_File := null;
+            Display_Stack_Frame (Frame_Num, Cur_Frame);
+         end if;
+
+         var Line_To_Display := Cur_Line;
+
+         if Line_To_Display is null then
+            Line_To_Display := Cur_Frame.Src_Pos.Line();
+         end if;
+
+         if Cur_File is null then
+            Cur_File := Cur_Frame.Src_Pos.File();
+         end if;
+
+         List_File (Cur_File, Line_To_Display,
+           Highlight_Line => Cur_Frame.Src_Pos.Line(),
+           Num_Lines_Of_Context => 0);
+
+       ["down"|"d"] =>
+         if Frame_Num <= 1 then
+            Println("Already at innermost frame.");
+         else
+            Frame_Num -= 1;
+            Cur_Frame := Stack_Frame_Info::Nth_Stack_Frame(Frame_Num);
+            Cur_Line := null;
+            Cur_File := null;
+            Display_Stack_Frame (Frame_Num, Cur_Frame);
+         end if;
+         var Line_To_Display := Cur_Line;
+
+         if Line_To_Display is null then
+            Line_To_Display := Cur_Frame.Src_Pos.Line();
+         end if;
+
+         if Cur_File is null then
+            Cur_File := Cur_Frame.Src_Pos.File();
+         end if;
+
+         List_File (Cur_File, Line_To_Display,
+           Highlight_Line => Cur_Frame.Src_Pos.Line(),
+           Num_Lines_Of_Context => 0);
+
+       ["params"|"param"|"par"] =>
+         if Cur_Frame.Start_Pc == 1 then
+            //  This frame is not a nested block
+            Display_Params (Frame_Num, Cur_Frame,
+              Pattern => |Cur_Command| >= 2? Cur_Command[2] : null);
+         else
+            //  This frame is a nested block, look for one that isn't
+            for F_Num in Frame_Num <.. Num_Frames forward loop
+               const Enclosing_Frame :=
+                 Stack_Frame_Info::Nth_Stack_Frame(F_Num);
+
+               if Enclosing_Frame.Start_Pc == 1 then
+                  //  Found a frame for an operation.
+                  Display_Params (F_Num, Enclosing_Frame,
+                    Pattern => |Cur_Command| >= 2? Cur_Command[2] : null);
+                  exit case;
+               end if;
+            end loop;
+            Println("  Cannot find frame of enclosing operation.");
+         end if;
+
+       ["locals"|"local"|"loc"] =>
+         const Pattern := |Cur_Command| >= 2? Cur_Command[2] : null;
+         var Num_Displayed := 0;
+
+         if Cur_Frame.Code is null then
+            Println("No operation found.");
+            exit case;
+         elsif Pattern not null then
+            Println("Locals of `(Cur_Frame.Code.Name()) " |
+              "matching \"`(Pattern)\":");
+         else
+            Println("Locals of `(Cur_Frame.Code.Name()):");
+         end if;
+
+         Display_Locals (Frame_Num, Cur_Frame,
+           Num_Displayed => Num_Displayed,
+           Pattern => Pattern);
+
+         if Cur_Frame.Start_Pc > 1 then
+            //  Display enclosing frames as well, up to enclosing operation.
+            for F_Num in Frame_Num <.. Num_Frames forward loop
+               const Enclosing_Frame :=
+                 Stack_Frame_Info::Nth_Stack_Frame(F_Num);
+
+               Display_Locals (F_Num, Enclosing_Frame,
+                 Num_Displayed => Num_Displayed,
+                 Pattern => Pattern);
+
+               if Enclosing_Frame.Start_Pc == 1 then
+                  //  Found a frame for an operation.
+                  exit loop;
+               end if;
+            end loop;
+         end if;
+
+         if Num_Displayed == 0 then
+            if Pattern not null then
+               Println("No local objects of `(Cur_Frame.Code.Name()) " |
+                 "matched \"`(Pattern)\".");
+            else
+               Println
+                 ("No local objects of `(Cur_Frame.Code.Name()) in scope.");
+            end if;
+         end if;
+
+       ["list"|"l"] =>
+         //  List lines around current point, or 
+         //  specific line, or specific file and line.
+
+         if |Cur_Command| == 1 then
+            if Cur_Line is null then
+               Cur_Line := Cur_Frame.Src_Pos.Line();
+            else
+               Cur_Line += Increment;
+            end if;
+         else
+            if not Get_File_And_Line (Cur_Command) then
+               Cur_Command := null;
+               continue loop;
+            end if;
+         end if;
+
+         if Cur_File is null then
+            Cur_File := Cur_Frame.Src_Pos.File();
+         end if;
+
+         //  List lines around chosen line.
+         //  Highlight the line of current breakpoint, if filenames match.
+         List_File(Cur_File, Cur_Line,
+           Highlight_Line =>
+             Cur_File == Cur_Frame.Src_Pos.File()?
+               Cur_Frame.Src_Pos.Line() : 0);
+        
+       ["break"|"br"|"b"] =>
+         //  Set a breakpoint at a given line or operation
+         if |Cur_Command| != 2 then
+            Println("Break command: break <op_name>|<line#>");
+            Cur_Command := null;
+            continue loop;
+         end if;
+
+         const Arg := Cur_Command[2];
+         var Op : Reflection::Routine := null;
+         var Break_Line : optional Univ_Integer := null;
+     
+         if Cur_File is null then
+            Cur_File := Cur_Frame.Src_Pos.File();
+         end if;
+
+         if Arg[1] in '0'..'9' then
+            Break_Line := From_String(Arg);
+
+            if Break_Line is null then
+               Println("Syntax error in line number: `(Arg)");
+               Cur_Command := null;
+               continue loop;
+            end if;
+
+            Op := Find_Op_By_Source_Pos
+                    (File_Name => Cur_File,
+                     Line => Break_Line);
+
+            if Op is null then
+               Println("No operation found at: `(Cur_File):`(Break_Line)");
+               Cur_Command := null;
+               continue loop;
+            end if;
+         else
+            Op := Find_Op_By_Name
+                    (Op_Name_Pat => Arg, 
+                     File_Name => Cur_File);
+
+            if Op is null then
+               Op := Find_Op_By_Name(Op_Name_Pat => Arg);
+            end if;
+
+            if Op is null then
+               Println("No operation found: `(Arg)");
+               Cur_Command := null;
+               continue loop;
+            end if;
+
+            //  Set breakpoint at first line of operation.
+            Break_Line := Nth_Instr(Op, 1).Source_Pos().Line();
+         end if;
+            
+         const Orig_Num_Brks := Stack_Frame_Info::Num_Breakpoints();
+
+         const BN := Stack_Frame_Info::Set_Breakpoint(Op, Break_Line);
+         const BOp_File := Source_Pos(Op.Nth_Instr(1)).File();
+
+         if BN <= Orig_Num_Brks then
+            Println("Breakpoint #`(BN) already " |
+              "set at `(Name(Op)), `(BOp_File):`(Break_Line).");
+            Cur_Command := null;
+            continue loop;
+         end if;
+
+         Println ("Breakpoint #`(BN) set at " |
+           "`(Name(Op)), `(BOp_File):`(Break_Line).");
+
+         //  Add breakpoint to Break_Line_To_File_Map
+         if Break_Line not in Break_Line_To_File_Map then
+            Break_Line_To_File_Map[Break_Line] := [BOp_File];
+         else
+            Break_Line_To_File_Map[Break_Line] |= BOp_File;
+         end if;
+
+       ["delete"|"del"|"clear"] =>
+         //  Delete breakpoint
+         if |Cur_Command| != 2 then
+            Println("delete breakpoint command: `(Cur_Command[1]) <break#>");
+            Cur_Command := null;
+            continue loop;
+         end if;
+
+         const Arg := Cur_Command[2];
+         const BN : optional Univ_Integer := From_String(Arg);
+
+         //  No point in repeating this command
+         Cur_Command := null;
+
+         if BN is null then
+            Println("Syntax error in line number: `(Arg)");
+            continue loop;
+         end if;
+
+         if BN not in 1 .. Stack_Frame_Info::Num_Breakpoints() then
+            Println("No breakpoint #`(BN).");
+            continue loop;
+         end if;
+
+         const BLine := Stack_Frame_Info::Nth_Breakpoint_Line(BN);
+
+         if BLine == 0 then
+            Println("Breakpoint #`(BN) already deleted.");
+            continue loop;
+         end if;
+
+         const BOp := Stack_Frame_Info::Nth_Breakpoint_Routine(BN);
+         const BOp_Src_Pos := Source_Pos(BOp.Nth_Instr(1));
+
+         Stack_Frame_Info::Clear_Breakpoint(BN);
+
+         Println("Deleted breakpoint #`(BN) at " |
+           "`(Name(BOp)), `(File(BOp_Src_Pos)):`(BLine).");
+
+         //  Remove breakpoint info from Break_Line_To_File_Map
+         if BLine in Break_Line_To_File_Map then
+            Break_Line_To_File_Map[BLine] -=
+              BOp.Nth_Instr(1).Source_Pos().File();
+         end if;
+
+       ["info"] =>
+         if |Cur_Command| == 1 then
+            Println("Info command: info br[eak[s]]|server[s]");
+            Cur_Command := null;
+            continue loop;
+         end if;
+         const Arg := Cur_Command[2];
+         case Arg of
+          ["breaks"|"break"|"br"] =>
+            var Displayed_One_Breakpoint : Boolean := #false;
+
+            for BN in 1 .. Stack_Frame_Info::Num_Breakpoints()
+              {Stack_Frame_Info::Nth_Breakpoint_Line(BN) != 0}
+              forward loop
+               if not Displayed_One_Breakpoint then
+                  Println("Breakpoints:");
+                  Displayed_One_Breakpoint := #true;
+               end if;
+
+               const At_This_BP :=
+                 Reason in Stack_Frame_Info::Breakpoint_Encountered
+                   and then BN == [[Reason]];
+               
+               const BN_Image := BN | (At_This_BP? ".> " : ".  ");
+               const BOp := Stack_Frame_Info::Nth_Breakpoint_Routine(BN);
+               const BOp_Src_Pos := Source_Pos(BOp.Nth_Instr(1));
+               const BLine := Stack_Frame_Info::Nth_Breakpoint_Line(BN);
+
+               Println((8 - |BN_Image|) * " " | BN_Image |
+                  "`(Name(BOp)), `(BOp_Src_Pos.File()):`(BLine)");
+            end loop;
+
+            if not Displayed_One_Breakpoint then
+               Println("No breakpoints.");
+            end if;
+
+          ["servers"|"server"] =>
+            Cur_Command := null;
+            Println("NYI: info servers");
+
+          [..] =>
+            Println("Info command: info br[eak[s]]|server[s]");
+            Cur_Command := null;
+         end case;
+
+       [..] =>
+         if Cur_Command[1] != "h"
+           and then Cur_Command[1] != "help"
+         then
+            Println("Unrecognized commmand:" |
+              (for each Word of Cur_Command forward => <""> | " " | Word));
+            //  Don't save an unrecognized command
+            Cur_Command := null;
+         end if;
+         Println("Debugger commands available:");
+         Println("  quit|q|exit : terminate the program and exit");
+         Println("  continue|c|con|cont : continue execution");
+         Println("  up|u : go to next outer stack frame, if any");
+         Println("  down|d : go to next inner stack frame, if any");
+         Println("  list|l [+|-|<line>] : list lines from source file");
+         Println("  params|param|par [<pattern>]: " |
+           "print values of parameters for current frame");
+         Println("                          " |
+           "which match \"grep\"-style pattern, if given");
+         Println("  locals|local|loc [<pattern>]: " |
+           "print value of locals of current frame");
+         Println("                          " |
+           "which match \"grep\"-style pattern, if given");
+         Println("  break|br <line>: set breakpoint at given line");
+         Println("  break|br <op_pattern>: set break on entry to operation");
+         Println("  delete|del <index>: delete breakpoint of given index");
+         Println("  info breaks|break|br: list current breakpoints");
+         Println("  step|s: single step");
+         Println("  next|n: single step, but skip over calls");
+         Println("  finish|fin: finish current operation");
+         Println("  help|h : show this message");
+      end case;
+   end loop;
+
+   {*Not_Reached* #false}
+end func PSC::Debugging::Console

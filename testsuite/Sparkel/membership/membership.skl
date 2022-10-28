@@ -1,0 +1,7 @@
+proc Membership(X, Y, Z : Integer) is
+    if X in Y..Z then
+	Println(X | " in " | Y | ".." | Z);
+    else
+	Println(X | " not in " | Y | ".." | Z);
+    end if;
+end proc Membership;

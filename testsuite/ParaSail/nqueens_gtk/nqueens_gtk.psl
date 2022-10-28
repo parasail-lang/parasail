@@ -1,0 +1,537 @@
+// Example ParaSail program -- Parallel, non-recursive N_Queens solver
+
+// Copyright (C) 2011-2014, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+interface N_Queens <Max_N : Univ_Integer := 8> is
+    // Place N queens on an NxN checkerboard so that none of them can
+    // "take" each other.
+    type Chess_Unit is new Integer< -Max_N*2 .. Max_N*2 >;
+        // An integer big enough to represent values -Max_N*2 .. +Max_N*2
+    // const Columns : Countable_Range<Chess_Unit> := 1..Max_N;
+    type Row is Chess_Unit; // {Row in Rows};  // A subrange in 1..Max_N
+    type Column is Chess_Unit; // {Column in Columns};  // A subrange
+    type Solution is Array<optional Column, Row>;  
+      // A "solution" is an array of Column's, indexed by "Row."
+      // It indicates in which Column a queen of the given Row is located
+      // An example solution would be:  2 8 6 1 3 5 7 4
+      //   meaning that the queen in row 1 is at column 2,
+      //   the queen in row 2 is at column 8, the queen in
+      //   row 3 is at column 6, and so on.
+
+    abstract concurrent interface NQ_Observer<> is
+        queued func Display_Partial_Solution (var NQ_Observer; Solution)
+    end interface NQ_Observer
+
+    func Create_Null_Observer() -> NQ_Observer+
+
+    queued func Place_Queens(N : Row := Max_N; var NQO : NQ_Observer+) 
+      -> Vector<Solution> 
+      {for all Sol of Place_Queens => for all Col of Sol => Col not null};
+        // Produce a vector of solutions, with the requirement
+        // that for each solution, there are non-null column numbers
+        // specified for each row of the checkerboard.
+end interface N_Queens;
+
+class N_Queens is
+    concurrent interface Null_Observer<> implements NQ_Observer<> is
+        queued func Display_Partial_Solution (var Null_Observer; Solution)
+          is (null)
+    end interface Null_Observer
+
+    type Sum_Range is Chess_Unit; // {Sum_Range in 2..2*Max_N};
+        // Sum_Range is used for diagonals where the row+column is the
+        // same throughout the diagonal.
+    type Diff_Range is Chess_Unit; // {Diff_Range in (1-Max_N) .. (Max_N-1)};
+        // Diff_Range is used for diagonals where row-column is the
+        // same throughout the diagonal.
+    type Sum is Countable_Set<Sum_Range>;
+        // This type of set keeps track of which Sum_Range diagonals
+        // have a queen on them already.
+    type Diff is Countable_Set<Diff_Range>;
+        // This type of set keeps track of which Diff_Range diagonals
+        // have a queen on them already.
+
+    interface Solution_State<> is
+        // We build up a solution state progressively as we move
+        // across the checkerboard, one column at a time.
+        func Initial_State(N : Row) -> Solution_State;
+        func Is_Acceptable(S : Solution_State; R : Row) -> Boolean;
+          // Is_Acceptable returns True if the next queen could be
+          // place in row R.
+        func Current_Column(S : Solution_State) -> Column;
+          // Current_Column indicates which column we are working on.
+        func Next_State(S : Solution_State; R : Row) -> Solution_State;
+          // Next_State returns a Solution_State produced by
+          // adding a queen at (Current_Column(S), R).
+        func Final_Result(S : Solution_State; R : Row) -> Solution;
+          // Final_Result returns a result produced by adding a queen
+          // at (Columns.Last, R) to a solution with all other columns
+          // placed.
+        func Partial_Solution(S : Solution_State) -> Solution;
+          // Return partial solution thus far
+    end interface Solution_State;
+
+    class Solution_State is
+        const C : Column;    // Current column
+        const Trial : Solution;  // Trial solution, some col#s still null
+        const Diag_Sum : Sum;   // Set of "sum" diagonals in use
+        const Diag_Diff : Diff; // Set of "diff" diagnoals in use
+      exports
+        func Initial_State(N : Row) -> Solution_State is
+            return (C => 1, Trial => Create(1..N, null), 
+              Diag_Sum => [], Diag_Diff => []);
+        end func Initial_State;
+
+        func Is_Acceptable(S : Solution_State; R : Row) -> Boolean is
+          // Is_Acceptable returns True if the next queen could be
+          // place in row R.
+            return S.Trial[R] is null and then
+              (R+S.C) not in S.Diag_Sum and then 
+              (R-S.C) not in S.Diag_Diff;
+        end func Is_Acceptable;
+        
+        func Current_Column(S : Solution_State) -> Column is
+          // Current_Column indicates which column we are working on.
+            return S.C;
+        end func Current_Column;
+
+        func Next_State(S : Solution_State; R : Row) -> Solution_State is
+          // Next_State returns a Solution_State produced by
+          // adding a queen at (Current_Column(S), R).
+            return (C => S.C+1, 
+              Trial     => S.Trial | [R => S.C],
+              Diag_Sum  => S.Diag_Sum | (R+S.C),
+              Diag_Diff => S.Diag_Diff | (R-S.C));
+        end func Next_State;
+
+        func Final_Result(S : Solution_State; R : Row) -> Solution is
+          // Final_Result returns a result produced by adding a queen
+          // at (Columns.Last, R) to a solution with all other columns
+          // placed.
+            return S.Trial | [R => S.C];
+        end func Final_Result;
+
+        func Partial_Solution(S : Solution_State) -> Solution is
+          // Return partial solution thus far
+            return S.Trial;
+        end func Partial_Solution;
+    end class Solution_State;
+
+  exports
+    func Create_Null_Observer() -> Result : NQ_Observer+ is
+        const Null_Obs : Null_Observer := ()
+        Result := Null_Obs
+    end func Create_Null_Observer
+
+    queued func Place_Queens(N : Row := Max_N; var NQO : NQ_Observer+) 
+      -> Vector<Solution> 
+      {for all Sol of Place_Queens => for all Col of Sol => Col not null}
+        // Produce a vector of solutions, with the requirement
+        // that for each solution, there are non-null column numbers
+        // specified for each row of the checkerboard.
+    is
+      const Rows : Countable_Range<Chess_Unit> := 1..N;
+      var Solutions : concurrent Vector<Solution> := [];
+      
+     *Outer_Loop*
+      for State : Solution_State := Initial_State(N) loop
+          // Iterate over the columns
+        
+          for R in Rows concurrent loop
+              // Iterate over the rows
+              if Is_Acceptable(State, R) then
+                  // Found a Row/Column combination that is not on any diagonal
+                  // already occupied.
+                  if Current_Column(State) < N then
+                      // Keep going since haven't reached Nth column.
+                      const Next := Next_State(State, R);
+                      NQO.Display_Partial_Solution (Partial_Solution(Next));
+                      continue loop Outer_Loop with State => Next;
+                  else
+                      // All done, remember trial result with last queen placed
+                      const Final := Final_Result(State, R);
+                      NQO.Display_Partial_Solution (Final);
+                      Solutions |= Final;
+                  end if;
+              end if;
+          end loop;
+      end loop Outer_Loop;
+      return Solutions;
+      
+    end func Place_Queens;
+end class N_Queens;
+
+func Test_N_Queens() is
+
+    const Do_9_Queens : Boolean := #false;
+
+    type Ten_Queens is N_Queens<10>; // <8>;
+    var Null_Observer := Ten_Queens::Create_Null_Observer()
+
+    if Do_9_Queens then
+
+        var Results9 := Ten_Queens::Place_Queens(9, Null_Observer);
+
+        Println("Number of results with 9 queens = " | Length(Results9));
+        for I in 1..Length(Results9) forward loop
+            const Result := Results9[I];
+            Print("Result #" | I);
+            for J in 1..Length(Result) forward loop
+                Print(" " | [[Result[J]]]);
+            end loop;
+            Print('\n');
+        end loop;
+    end if;
+
+
+    var Results8 := Ten_Queens::Place_Queens(8, Null_Observer);
+
+    Println("Number of results with 8 queens = " | Length(Results8));
+    for I in 1..Length(Results8) forward loop
+        const Result := Results8[I];
+        Print("Result #" | I);
+        for J in 1..Length(Result) forward loop
+            Print(" " | [[Result[J]]]);
+        end loop;
+        Print('\n');
+    end loop;
+
+    // type Six_Queens is N_Queens<6>;
+
+    var Results6 := Ten_Queens::Place_Queens(6, Null_Observer);
+
+    Println("Number of results with 6 queens = " | Length(Results6));
+    for I in 1..Length(Results6) forward loop
+        const Result := Results6[I];
+        Print("Result #" | I);
+        for J in 1..Length(Result) forward loop
+            Print(" " | [[Result[J]]]);
+        end loop;
+        Print('\n');
+    end loop;
+    // type Four_Queens is N_Queens<4>;
+    var Results4 := Ten_Queens::Place_Queens(4, Null_Observer);
+    Println("Number of results with 4 queens = " | Length(Results4));
+    for I in 1..Length(Results4) forward loop
+        const Result := Results4[I];
+        Print("Result #" | I);
+        for J in 1..Length(Result) forward loop
+            Print(" " | [[Result[J]]]);
+        end loop;
+        Print('\n');
+    end loop;
+
+end func Test_N_Queens;
+
+import *, GTK::*, Cairo::*
+
+interface Nqueens_GTK<> extends GTK::Controller<> is
+    func On_Delete_Event(var Nqueens_GTK; var Window+; Event+) -> Boolean
+    func On_Destroy(var Nqueens_GTK; var Window+)
+    func On_Clicked(var Nqueens_GTK; var Widget+)
+    func On_Draw (var Nqueens_GTK; var Widget+; var Cairo::Context) -> Boolean
+
+  new
+
+    type Ten_Queens is N_Queens<Max_N => 10> // => 8>;
+    func Create(locked GTK; N : Univ_Integer) -> Nqueens_GTK
+    var Observer : optional Ten_Queens::NQ_Observer+ := null
+
+    concurrent interface GTK_Observer<>
+      implements Ten_Queens::NQ_Observer<> is
+        queued func Display_Partial_Solution
+          (var GTK_Observer; Ten_Queens::Solution)
+        func Create(Drawing_Area) -> GTK_Observer
+        func Saved_Solutions(locked GTK_Observer)
+          -> Vector<Ten_Queens::Solution>
+
+        func Start_Solution(locked var GTK_Observer)
+        func Await_Start(queued var GTK_Observer)
+
+        func GTK_View(ref NQObs : Ten_Queens::NQ_Observer+) -> ref GTK_Observer
+    end interface GTK_Observer
+
+    // var ObsGTK : optional GTK_Observer := null
+end interface Nqueens_GTK
+
+class Nqueens_GTK is
+    var Top : optional Window := null
+    var Main_Table : optional Table := null
+    var Main_Display : optional Drawing_Area := null
+    var Solve : optional Button := null
+    var Num : Ten_Queens::Row := 4
+
+  exports
+    concurrent class GTK_Observer is
+        var Solutions : Vector<Ten_Queens::Solution>
+        var Main_Display : Drawing_Area
+        var Start : Boolean
+        var Wait_For : Time  //  When to allow next change to occur
+        const Delay_Per_Change : Time::Time_Interval := 0.5
+                             //  Delay between changes
+
+        func Print_Partial_Solution (Ten_Queens::Solution) is
+            for each E of Solution forward loop
+                Print (" " | E)
+            end loop
+            Print ("\n")
+        end func Print_Partial_Solution
+
+        func Remember_Partial_Solution
+          (locked var GTK_Observer; Ten_Queens::Solution) is
+            //  Add partial solution to current graphical summary of solutions
+            Print ("Partial solution:")
+            Print_Partial_Solution (Solution)
+
+            //  Look for an existing solution that has just one less
+            //  queen placed, and all other queens at same location.
+            var Match := 0
+           *Outer*
+            for each [Index => E] of GTK_Observer.Solutions concurrent loop
+                var Num_Diffs := 0
+                for I in E.Bounds loop
+                    if E[I] is null then
+                        if Solution[I] not null then
+                           Num_Diffs += 1
+                           if Num_Diffs > 1 then
+                               //  Too many differences, go to next one
+                               continue loop Outer
+                           end if
+                        end if
+                    elsif Solution[I] is null
+                      or else E[I] != Solution[I]
+                    then
+                        //  Existing solution has more queens or has a queen
+                        //  in a different column.
+                        continue loop Outer
+                    end if;
+                end loop
+                if Num_Diffs == 1 then
+                    //  Found one with exactly one difference; use that one.
+                    exit loop Outer with Match => Index
+                end if
+            end loop Outer
+
+            if Match > 0 then
+                Print("Found prior solution, Solutions[" | Match | "] = ")
+                Print_Partial_Solution (GTK_Observer.Solutions[Match])
+                GTK_Observer.Solutions[Match] := Solution
+            else
+                Println("New starting point");
+                GTK_Observer.Solutions |= Solution
+            end if
+
+        end func Remember_Partial_Solution
+    
+        func Bump_Wait (locked var GTK_Observer) -> Result : Time is
+            //  Get current wake-up time
+            const Now := Clock::Now()
+            Result := GTK_Observer.Wait_For
+
+            //  Compute next time to allow a change
+            GTK_Observer.Wait_For := Max (Result, Now) + Delay_Per_Change
+
+            if Result > Now then
+                Println ("Delaying for " | Result - Now | 
+                  " seconds (until " | Seconds_Since_1970 (Result) | ")")
+            end if
+
+        end func Bump_Wait
+
+      exports
+
+        queued func Display_Partial_Solution
+          (var GTK_Observer; Ten_Queens::Solution) is
+            //  Get time when change is allowed
+            Clock::Delay(GTK_Observer.Bump_Wait())  
+                                 // Wait before doing a change
+            //  Update state
+            Remember_Partial_Solution (GTK_Observer, Solution)
+
+            //  (Re)display current state
+            GTK_Observer.Main_Display.Queue_Draw()
+        end func Display_Partial_Solution
+
+        func Create(Drawing_Area) -> GTK_Observer is
+            return (Solutions => [],
+                    Main_Display => Drawing_Area,
+                    Start => #false,
+                    Wait_For => Clock::Now())
+        end func Create
+
+        func Saved_Solutions(locked GTK_Observer)
+          -> Vector<Ten_Queens::Solution> is
+            return GTK_Observer.Solutions
+        end func Saved_Solutions
+
+        func Start_Solution(locked var GTK_Observer) is
+            GTK_Observer.Start := #true
+        end func Start_Solution
+
+        func Await_Start(queued var GTK_Observer) is
+          queued until GTK_Observer.Start then
+            GTK_Observer.Start := #false
+        end func Await_Start
+        
+        func GTK_View(ref NQObs : Ten_Queens::NQ_Observer+)
+          -> ref GTK_Observer is
+            case NQObs of
+              [GTK_Obs : GTK_Observer] =>
+                return GTK_Obs;
+              [..] =>
+                Println ("Unexpeced kind of observer")
+            end case
+        end func GTK_View
+       
+    end class GTK_Observer
+
+    func Create(locked GTK; N : Univ_Integer) -> Result : Nqueens_GTK is
+        Result := (GTK => GTK);
+        const Display : Drawing_Area := Result.GTK.New()
+        Result.Observer := GTK_Observer::Create(Display);
+        // Result.ObsGTK := GTK_Observer::Create(Display);
+        Result.Num := N
+
+        Result.Top := Result.GTK.New(#toplevel)
+        Result.Top.Set_Title(N | " Queens Solutions");
+        Result.Top.Set_Default_Size(1000, 800)
+        Result.Top.Set_Position(#center)
+
+        Result.Main_Table := Result.GTK.New(1, 1, Homogeneous => #false)
+        Result.Main_Display := Display
+        Result.Main_Table.Attach(Result.Main_Display, 0, 3, 1, 4)
+
+        Result.Solve := Result.GTK.New("Solve")
+        Result.Main_Table.Attach(Result.Solve, 2, 3, 4, 5)
+
+        Result.Top.Add(Result.Main_Table);
+
+        Show_All (Result.Top)
+
+    end func Create
+    
+    func On_Delete_Event(var Nqueens_GTK; var Window+; Event+) -> Boolean is
+        Println("In Nqueens_GTK On_Delete_Event routine")
+        Println("delete event occurred")
+        // Println("Get_Type(Event) = " | Get_Type(Event))
+
+        Println("About to destroy window")
+        Destroy (Window);
+        return #false
+    end func On_Delete_Event
+
+    func On_Destroy(var Nqueens_GTK; var Window+) is
+        Println("In Nqueens_GTK On_Destroy routine")
+        Nqueens_GTK.GTK.Main_Quit()
+    end func On_Destroy
+
+    func On_Clicked(var Nqueens_GTK; var Widget+) is
+        Println("In Nqueens_GTK On_Clicked routine")
+        case Widget of
+          [Nqueens_GTK.Solve] =>
+            Nqueens_GTK::GTK_Observer::Start_Solution
+              (GTK_View(Nqueens_GTK.Observer))
+          [..] => null
+        end case
+    end func On_Clicked
+
+    func On_Draw
+      (var NQ : Nqueens_GTK; var W : Widget+; var Cr : Cairo::Context)
+      -> Boolean is
+        Println("In On_Draw")
+        var Sols : Vector<Ten_Queens::Solution>
+        case NQ.Observer of
+            [GTK_Obs : GTK_Observer] =>
+                Sols := Saved_Solutions (GTK_Obs)
+            [..] =>
+                Println ("Unexpected kind of Observer")
+                return
+        end case
+        const Width : Float := Int_To_Float (W.Get_Allocated_Width());
+        const Height : Float := Int_To_Float (W.Get_Allocated_Height());
+        const Gap : Float := 20.0  // space between boards
+        const Boards_Per_Row := 10
+        const Board_Spacing := Width / Boards_Per_Row
+        const Board_Width := Board_Spacing - Gap
+        const Unit_Width := Board_Width / NQ.Num
+
+        var Queen : Pango::Layout := New(Cr);
+        Queen.Set_Text ("*")
+        const Q_Height : Float := Int_To_Float (Queen.Get_Pixel_Height())
+        const Q_Width : Float := Int_To_Float (Queen.Get_Pixel_Width())
+
+        var Blank : Pango::Layout := New(Cr);
+        Blank.Set_Text ("  ")
+        const B_Height : Float := Int_To_Float (Blank.Get_Pixel_Height())
+        const B_Width : Float := Int_To_Float (Blank.Get_Pixel_Width())
+
+        for I in 1..|Sols| loop
+            ref Sol => Sols[I]
+            const Upper_Left_X := 
+              ((I-1) mod Boards_Per_Row) * Board_Spacing + Gap/2
+            const Upper_Left_Y := 
+              ((I-1) / Boards_Per_Row) * Board_Spacing + Gap/2
+            //  Draw horizontal lines
+            for Row in 0 .. NQ.Num loop
+                Cr.Move_To (Upper_Left_X, Upper_Left_Y + Row * Unit_Width)
+                Cr.Line_To (Upper_Left_X + Board_Width,
+                  Upper_Left_Y + Row * Unit_Width)
+                Cr.Stroke()
+            end loop
+            //  Draw vertical lines
+            for Col in 0 .. NQ.Num loop
+                Cr.Move_To (Upper_Left_X + Col * Unit_Width, Upper_Left_Y)
+                Cr.Line_To (Upper_Left_X + Col * Unit_Width, 
+                  Upper_Left_Y + Board_Width)
+                Cr.Stroke()
+            end loop
+            //  Draw Queens
+            const Max_Col := (for each Col of Sol => Max(<null>, Col))
+            for Row in 1 .. NQ.Num loop
+                if Sol[Row] not null then
+                    // Display a queen marker
+                    if Sol[Row] == Max_Col then
+                       //  Last column added
+                       Cr.Set_Source_RGB(1.0, 0.0, 0.0)  // Set to red
+                    elsif Max_Col == NQ.Num then
+                       //  We have a complete solution
+                       Cr.Set_Source_RGB(0.0, 0.7, 0.0)  // Set to dark green
+                    end if
+                    Cr.Move_To (Upper_Left_X + (Sol[Row]-1) * Unit_Width +
+                        (Unit_Width - Q_Width)/2,
+                      Upper_Left_Y + (Row-1) * Unit_Width +
+                        (Unit_Width - Q_Height)/2)
+                    Cr.Show_Layout (Queen)
+                    Cr.Stroke()
+                    Cr.Set_Source_RGB(0.0, 0.0, 0.0)  // Set back to black
+                end if
+            end loop
+        end loop
+        Show(W)
+        Println("Draw done");
+        return #false
+    end func On_Draw
+end class Nqueens_GTK;
+
+func help() is
+    Println("type \"Test_Nqueens_GTK <num>\" to start")
+end func help
+
+func Test_Nqueens_GTK(Num : Univ_Integer) is
+    var IO := IO::Get_IO()
+    var NQ_GTK := Nqueens_GTK::Create(Init(IO, []), Num)
+
+    Println ("About to solve " | Num | " queens problem")
+    block
+        NQ_GTK.Main_Loop()
+        exit block
+     ||
+        loop
+            Nqueens_GTK::GTK_Observer::Await_Start (GTK_View (NQ_GTK.Observer))
+            const Ignore :=
+              Nqueens_GTK::Ten_Queens::Place_Queens(Num, NQ_GTK.Observer)
+        end loop
+    end block
+    Println ("All done!");
+end func Test_Nqueens_GTK;

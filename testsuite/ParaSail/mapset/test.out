@@ -1,0 +1,13 @@
+Count = 2
+Mapping #false => ParaSail
+Mapping #true => example
+Count after deletion = 1
+Mapping #true => example
+Count after addition = 2
+Mapping #false => a new value
+Mapping #true => example
+Count after replacement = 2
+Mapping #false => a third value
+Mapping #true => example
+Count after deletion = 1
+Mapping #false => a third value

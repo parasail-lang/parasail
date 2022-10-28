@@ -1,0 +1,11 @@
+X = 10, Y = 20
+Sign(10) = 1
+X > Y = #false
+Bigger is 20
+Smaller is 10
+not X < Y is #false
+(if X > Y then X) = null
+Vec: [30, 50, 70, 90, 110, 130, 150, 170, 190, 210]
+All_Small = #false
+Some_Even = #true
+Double of Vec: [60, 100, 140, 180, 220, 260, 300, 340, 380, 420]

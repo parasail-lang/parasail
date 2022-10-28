@@ -1,0 +1,126 @@
+// Interfaces used for mapping psvm instructions to Ada
+
+interface PSVM<> is
+    type Area_Base_Indicator is new Integer<0..255>;
+	// Indicator of which base register to use
+
+    type Area_Base_Range is Countable_Range<Area_Base_Indicator>;
+
+    const Zero_Base : Area_Base_Indicator := 0;
+    const Local_Area : Area_Base_Indicator := 1;
+      // Relative to current local area
+    const Param_Area : Area_Base_Indicator := 2;
+      // Relative to param area of current operation
+    const Type_Area : Area_Base_Indicator := 3;
+      // Relative to enclosing type for current operation;
+      // This is equivalent to the outermost enclosing local area.
+    const Const_Area : Area_Base_Indicator := 4;
+      // This is a compile-time-known constant.
+      // The offset is an index into a Const_Info_Array.
+
+    const Base_Registers : Area_Base_Range := 32..255;
+      // Relative to some temp base register kept in the current Local_Area
+
+    const Enclosing_Param_Areas : Area_Base_Range := 8..15;
+      // Relative to a param area of an enclosing operation
+      // The second word of a local area points at its param area
+      // if it has nested operations.  This walks up through the
+      // static links in the local areas, and then when it reaches
+      // the right local area, it gets the param area from there.
+
+    const Enclosing_Local_Areas : Area_Base_Range := 16..23;
+      // Relative to a local area of an enclosing block or operation
+      // The first word of a local area points at its enclosing
+      // block, or at the outermost level, the enclosing type area.  
+      // The type area has a null in its first word.
+
+    const Enclosing_Type_Areas : Area_Base_Range := 24..31;
+      // Relative to a type area for an enclosing module
+      // Type areas are linked together via the Enclosing_Type link.
+
+    // Make sure that we can use "mod" to extract the up-level count, 
+    // from both Enclosing_Param_Areas and Enclosing_Local_Areas
+    const Max_Up_Levels := Length(Enclosing_Param_Areas);
+
+    {Max_Up_Levels == Length(Enclosing_Local_Areas)};
+    {Enclosing_Param_Areas.First mod Max_Up_Levels == 0}
+    {Enclosing_Local_Areas.First mod Max_Up_Levels == 0};
+    {Enclosing_Type_Areas.First mod Max_Up_Levels == 0};
+
+    type Non_Null_Value is new Integer<-(2**62-1)*2-1 .. +(2**62-1)*2+1>;
+      // Memory is organized as an array of 64-bit "words"
+    type Word_Type is optional Non_Null_Value;
+
+    const Word_Size := 64;  // Word_Type#size
+
+    const Null_Value : Word_Type := null;
+	// Most negative value used to represent "null" int and null pointer
+
+    const Null_Float_Value : Word_Type := -1;  // all ones is an IEEE NaN
+
+    const Chunk_Divisor := 2**32;
+
+    type Offset_Within_Chunk is 
+      Integer<0..2**31-1>;
+    {Offset_Within_Chunk::Last() < Chunk_Divisor};
+      // We are limited to the overall number of bits given to the chunk.
+
+    type Offset_Within_Area is 
+      Offset_Within_Chunk {Offset_Within_Area in 0..2**16-1};
+	// Offset within area identified by base register
+
+    const Local_Area_Local_Data_Offset : Offset_Within_Area := 3;
+      // Offset to where local data starts in local area
+
+    const Max_Offset_For_Base_Register : Offset_Within_Area :=
+      [[Base_Registers.Last - Base_Registers.First]];
+	// Limit on local-area offset that can be turned into a base register
+
+    interface Object_Locator<> is
+	// Combination of base register identifier and offset, this
+	// kind of locator can appear within an instruction.
+	// These are used both for identifying code and for identifying data.
+	// When used for identifying code, the locator is pointing
+	// at something which contains the "address" of the code.
+	const Base : Area_Base_Indicator;
+        const Offset : Offset_Within_Area;
+    end interface Object_Locator;
+
+    const Null_Object_Locator : Object_Locator := (Zero_Base, 0);
+
+end interface PSVM;
+
+interface PSVM::Instruction<> is
+    type Opcode_Enum is new Enum<[#Skip_Op, #Call_Op, #Return_Op,
+      #Move_Word_Op, #Store_Address_Op,
+      #Create_Obj_Op, #Assign_Word_Op, #Swap_Obj_Op, 
+      #Move_Obj_Op, #Make_Copy_In_Region_Op,
+      #Store_Local_Null_Op, #Store_Null_Of_Same_Region_Op,
+      #Is_Null_Op, #Not_Null_Op,
+      #Store_Int_Lit_Op, #Store_Real_Lit_Op, #Store_Char_Lit_Op,
+      #Store_Enum_Lit_Op, #Store_Str_Lit_Op,
+      #Start_Parallel_Op, #Add_Parallel_Op, #Wait_For_Parallel_Op,
+      #Start_Parallel_Call_Op, #Add_Parallel_Call_Op,
+      #Create_Lock_For_Obj_Op, #Create_TCB_Op,
+      #Create_Polymorphic_Obj_Op, #Select_Polymorphic_Ancestor_Part_Op,
+      #Select_Ancestor_Part_Op,
+      #If_Op, #Call_Block_Op, #Check_Block_Op, #Exit_Op, 
+      #End_Op, #Case_Op, #Loop_Op]>; // TBD: These three are not used yet
+	// The various op codes in the instruction set
+
+    func Line(Instruction) -> Univ_Integer;
+    func Opcode(Instruction) -> Opcode_Enum;
+end interface PSVM::Instruction;
+    
+interface PSVM::Operation<> is
+    func Name(Operation) -> Univ_String;
+    func Instrs(Operation) -> Vector<PSVM::Instruction>;
+end interface PSVM::Operation;
+
+interface PSVM::Module<> is
+    func Operations(Module) -> Vector<PSVM::Operation>;
+end interface PSVM::Module;
+
+interface PSVM::Library<> is
+    func Modules(Library) -> Vector<PSVM::Module>;
+end interface PSVM::Library;

@@ -1,0 +1,49 @@
+concurrent interface PSL::Core::IO<>:
+  // Locked versions of the Print, Println and Readln operations
+    var Stdout : Standard_Output_Stream
+    var Stderr : Standard_Output_Stream
+
+    func Get_IO() -> IO  // Get handle on IO subsystem
+
+    func Print(locked var IO; Univ_String)
+    func Println(locked var IO; Univ_String)
+
+    func Print(locked var IO; Val : Val_Type is Imageable<>)
+    func Println(locked var IO; Val : Val_Type is Imageable<>)
+
+    func Readln(locked var IO) -> optional Univ_String
+        //  Read input up to a newline, from standard input.
+        //  Return null value when reaching end of file of standard input
+        //  (which can happen when standard input is coming from a file,
+        //   or when user types control/D on a Unix-like platform).
+
+    type Exit_Status_Value is new Integer<-9999 .. +9999>
+    const Exit_Success : Exit_Status_Value := 0
+    const Exit_Failure : Exit_Status_Value := 1 
+    func Set_Exit_Status(locked var IO; Exit_Status_Value)
+      is import(#set_exit_status)
+
+end interface PSL::Core::IO
+
+concurrent class PSL::Core::IO:
+  exports
+    func Get_IO() -> IO:
+        return (Stdout => (Channel => #stdout),
+                Stderr => (Channel => #stderr));
+
+    func Print(locked var IO; Univ_String):
+        Print (Univ_String)
+
+    func Println(locked var IO; Univ_String):
+        Println (Univ_String)
+
+    func Print(locked var IO; Val : Val_Type is Imageable<>):
+        Print (Val_Type::To_String(Val))
+
+    func Println(locked var IO; Val : Val_Type is Imageable<>):
+        Println (Val_Type::To_String(Val))
+
+    func Readln(locked var IO) -> optional Univ_String:
+        return Readln()
+
+end class PSL::Core::IO

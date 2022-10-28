@@ -1,0 +1,8 @@
+def Func_Result(X : Integer) -> Integer :
+    if X < 0 :
+	Func_Result = Func_Result(-X)*3;
+    else :
+	Func_Result = X*2;
+    end if;
+end def Func_Result;
+

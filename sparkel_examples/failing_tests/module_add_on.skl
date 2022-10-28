@@ -1,0 +1,40 @@
+--  This example is NOT a direct translation of the module_add_on.psl
+--  example since I don't know the ParaSail meaning of the section
+--  between brackets located in the header of class/interface types.
+--  I mean:
+--      interface Set[#output] is ...
+--      class Set[#output, 2] is ...
+
+package Set is
+   type Set is abstract null record;
+   abstract func Text_Image(S : Set) return Univ_String;
+   abstract func XML_Image (S : Set) return Univ_String;
+end Set;
+
+package MySet is
+   --  ??? According to the grammar rules of the reference manual
+   --  this record type definition is not valid
+   type MySet is new Set with null record;
+
+   func Text_Image(S : Set) return Univ_String;
+   func XML_Image (S : Set) return Univ_String;
+end MySet;
+
+package body MySet is
+   --  ??? "exports" is NOT a reserved word of Sparked but it is
+   --  required by the compiler
+exports
+   func Text_Image(S : Set) return Univ_String is
+      return "";
+   end func Text_Image;
+
+   func XML_Image (S : Set) return Univ_String is
+      return "<br/>";
+   end func XML_Image;
+end MySet;
+
+proc TestSet() is
+   var Obj : MySet;
+
+   Obj.XML_Image();
+end proc TestSet;

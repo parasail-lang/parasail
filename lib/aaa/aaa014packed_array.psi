@@ -1,0 +1,699 @@
+interface PSL::Containers::Packed_Word
+  <Key_Type is Enum<>;
+   Bit_Field_Sizes : Array<Univ_Integer, Indexed_By => Key_Type>;
+     {Bit_Field_Sizes.Bounds == [..]}  // All values of Key_Type have a size
+     {(for each Size of Bit_Field_Sizes => <0> + |Size|) <= 63} // Sizes <= 63
+   Allow_Null : Boolean := #false> is
+   // This implements a packed word, where the map determines
+   // the sizes of the bit fields.
+   // The size of a bit field may be negative to indicate a signed bit field,
+   // or positive to indicate an unsigned bit field.
+   // The sum of the absolute values of the sizes must be no more than 63.
+   // If Allow_Null is #true, then null values can be stored/fetched.
+   // Otherwise, only non-null values are permitted.
+
+   const Bit_Field_Ranges :
+     Array<Countable_Range<Univ_Integer>, Indexed_By => Key_Type> :=
+     //  Range of allowed values for each bit field
+     //  Null is most negative value if Size < 0, else most positive value.
+      [for each [Key => Size] of Bit_Field_Sizes,
+        Key => (if Size >= 0 then 0
+                elsif Allow_Null then -2**(|Size|-1) + 1
+                else -2**(|Size|-1))
+                 ..
+               (if Size < 0 then 2**(|Size|-1) - 1
+                elsif Allow_Null then 2**Size - 2
+                else 2**Size - 1)]
+
+   func Create(Bit_Field_Values : Map<Key_Type, Univ_Integer>)
+     {(for all [Key => Val] of Bit_Field_Values =>
+        (if Val is null then Allow_Null else Val in Bit_Field_Ranges[Key]))}
+     -> Packed_Word
+     // Create a packed word with the given initial values.
+     // Unspecified fields will be initialized to zero or null,
+     // according to Allow_Null.
+
+   op "indexing"(W : Packed_Word; Key : Key_Type)
+     -> Result : optional Univ_Integer
+     {(if Result is null then Allow_Null else Result in Bit_Field_Ranges[Key])}
+     //  Extract from W and return the bit field identified by Key
+
+   func Set_Bit_Field(var W : Packed_Word;
+                      Key : Key_Type; Value : optional Univ_Integer)
+     {(if Value is null then Allow_Null else Value in Bit_Field_Ranges[Key])}
+     //  Insert Value into bit field of W identified by Key
+
+   func Dump_Constant_Info()
+   //  Dump constants computed to make packing/unpacking more efficient.
+
+end interface PSL::Containers::Packed_Word
+
+class PSL::Containers::Packed_Word is
+   // This implements a packed word, where the map determines
+   // the sizes of the bit fields.
+   // The size of a bit field may be negative to indicate a signed bit field,
+   // or positive to indicate an unsigned bit field.
+   // The sum of the absolute values of the sizes must be no more than 63.
+   // If Allow_Null is #true, then null values can be stored/fetched.
+   // Otherwise, only non-null values are permitted.
+
+   var Word : Univ_Integer  // TBD: define a type that doesn't allow null
+                            //      (and use it to implement Modular?)
+   const Bit_Field_Defaults : Array<Univ_Integer, Indexed_By => Key_Type> :=
+     [for each [Key => Size] of Bit_Field_Sizes, Key =>
+        (if not Allow_Null then 0
+         elsif Size < 0 then -2**(|Size|-1)
+         else 2**Size-1)]
+
+   const Bit_Field_Offsets : Array<Univ_Integer, Indexed_By => Key_Type> :=
+     [for each [Key => Size] of Bit_Field_Sizes, Key =>
+        (for K in Key_Type::First() .. Key-1 => <0> + Bit_Field_Sizes[K])]
+
+ exports
+
+   func Create(Bit_Field_Values : Map<Key_Type, Univ_Integer>)
+     -> Result : Packed_Word is
+     // Create a packed word with the given initial values.
+     // Unspecified fields will be initialized to zero or null,
+     // according to Allow_Null.
+      //  TBD: Should not need to repeat precondition here to get it checked!
+      {(for all [Key => Val] of Bit_Field_Values =>
+           (if Val is null then Allow_Null else Val in Bit_Field_Ranges[Key]))}
+      return (Word => (for each [Key => Size] of Bit_Field_Sizes reverse =>
+                <0> * 2**|Size| + (Key in Bit_Field_Values?
+                                     Bit_Field_Values[Key]:
+                                     Bit_Field_Defaults[Key])))
+   end func Create
+
+   op "indexing"(W : Packed_Word; Key : Key_Type)
+     -> Result : optional Univ_Integer is
+     //  Extract from W and return the bit field identified by Key
+     const Size := Bit_Field_Sizes[Key]
+     const Abs_Size := |Size|
+     Result := (W.Word >> Bit_Field_Offsets[Key]) mod 2 ** Abs_Size
+
+     if Size < 0 and then Result >= 2 ** (Abs_Size-1) then
+        //  Handle negative values for signed fields
+        Result -= 2 ** (Abs_Size-1)
+     end if
+
+     if Allow_Null and then Result == Bit_Field_Defaults[Key] then
+        //  We have a "null" value
+        Result := null
+     end if
+
+     {(if Result is null then Allow_Null else Result in Bit_Field_Ranges[Key])}
+   end op "indexing"
+
+   func Set_Bit_Field(var W : Packed_Word;
+                      Key : Key_Type; Value : optional Univ_Integer) is
+     //  Insert Value into bit field of W identified by Key
+      {(if Value is null then Allow_Null else Value in Bit_Field_Ranges[Key])}
+      const Abs_Size := |Bit_Field_Sizes[Key]|
+
+      const Unsigned_Field_Value :=  //  Unsigned Value of field
+        (if Value is null then Bit_Field_Defaults[Key] else Value) mod
+           2 ** Abs_Size
+
+      const Above_Field :=
+         W.Word - W.Word mod (2 ** (Abs_Size + Bit_Field_Offsets[Key]))
+      const Below_Field := W.Word mod 2**Bit_Field_Offsets[Key]
+
+      W.Word := (Unsigned_Field_Value << Bit_Field_Offsets[Key]) +
+             Above_Field + Below_Field
+   end func Set_Bit_Field
+
+   func Dump_Constant_Info() is
+   //  Dump constants computed to make packing/unpacking more efficient.
+      Println(" Bit_Field_Sizes: [" |
+        (for (each [Key => Size] of Bit_Field_Sizes; Sep := "" then ", ")
+          forward => <""> | Sep | Key | " => " | Size) | "]")
+
+      Println(" Bit_Field_Ranges: [" |
+        (for (each [Key => Range] of Bit_Field_Ranges; Sep := "" then ", ")
+          forward => <""> | Sep | Key | " => " |
+            Range.First | ".." | Range.Last) | "]")
+
+      Println(" Bit_Field_Defaults: [" |
+        (for (each [Key => Default] of Bit_Field_Defaults; Sep := "" then ", ")
+          forward => <""> | Sep | Key | " => " | Default) | "]")
+
+      Println(" Bit_Field_Offsets: [" |
+        (for (each [Key => Offset] of Bit_Field_Offsets; Sep := "" then ", ")
+          forward => <""> | Sep | Key | " => " | Offset) | "]")
+   end func Dump_Constant_Info
+
+end class PSL::Containers::Packed_Word
+
+func PSL::Test::Test_Packed_Word() is
+   type Fields is Enum<[#red, #green, #blue]>
+   type RGB is Packed_Word<Fields, [#red => 8, #green => 7, #blue => 9]>
+
+   Println ("type RGB is Packed_Word" |
+     "<Fields, [#red => 8, #green => 7, #blue => 9]>");
+
+   RGB::Dump_Constant_Info()
+
+   var All_Red : RGB := Create([#red => 255, #green => 0])
+
+   func Print_RGB(C : RGB) is
+      Print("[")
+      for (F in Fields; Sep := "" then ", ") forward loop
+         Print(Sep | F | " => " | C[F])
+      end loop
+      Println("]")
+   end func Print_RGB
+
+   Print("Red: ")
+   Print_RGB(All_Red)
+
+   var Purple := All_Red
+   Set_Bit_Field(Purple, #blue, 255)
+
+   Print("Purple: ")
+   Print_RGB(Purple)
+
+   Set_Bit_Field(Purple, #green, Purple[#green] + 3)
+
+   Print("Purple with a touch of green: ")
+   Print_RGB(Purple)
+
+
+end func PSL::Test::Test_Packed_Word
+interface PSL::Containers::Packed_Array
+  <Elem_Type is Countable<>; Indexed_By is Countable<>;
+   Allow_Null : Boolean := #false> 
+  implements Indexable<Elem_Type, Indexed_By> is
+  // A packed array abstraction where the index type is not necessarily
+  // Univ_Integer, but instead can be any Countable type (e.g. Enum<...>)
+  // The element type must be countable, and only the range First()..Last()
+  // need be represented.
+  // If Allow_Null is #true, then one extra value per element is allowed
+  // so that "null" can be represented (the "all ones" value is used for null).
+  // In an instantiation, the Elem_Type should include "optional"
+  // if Allow_Null is #true.
+
+    const Bounds : Countable_Range<Indexed_By>
+
+    func Create(Bounds : Countable_Range<Indexed_By>;
+      Initial_Value : Elem_Type)
+      -> Packed_Array
+
+    func Length(Arr : Packed_Array) -> Univ_Integer
+    op "magnitude"(Packed_Array) -> Univ_Integer is Length
+
+    func Bounds(Arr : Packed_Array) -> Countable_Range<Indexed_By>
+    func First(Arr : Packed_Array) -> Indexed_By is (Arr.Bounds().First)
+    func Last(Arr : Packed_Array) -> Indexed_By is (Arr.Bounds().Last)
+
+    interface Packed_Array_Ref<> is
+        func Create(ref Arr : Packed_Array; Index : Indexed_By)
+          -> ref Packed_Array_Ref
+        op "ref"(ref Packed_Array_Ref) -> ref Elem_Type
+        op "end"(var Packed_Array_Ref)
+    end interface Packed_Array_Ref
+
+    op "indexing"(Arr : Packed_Array; Index : Indexed_By)
+      -> optional Elem_Type
+    op "var_indexing"(ref var Arr : Packed_Array; Index : Indexed_By)
+      -> ref var Packed_Array_Ref
+    op "index_set"(Arr : Packed_Array) -> Countable_Range<Indexed_By>
+    func Set(var Arr : Packed_Array; Index : Indexed_By; New_Val : Elem_Type)
+    op "<|="(var Left : Packed_Array; var Right : Elem_Type)
+    op "|"(Left : Packed_Array; Right : Key_Value<Indexed_By, Elem_Type>)
+      -> Packed_Array
+    op "[]"() -> Packed_Array
+    func Dump()
+end interface PSL::Containers::Packed_Array
+
+class PSL::Containers::Packed_Array is
+  // A packed array abstraction where the index type is not necessarily
+  // Univ_Integer, but instead can be any Countable type (e.g. Enum<...>)
+  // The element type must be countable, and only the range First()..Last()
+  // need be represented.
+  // If Allow_Null is #true, then one extra value per element is allowed
+  // so that "null" can be represented (the "all ones" value is used for null).
+  // In an instantiation, the Elem_Type should include "optional"
+  // if Allow_Null is #true.
+    const Word_Size := 62  // So as to avoid the null value of Univ_Integer
+    func Num_Bits(Num_Vals : Univ_Integer) -> Univ_Integer is
+        for (Bits in 1 .. Word_Size-1; Pow := 2 then Pow + Pow) forward loop
+            if Pow >= Num_Vals then
+                return Bits
+            end if
+        end loop
+        return Word_Size
+    end func Num_Bits
+
+    type Word is Modular<2**Word_Size>
+
+    //  TBD: the following causes order-of-eval problems:
+    //    const Num_Elem_Vals := (Elem_Type::Last() - Elem_Type::First()) + 1
+        
+    func Num_Elem_Vals() -> Univ_Integer is
+        //  Return number of values needed, including one for null if allowed.
+        return (Elem_Type::Last() - Elem_Type::First()) + (Allow_Null? 2 : 1)
+    end func Num_Elem_Vals
+
+    const Bits_Per_Elem := Num_Bits (Num_Elem_Vals())
+    const Elems_Per_Word := Word_Size / Bits_Per_Elem
+    const Mask : Word := 2 ** Bits_Per_Elem - 1
+
+    func Compute_Spreader() -> Result : Word is
+      // Compute a value which when multiplied by the initial value
+      // "spreads" it over the packed array
+        Result := 0
+        for (I in 1 .. Elems_Per_Word;
+             One_Bit := 1 then One_Bit << Bits_Per_Elem) forward loop
+           Result += One_Bit
+        end loop
+    end func Compute_Spreader
+
+    const Spreader : Word := Compute_Spreader()
+
+    type Word_Array is Basic_Array<Word>
+    var Data : Word_Array
+
+    func Nth_Elem(Arr : Packed_Array; Index : Indexed_By)
+      -> optional Elem_Type is
+        const Zero_Based_Index := Index - Arr.Bounds.First
+        const Word_Index := Zero_Based_Index / Elems_Per_Word + 1
+        const Word_Val := Arr.Data[ Word_Index ]
+        const Val_Offset :=
+           Mask and (Word_Val >>
+             ((Zero_Based_Index rem Elems_Per_Word) * Bits_Per_Elem))
+        if Allow_Null and then Val_Offset == Mask then
+           return null
+        else
+           return Elem_Type::First() + Val_Offset
+        end if
+    end func Nth_Elem
+
+  exports
+
+    class Packed_Array_Ref is
+        ref Arr : Packed_Array;
+        const Index : Indexed_By;
+        var Elem : Elem_Type;
+      exports
+        func Create(ref Arr : Packed_Array; Index : Indexed_By)
+          -> ref Packed_Array_Ref is
+            return (Arr, Index, Elem => Nth_Elem(Arr, Index))
+        end func Create
+        op "ref"(ref Packed_Array_Ref) -> ref Elem_Type is
+            return Packed_Array_Ref.Elem
+        end op "ref"
+        op "end"(var Packed_Array_Ref) is
+            Set(Packed_Array_Ref.Arr, Packed_Array_Ref.Index,
+              New_Val => Packed_Array_Ref.Elem)
+        end op "end"
+    end class Packed_Array_Ref
+
+    func Dump() is
+        Println ("Bits_Per_Elem = " | Bits_Per_Elem)
+        Println ("Elems_Per_Word = " | Elems_Per_Word)
+        Println ("Mask = " | Mask)
+    end func Dump
+
+    func Create(Bounds : Countable_Range<Indexed_By>;
+      Initial_Value : Elem_Type)
+      -> Result : Packed_Array is
+        const Num_Words :=
+          (Length(Bounds) + Elems_Per_Word - 1) / Elems_Per_Word
+        const Adjusted_Val := Initial_Value is null?
+                                Mask : Initial_Value - Elem_Type::First()
+        return (Data => Create(Num_Words, Adjusted_Val * Spreader),
+          Bounds => Bounds)
+    end func Create
+
+    func Length(Arr : Packed_Array) -> Univ_Integer is
+        return Length(Arr.Bounds)
+    end func Length
+
+    func Bounds(Arr : Packed_Array) -> Countable_Range<Indexed_By> is
+        return Arr.Bounds
+    end func Bounds
+
+    op "indexing"(Arr : Packed_Array; Index : Indexed_By)
+      -> optional Elem_Type is (Nth_Elem(Arr, Index))
+
+    op "var_indexing"(ref var Arr : Packed_Array; Index : Indexed_By)
+      -> ref var Packed_Array_Ref is
+        if Index not in Arr.Bounds then
+           //  Need to extend the array
+           Set (Arr, Index, Allow_Null? null: Elem_Type::First())
+        end if
+        return Create(Arr, Index)
+    end op "var_indexing"
+
+    op "index_set"(Arr : Packed_Array) -> Countable_Range<Indexed_By> is
+        return Arr.Bounds
+    end op "index_set"
+
+    func Set(var Arr : Packed_Array; Index : Indexed_By; New_Val : Elem_Type) is
+        if |Arr.Bounds| == 0 then
+            // First element in array
+            Arr := Create (Index .. Index, New_Val);
+            return
+        end if
+
+        if Index < Arr.Bounds.First then
+            //  Extending low bound (ugh)
+            var Old_Arr <== Arr;
+            //  Create a new array, and copy old values over
+            Arr := Create (Index .. Old_Arr.Bounds.Last, New_Val);
+            for each [I => E] of Old_Arr loop
+                Arr[I] := Old_Arr[I]
+            end loop
+            Old_Arr := null
+            return
+        end if
+
+        if Index > Arr.Bounds.Last then
+            //  Extending high bound
+            Arr := (Data <== Arr.Data,
+                    Bounds => (First => Arr.Bounds.First, Last => Index))
+        end if
+        const Zero_Based_Index := Index - Arr.Bounds.First
+        const Word_Index := Zero_Based_Index / Elems_Per_Word + 1
+        if Word_Index > |Arr.Data| then
+            // Need to extend the the word array
+            Arr.Data[ Word_Index ] := (Allow_Null? Mask * Spreader: 0)
+        end if
+        const Elem_Loc :=
+          (Zero_Based_Index rem Elems_Per_Word) * Bits_Per_Elem
+        const Adjusted_Val := (New_Val is null?
+          Mask : New_Val - Elem_Type::First()) << Elem_Loc
+        const Elem_Mask := Mask << Elem_Loc
+        Arr.Data[ Word_Index ] := (Arr.Data[ Word_Index ] and not Elem_Mask) or
+          Adjusted_Val
+    end func Set
+
+    op "<|="(var Left : Packed_Array; var Right : Elem_Type) is
+        // Add Right onto Array
+        if Length(Left) == 0 then
+            Left := (Data => Create(1, 0),
+              Bounds => Indexed_By::First() .. Indexed_By::First())
+            Set (Left, Indexed_By::First(), Right)
+        else
+            Set (Left, Left.Bounds.Last + 1, Right)
+        end if
+    end op "<|="
+    
+    op "|"(Left : Packed_Array; Right : Key_Value<Indexed_By, Elem_Type>) 
+      -> Result : Packed_Array is
+        Result := Left
+        Set (Result, Right.Key, Right.Value)
+    end op "|"
+
+    op "[]"() -> Result : Packed_Array is
+        return (Data => Create(0, 0),
+          Bounds => Indexed_By::First()+1 .. Indexed_By::First())
+            // Bounds not meaningful when empty
+    end op "[]"
+
+end class PSL::Containers::Packed_Array
+
+func PSL::Test::Test_Packed() is
+    type Color is Enum< [#red, #green, #blue] >
+    type RCB is Packed_Array
+      <optional Integer<Range => 0..0xFF>, Indexed_By => Color,
+       Allow_Null => #true>
+
+    RCB::Dump()
+
+    const Red : RCB := [#red => 0x33, #green => 0, #blue => 0]
+    const Blue : RCB := [#blue => 0x33, #green => 0, #red => 0]
+    const Yellow : RCB := [#green => 0x33, #blue => 0x33, #red => 0] 
+    const White : RCB := [0xFF, 0xFF, 0xFF]
+    const Partial : RCB := [0xFF, 0xFF, null]
+    
+    const RCBs : Vector<RCB> := [Red, Blue, Yellow, White, Partial]
+    const Names : Vector<Univ_String> :=
+      ["Red", "Blue", "Yellow", "White", "Partial"]
+
+    for each [I => C] of RCBs forward loop
+        Println(Names[I] | " = [#red => " | C[#red] |
+          ", #green => " | C[#green] | ", #blue => " | C[#blue] | "]")
+    end loop
+
+    var Arr : RCB := Create(#red .. #blue, 0x77)
+    Print("Arr = ")
+    for (each [I => X] of Arr; Sep := "[" then ", ") forward loop
+        Print(Sep | I | " => " | X)
+    end loop
+    Println("]")
+
+    Println ("About to update Arr[#green] with 0x33 (= " | 0x33 | ")")
+    block
+        ref Green_Elem => Arr[#green]
+        Green_Elem := 0x32
+        Green_Elem += 1
+
+        //  "end"(Green_Elem) should be invoked here
+    end block
+
+    Println ("About to update Arr[#blue] with 0x55 (= " | 0x55 | ")")
+
+    Arr[#blue] := 0x22
+    //  "end"(Arr[#blue]) should be invoked here
+
+    //  Arr[#blue] := Arr[#blue] * 5
+    Arr[#blue] *= 5
+    //  "end"(Arr[#blue]) should be invoked here
+
+    Arr[#blue] := Arr[#blue] / 2
+    //  "end"(Arr[#blue]) should be invoked here
+
+    Print("Arr now = ")
+    for (each [I => X] of Arr; Sep := "[" then ", ") forward loop
+        Print(Sep | I | " => " | X)
+    end loop
+    Println("]")
+
+    const RR : RCB :=
+      [#red => Arr[#green],
+       #green => "var_indexing"(Arr, #blue),  //  "end" invoked here
+       #blue => Arr[#red]]
+    Print("RR = ")
+    for (each [I => X] of RR; Sep := "[" then ", ") forward loop
+        Print(Sep | I | " => " | X)
+    end loop
+    Println("]")
+
+    var VV : Vector<Univ_Integer> := [3, Arr[#green], Arr[#red] / 5]
+    VV := VV | [7, Arr[#blue]]
+    Print("VV = ")
+    for (each Z of VV; Sep := "[" then ", ") forward loop
+        Print (Sep | Z)
+    end loop
+    Println("]")
+    
+end func PSL::Test::Test_Packed
+interface PSL::Containers::Basic_Packed_Array
+  <Elem_Type is Countable<>; Allow_Null : Boolean := #false> is
+  // A packed array abstraction indexed by Univ_Integer 1 .. Length().
+  // The element type must be countable, and only the range First()..Last()
+  // need be represented.
+  // If Allow_Null is #true, then one extra value per element is allowed
+  // so that "null" can be represented (the "all ones" value is used for null).
+  // In an instantiation, the Elem_Type should include "optional"
+  // if Allow_Null is #true.
+
+    func Create(Length : Univ_Integer; Initial_Value : Elem_Type)
+      -> Basic_Packed_Array
+
+    func Length(Arr : Basic_Packed_Array) -> Univ_Integer
+    op "magnitude"(Basic_Packed_Array) -> Univ_Integer is Length
+
+    func Bounds(Arr : Basic_Packed_Array) -> Countable_Range<Univ_Integer>
+      is (1 .. |Arr|)
+    func First(Arr : Basic_Packed_Array) -> Univ_Integer is (1)
+    func Last(Arr : Basic_Packed_Array) -> Univ_Integer is (|Arr|)
+
+    op "indexing"(Arr : Basic_Packed_Array; Index : Univ_Integer)
+      -> optional Elem_Type
+    op "index_set"(Arr : Basic_Packed_Array) -> Countable_Range<Univ_Integer>
+      is Bounds
+    func Set_Nth_Elem(var Arr : Basic_Packed_Array;
+      Index : Univ_Integer; New_Val : Elem_Type)
+    func Dump()
+end interface PSL::Containers::Basic_Packed_Array
+
+class PSL::Containers::Basic_Packed_Array is
+  // A packed array abstraction where the index type is not necessarily
+  // Univ_Integer, but instead can be any Countable type (e.g. Enum<...>)
+  // The element type must be countable, and only the range First()..Last()
+  // need be represented.
+  // If Allow_Null is #true, then one extra value per element is allowed
+  // so that "null" can be represented (the "all ones" value is used for null).
+  // In an instantiation, the Elem_Type should include "optional"
+  // if Allow_Null is #true.
+    const Debug : Boolean := #false
+
+    const Word_Size := 64 
+    func Num_Bits(Num_Vals : Univ_Integer) -> Univ_Integer is
+        for (Bits in 1 .. Word_Size-1; Pow := 2 then Pow + Pow) forward loop
+            if Pow >= Num_Vals then
+                return Bits
+            end if
+        end loop
+        {*nyi_unpacked* #false}  //  Can't handle unpacked values, due to null.
+        return Word_Size
+    end func Num_Bits
+
+    //  TBD: the following causes order-of-eval problems:
+    //    const Num_Elem_Vals := (Elem_Type::Last() - Elem_Type::First()) + 1
+        
+    func Num_Elem_Vals() -> Univ_Integer is
+        //  Return number of values needed, including one for null if allowed.
+        return (Elem_Type::Last() - Elem_Type::First()) + (Allow_Null? 2 : 1)
+    end func Num_Elem_Vals
+
+    const Bits_Per_Elem := Num_Bits (Num_Elem_Vals())
+    const Elems_Per_Word := Word_Size / Bits_Per_Elem
+    const Modulus := 2 ** Bits_Per_Elem
+    const Mask := Modulus - 1
+    const High_Bit_On := 2 ** (Bits_Per_Elem-1)
+    const Fills_Word : Boolean := (Bits_Per_Elem * Elems_Per_Word == Word_Size)
+
+    func Compute_Spreader() -> Result : Univ_Integer is
+      // Compute a value which when multiplied by the initial value
+      // "spreads" it over the packed array
+        Result := 0
+        if Elems_Per_Word == Word_Size then
+           // Special case for bit-vector
+           Result := -1
+        else
+           for (I in 1 .. Elems_Per_Word;
+                One_Bit := 1 then One_Bit << Bits_Per_Elem) forward loop
+              Result += One_Bit
+           end loop
+        end if
+    end func Compute_Spreader
+
+    const Spreader : Univ_Integer := Compute_Spreader()
+
+    type Word_Array is Basic_Array<optional Univ_Integer>
+    var Data : Word_Array
+
+    func Nth_Elem(Arr : Basic_Packed_Array; Index : Univ_Integer)
+      -> optional Elem_Type is
+        const Zero_Based_Index := Index - 1
+        const Within_Word_Index := Zero_Based_Index rem Elems_Per_Word
+        const Word_Index := Zero_Based_Index / Elems_Per_Word + 1
+        const Word_Val := Arr.Data[ Word_Index ]
+        var Val_Offset : Univ_Integer
+
+        if Word_Val is null then
+           //  Special case for null value of Univ_Integer
+           //  assumed to have high bit set, and all others zero.
+           if Within_Word_Index == Elems_Per_Word-1 then
+              Val_Offset := 2**(Bits_Per_Elem-1)
+           else
+              Val_Offset := 0
+           end if
+        else
+           // Normal case, compute Val_Offset
+           Val_Offset :=
+             (Word_Val >> (Within_Word_Index * Bits_Per_Elem)) mod Modulus
+        end if
+        if Allow_Null and then Val_Offset == Mask then
+           return null
+        else
+           return Elem_Type::First() + Val_Offset
+        end if
+    end func Nth_Elem
+
+  exports
+
+    func Dump() is
+        Println ("Bits_Per_Elem = " | Bits_Per_Elem)
+        Println ("Elems_Per_Word = " | Elems_Per_Word)
+        Println ("Mask = " | Mask)
+    end func Dump
+
+    func Create(Length : Univ_Integer; Initial_Value : Elem_Type)
+      -> Result : Basic_Packed_Array is
+        const Num_Words :=
+          (Length + Elems_Per_Word - 1) / Elems_Per_Word
+        const Adjusted_Val := Initial_Value is null?
+                                Mask : Initial_Value - Elem_Type::First()
+        if Debug then
+           Println("Create(" | Length | "(*" | Bits_Per_Elem | "), " |
+             Adjusted_Val | ")")
+        end if
+        return (Data => Create(Num_Words, Adjusted_Val * Spreader))
+    end func Create
+
+    func Length(Arr : Basic_Packed_Array) -> Univ_Integer is
+        return |Arr.Data|
+    end func Length
+
+    op "indexing"(Arr : Basic_Packed_Array; Index : Univ_Integer)
+      -> optional Elem_Type is (Nth_Elem(Arr, Index))
+
+    func Set_Nth_Elem(var Arr : Basic_Packed_Array; Index : Univ_Integer;
+                      New_Val : Elem_Type) is
+        const Zero_Based_Index := Index - 1
+        const Word_Index := Zero_Based_Index / Elems_Per_Word + 1
+        const Within_Word_Index := Zero_Based_Index rem Elems_Per_Word
+        const Elem_Loc :=
+          Within_Word_Index * Bits_Per_Elem
+        var Adjusted_Val := New_Val is null?
+          Mask : New_Val - Elem_Type::First()
+        {Adjusted_Val < Modulus}
+        if Debug then
+           Println("Set_Nth_Elem(Arr, " | Index | ", " | Adjusted_Val | ")")
+           Println("Arr.Data[" | Word_Index | "] = " |
+             Hex_Image(Arr.Data[Word_Index]))
+           Println("Within_Word_Index = " | Within_Word_Index);
+        end if
+        const Low_Order_Part := Arr.Data[Word_Index] mod
+           (Modulus ** Within_Word_Index)
+        if Within_Word_Index == Elems_Per_Word-1 then
+           //  Setting the high-order element of the word; "<<" might overflow
+           //  but nothing to preserve above the new element.
+           if Adjusted_Val >= High_Bit_On
+             and then Fills_Word
+           then
+              //  "<<" will overflow, make it negative to avoid that
+              if Adjusted_Val == High_Bit_On then
+                 //  Oh dear, shifting this value will produce "null"
+                 if Low_Order_Part == 0 then
+                    //  Overall result is "null"
+                    Arr.Data[Word_Index] := null
+                 else
+                    //  Overall result is not null, play games to avoid
+                    //  generating an intermediate null
+                    const Half_Max := 2 ** (Word_Size-2)
+                    Arr.Data[Word_Index] :=
+                      (Low_Order_Part - 1) - Half_Max - Half_Max
+                 end if
+              else
+                 //  "<<" will overflow, so make it negative
+                 Arr.Data[Word_Index] := Low_Order_Part +
+                   ((Adjusted_Val - Modulus) << Elem_Loc)
+              end if
+           else
+              //  No "<<" overflow danger
+              Arr.Data[Word_Index] := Low_Order_Part +
+                (Adjusted_Val << Elem_Loc)
+           end if
+        else
+           //  Not setting the high-order element, "<<" won't overflow
+           //  but we need to preserve the part that is above the new
+           //  element.
+           const Part_To_Remove :=
+             Arr.Data[Word_Index] mod (Modulus ** (Within_Word_Index+1)) -
+               Low_Order_Part
+           Arr.Data[ Word_Index ] += 
+             (Adjusted_Val << Elem_Loc) - Part_To_Remove
+        end if
+        if Debug then
+           Println("Arr.Data[" | Word_Index | "]' = " |
+             Hex_Image(Arr.Data[Word_Index]))
+        end if
+    end func Set_Nth_Elem
+
+end class PSL::Containers::Basic_Packed_Array

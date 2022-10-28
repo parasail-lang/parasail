@@ -1,0 +1,459 @@
+interface Range_Set<Element_Type is Comparable<>> is
+  // A set abstract that supports efficiently storing potentially
+  // large ranges of values
+    op "[]"() -> Range_Set;
+
+    func Singleton(Elem : Element_Type) -> Range_Set;
+	// Return a set consisting of a single element
+
+    op ".."(Left, Right : Element_Type) -> Range_Set;
+	// Closed interval of values
+    op "<.."(Left, Right : Element_Type) -> Range_Set;
+	// Open-Closed interval of values
+    op "..<"(Left, Right : Element_Type) -> Range_Set;
+	// Closed-Open interval of values
+    op "<..<"(Left, Right : Element_Type) -> Range_Set;
+	// Open interval of values
+
+    op "|"(Left, Right : Element_Type) -> Range_Set;
+    op "|"(Left : Range_Set; Right : Element_Type) -> Range_Set;
+    op "|"(Left : Element_Type; Right : Range_Set) -> Range_Set;
+    op "|"(Left : Range_Set; Right : Range_Set) -> Range_Set;
+
+    op "|="(var Left : Range_Set; Right : Element_Type);
+    op "|="(var Left : Range_Set; Right : Range_Set);
+
+    op "<|="(var Left : Range_Set; var Right : Element_Type);
+        // Move element into set, leaving Right null afterward.
+
+    op "-"(Left, Right : Range_Set) -> Range_Set;
+      // Set difference
+    op "-="(var S : Range_Set; Elem : Element_Type);
+      // Remove the given element from the set, if present
+    op "-="(var Left : Range_Set; Right : Range_Set);
+      // Remove all elements of Right from Left, if present
+
+    op "or"(Left : Range_Set; Right : Range_Set) 
+      -> Range_Set is "|";  // union
+    op "or="(var Left : Range_Set; Right : Range_Set) is "|=";
+
+    op "+"(Left : Range_Set; Right : Range_Set) 
+      -> Range_Set is "|";  // Union
+    op "+="(var Left : Range_Set; Right : Range_Set) is "|=";
+    op "+="(var Left : Range_Set; Right : Element_Type) is "|=";
+   
+    op "and"(Left, Right : Range_Set) -> Range_Set;
+	// Intersection
+    op "and="(var Left : Range_Set; Right : Range_Set);
+
+    op "xor"(Left, Right : Range_Set) -> Range_Set;
+	// Symmetric difference
+    op "xor="(var Left : Range_Set; Right : Range_Set);
+
+    op "in"(Left : Element_Type; Right : Range_Set) -> Boolean;
+
+    op "=?"(Left, Right : Range_Set) -> Ordering;
+	// Return #equal if Left and Right have the same elements
+	// Return #less if Left is a proper subset of Right
+	// Return #greater if Left is a proper superset of Right
+	// Return #unordered otherwise
+
+    func Is_Empty(S : Range_Set) -> Boolean;
+
+    func Lower_Bound(S : Range_Set) -> optional Element_Type;
+	// Lower bound of set
+    func Lower_Bound_Is_Open(S : Range_Set) -> Boolean;
+	// Whether lower bound is "open" or "closed"
+
+    func Upper_Bound(S : Range_Set) -> optional Element_Type;
+	// Upper bound of set
+    func Upper_Bound_Is_Open(S : Range_Set) -> Boolean;
+	// Whether upper bound is "open" or "closed"
+
+    func Remove_First(var S : Range_Set) -> optional Interval<Element_Type>;
+	// Remove first interval of set (lowest low bound)
+
+    func Remove_Last(var S : Range_Set) -> optional Interval<Element_Type>;
+	// Remove last interval of set (highest high bound)
+
+    func Remove_Any(var S : Range_Set) -> optional Interval<Element_Type>;
+	// Remove an arbitrary interval of set
+
+end interface Range_Set;
+
+class Range_Set is
+
+    type Element_Interval is Interval<Element_Type>;
+
+    var Items : optional AA_Tree<Element_Interval>;
+
+    func Remove_Interval(var S : Range_Set; Remove_IV : Element_Interval) is
+      // Remove the given interval from the set, if present
+	if Remove_IV.Low > Remove_IV.High then
+	    // Nothing to remove
+	    return;
+	end if;
+
+	  // Find an interval within the AA_Tree that overlaps
+	for Remaining_IV := Remove_IV while Remaining_IV not null loop
+	    // Get overlap, if any
+	    var IV := Overlapping(S.Items, Remaining_IV);
+
+	    if IV is null then
+		// No overlap, nothing left to remove
+		exit loop;
+	    end if;
+	
+	    // Found an overlapping interval; delete it and add back what's left
+	    Delete(S.Items, IV);
+	    if Is_Strictly_Within(Remaining_IV, IV) then
+		// Add back left and right remnants;
+		// Remaining_IV is fully subsumed.
+		S.Items |= (Low => IV.Low, Low_Is_Open => IV.Low_Is_Open, 
+		  High => Remaining_IV.Low, 
+		  High_Is_Open => not Remaining_IV.Low_Is_Open);
+		S.Items |= (Low => Remaining_IV.High, 
+		  Low_Is_Open => not Remaining_IV.High_Is_Open,
+		  High => IV.High, 
+		  High_Is_Open => IV.High_Is_Open);
+		// we are all done now
+		exit loop;
+	    end if;
+
+	    // May be something left
+	    const Overlap := IV and Remaining_IV;
+	    IV -= Overlap;
+
+	    if not Is_Empty(IV) then
+		// Worth putting the interval back
+		S.Items |= IV;
+	    end if;
+
+	    continue loop with Remaining_IV - Overlap;
+
+	end loop;
+
+    end func Remove_Interval;
+
+    func Is_Subset(Left, Right : Range_Set) -> Boolean is
+	// Return True if Left is a subset of Right
+	for Left_IV in Left loop
+	    for Remaining_IV := Left_IV while not Is_Empty(Remaining_IV) loop
+		const Right_IV := Overlapping(Right.Items, Remaining_IV);
+		if Right_IV is null then
+		    // Found some values that are not in Right
+		    return #false;
+		end if;
+
+		// Loop around with what is left
+		continue loop with Remaining_IV - Right_IV;
+	    end loop;
+	end loop;
+	// Everything in Left was found in Right
+	return #true;
+    end func Is_Subset;
+
+  exports
+    op "[]"() -> Range_Set is
+        return (Items => []);
+    end op "[]";
+
+    func Singleton(Elem : Element_Type) -> Result : Range_Set is
+	// Return a set consisting of a single element
+	Result := [];
+	Result.Items |= Singleton(Elem);
+    end func Singleton;
+
+    op ".."(Left, Right : Element_Type) -> Result : Range_Set is
+        Result := [];
+        if Left <= Right then
+            Result.Items |= (Low => Left, Low_Is_Open => #false, 
+	      High => Right, High_Is_Open => #false);
+        end if;
+    end op "..";
+    
+    op "<.."(Left, Right : Element_Type) -> Result : Range_Set is
+        Result := [];
+        if Left < Right then
+            Result.Items |= (Low => Left, Low_Is_Open => #true,
+	      High => Right, High_Is_Open => #false);
+        end if;
+    end op "<..";
+    
+    op "<..<"(Left, Right : Element_Type) -> Result : Range_Set is
+        Result := [];
+        if Left < Right then
+            Result.Items |= (Low => Left, Low_Is_Open => #true,
+	      High => Right, High_Is_Open => #true);
+        end if;
+    end op "<..<";
+    
+    op "..<"(Left, Right : Element_Type) -> Result : Range_Set is
+        Result := [];
+        if Left < Right then
+            Result.Items |= (Low => Left, Low_Is_Open => #false,
+	      High => Right, High_Is_Open => #true);
+        end if;
+    end op "..<";
+    
+    op "|"(Left, Right : Element_Type) -> Result : Range_Set is
+        Result := [];
+	Result |= Left;
+	if Left != Right then
+	    Result |= Right;
+        end if;
+    end op "|";
+
+    op "|"(Left : Range_Set; Right : Element_Type) 
+      -> Result : Range_Set is
+        Result := Left;
+        Result |= Right;
+    end op "|";
+
+    op "|"(Left : Element_Type; Right : Range_Set) -> Range_Set is
+        return Right | Left;
+    end op "|";
+
+    op "|"(Left : Range_Set; Right : Range_Set) 
+      -> Result : Range_Set is
+        Result := Left;
+        Result |= Right;
+    end op "|";
+
+    op "|="(var Left : Range_Set; Right : Element_Type) is
+        const Right_IV : Element_Interval := Singleton(Right);
+        const Left_IV := Overlapping(Left.Items, Right_IV);
+        if Left_IV is null then
+            // Nothing overlaps, need to add it (might want to merge someday)
+            Left.Items |= Right_IV;
+        end if;
+    end op "|=";
+
+    op "<|="(var Left : Range_Set; var Right : Element_Type) is
+        // Move element into set, leaving Right null afterward.
+	// TBD: No copy minimization done at the moment
+	Left |= Right;
+	Right := null;
+    end op "<|=";
+
+    op "|="(var Left : Range_Set; Right : Range_Set) is
+        if Count(Left.Items) == 0 then
+            Left := Right;
+        else
+            // Make a copy of the tree of items of the Right set
+            var Right_Items := Right.Items;
+
+            // Iterate through the tree
+            var Right_IV := Remove_Any(Right_Items);
+            while Right_IV not null loop
+                // See whether it overlaps with an existing interval
+                // in Left tree
+                var Left_IV := Overlapping(Left.Items, Right_IV);
+                while Left_IV not null loop
+		    const Combined_IV : Element_Interval := Left_IV | Right_IV;
+
+		    if Combined_IV == Left_IV then
+			// Right_IV fully subsumed by existing interval
+			Right_IV := null;
+			exit loop;
+		    end if;
+
+		    // Need to delete Left_IV and incorporate
+		    // into Right_IV
+		    Delete(Left.Items, Left_IV);
+		    Right_IV := Combined_IV;
+
+		    // Now see if there is anything still overlapping
+		    Left_IV := Overlapping(Left.Items, Right_IV);
+                end loop;
+
+                if not Is_Empty(Right_IV) then
+                    // Add Right_IV
+                    Left.Items |= Right_IV;
+                end if;
+
+                // Move on to next item
+                Right_IV := Remove_Any(Right_Items);
+            end loop;
+        end if;
+    end op "|=";
+
+    op "-"(Left, Right : Range_Set) -> Result : Range_Set is
+      // Set difference
+	Result := Left;
+	Result -= Right;
+    end op "-";
+
+    op "-="(var S : Range_Set; Elem : Element_Type) is
+      // Remove the given element from the set, if present
+	Remove_Interval(S, Singleton(Elem));
+    end op "-=";
+
+    op "-="(var Left : Range_Set; Right : Range_Set) is
+      // Remove all intervals of Right from Left, if present
+	for IV in Right loop
+	    Remove_Interval(Left, IV);
+	end loop;
+    end op "-=";
+
+    op "and"(Left, Right : Range_Set) -> Result : Range_Set is
+	// Intersection
+
+	// Add elements that are in both Right and Left into result
+	Result := [];
+	for Right_IV in Right loop
+	    for Remaining_IV := Right_IV while Remaining_IV not null loop
+		var Left_IV := Overlapping(Left.Items, Remaining_IV);
+
+		if Left_IV is null then
+		    exit loop;
+		end if;
+
+		// Compute overlap, add into result, and then loop
+		// around after removing it from Remaining_IV
+		const Overlap := Remaining_IV and Left_IV;
+
+		Result.Items |= Overlap;
+
+		continue loop with Remaining_IV - Overlap;
+	    end loop;
+	end loop;
+    end op "and";
+
+    op "and="(var Left : Range_Set; Right : Range_Set) is
+	// Intersection
+	Left := Left and Right;
+    end op "and=";
+
+    op "xor"(Left, Right : Range_Set) -> Range_Set is
+	// Symmetric difference
+
+	return (Left - Right) or (Right - Left);
+    end op "xor";
+
+    op "xor="(var Left : Range_Set; Right : Range_Set) is
+	// Symmetric difference
+	// Want elements that are only in one of the two inputs
+	const Only_In_Right := Right - Left;
+	Left -= Right;
+	Left += Only_In_Right;
+    end op "xor=";
+
+    op "in"(Left : Element_Type; Right : Range_Set) -> Boolean is
+        return Overlapping(Right.Items, Singleton(Left)) not null;
+    end op "in";
+
+    op "=?"(Left, Right : Range_Set) -> Ordering is
+	// Return #equal if Left and Right have the same elements
+	// Return #less if Left is a proper subset of Right
+	// Return #greater if Left is a proper superset of Right
+	// Return #unordered otherwise
+	if Is_Subset(Left, Right) then
+	    if Is_Subset(Right, Left) then
+		return #equal;
+	    else
+		return #less;
+	    end if;
+	elsif Is_Subset(Right, Left) then
+	    return #greater;
+	else
+	    return #unordered;
+	end if;
+    end op "=?";
+
+    func Is_Empty(S : Range_Set) -> Boolean is
+        // Return count of items in set
+	return Count(S.Items) == 0;
+    end func Is_Empty;
+
+    func Lower_Bound(S : Range_Set) -> optional Element_Type is
+        const First_IV := First(S.Items);
+        if First_IV is null then
+            return null;
+        else
+            return First_IV.Low;
+        end if;
+    end func Lower_Bound;
+
+    func Lower_Bound_Is_Open(S : Range_Set) -> Boolean is
+        const First_IV := First(S.Items);
+        if First_IV is null then
+            return #true;  // TBD: or null?
+        else
+            return First_IV.Low_Is_Open;
+        end if;
+    end func Lower_Bound_Is_Open;
+
+    func Upper_Bound(S : Range_Set) -> optional Element_Type is
+        const Last_IV := Last(S.Items);
+        if Last_IV is null then
+            return null;
+        else
+            return Last_IV.High;
+        end if;
+    end func Upper_Bound;
+
+    func Upper_Bound_Is_Open(S : Range_Set) -> Boolean is
+        const Last_IV := Last(S.Items);
+        if Last_IV is null then
+            return #true;  // TBD: or null?
+        else
+            return Last_IV.High_Is_Open;
+        end if;
+    end func Upper_Bound_Is_Open;
+
+    func Remove_First(var S : Range_Set) 
+      -> optional Interval<Element_Type> is
+	// Remove first interval of set (lowest low bound)
+	return Remove_First(S.Items);
+    end func Remove_First;
+
+    func Remove_Last(var S : Range_Set) 
+      -> optional Interval<Element_Type> is
+	// Remove last interval of set (highest high bound)
+	return Remove_Last(S.Items);
+    end func Remove_Last;
+
+    func Remove_Any(var S : Range_Set) 
+      -> optional Interval<Element_Type> is
+	// Remove an arbitrary interval of set
+	return Remove_Any(S.Items);
+    end func Remove_Any;
+
+end class Range_Set;
+
+func Test_Range_Set(A, X, Y, Z : Univ_Real) is
+    var S : Range_Set<Univ_Real> := X | Y..Z;
+    Println(A | " in " | X | "|" | Y | ".." | Z | "=" | [[ A in S ]]);
+
+    const Agg : Range_Set<Univ_Real> := [X, Y, Z];
+    const Or : Range_Set<Univ_Real> := Y | Z | X;
+    const Open_Ind : Map<Boolean, Univ_String> := [#false => "", #true => "<"];
+
+    Println(" [X, Y, Z] =? (Y | Z | X) --> " | [[ Agg =? Or ]]);
+
+    S := [];
+
+    var R := 0.0;
+    for I in 1..10 forward loop
+	R += 1.0;
+        S += R;
+        Println("Adding " | R | " to S, Is_Empty(S) = " | [[ Is_Empty(S) ]] );
+    end loop;
+
+    var Xor := S xor [2.0, 5.0, 12.0, 15.0];
+    Print("S xor [2.0, 5.0, 12.0, 15.0] = ");
+    for IV in Xor forward loop
+	if IV.Low != IV.High then
+	    Print(IV.Low | Open_Ind[IV.Low_Is_Open] | ".." | 
+	      Open_Ind[IV.High_Is_Open] | IV.High | " ");
+	else
+            Print(IV.Low | " ");
+	end if;
+    end loop;
+    Print('\n');
+end func Test_Range_Set;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Range_Set (3.0, 1.0, 3.0, 4.0);
+end func main;

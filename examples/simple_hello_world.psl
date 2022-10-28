@@ -1,0 +1,9 @@
+func Hello_World () is
+
+    Println("Hello world!");
+
+     for I in 1..10 reverse :
+	    Println(I | " ** 3 = " | I**3);
+
+end func Hello_World;
+

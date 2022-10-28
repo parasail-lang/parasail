@@ -1,0 +1,150 @@
+func cross_roads2() is
+   //  CROSS + ROADS = DANGER
+   // John Barnes puzzle, Ada-Europe 2019
+
+   type Letter is Univ_Character;
+   type Digit is new Integer<0..9>;
+   type Letter_Map is Two_Way_Map<Letter, Digit>;
+
+   const Puzzle : Vector<Univ_String> := ["CROSS", "ROADS", "DANGER"];
+   const Flat_Puzzle : Univ_String := (for each S of Puzzle => <""> | S)
+   const All_Letters : Set<Letter> :=
+                          (for each L of Flat_Puzzle => <[]> | L);
+
+   func Compute_Search_Order() -> Result : Vector<Set<Letter>> is
+      //  Compute best order to perform letter search, indexed by
+      //  number of digits starting from the right
+
+      var Seen_Already : Set<Letter> := []
+      Result := [for I in 1 .. |Puzzle[3]| => []];
+      
+      for I in 1 .. |Result| forward loop
+         for J in 1 .. |Puzzle| {I <= |Puzzle[J]|} loop
+            const LJ := Puzzle[J][|Puzzle[J]| - I + 1]
+            if LJ not in Seen_Already then
+               //  We have a new letter to try for this digit
+               Result[I] |= LJ
+               Seen_Already |= LJ
+            end if
+         end loop
+      end loop
+      Println("Search order:")
+      for each S of Result forward loop
+         Println(" [" | (for (each L of S;Sep := "" then ", ") =>
+                           <""> | Sep | L) | "]")
+      end loop
+   end func Compute_Search_Order
+         
+   //  Compute and save search order
+   const Search_Order : Vector<Set<Letter>> := Compute_Search_Order()
+
+   func Value(S : Univ_String; Letter_Map;
+     Num_Digits : optional Univ_Integer := null) -> Univ_Integer is
+      //  Return value of string based on Letter_Map
+      //  If Num_Digits is not null, then limit to last Num_Digits of
+      //  value.
+
+      const Result :=
+        (for each L of S forward =>
+          10*<0> + (L in Letter_Map? Letter_Map[L]: 0))
+
+      if Num_Digits not null then
+         return Result mod 10**Num_Digits
+      else
+         return Result
+      end if
+
+   end func Value
+
+   func Check_Map(Letter_Map;
+                  Num_Digits : optional Univ_Integer := null) -> Boolean is
+      //  Return #true if Letter_Map is a good solution
+      //  If Num_Digits not null, then limit check to last Num_Digits
+      if 0 in Keys (Rev_Map (Letter_Map)) then
+         return #false;
+      end if
+
+      if Num_Digits not null then
+         //  Require they match modulo 10^Num_Digits
+         return Num_Digits <= 0
+           or else
+             (Value(Puzzle[1], Letter_Map, Num_Digits) +
+              Value(Puzzle[2], Letter_Map, Num_Digits) -
+              Value(Puzzle[3], Letter_Map, Num_Digits)) mod
+                10 ** Num_Digits == 0
+      else
+         //  Require an exact match
+         return Keys (Letter_Map) == All_Letters
+           and then
+             Value(Puzzle[1], Letter_Map) + Value(Puzzle[2], Letter_Map) ==
+               Value(Puzzle[3], Letter_Map);
+      end if
+   end func Check_Map
+
+   func Num_Filled(Letter_Map) -> Univ_Integer is
+      //  Return Number of digits that have been filled for all
+      //  numbers in the puzzle
+      const Filled : Set<Letter> := Keys(Letter_Map)
+
+      for I in 1 .. |Search_Order| forward loop
+         if not (Search_Order[I] <= Filled) then
+            //  Not fully filled out
+            return I-1
+         end if
+      end loop
+      // All filled
+      return |Search_Order|
+   end func Num_Filled
+
+   func Display_Letter_Map(Sol : Letter_Map) is
+      Println("");
+      Println(" `(Value(Puzzle[1], Sol))");
+      Println(" `(Value(Puzzle[2], Sol))");
+      Println("`(Value(Puzzle[3], Sol))");
+   end func Display_Letter_Map
+
+   ///
+
+   var Solutions : concurrent Vector<Letter_Map> := []
+
+  *Outer*
+   for Solution : Letter_Map := [] loop
+      const Num_Digits := Num_Filled(Solution)
+
+      if |Solution| == |All_Letters| then
+         if Check_Map(Solution) then
+            //  Found a good solution
+            Solutions |= Solution
+         end if
+      elsif Check_Map (Solution, Num_Digits) then
+         for each L of Search_Order[Num_Digits+1] {L not in Solution} loop
+            //  Find a letter that does not have a mapping yet
+            for D in 1..9 {D not in Rev_Map(Solution)} concurrent loop
+               //  Add a mapping to all digits not yet mapped
+               const New_Sol := Solution | [L => D]
+               const NF := Num_Filled(New_Sol)
+
+               if NF == Num_Digits 
+                 or else
+                    Check_Map (New_Sol, NF)
+               then
+                  //  Don't have a new column, or new column works
+                  continue loop Outer with Solution => New_Sol
+               end if
+            end loop
+            //  No point in continuing this loop, since we will come
+            //  here again.
+            exit loop
+         end loop
+      end if
+   end loop Outer
+
+   if |Solutions| == 0 then
+      Println("No solutions.")
+   else
+      for each Sol of Solutions loop
+         Display_Letter_Map(Sol);
+      end loop;
+   end if
+
+end func cross_roads2

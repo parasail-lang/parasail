@@ -1,0 +1,76 @@
+// Example ParaSail program -- Simple concurrent locked box
+
+// Copyright (C) 2011-2014, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+concurrent interface Locked_Box<Content_Type is Assignable<>> is
+    func Create(C : optional Content_Type) -> Locked_Box;
+        // Create a box with the given content
+    func Put(locked var B : Locked_Box; C : Content_Type);
+        // Put something into the box
+    func Content(locked B : Locked_Box) -> optional Content_Type;
+        // Get a copy of current content
+    func Remove(locked var B : Locked_Box) -> optional Content_Type;
+        // Remove current content, leaving it null
+    func Get(queued var B : Locked_Box) -> Content_Type;
+        // Wait until content is non-null, then return it, leaving it null.
+end interface Locked_Box;
+
+concurrent class Locked_Box is
+    var Content : optional Content_Type;
+  exports
+    func Create(C : optional Content_Type) -> Locked_Box is
+        // Create a box with the given content
+        return (Content => C);
+    end func Create;
+
+    func Put(locked var B : Locked_Box; C : Content_Type) is
+        // Put something into the box
+        B.Content := C;
+    end func Put;
+
+    func Content(locked B : Locked_Box) -> optional Content_Type is
+        // Get a copy of current content
+        return B.Content;
+    end func Content;
+
+    func Remove(locked var B : Locked_Box) -> Result : optional Content_Type is
+        // Remove current content, leaving it null
+        Result <== B.Content;
+    end func Remove;
+
+    func Get(queued var B : Locked_Box) -> Result : Content_Type is
+        // Wait until content is non-null, then return it, leaving it null.
+      queued until B.Content not null then
+        Result <== B.Content;
+    end func Get;
+        
+end class Locked_Box;
+
+func Test_Box(Seed : Univ_Integer) is
+    var U_Box : Locked_Box<Univ_Integer> := Create(null);
+    var Ran := Random::Start(Seed);
+
+    Println("Starting 100 pico-threads trying to put something in the box");
+    Println(" or take something out.");
+    for I in 1..100 concurrent loop
+        if I < 30 then
+            Println("Getting out " | Get(U_Box));
+        else
+            Println("Putting in " | I);
+            Put(U_Box, I);
+        end if;
+    end loop;
+
+    Println("And the winner is: " | Remove(U_Box));
+    Println("And the box is now " | Content(U_Box));
+end func Test_Box;
+
+func main_locked(Args : Basic_Array<Univ_String>) is
+   if Length(Args) > 0 then
+      Test_Box(Univ_Integer::From_String(Args[1]));
+   else
+      Test_Box(0);
+   end if;
+end func main_locked;

@@ -1,0 +1,9 @@
+interface PSL::Short_Names<> is
+   type Int is Univ_Integer<>
+   type Char is Univ_Character<>
+   type String is Univ_String<>
+   type Real is Univ_Real<>
+   type Bool is Boolean<>
+   //interface Arr<Element_Type is Assignable<>> extends Basic_Array<Element_Type> is
+   //end interface Arr
+end interface PSL::Short_Names

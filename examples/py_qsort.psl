@@ -1,0 +1,74 @@
+interface PY_Sorting<>: # Vec_Type is Vector<Comparable<>>>:
+    func QSort(V : Vec_Type is Vector<Comparable<>>) -> Vec_Type
+
+class PY_Sorting:
+  exports
+    func QSort(V : Vec_Type is Vector<Comparable<>>) -> Vec_Type:
+        if |V| <= 1:
+            return V  # The easy case
+        else:
+            const Mid := V[ |V|/2 ]  # Pick a pivot value
+            return 
+                QSort( [for each E of V {E < Mid} => E] )  # Recurse
+              | [for each E of V {E == Mid} => E]          # No Recurse
+              | QSort( [for each E of V {E > Mid} => E] )  # Recurse
+end class PY_Sorting
+
+func Test_Sort(Len : Univ_Integer) is
+    // For Random
+    const Mult := 7**5;
+    const Mod := 2**31 - 1;
+    var Ran := Random::Start(Len, Mult, Mod);
+
+    Println("Seed = " | Len | ", Mult = " | Mult | ", Mod = " | Mod);
+
+    var Vec : Vector<Univ_Integer> := [];
+
+    for I in 1..Len:
+        Vec |= Next(Ran) mod 10**9;
+
+    const Vec_Orig := Vec;
+
+    Println("Before sort, Vec = ");
+    const Num_To_Show := Min(20, Length(Vec));
+
+    for I in 1 .. Num_To_Show forward:
+        Print(" " | Vec[I]);
+        if I < Num_To_Show:
+            Print(",");
+            if I mod 10 == 0:
+                Print('\n');
+    if Num_To_Show < Length(Vec):
+        Print(", ...");
+    Print("\n");
+
+    type PY_Sorter is PY_Sorting<> # Vector<Univ_Integer>>
+    
+    const Vec3 := PY_Sorter::QSort(Vec_Orig)
+
+    Println("\nAfter sort using PARython, |Vec3| = " | |Vec3| | ", Vec3 = ")
+    for each [I => E] of Vec3 forward:
+        Print(" " | E)
+        if I < Num_To_Show:
+            Print(",")
+            if I mod 10 == 0:
+                Print('\n');
+        elsif I == Num_To_Show:
+            exit loop
+    if Num_To_Show < |Vec3|:
+        Print(", ...");
+    Print('\n')
+
+end func Test_Sort;
+
+func main(Args : Basic_Array<Univ_String>):
+    if |Args| == 0:
+       Test_Sort(10)
+    else:
+       const Num : optional Univ_Integer := From_String(Args[1])
+       if Num is null:
+          Println("Not understood: " | Args[1])
+       else:
+          Test_Sort(Num)
+end func main
+

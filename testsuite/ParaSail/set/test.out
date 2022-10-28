@@ -1,0 +1,36 @@
+10 is in 10|30..40
+20 is *not* in 10|30..40
+35 is in 10|30..40
+10 in 20|30..40=#false
+Remove_Any(S) = 20
+Remove_Any(S) = 40
+Remove_Any(S) = 30
+Remove_Any(S) = 39
+Remove_Any(S) = 31
+Remove_Any(S) = 38
+Remove_Any(S) = 32
+Remove_Any(S) = 37
+Remove_Any(S) = 33
+Remove_Any(S) = 36
+Remove_Any(S) = 34
+Remove_Any(S) = 35
+Adding 1 to S, Count = 1
+Adding 2 to S, Count = 2
+Adding 3 to S, Count = 3
+Adding 4 to S, Count = 4
+Adding 5 to S, Count = 5
+Adding 6 to S, Count = 6
+Adding 7 to S, Count = 7
+Adding 8 to S, Count = 8
+Adding 9 to S, Count = 9
+Adding 10 to S, Count = 10
+Remove_Any(S) = 4
+Remove_Any(S) = 3
+Remove_Any(S) = 6
+Remove_Any(S) = 5
+Remove_Any(S) = 2
+Remove_Any(S) = 7
+Remove_Any(S) = 8
+Remove_Any(S) = 9
+Remove_Any(S) = 1
+Remove_Any(S) = 10

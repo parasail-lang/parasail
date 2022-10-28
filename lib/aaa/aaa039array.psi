@@ -1,0 +1,113 @@
+interface PSL::Containers::Array
+  <Elem_Type is Assignable<>; Indexed_By is Countable<>> 
+  implements Indexable<Elem_Type, Indexed_By> is
+  // An array abstraction where the index type is not necessarily
+  // Univ_Integer, but instead can be any Countable type (e.g. Enum<...>)
+
+    const Bounds : Countable_Range<Indexed_By>
+
+    func Create(Bounds : Countable_Range<Indexed_By>;
+      Initial_Value : optional Elem_Type)
+      -> Array
+
+    func Length(Arr : Array) -> Univ_Integer
+    op "magnitude"(Array) -> Univ_Integer is Length
+
+    func Bounds(Arr : Array) -> Countable_Range<Indexed_By>
+
+    op "indexing"(ref Arr : Array; Index : Indexed_By) -> ref Elem_Type
+    op "var_indexing"(ref var Arr : Array; Index : Indexed_By) 
+      -> ref var Elem_Type
+    op "index_set"(Arr : Array) -> Countable_Range<Indexed_By> is Bounds
+    op "<|="(var Left : Array; var Right : optional Elem_Type)
+    op "|"(Left : Array; Right : Key_Value<Indexed_By, Elem_Type>) -> Array
+    op "[]"() -> Array
+end interface PSL::Containers::Array
+
+class PSL::Containers::Array is
+  // An array abstraction where the index type is not necessarily
+  // Univ_Integer, but instead can be any Countable type (e.g. Enum<...>)
+    type Elem_Array is Basic_Array<Elem_Type>
+    var Data : Elem_Array
+  exports
+
+    func Create(Bounds : Countable_Range<Indexed_By>;
+      Initial_Value : optional Elem_Type)
+      -> Array is
+        return (Data => Create(Length(Bounds), Initial_Value),
+          Bounds => Bounds)
+    end func Create
+
+    func Length(Arr : Array) -> Univ_Integer is
+        return Length(Arr.Data)
+    end func Length
+
+    func Bounds(Arr : Array) -> Countable_Range<Indexed_By> is
+        return Arr.Bounds
+    end func Bounds
+
+    op "indexing"(ref Arr : Array; Index : Indexed_By) -> ref Elem_Type is
+        return Arr.Data[ Index - Arr.Bounds.First + 1 ]
+    end op "indexing"
+
+    op "var_indexing"(ref var Arr : Array; Index : Indexed_By) 
+      -> ref var Elem_Type is
+        if Length(Arr) == 0 then
+            // Create a one-element array
+            Arr := (Data => Create(1, null),
+              Bounds => Index .. Index)
+        elsif Index < Arr.Bounds.First then
+            // Extend below
+            Arr := (Data => 
+              Elem_Array::Create(Arr.Bounds.First - Index, null) | Arr.Data,
+              Bounds => Index .. Arr.Bounds.Last)
+        elsif Index > Arr.Bounds.Last then
+            // Extend above
+            Arr := (Data => 
+              Arr.Data | Elem_Array::Create(Index - Arr.Bounds.Last, null),
+              Bounds => Arr.Bounds.First .. Index)
+        end if
+        return Arr.Data[ Index - Arr.Bounds.First + 1 ]
+    end op "var_indexing"
+
+    op "<|="(var Left : Array; var Right : optional Elem_Type) is
+        // Add Right onto Array
+        if Length(Left) == 0 then
+            Left := (Data => Create(1, null),
+              Bounds => Indexed_By::First() .. Indexed_By::First())
+            Left[Indexed_By::First()] <== Right
+        else
+            Left[Left.Bounds.Last + 1] <== Right
+        end if
+    end op "<|="
+    
+    op "|"(Left : Array; Right : Key_Value<Indexed_By, Elem_Type>) 
+      -> Result : Array is
+        Result := Left
+        Result[Right.Key] := Right.Value
+    end op "|"
+
+    op "[]"() -> Result : Array is
+        const First := Indexed_By::First()
+        return (Data => Create(0, null), Bounds => First + 1 .. First)
+            // Bounds not meaningful when empty
+    end op "[]"
+
+end class PSL::Containers::Array
+
+func PSL::Test::Test_Array() is
+    type Color is Enum< [#red, #green, #blue] >
+    type RCB is Array<Integer<Range => 0..0xFF>, Indexed_By => Color>
+
+    const Red : RCB := [#red => 0x33, #green => 0, #blue => 0]
+    const Blue : RCB := [#red => 0, #green => 0, #blue => 0x33]
+    const Yellow : RCB := [0, 0x33, 0x33]
+    const White : RCB := [0xFF, 0xFF, 0xFF]
+    
+    const RCBs : Vector<RCB> := [Red, Blue, Yellow, White]
+
+    for each C of RCBs forward loop
+        Println("#red => " | C[#red] | ", #green => " | C[#green] |
+          ", #blue => " | C[#blue])
+    end loop
+end func PSL::Test::Test_Array

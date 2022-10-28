@@ -1,0 +1,140 @@
+concurrent interface PSL::Core::Clock<> is
+    // A module that provides access to a wall clock and
+    // to other timers, and an ability to delay the caller
+    // for a given amount of time, or until a specified time
+    // in the future.
+    
+    func Create() -> Clock
+        // Create a clock, which corresponds to the current wall clock time
+
+    func Create(Now : Time) -> Clock
+        // Create a clock, where Now() returns the given time when created
+
+    func Now(locked C : Clock) -> Time
+        // Return current reading of clock
+
+    func Now() -> Time
+        // Return current reading of wall clock
+
+    queued func Delay(C : Clock; Until : Time)
+        // Wait until the given clock reads >= Until
+
+    queued func Delay(Until : Time)
+        // Wait until the wall clock reads >= Until
+
+    queued func Delay(C : Clock; For : Time::Time_Interval)
+        // Wait until the given clock reads "Now(C) + For"
+
+    queued func Delay(For : Time::Time_Interval)
+        // Wait until the wall clock reads "Now() + For"
+
+    func Set(locked var C : Clock; To : Time)
+        // Update clock so it reads the given time
+end interface PSL::Core::Clock
+
+concurrent class PSL::Core::Clock is
+
+    var Timer_Delta : Time::Time_Interval
+        // Amount to be subtracted from Current Time
+        // to produce value of timer
+
+    func Current_Time(locked C : Clock) -> Time 
+      is import(#clock_current_time)
+        // NOTE: Clock parameter is ignored; returns wall clock
+
+    func Wait_For_Delay(queued C : Clock; Until : Time) is 
+      import(#clock_delay)
+        // Wait until the wall clock reads >= Until
+        // NOTE: Clock parameter is ignored
+
+  exports
+    func Create() -> Clock is
+        // Create a clock, which corresponds to the current wall clock time
+        // Println("Create Clock with Delta 0.0")
+        return (Timer_Delta => 0.0)
+    end func Create
+
+    func Create(Now : Time) -> Result : Clock is
+        // Create a clock, where Now() returns the given time when created
+        const Delta := Current_Time(Create()) - Now
+        // Println("Create Clock with Delta = " | Delta)
+        return (Timer_Delta => Current_Time(Create()) - Now)
+    end func Create
+
+    func Now(locked C : Clock) -> Result : Time is
+        // Return current reading of clock
+        Result := Current_Time(C) - C.Timer_Delta
+        // Println("Now returning " | Result-Zero())
+    end func Now
+
+    func Now() -> Result : Time is
+        // Return current reading of wall clock
+        var C : Clock := Create()
+        Result := Current_Time(C)
+        // Println("Now returning " | Result-Zero())
+    end func Now
+
+    queued func Delay(C : Clock; Until : Time) is
+        // Wait until the given clock reads >= Until
+        Wait_For_Delay(C, Until + C.Timer_Delta)
+    end func Delay
+
+    queued func Delay(Until : Time) is
+        // Wait until the wall clock reads >= Until
+        var C : Clock := Create()
+        Wait_For_Delay(C, Until)
+    end func Delay
+
+    queued func Delay(C : Clock; For : Time::Time_Interval) is
+        // Wait until the given clock reads "Now(C) + For"
+        // NOTE: Timer_Delta is irrelevant for this one
+        // Println("Wait for delay of " | For)
+        const Time_Now := Current_Time(C)
+        const Until := Time_Now + For
+        // Println("Time_Now + " | For | " - Time_Now = " | Until - Time_Now)
+        Wait_For_Delay(C, Until)
+    end func Delay
+
+    queued func Delay(For : Time::Time_Interval) is
+        // Wait until the wall clock reads "Now() + For"
+        // NOTE: Timer_Delta is irrelevant for this one
+        // Println("Wait for delay of " | For)
+        var C : Clock := Create()
+        const Time_Now := Current_Time(C)
+        const Until := Time_Now + For
+        // Println("Time_Now + " | For | " - Time_Now = " | Until - Time_Now)
+        Wait_For_Delay(C, Until)
+    end func Delay
+
+    func Set(locked var C : Clock; To : Time) is
+        // Update clock so it reads the given time
+        C.Timer_Delta := Current_Time(C) - To
+    end func Set
+
+end class PSL::Core::Clock
+
+func PSL::Test::Test_Clock() is
+    var C := Clock::Create()
+    const Start := C.Now()
+    var Ran := Random::Start (Round_To_Int (Seconds_Since_1970 (Clock::Now())))
+    Println("First random number = " | Next(Ran));
+    Println("Second random number = " | Next(Ran));
+    Println("Third random number = " | Next(Ran));
+
+  then
+    Println("About to delay 4.0 seconds")
+    C.Delay(4.0)
+    Println("Done with delay of 4.0")
+  ||
+    Println("About to delay 2.0 seconds")
+    C.Delay(2.0)
+    Println("Done with delay of 2.0")
+||    // check that indent of 0 works
+    for I in 1..7 loop
+        Println("In loop delaying for 1.0")
+        C.Delay(1.0)
+        Println("Done with delay " | I | " of 1.0")
+    end loop
+then  // check that indent of 0 works
+    Println("Elapsed time: " | (C.Now() - Start))
+end func PSL::Test::Test_Clock

@@ -1,0 +1,107 @@
+Mapping from ParaSail VM to Ada.
+
+ParaSail module becomes Ada package.
+ParaSail operation becomes Ada subprogram with some extra arguments.
+One key argument is the "context" which includes the type-descriptor,
+the local region, TCB, stack,etc.  Static link is currently
+passed by filling in the first word of the new local region
+created
+
+ParaSail pico-thread sub-function becomes a nested Ada subprogram.
+Body of "for" loop is generally treated as a pico-thread sub-function,
+which spawns its successor iteration(s).
+
+ParaSail call maps to Ada call or Ada built-in operator
+ParaSail module instantiation produces a type descriptor.
+
+Type descriptor has set of "routine" pointers (see Interpreter.Type_Descriptor).
+
+Ada code presumably has "with" for (extract of) PSC.Interpreter.
+to get definitions for regions, type-descriptors, etc.
+Do we want Ada code brought in as a DLL, or do we want it
+to be a separately linked executable without the interpreter?
+I would think the latter, though then we will need to work
+a bit to be sure we keep the data structures in sync.
+The built-in operations would be put out as generated code (this should probably be handled by having separate Ada-generating routines identified by the same designator).
+
+Probably shouldn't generate Ada source code directly, but rather call an API which could generate C instead, or perhaps WhyML.
+
+-----
+Representation of objects:
+
+Do we want to use a single Ada type for all objects in the
+Ada translation?  That would be inconvenient when we "know"
+the object to be a 64-bit int or float.
+
+If a type has any "imported" operators, then that would argue
+for using a distinct type for it, so that we can inline those
+operators without undue type conversion.  This presumably means
+the Univ_* types, Integer, Fixed, Float, Enum<>, ...  Unary "+"
+might be used to convert these back to the "generic" type used
+for other calls.  Alternatively, we use Ada generics just for
+these type conversions.
+
+Particular examples mentioned by Steve:
+
+Object with an optional component:
+    For "large" object, a recognizably null address.
+    For "small" object, a type-specific null value.
+    For a "wrapper" object, same as the wrapped object.
+    
+A concurrent object
+    Just like a regular object, except there is a non-zero
+    lock index in its header.
+
+----------
+
+Sample by-hand conversions
+
+----------
+
+
+Presume that we are mapping ParaSail VM routines to Ada
+subprograms, reading the sequence of instructions, reconstructing
+a bit of a tree representation, and then dumping it out as Ada
+source.  Furthermore, presume this code generator is itself
+written in ParaSail.
+
+Data types in the generated Ada source code:
+
+   Word_Type -- 64 bit signed integer, used for objects
+     of unknown type
+     
+   Normal numeric types -- when we can determine that that is
+     what is being manipulated.
+     
+   Enumeration types -- when we can determine that that is what
+     is being manipulated.
+     
+   Large_Object -- when we know we are manipulating a large object
+   
+   Small_Object -- when we know we are manipulating a small object,
+     but we don't know what it is.
+     
+   Ref -- A reference to an object -- not sure we need these given
+     "in out" parameters on functions.   But how do we return a
+     reference without having a special notion of "ref"?
+     
+   Large object header -- used to represent first word of
+     a large object, including its size, lock, type, and region.
+     
+ParaSail operation representation in Ada:
+
+   Ada procedure -- ParaSail operation with no outputs
+   
+   Ada function -- ParaSail operation with one or more outputs
+      -- Result type is either a single object of one of the
+      -- above types if there is only one output, or a record 
+      -- declared for the purpose if there are multiple outputs.
+      -- "var" parameters become "refs" or "access X" or "in out"
+      
+   Ada nested procedure -- For pico-functions that don't have any
+      -- output; up-level references used in most cases, but
+      -- for loop bodies, parameters are used for loop indices.
+      
+   Ada nested function -- For pico-functions that have an output
+     -- (e.g. for picothreads within an aggregate).
+     

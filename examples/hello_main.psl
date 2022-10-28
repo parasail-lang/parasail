@@ -1,0 +1,19 @@
+func main (Basic_Array<Univ_String>) is
+
+    var X : Univ_Integer
+    var Y : Univ_Integer
+
+    //  Now try to produce a string
+    Println("Hello world");
+    
+    X := 6;
+    Y := 7;
+
+    Print(" and the answer is... ");
+
+    //  Printing out a string is too complicated, so we just print "42"
+    Print(X * Y);
+    Print('\n');
+
+end func main;
+

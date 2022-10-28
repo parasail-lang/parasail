@@ -1,0 +1,6 @@
+func main(Args : Basic_Array<Univ_String>) is
+   type Answer is PSL::Core::Enum<[#no, #idk, #yes]>;
+   type Answers is Array<Univ_Character, Answer>;
+   const No : Answers := [#no => 'n', #idk => 'i', #yes => 'y'];
+   Println(No[#yes]);
+end func main;

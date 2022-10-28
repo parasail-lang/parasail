@@ -1,0 +1,33 @@
+package P is
+   type TWP is new Integer<Range => -100 .. +100>;
+
+   function OK (Val : TWP) return Boolean is (#True);
+
+   type TWP'Properties is record
+       Low : TWP := TWP'First;
+       High : TWP := TWP'Last;
+       --  Predicate : access function (Val : TWP) return Boolean := OK;
+   end record;
+
+   function Check(Val : TWP; Against : TWP'Properties) return Boolean is
+     (Val >= Against.Low and then Val <= Against.High);
+        --  and then Predicate (Val));
+
+end P;
+
+with P.*;
+procedure Test_TWP is
+   
+   Natural : TWP'Properties := (0, TWP'Last); -- , OK);
+
+   X : TWP with Properties => Natural;
+begin
+
+   X := 3;
+   pragma Assert (Check(X, Against => Natural));
+   Put_Line ("Assigned 3, X =" & X'Image);
+
+   X := -3;
+   pragma Assert (Check(X, Against => Natural));
+   Put_Line ("Assigned -3, X =" & X'Image);
+end Test_TWP;

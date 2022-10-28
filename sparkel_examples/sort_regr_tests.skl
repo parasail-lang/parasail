@@ -1,0 +1,98 @@
+proc Sort_Regr_Tests(In_File_Name : Univ_String) is
+    --  Procedure to sort the output of a CodePeer regression-test run.
+    --  This presumes that the "XFAIL" tests, if not already deleted,
+    --  come after a line with "----" at the beginning of the line.
+    --  It sorts the "====... Bug" entries that precede the "----" line
+    --  by the test-name string that follows "Bug"
+
+    package Bug_Entry is
+        type Bug_Entry is record
+            --  Info kept on each "====... Bug" entry
+            Key : Univ_String  -- string following "Bug"
+            Lines : Vector<Univ_String>  -- all of the lines
+        end record Bug_Entry
+
+        func "=?" (Left, Right : Bug_Entry) return Ordering
+          is (Left.Key =? Right.Key)
+    end package Bug_Entry
+
+    var IO := SSL.Core.IO.Get_IO()
+    var In_File := File_Input_Stream.Open(IO, In_File_Name);
+    if In_File is null then
+        Put_Line(In_File_Name & " not found")
+        return
+    end if
+    var Out_File := File_Output_Stream.Create(IO, In_File_Name & ".sorted")
+    var Line : Univ_String
+
+    Put_Line ("Sorting '" & In_File_Name & "' to produce '" &
+      In_File_Name & ".sorted'");
+
+    --  Read up to first bug
+    loop
+        Line := In_File.Get_Line()
+        if Line is null then
+            Put_Line("No bug entries found in " & In_File_Name)
+            return
+        end if
+        exit loop
+          when |Line| > 4 and then Line[1..4] = "===="
+        Out_File.Put_Line (Line)
+    end loop
+
+    --  Read in each entry
+    var Bugs : Vector<Bug_Entry> := []
+
+    loop
+        var Line_Vec : Vector<Univ_String> := [Line]
+        var Key : Univ_String := Line
+
+        --  Extract key from first line of bug entry
+        for I in 1 .. |Line|-3 forward loop
+            if Line[I .. I+2] = "Bug" then
+                Key := Line[I+3 .. |Line|]
+                exit loop
+            end if
+        end loop
+
+        --  Read rest of lines in bug entry
+        loop
+            Line := In_File.Get_Line()
+            exit loop
+              when Line is null or else
+                (|Line| > 4
+                  and then (Line[1..4] = "====" or else Line[1..4] = "----"))
+            Line_Vec &= Line
+        end loop
+
+        --  Add to vector of bug entries
+        Bugs &= Bug_Entry'(Key => Key, Lines => Line_Vec)
+
+        exit loop
+          when Line is null or else (|Line| > 4 and then Line[1..4] = "----")
+            -- Reached the end of the bug entries to be sorted
+    end loop
+
+    --  Now we can sort the bug entries
+
+    Put_Line ("About to sort " & |Bugs| & " bug entries.")
+
+    package Sort_Bugs is new Sorting<Array_Type => Vector<Bug_Entry>>
+    
+    Sort_Bugs.Quicksort(Bugs)
+
+    Put_Line ("Printing out sorted list.")
+    for each Bug of Bugs forward loop
+        for each Bug_Line of Bug.Lines forward loop
+            Out_File.Put_Line (Bug_Line)
+        end loop
+    end loop
+
+    while Line not null loop
+        --  Print out rest of lines as is
+        Out_File.Put_Line (Line)
+        Line := In_File.Get_Line()
+    end loop
+
+    Put_Line ("All done.")
+end proc Sort_Regr_Tests

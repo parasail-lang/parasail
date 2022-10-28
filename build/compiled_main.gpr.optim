@@ -1,0 +1,26 @@
+project Compiled_Main is
+
+   for Object_Dir use "fast_obj";
+   -- for Object_Dir use "slow_obj";
+   -- for Exec_Dir use "..";
+
+   for Source_Dirs use ("../semantics", "../interpreter");
+
+   for Main use
+     ("call_compiled_main.adb");
+
+   package Builder is
+      for Default_Switches ("ada") use ("-s", "-O2", "-g", "-k", "-gnatN");
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("ada") use
+           ("-gnatE", "-fstack-check",
+            "-O2", "-g", "-gnat95", "-gnatU", "-gnatN");
+   end Compiler;
+
+   package Linker is
+      for Default_Switches ("ada") use ("-O2", "-g", "-L/usr/lib", "-L.", "-ltermcap");
+   end Linker;
+
+end Compiled_Main;

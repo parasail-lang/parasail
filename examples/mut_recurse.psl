@@ -1,0 +1,65 @@
+interface I1<> is
+   func create() -> I1
+   func bump(var I1)
+   func read(I1)
+end interface I1
+
+class I1 is
+  exports
+   func create() -> I1 is
+      return ();
+   end func create
+   func bump(var I1) is
+      null
+   end func bump
+   func read(I1) is
+      null
+   end func read
+end class I1
+
+interface Mut_Recurse<> is
+   func dummy()
+end interface Mut_Recurse
+
+class Mut_Recurse is
+  exports
+   func dummy() is
+      var Up : I1 := create()
+      func B(I : I1);
+      func A() is
+         var X : I1 := create()
+         B(X)  //  Be sure can call before body defined
+      end func A
+      func B(I : I1) is
+         read(I)
+         bump(Up)
+      end func B
+      func C() is
+         var Y : I1 := create()
+         B(Y)  //  Be sure can call after body defined
+         read(Up)
+      end func C
+      func D() is
+         var Y : I1 := create()
+         B(Y)  //  Be sure can call after body defined
+         B(Up)  //  Data Race with Up
+         bump(Up)
+         read(Up)
+      end func D
+
+      A()
+      C()
+      D()
+      block
+        A()
+      ||
+        C()  // Data races
+      end block
+   end func dummy
+end class Mut_Recurse
+
+import Mut_Recurse
+
+func Test_Mut_Recurse() is
+   Mut_Recurse::dummy()
+end func Test_Mut_Recurse

@@ -1,0 +1,25 @@
+concurrent interface Counter <> is
+
+   func Create () -> Counter;
+   func Next_Index
+     (locked var Counter; Increment : Univ_Integer := 1) -> Univ_Integer
+
+   func Cur_Count(locked Counter) -> Univ_Integer
+
+end interface Counter
+
+concurrent class Counter is
+   var Index : Univ_Integer := 0;
+ exports
+   func Create () -> Counter is (())
+
+   func Next_Index
+     (locked var Counter; Increment : Univ_Integer := 1) -> Univ_Integer is
+      Next_Index := Counter.Index + 1
+      Counter.Index += Increment;
+   end func Next_Index
+
+   func Cur_Count(locked Counter) -> Univ_Integer is (Counter.Index)
+
+end class Counter
+   

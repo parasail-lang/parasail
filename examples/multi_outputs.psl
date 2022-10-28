@@ -1,0 +1,4 @@
+func Multi_Outputs(X : Univ_Integer) -> (A : Univ_Integer; B : Univ_Integer) is
+    A := X*2;
+    B := X*3;
+end func Multi_Outputs;

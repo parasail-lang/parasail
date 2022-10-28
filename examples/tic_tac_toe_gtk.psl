@@ -1,0 +1,469 @@
+import GTK::*,*
+
+interface Tic_Tac_Toe<> is
+	func Create(dimentions : Univ_Integer) -> Tic_Tac_Toe;
+	//Sets all the values so the player can start playing
+	func DrawGameBoard(Game : Tic_Tac_Toe);
+	//Renders the Game Board
+	func Take(var Game : Tic_Tac_Toe;
+          Row : Univ_Integer ; Col : Univ_Integer ; Mark : Univ_Character);
+	//Lets player select the box the want to claim
+	func gameOver(var Game : Tic_Tac_Toe;
+          Row : Univ_Integer ; Col : Univ_Integer ; Mark : Univ_Character) -> Boolean;
+	//checks to see if someone has won this turn
+	func turn(var Game : Tic_Tac_Toe ; Mark : Univ_Character) -> Univ_Integer;
+	//what happens in each turn
+	func checkMarkForAboutToWin(var Game : Tic_Tac_Toe ; Mark : Univ_Character) -> Univ_Integer;
+	//Ai check if someone is about to win
+end interface Tic_Tac_Toe;
+
+class Tic_Tac_Toe is
+	var Slots : Vector<Univ_Character>;
+	var Size : Univ_Integer;
+	exports
+	func Create(dimentions : Univ_Integer) -> Tic_Tac_Toe is
+           var Game : Tic_Tac_Toe :=
+             (Slots => [for I in 1..(dimentions ** 2) => ' '], Size => dimentions);
+           Println("Game Started.");
+	   Println("To win get "|dimentions|" in a row.");
+
+           Game.DrawGameBoard();
+           return Game;
+	end func Create; 
+	
+	func DrawGameBoard(Game : Tic_Tac_Toe) is
+		for I in 1..Game.Size forward loop
+			Print("_|___"|I|"__");
+		end loop;
+		Println("_|");
+		for J in 1..Game.Size forward loop
+			for I in 1..Game.Size forward loop
+				Print(" |      ");
+			end loop;
+			Println(" |");
+			Print(J);
+			for I in 1..Game.Size forward loop
+				Print("|   "|Game.Slots[(J - 1) * Game.Size + I]|"   ");
+			end loop;
+			Println("|");
+			for I in 1..Game.Size forward loop
+				Print(" |      ");
+			end loop;
+			Println(" |");
+			for I in 1..Game.Size forward loop
+				Print("-|------");
+			end loop;
+			Println("-|");
+		end loop;
+	end func DrawGameBoard;
+
+	func Take(var Game : Tic_Tac_Toe;
+          Row : Univ_Integer ; Col : Univ_Integer ; Mark : Univ_Character) is
+		Game.Slots[(Row - 1) * Game.Size + Col] := Mark;
+	end func Take;
+	
+	func gameOver(var Game : Tic_Tac_Toe;
+          Row : Univ_Integer ; Col : Univ_Integer ; Mark : Univ_Character) -> Boolean is
+		var RowAmnt : Univ_Integer := 0;
+        	var ColAmnt : Univ_Integer := 0;
+        	var BacSlashAmnt : Univ_Integer := 0;
+        	var FrdSlashAmnt : Univ_Integer := 0;
+		for I in 1..Game.Size forward loop
+			if Game.Slots[(Row - 1) * Game.Size + I] == Mark then
+				RowAmnt := RowAmnt + 1;
+			end if;
+			if Game.Slots[(I - 1) * Game.Size + Col] == Mark then
+				ColAmnt := ColAmnt + 1;
+			end if;
+			if Row == Col then
+				if Game.Slots[(I - 1) * Game.Size + I] == Mark then
+					BacSlashAmnt := BacSlashAmnt + 1;
+				end if;
+			end if;
+			if Row + Col == Game.Size + 1 then
+				if Game.Slots[((Game.Size + 1 - I) - 1) * Game.Size + I] == Mark then
+					FrdSlashAmnt := FrdSlashAmnt + 1;
+				end if;
+			end if;
+		end loop;
+		if ColAmnt == Game.Size then
+			Println(Mark | " Wins in Column "| Col);
+			return #true;
+		end if;
+		if RowAmnt == Game.Size then
+			Println(Mark | " Wins in Row "| Row);
+			return #true;
+		end if;
+		if BacSlashAmnt == Game.Size then
+			Println(Mark | " Wins in Diagonal \\");
+			return #true;
+		end if;
+		if FrdSlashAmnt == Game.Size then
+			Println(Mark | " Wins in Diagonal /");
+			return #true;
+		end if;
+		
+		for I in 1..(Game.Size ** 2) forward loop
+			if Game.Slots[I] == ' ' then
+				exit loop;
+			end if;
+			if I == (Game.Size ** 2) then
+				Println("It\'s a Tie");
+				return #true;
+			end if;
+		end loop;
+		return #false;
+	end func gameOver;
+
+	func turn(var Game : Tic_Tac_Toe ; Mark : Univ_Character) -> Univ_Integer is
+		Println(Mark |" it\'s your turn.");
+		Println("Type the Row and Column to select the slot you want.");
+		var size : Univ_Integer := Game.Size;
+	        var Row : Univ_Integer;
+        	var Col : Univ_Integer;
+		loop
+			loop
+				Print("Row: ");
+        			Row := From_String(Readln());
+				if Row in 1..size then
+					exit loop;
+				end if;
+				Println("Row "| Row |" is not on the board.");
+			end loop;
+			loop
+				Print("Col: ");
+	        		Col := From_String(Readln());
+				if Col in 1..size then
+					exit loop;
+				end if;
+				Println("Col "| Col |" is not on the board.");
+			end loop;
+			if Game.Slots[(Row - 1) * size + Col] != ' ' then
+				Println(Row|", "|Col|" has already been claimed, try again.");
+				continue loop;
+			end if;
+			exit loop;
+		end loop;
+		Println(Mark |" takes "|Row|", "|Col);
+		Println("");
+        	Game.Take(Row, Col, Mark);
+        	Game.DrawGameBoard();
+		return (Row - 1) * size + Col;
+	end func turn;
+	
+	func checkMarkForAboutToWin(var Game : Tic_Tac_Toe ; Mark : Univ_Character) -> Univ_Integer is
+        	var Row : Univ_Integer;
+        	var Col : Univ_Integer;
+		var Blocking : Boolean := #false;
+		for J in 1..Game.Size forward loop
+		 	var RowAmnt : Univ_Integer := 0;
+      			var ColAmnt : Univ_Integer := 0;
+        		var BacSlashAmnt : Univ_Integer := 0;
+        		var FrdSlashAmnt : Univ_Integer := 0;
+			for I in 1..Game.Size forward loop
+				if Game.Slots[(J - 1) * Game.Size + I] == Mark then
+					RowAmnt := RowAmnt + 1;
+				end if;
+				if Game.Slots[(I - 1) * Game.Size + J] == Mark then
+					ColAmnt := ColAmnt + 1;
+				end if;
+				if Game.Slots[(I - 1) * Game.Size + I] == Mark then
+				      BacSlashAmnt := BacSlashAmnt + 1;
+				end if;
+				if Game.Slots[((Game.Size + 1 - I) - 1) * Game.Size + I] == Mark then
+					FrdSlashAmnt := FrdSlashAmnt + 1;
+				end if;
+			end loop;
+			if ColAmnt == Game.Size - 1 and Blocking == #false then
+				for I in 1..Game.Size forward loop
+					if Game.Slots[(I - 1) * Game.Size + J] == ' ' then
+						Col := J;
+						Row := I;
+						Blocking := #true;
+						exit loop;
+					end if;
+				end loop
+			end if;
+			if RowAmnt == Game.Size - 1 and Blocking == #false then
+				for I in 1..Game.Size forward loop
+					if Game.Slots[(J - 1) * Game.Size + I] == ' ' then
+						Col := I;
+						Row := J;
+						Blocking := #true;
+						exit loop;
+					end if;
+				end loop
+			end if;
+			if BacSlashAmnt == Game.Size - 1 and Blocking == #false then
+				for I in 1..Game.Size forward loop
+					if Game.Slots[(I - 1) * Game.Size + I] == ' ' then
+						Col := I;
+						Row := I;
+						Blocking := #true;
+						exit loop;
+					end if;
+				end loop
+			end if;
+			if FrdSlashAmnt == Game.Size - 1 and Blocking == #false then
+				for I in 1..Game.Size forward loop
+					if Game.Slots[((Game.Size + 1 - I) - 1) * Game.Size + I] == ' ' then
+						Col := I;
+						Row := Game.Size + 1 - I;
+						Blocking := #true;
+						exit loop;
+					end if;
+				end loop;
+			end if;
+		end loop;
+		if Col != null and Row != null then
+			return ((Row - 1) * Game.Size + Col);
+		end if;
+		return null;
+	end func checkMarkForAboutToWin;
+
+end class Tic_Tac_Toe;
+
+func help() is
+	Println("");
+	Println("To play against the computer type oneplayer #");
+	Println("To play a two player game type twoplayer #");
+	Println("To play a two player game with a GUI type twoplayerGui #");
+	Println("where # is the size of the game board");
+	Println("");
+	Println("It is suggested that # be between 3 and 9");
+	Println("");
+end func help;
+
+func twoplayer(dimentions : Univ_Integer) is
+    Println("");
+    Println("");
+    var Game : Tic_Tac_Toe := Create(dimentions);
+    var size : Univ_Integer := Game.Size;
+		
+    loop
+        var slot : Univ_Integer := Game.turn('X'); // X's Turn
+	if Game.gameOver((slot - (((slot - 1) mod size) + 1)) / size + 1, ((slot - 1) mod size) + 1, 'X') then
+		exit loop;
+	end if;
+	var Oslot : Univ_Integer := Game.turn('O'); //O's Turn
+	if Game.gameOver((Oslot - (((Oslot - 1) mod size) + 1)) / size + 1, ((Oslot - 1) mod size) + 1, 'O') then
+		exit loop;
+	end if;
+    end loop;
+    Println("To play again type \"twoplayer " | Game.Size |"\"");
+
+end func twoplayer;
+
+func oneplayer(dimentions : Univ_Integer) is
+    Println("");
+    Println("");
+    Println("TicTacToe Ai Activated");
+    var Game : Tic_Tac_Toe := Create(dimentions);
+    var size : Univ_Integer := Game.Size;
+
+    loop
+        var slot : Univ_Integer := Game.turn('X'); //X's Turn
+	if Game.gameOver((slot - (((slot - 1) mod size) + 1)) / size + 1, ((slot - 1) mod size) + 1, 'X') then
+		exit loop;
+	end if;
+	Println("O it\'s your turn."); 		//Cpu O's Turn
+        var Row : Univ_Integer;
+        var Col : Univ_Integer;
+	var Ran : Random := Start();
+	var Blocking : Boolean := #false;
+	loop
+		var slot1 : Univ_Integer := Game.checkMarkForAboutToWin('O');
+		if slot1 != null then
+			Row := (slot1 - ((slot1 - 1) mod Game.Size) + 1) / Game.Size + 1;
+			Col := ((slot1 - 1) mod Game.Size) + 1;
+			Blocking := #true;
+		end if;
+		if Blocking == #false then
+			var slot2 : Univ_Integer := Game.checkMarkForAboutToWin('X');
+			if slot2 != null then
+				Row := (slot2 - ((slot2 - 1) mod Game.Size) + 1) / Game.Size + 1;
+				Col := ((slot2 - 1) mod Game.Size) + 1;
+				Blocking := #true;
+			end if;
+		end if;
+		if Blocking == #false then
+			Row := (Ran.Next() mod Game.Size) + 1;
+			Col := (Ran.Next() mod Game.Size) + 1;
+		end if;
+		if Game.Slots[(Row - 1) * size + Col] != ' ' then
+			continue loop;
+		end if;
+		exit loop;
+	end loop;
+	Println("O takes "|Row|", "|Col);
+	Println("");
+        Game.Take(Row, Col, 'O');
+        Game.DrawGameBoard();
+	if Game.gameOver(Row, Col, 'O') then
+		exit loop;
+	end if;
+    end loop;
+    Println("To play again type \"oneplayer " | Game.Size |"\"");
+end func oneplayer;
+
+func twoplayerGui(dimentions : Univ_Integer) is
+    Println("");
+    Println("");
+    Println("TicTacToe Ai Activated");
+    var Game : Tic_Tac_Toe := Create(dimentions);
+    var size : Univ_Integer := Game.Size;
+    
+    var IO := IO::Get_IO()
+    const GTK := GTK::Init(IO, [])
+    //var W := Window::New(GTK);
+    var Gui : TicTacToe_Gui := startGui(GTK, Game);
+    //W.Show()
+    Gui.Main_Loop()
+
+    Println("To play again type \"twoplayerGui " | Game.Size | "\"");
+end func twoplayerGui;
+
+interface TicTacToe_Gui<> extends GTK::Controller is
+	func On_Button_Press_Event(var TicTacToe_Gui; var W : Widget+;
+           Event_Button) -> Boolean
+    	func On_Draw(var TicTacToe_Gui; var W : Widget+;
+           var Cr : Cairo::Context) -> Boolean
+
+   new
+
+	func startGui(locked GTK; Game : Tic_Tac_Toe) -> TicTacToe_Gui
+	//Creates the Gui for the player
+    
+end interface TicTacToe_Gui;
+
+class TicTacToe_Gui is
+	var GameToDraw : Tic_Tac_Toe;
+	var Mark : Univ_Character;
+	var Buffer : Univ_Integer;
+	var slotWidth : Univ_Integer;
+	var slotHeight : Univ_Integer;
+        var W : optional GTK::Window := null;
+	var Grid : optional TicTacToe_Grid := null;
+        var Prior_Row : Univ_Integer := 0;
+        var Prior_Col : Univ_Integer := 0;
+        var Changed : Boolean := #false;
+	exports
+	func startGui(locked GTK; Game : Tic_Tac_Toe) -> Gui : TicTacToe_Gui is
+		Gui :=
+	           (GTK => GTK, GameToDraw => Game, Mark => 'X', Buffer => 20, slotWidth => 40, slotHeight => 40);
+                Gui.W := Window::New(Gui.GTK);
+		Gui.Grid := TicTacToe_Grid::New(Gui.GTK, Gui.GameToDraw);
+		Gui.W.Add(Gui.Grid)
+                Gui.W.Show_All()
+		Gui.Grid.Add_Events(#button_press)
+                Gui.Changed := #true
+		Gui.Grid.Queue_Draw()
+	end func startGui;
+
+	func On_Button_Press_Event(var Gui : TicTacToe_Gui; var W : Widget+;
+          Event : Event_Button) -> Boolean is
+		Println("Click " | Gui.Mark |
+                  " at " | Event.Get_X() | ", " | Event.Get_Y());
+                const Row := 1 +
+                  (Round_To_Int (Event.Get_X()) - Gui.Buffer) / Gui.slotWidth
+                const Col := 1 +
+                  (Round_To_Int (Event.Get_Y()) - Gui.Buffer) / Gui.slotHeight
+                Println("Row = " | Row | ", Col = " | Col)
+
+                if Row == Gui.Prior_Row and then Col == Gui.Prior_Col then
+                    Println("Duplicate event");
+                    return;
+                end if;
+                Gui.Prior_Row := Row;
+                Gui.Prior_Col := Col
+
+                if Row in 1..Gui.GameToDraw.Size
+                  and then Col in 1..Gui.GameToDraw.Size then
+                    Gui.GameToDraw.Take (Row, Col, Gui.Mark)
+                end if;
+                Gui.Changed := #true
+                Gui.Grid.Queue_Draw()
+                if Gui.Mark == 'X' then
+                    Gui.Mark := 'O'
+                else
+                    Gui.Mark := 'X';
+                end if;
+                return #false
+	end func On_Button_Press_Event;
+
+    	func On_Draw(var Gui : TicTacToe_Gui; var W : Widget+; var Cr : Cairo::Context) -> Boolean is
+                Println(" In On_Draw")
+                if not Gui.Changed then
+                    // 
+                    Println(" On_Draw returning because Changed is #false")
+                    return
+                end if
+                Gui.Changed := #false
+
+		var Width : Univ_Integer := W.Get_Allocated_Width();
+        	var Height : Univ_Integer := W.Get_Allocated_Height();
+		Gui.slotWidth := (Width - (Gui.Buffer * 2)) / Gui.GameToDraw.Size;
+		Gui.slotHeight := (Height - (Gui.Buffer * 2)) / Gui.GameToDraw.Size;
+		var text : Pango::Layout := New(Cr);
+		//var Discrip : Pango::Font_Description := ("Sans 10") //font type and size
+		//text.Set_Font_Description(Discrip);
+		for I in 0..Gui.GameToDraw.Size forward loop
+			Cr.Move_To(Int_To_Float(Gui.Buffer + (Gui.slotWidth * I)), Int_To_Float(Gui.Buffer));
+			Cr.Line_To(Int_To_Float(Gui.Buffer + (Gui.slotWidth * I)), Int_To_Float(Height - Gui.Buffer));
+			Cr.Stroke()
+			Cr.Move_To(Int_To_Float(Gui.Buffer), Int_To_Float(Gui.Buffer + (Gui.slotHeight * I)));
+			Cr.Line_To(Int_To_Float(Width - Gui.Buffer), Int_To_Float(Gui.Buffer + (Gui.slotHeight * I)));
+			Cr.Stroke()
+		end loop;
+		Println("It\'s " | Gui.Mark | "\'s turn");
+		text.Set_Text("It\'s " | Gui.Mark | "\'s turn");
+		Cr.Move_To(Int_To_Float(Gui.Buffer),
+                  (Gui.Buffer - text.Get_Pixel_Height()) * 0.5)
+		Cr.Show_Layout(text);
+		Cr.Stroke();
+		for I in 1..|Gui.GameToDraw.Slots| forward loop
+			text.Set_Text("" | Gui.GameToDraw.Slots[I]);
+			Cr.Move_To(Int_To_Float(Gui.Buffer +
+                          (Gui.slotWidth *
+                            (((I-1) / Gui.GameToDraw.Size) + 1))) -
+                            (Gui.slotWidth + text.Get_Pixel_Width()) * 0.5,
+                            Int_To_Float (Gui.Buffer +
+                              (Gui.slotHeight *
+                                 ((I-1) mod Gui.GameToDraw.Size + 1))) -
+                                   (Gui.slotHeight + text.Get_Pixel_Height()) * 0.5);
+			Cr.Show_Layout(text);
+			Cr.Stroke();
+		end loop;
+		Println("Draw done");
+		return #false;
+    	end func On_Draw;
+end class TicTacToe_Gui
+
+interface TicTacToe_Grid<> extends GTK::Drawing_Area is
+	    func New (var GTK; Game : Tic_Tac_Toe) -> TicTacToe_Grid
+
+	    // Overridings for operations inherited from Drawing_Area
+	    func Init_Widget_Id (GTK::Widget_Id) -> TicTacToe_Grid
+	    func New (var GTK) -> TicTacToe_Grid
+end interface TicTacToe_Grid;
+
+class TicTacToe_Grid is
+	var GameToDraw : Tic_Tac_Toe;
+exports
+	func New (var GTK; Game : Tic_Tac_Toe) -> TicTacToe_Grid is
+		var Grid : TicTacToe_Grid :=
+	           (Drawing_Area => GTK.New(), GameToDraw => Game);
+		return Grid;
+	end func New;
+
+	// Overridings for operations inherited from Drawing_Area
+	func Init_Widget_Id (GTK::Widget_Id) -> TicTacToe_Grid is
+	   return (Drawing_Area => Init_Widget_Id(Widget_Id),
+	     GameToDraw => null)
+	end func Init_Widget_Id;
+
+	func New (var GTK) -> TicTacToe_Grid is
+	   return (Drawing_Area => GTK.New(), GameToDraw => null);
+	end func New;
+
+end class TicTacToe_Grid

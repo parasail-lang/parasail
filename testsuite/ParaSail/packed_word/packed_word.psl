@@ -1,0 +1,189 @@
+interface PSL::Test::Packed_Word
+  <Key_Type is Enum<>;
+   Bit_Field_Sizes : Array<Univ_Integer, Indexed_By => Key_Type>;
+     {Bit_Field_Sizes.Bounds == [..]}  // All values of Key_Type have a size
+     {(for each Size of Bit_Field_Sizes => <0> + Size) <= 63} // Sizes <= 63
+   Allow_Null : Boolean := #false> is
+   // This implements a packed word, where the map determines
+   // the sizes of the bit fields.
+   // The size of a bit field may be negative to indicate a signed bit field,
+   // or positive to indicate an unsigned bit field.
+   // The sum of the absolute values of the sizes must be no more than 63.
+   // If Allow_Null is #true, then null values can be stored/fetched.
+   // Otherwise, only non-null values are permitted.
+
+   const Bit_Field_Ranges :
+     Array<Countable_Range<Univ_Integer>, Indexed_By => Key_Type> :=
+     //  Range of allowed values for each bit field
+     //  Null is most negative value if Size < 0, else most positive value.
+      [for each [Key => Size] of Bit_Field_Sizes,
+        Key => (if Size >= 0 then 0
+                elsif Allow_Null then -2**(|Size|-1) + 1
+                else -2**(|Size|-1))
+                 ..
+               (if Size < 0 then 2**(|Size|-1) - 1
+                elsif Allow_Null then 2**Size - 2
+                else 2**Size - 1)]
+
+   func Create(Bit_Field_Values : Map<Key_Type, Univ_Integer>)
+     {(for all [Key => Val] of Bit_Field_Values =>
+        (if Val is null then Allow_Null else Val in Bit_Field_Ranges[Key]))}
+     -> Packed_Word
+     // Create a packed word with the given initial values.
+     // Unspecified fields will be initialized to zero or null,
+     // according to Allow_Null.
+
+   op "indexing"(W : Packed_Word; Key : Key_Type)
+     -> Result : optional Univ_Integer
+     {(if Result is null then Allow_Null else Result in Bit_Field_Ranges[Key])}
+     //  Extract from W and return the bit field identified by Key
+
+   func Set_Bit_Field(var W : Packed_Word;
+                      Key : Key_Type; Value : optional Univ_Integer)
+     {(if Value is null then Allow_Null else Value in Bit_Field_Ranges[Key])}
+     //  Insert Value into bit field of W identified by Key
+
+   func Dump_Constant_Info()
+   //  Dump constants computed to make packing/unpacking more efficient.
+
+end interface PSL::Test::Packed_Word
+
+class PSL::Test::Packed_Word is
+   // This implements a packed word, where the map determines
+   // the sizes of the bit fields.
+   // The size of a bit field may be negative to indicate a signed bit field,
+   // or positive to indicate an unsigned bit field.
+   // The sum of the absolute values of the sizes must be no more than 63.
+   // If Allow_Null is #true, then null values can be stored/fetched.
+   // Otherwise, only non-null values are permitted.
+
+   var Word : Univ_Integer  // TBD: define a type that doesn't allow null
+                            //      (and use it to implement Modular?)
+   const Bit_Field_Defaults : Array<Univ_Integer, Indexed_By => Key_Type> :=
+     [for each [Key => Size] of Bit_Field_Sizes, Key =>
+        (if not Allow_Null then 0
+         elsif Size < 0 then -2**(|Size|-1)
+         else 2**Size-1)]
+
+   const Bit_Field_Offsets : Array<Univ_Integer, Indexed_By => Key_Type> :=
+     [for each [Key => Size] of Bit_Field_Sizes, Key =>
+        (for K in Key_Type::First() .. Key-1 => <0> + Bit_Field_Sizes[K])]
+
+ exports
+
+   func Create(Bit_Field_Values : Map<Key_Type, Univ_Integer>)
+     -> Result : Packed_Word is
+     // Create a packed word with the given initial values.
+     // Unspecified fields will be initialized to zero or null,
+     // according to Allow_Null.
+      //  TBD: Should not need to repeat precondition here to get it checked!
+      {(for all [Key => Val] of Bit_Field_Values =>
+           (if Val is null then Allow_Null else Val in Bit_Field_Ranges[Key]))}
+      return (Word => (for each [Key => Size] of Bit_Field_Sizes reverse =>
+                <0> * 2**|Size| + (Key in Bit_Field_Values?
+                                     Bit_Field_Values[Key]:
+                                     Bit_Field_Defaults[Key])))
+   end func Create
+
+   op "indexing"(W : Packed_Word; Key : Key_Type)
+     -> Result : optional Univ_Integer is
+     //  Extract from W and return the bit field identified by Key
+     const Size := Bit_Field_Sizes[Key]
+     const Abs_Size := |Size|
+     Result := (W.Word >> Bit_Field_Offsets[Key]) mod 2 ** Abs_Size
+
+     if Size < 0 and then Result >= 2 ** (Abs_Size-1) then
+        //  Handle negative values for signed fields
+        Result -= 2 ** (Abs_Size-1)
+     end if
+
+     if Allow_Null and then Result == Bit_Field_Defaults[Key] then
+        //  We have a "null" value
+        Result := null
+     end if
+
+     {(if Result is null then Allow_Null else Result in Bit_Field_Ranges[Key])}
+   end op "indexing"
+
+   func Set_Bit_Field(var W : Packed_Word;
+                      Key : Key_Type; Value : optional Univ_Integer) is
+     //  Insert Value into bit field of W identified by Key
+      {(if Value is null then Allow_Null else Value in Bit_Field_Ranges[Key])}
+      const Abs_Size := |Bit_Field_Sizes[Key]|
+
+      const Unsigned_Field_Value :=  //  Unsigned Value of field
+        (if Value is null then Bit_Field_Defaults[Key] else Value) mod
+           2 ** Abs_Size
+
+      const Above_Field :=
+         W.Word - W.Word mod (2 ** (Abs_Size + Bit_Field_Offsets[Key]))
+      const Below_Field := W.Word mod 2**Bit_Field_Offsets[Key]
+
+      W.Word := (Unsigned_Field_Value << Bit_Field_Offsets[Key]) +
+             Above_Field + Below_Field
+   end func Set_Bit_Field
+
+   func Dump_Constant_Info() is
+   //  Dump constants computed to make packing/unpacking more efficient.
+      Println(" Bit_Field_Sizes: [" |
+        (for (each [Key => Size] of Bit_Field_Sizes; Sep := "" then ", ")
+          forward => <""> | Sep | Key | " => " | Size) | "]")
+
+      Println(" Bit_Field_Ranges: [" |
+        (for (each [Key => Range] of Bit_Field_Ranges; Sep := "" then ", ")
+          forward => <""> | Sep | Key | " => " |
+            Range.First | ".." | Range.Last) | "]")
+
+      Println(" Bit_Field_Defaults: [" |
+        (for (each [Key => Default] of Bit_Field_Defaults; Sep := "" then ", ")
+          forward => <""> | Sep | Key | " => " | Default) | "]")
+
+      Println(" Bit_Field_Offsets: [" |
+        (for (each [Key => Offset] of Bit_Field_Offsets; Sep := "" then ", ")
+          forward => <""> | Sep | Key | " => " | Offset) | "]")
+   end func Dump_Constant_Info
+
+end class PSL::Test::Packed_Word
+
+import PSL::Test::Packed_Word
+func Test_Packed_Word() is
+   type Fields is Enum<[#red, #green, #blue]>
+   type RGB is PSL::Test::Packed_Word
+     <Fields, [#red => 8, #green => 7, #blue => 9]>
+
+   Println ("type RGB is Packed_Word" |
+     "<Fields, [#red => 8, #green => 7, #blue => 9]>");
+
+   RGB::Dump_Constant_Info()
+
+   var All_Red : RGB := Create([#red => 255, #green => 0])
+
+   func Print_RGB(C : RGB) is
+      Print("[")
+      for (F in Fields; Sep := "" then ", ") forward loop
+         Print(Sep | F | " => " | C[F])
+      end loop
+      Println("]")
+   end func Print_RGB
+
+   Print("Red: ")
+   Print_RGB(All_Red)
+
+   var Purple := All_Red
+   Set_Bit_Field(Purple, #blue, 255)
+
+   Print("Purple: ")
+   Print_RGB(Purple)
+
+   Set_Bit_Field(Purple, #green, Purple[#green] + 4)
+
+   Print("Purple with a touch of green: ")
+   Print_RGB(Purple)
+
+
+end func Test_Packed_Word
+
+import Test_Packed_Word
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Packed_Word ();
+end func main;

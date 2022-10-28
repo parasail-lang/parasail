@@ -1,0 +1,1962 @@
+Thoughts on improving the LLVM generation.  15 May 2015
+
+Basic idea is to turn all local area and parameter area references into
+LLVM register references.
+
+Some locals are subject to up-level references, so those need to be
+stored in memory across calls that reference them.  But they probably
+want their own cell, so there is no aliasing associated with them.
+
+One simple approach would be to make every local into a separate
+variable.  One problem is the stack space left for task control blocks,
+including the associated trailing parameter list.
+
+Some local space is used for passing parameters.  These should ideally be
+allocated separately, with an appropriate struct type.  If they are
+connected to a task control block, that should come first in the struct.
+
+------
+
+Initial approach is simply to do all of the loads/stores that might
+reference the local area or the parameter area in the Load_Via_Locator
+and Store_Via_Locator routines, presuming we can establish a cache that
+will keep track of what locals/parameters are in what registers.
+We could add a parameter to Get_Locator_Ptr to know how much of the
+cache to kill/invalidate/flush.  We also need to flush at certain basic
+block boundaries, until we get the "phi" mechanism working.
+
+Load_Via_Locator should simply copy the register in the cache associated with
+the given address, or initialize the cache so that multiple loads
+of the same parameter or local refer to the same register.
+Store_Via_Locator should update the cache with the value
+being stored (which might be a literal rather than a string starting with '%').
+to specify the number of words to "kill/flush" at the given address.
+At basic block boundaries we need to detect whether the cache is consistent,
+and the register definition dominates the reference.
+By iterating we can determine what is unmodified in the loop, or we could
+pre-analyze.
+
+---
+
+Interface to Stack_Cache:
+
+- Construct a cache (one per invocation of Call_Operation)
+- Flush the cache (e.g. when starting a nested block)
+- Fetch contents of Cache(stack-locator) -> llvm-reg  (for Load_Via_Locator)
+- Set contents of Cache(stack-locator, llvm-reg) (for Load/Store_Via_Locator)
+- Flush part of cache(stack-locator, num-words) (for Get_Locator_Ptr)
+- Save state of cache
+- Restore state of cache from saved value (destructively?)
+- Merge in saved state of cache (destructively?)
+
+Currently, labels are added by calling "Add_Label" and are physically inserted
+into instruction stream at the very end.  We would like to know when we start
+a new basic block, and merge/flush/... as appropriate.  Next_PSIR_Instr could
+probably indicate that, or we could have an LLVM query.  We would also
+want to know the predecessors.  It might be nice to have queries that would
+be compatible with using a "full" CFG package at some point.
+
+-----
+
+Alternative approach, VN-based IL:
+
+Perhaps construct a completely separate IL, based around value numbers
+computed by ParaScope.  
+- "Store" operations would be invoked when storing
+into components of large objects, and through references, and into
+objects that must support up-level references.
+- "Call" operations would be used for invoking a call.  
+- "Load" operations would be used when loading from components
+of large objects.  
+- An implicit "load" would be used the first time
+we encounter an "unknown" or "input" VN (we will need to know what a nested
+block/operation might update, including when we pass a nested operation as
+a parameter).
+- A "phi" operation will be explicitly provided for merging values
+at join points
+- A few other operations will be needed, particularly having to do with
+parallel blocks/calls.
+
+There will also be control-flow-graph (CFG) information, so will know
+where to put labels, etc.
+
+If the compiler is given a VN-based IL, it will use that instead of looking
+directly at the PSVM instructions.  The VN-based IL might be represented
+as a parallel array of IL sequences, indexed by same (PSVM) code offset as the
+PSVM IL, with each sequence being zero or more VN-IL instructions.
+
+----------
+
+We should identify for every PSVM op, what would be the possible VN-IL ops.
+It might be appropriate to do an extended example, to suggest what would be
+the VN-IL for some existing code.  We might start with the scope_test.psl
+example.
+
+-----------------
+
+It might be worth going back to a halfway approach, where the VN-IL augments
+the PSVM.  What we are trying to reduce are the stores and loads from
+the stack, as well as the redundant loads from anywhere.  We also want to
+use separate "alloca"s for calls, and TCBs + param-list, if possible.
+If we know what stack locations are:
+1) purely temps -- can replace with LLVM registers
+2) associated with a call -- can replace with separate alloca's
+3) up-level referenced -- need to be stored, but not redundantly loaded
+that should significantly improve the code.
+
+Other improvements would be associated with fetching type descriptors,
+strings, constants, etc.  These are read-only, and so eliminating redundant
+loads should be relatively easy.
+
+Currently most loads are handled with Load_Via_Locator.  But there are still
+some that provide levels of indirection.  Perhaps that should be
+an additional indirection count to "load via locator."
+Similar considerations apply to store via locator, but we need to be sure
+not to pessimize the code by a load indirect followed by a store indirect.
+We could add a load indirect/store indirect operation, and have
+Load-via-locator take an indicator that it is loading a pointer/ref rather
+than a value.
+
+Select_[Poly_]Ancestor uses some loads that could be unified.
+
+----
+
+It would be nice to have a situation where ParaScope was providing "hints" 
+that could be ignored, and that the Compiler could properly decide whether 
+it could believe a hint by checking its own tables.  For example, ParaScope
+might say the value of interest is in VNxx, and the Compiler could check
+VNxx already exists in an LLVM register that was defined in some dominating
+block.  We could steadily improve the hints, and honor more of them.
+
+
+---
+
+From each locator we get an address VN.  For local areas/enclosing locals,
+param areas/enclosing params, we get a simple Param_Addr or Local_Addr,
+with level/bb-id.  For indirect references, the base address might be
+a local or a parameter.
+
+Load_Via_Locator looks up value of locator at given instruction.
+We need to know the value of a locator within certain ranges of
+instructions.
+
+Store_Via_Locator determines what value number to give to value, or to
+do an actual store.
+Load_Via_Locator determines what value number to fetch fron.
+Store_Indir determines whether to create a new value number or
+do an actual store.
+What question do we ask of the VN_IL do decide these things?
+We have a locator and a level of indirection.  We have a LLVM name
+for the content as well as the address, which we then use to store back into
+with Store_Indir.
+
+We need to know whether the value is live at the end of the block, if that
+is a join point.  If so, we need to store into memory, or use a "phi" at
+the successor.  We can allocate a separate object, but
+we need to remember the name so we can load from it in the successor, but
+we would have to remember to use the same memory cell in other predecessors
+of the successor, which seems to be simply making the job harder.
+Alternatively we do things backwards, that is, start at the end of the
+routine and work forward.
+
+Alternatively, we use the same memory cell for all stores into the
+same location if it is live across join points.  We need to know whether
+it is referenced at calls to nested operations/blocks, in which case we
+need to store it in the stack frame.  But we don't need to ever store
+outgoing parameters into the main stack frame, nor pass the address
+of the stack frame to anything but nested procedures.
+
+When we come to a call, we need to put all of the values into memory.
+
+Back to the questions --
+
+Load_Via_Locator -- Value number to put into Content VN and Address VN.
+Would code origin help?  Not really, since most loads are not generating
+a new OID.  We should focus on locators (or address VNs).
+
+Get_Locator_Ptr needs to remember locator associated with llvm name,
+so Store_Via_Locator can use that information.
+
+In general we need to keep a mapping of llvm name to what it holds.
+It could be a locator.  It could be a fetch via a locator.
+It could be multiple levels of fetch.  These llvm names only last
+a single instruction, so this mapping can be very small, because
+all values are back in memory (i.e. locator) by the end of an llvm
+instruction.
+
+We *almost* never actually load or store from memory.  Instead we load
+or store from value numbers.  So before a load we check to see if there
+is a VN we should load from, for each level of indirection.  
+Before a store we check to see if there
+is a VN we should store into.  Only memory or VNs cross instructions.
+When we store an llvm-reg into memory, we need to know the something about
+it.  It is the output of Get_Locator_Ptr, or some number of indirections
+thereof.  This is most important for a Store_Indir, since normally ParaScope
+should track other info itself.
+
+So the question is:
+
+    Store_Via_Locator -- Here is locator, and indir count, and value being
+      stored.  Do we copy into a VN?  Do we store into memory at existing
+      llvm reg?
+      NOTE: we never store into a different location (see Call explanation),
+        but instead always use VNs to communicate, letting individual
+        instructions store and fetch from temporary memory if necessary.
+    Call -- Need set of VNs to initialize param list, and VN(s) to initialize
+            from output(s).  This implies that VNs are required for call
+            parameters.  If not provided, fall back to normal call.
+            This implies stores into (outgoing) param list and fetches
+            from result slot(s) of outgoing param list are all performed
+            by the "call" (or parallel) instruction.
+    Create_TCB_obj -- Master actually resides in memory, but TCB pointer
+            need not reside in frame, but can be in its own location.
+            We can allocate a temp and then load it into a VN.
+    Load_Via_Locator -- Here is locator and indir count and llvm_reg to
+      initialize.  Do we copy from a VN?  Do we load from memory at
+      existing location?
+
+Compiler could compress stack frame by noticing what is referenced up-level
+and placing it at the beginning of the frame.  Or it could simply allocate
+TCB objects and outgoing calls always at a place separate from the named
+local variables.  It might simplify other things if we never tried to
+compute directly into named variables, but only used compute-into-target-slot
+for anonymous intermediate results of calls.
+
+-------- 16 June 2015 ------  Locator-to-VN map
+
+Instr#7 in scope_test.psl is the following:
+    4 (COPY_WORD_OP, Destination => (Local_Area, 7), Source => (Base_Registers'First + 7, 1))
+This uses local area 7 but then clobbers it.  What VN do we associate
+with local_area 7?  Do we use the value at the end of instr#6?  That
+seems like the right answer, if we presume that updates happen at the
+very end.  Calls are more complicated, perhaps.
+
+%vn_1 is used for *all* nulls, but that doesn't work because each null
+%can be different.  Probably need a flag in ParaScope to create new VNs
+%for each null, but know that it is in fact a null value -- it can still be a null literal, but just make it unique for each origin.
+
+More generally, we can't define the same VN twice, so we need to check
+whether a given VN has already been initialized.  One idea was to return
+0 to indicate desired VN already has appropriate value.  Note that in a
+copyword operation, it is highly likely that the vn is already defined.
+Might want to check at beginning of operation.  If already defined, then
+suppress entire instruction rather than just suppressing final store.
+
+Calls aren't doing the right thing yet.  Need to alloca a parameter
+list, fetch VNx for each param_start+N, and store into alloca'ed area.
+Afterward, need to copy alloca'ed zeroth slot back into param_start+0.
+For by-reference parameters, if they currently live in an llvm register,
+need to alloca a slot for them, copy local+N into alloca'ed temp, and
+store alloca'ed temp's address into call-alloca'ed-area.
+
+Need to understand what is happening with composite objects and components,
+and be sure it is consistent.
+
+----------
+
+We need to handle by-ref parameters, and in particular assign_word, which
+is expecting the address of the destination, which might be in the local
+area.  For local-area objects, we could create temps, and copy into
+them before hand, and copy back from them afterword.
+
+[This might be another argument for eliminating pass by reference, and go to
+full copy-in/copy-out.  But this poses difficulties when the reference
+is the result of a call on an operation, such as indexing.  We clearly need
+to call the indexing operation only once.  Packed indexing poses its own
+set of problems.]
+
+We need to handle up-level references.  For these, we should probably just
+store "through" to the local area slots that are referenced up level.  At
+some point it would be nice to "compress" the stack.  At a minimum we could
+keep track of the highest local offset that is up-level referenced.
+
+ParaScope would need to keep track of the highest local offset that
+is up-level referenced, as well as all of the slots that are up-level ref'ed,
+for each nested block and for the operation as a whole.  Nested operations
+need to figure into this as well, though those are currently handled
+pretty independently.
+
+-------
+
+We can perhaps use the "Object_Access" abstraction to represent the up-level
+references by a nested operation.  It would be nice to remove internal
+references and only store references involving up-levels.  How do we
+decide the level of a sym?  Note that we are in the pre-CG phase, so we
+don't have a level filled out.  However, we do have a sym, which has an
+enclosing region, so that might be adequate.  If we ignore those enclosed
+within the operation (including parameters), that would seem to be adequate.
+
+
+-----
+
+To deal with recursion, we can keep track of number of uplevels at point of
+call, and if that is less than the number when we finish doing Pre_CG on the
+operation, then we need to do it again, or do the encloser again if the
+calls occurred before we started doing Pre_CG on the operation.
+
+How do we signal that the encloser needs to be analyzed again?  Could we
+set a flag in the visitor, or in the Read_Write mapping?  The visitor isn't
+passed up, so that won't work.  The Read_Write mapping is combined, so
+that provides an opportunity to propagate.  Alternatively, we add a flag
+to the Op_Sem, which is set to true when we need to re-run the Pre_CG
+analysis.
+
+At a call site, we want to incorporate the effects of uplevel references.
+Currently we combine the effects of evaluating each operand using How_Combined
+being "Parallel" and Mode being "Param_Computation."  This is independent
+of the actual parameter mode for the call.  For globals, we want to be sure
+that we don't violate various rules:
+  1) If global is updated, then it must not be aliased with any parameter.
+  2) If global is read, then it must not be aliased with any "var" param.
+  3) Effects on global should be included in effects at point of call.
+
+-----
+
+Need to suppress multiple identical error messages generated in Pre_CG
+when we have to iterate.  Simplest would be to have a global set of
+messages already issued.  We could hash the entire string, or we could
+break it down into its parts.
+
+-----
+
+We now have a correctly initialized Uplevel_Refs Read_Write_Mapping in the
+Operation_Semantic_Info for nested operations.  It is also on the Spec_Sem
+if there is a separate one.  Unfortunately, neither of these is available
+at a call site.  All we have is a target "routine," and there isn't really
+any way to get from a routine to the associated operation_sem info.
+So this implies we will need to put something on the PSVM Routine object.
+What sort of object info/identifier should we use?  The locator is one thing,
+and perhaps the type, of the uplevel object.  One issue is the order in
+which we generate code.  But that shouldn't really matter since the llvm
+generator runs after all code has been generated.
+
+We also have to worry about uplevel references from nested blocks.  We don't
+know about these until we generate code for the block.  From the LLVM code
+generator, nested blocks and nested operations are pretty much equivalent.
+But from the Code_Gen phase, they are quite different.  We need to decide
+what we want in the PSVM to represent up-level references, both for nested
+operations and nested blocks.  Probably we will record something on the
+nested operation/block header, recording the up-level references.  We
+want nested blocks to include the up-level refereneces from their nested
+operations.  But note that some of the up-level references from an operation
+nested in a nested block might be to locals of the nested block, and others
+might be to the enclosing operation, or some intervening nested block, etc.
+The level number should give the story.
+
+------
+
+Focusing on how we will use the up-level information, let us presume it is
+some kind of table indexed by locator, including both locals and parameters.
+We might try to allocate non-up-level-referenced locals at higher offsets,
+or even use completely different locators for outgoing parameter lists.
+It would also be nice to know all of the locators that are up-level
+referenced in general when compiling a routine, so we could use a simple
+"store-through" approach for such locators.  One issue is that we might
+have two unrelated variables stored at the same locator, and end up storing
+through with both of them, even though only one of them needs it.  In Java
+variables have a range of byte-codes where they are meaningful.  We could
+record that in the object_sem info, presumably.
+
+Conceivably we could have a single table, containing objects defined or
+referenced, indexed by locator (or perhaps level/param vs. local/offset),
+with name, type, first use and last use, read vs. R/W.  But it is probably
+unwise to mix optional with essential information.   So let's stick to
+up-level references.
+
+So where do we use this information?  In ParaScope, on a call on a nested
+operation, we need to create new value numbers for objects that are modified.
+In the compiler, we need to be sure that objects that are read are in the
+right stack slot before we make the call.  So the compiler needs to keep track
+of when it suppresses a store into a local stack slot, and flush out those
+that are of interest at a particular call, including a nested block "call."
+We are storing up-levels and parameters as they are modified.  We are only
+interested in "reads" of the local stack.  We don't care about reads that
+are of enclosing stacks, as those are already being kept in memory.
+
+Now what about branching?  We have ignored the "phi" nodes so far.  That
+works for the "read" side because the VN won't be in the init'ed set.  But
+we will have similar problems if we suppress a store and then go to a join
+point.  Essentially a join point is similar to call, unless we emit
+appropriate phi nodes.
+
+---  phi nodes
+
+So, what is needed to issue appropriate "phi" nodes?  At each join point we
+need to know which phi VNs need defining, and what are their inputs.
+Alternatively, we just force into memory at joins.  Joins can be identified
+by the instruction index, but we also need to know about the end of the
+predecessor basic blocks.  That is also recognizable, by being equal to
+Op_Ctx.CFG[Op_Ctx.Cur_Node_Id].Last.  If compiler keeps track of what VNs
+are *not* in their "home" location, it can iterate over those and check
+whether they need to be flushed.  So VN_IL needs to answer the query of whether
+a given VN is an input to a phi at the join point.  More generally, at the
+end of an instruction, compiler could ask VN_IL which vns need to be stored, of
+those not currently in their "home" base.  If the next instruction is
+a call_op, that would handle the up-level problems.
+
+Do we need to set Inited_VNs to [] at join points?  Perhaps compiler should
+also check with VN_IL to determine which Inited_VNs need to be forgotten.  
+But that is a harder question, because the compiler might have loaded
+the VN on one branch but not on the other.  We probably need to keep track
+of the instruction where we init a VN, so we can find out whether it dominates
+the current point of use.  We don't really need to clean out Inited_VNs
+if we don't want to, so long as we keep track of the set of places where
+the VN is inited.  There will only be more than one if they don't dominate
+each other.
+
+---------
+
+In VN_IL, we now have a mapping from locator to VN called
+Local_Values_Held_In_VNs, plus a couple of routines Might_Need_To_Flush_VNs
+and Need_To_Flush_VN which indicate whether any VNs need to be flushed, and
+exactly which ones need flushing.  At a call site, we need to flush
+items that are up-level referenced, or whose address is passed as a parameter.
+If we have longer-lived ref objects, we may need to flush such objects
+more frequently, e.g. before an indirect load or a call that takes the ref.
+We also have to be sure that all these indirect effects are properly handled
+in ParaScope, so new value-numbers are generated to represent side effects.
+
+----
+
+LLVM registers can only be initialized in one place, so if the same VN
+is used in two places that don't dominate one another, we need
+to a) hoist the definition to a common dominator, or b) combine multiple
+definitions of the same VN using a phi, or c) just reload the VN next time
+it is needed.  In (b) and (c) we need to add a unique suffix to the LLVM
+register name.  (c) is clearly the simpler.
+This implies changing Inited_VNs to be a map, indicating the instruction or
+basic block where the VN was init'ed.  If the place where the VN was init'ed
+does not dominate the current instr, then we add the current instr-index
+to a vector of instr-indices, and add a suffix like "_2" to the LLVM
+register name.
+
+--------
+
+We need to keep track of the globals that are read as part of a call, or as
+part of a nested block execution.  It is relatively easy for code-gen to
+record the uplevel references to locals/parameters associated with a
+nested routine, or walk the Uplevel_Refs directly.  There is no Uplevel_Refs
+on nested blocks, so a different mechanism is needed there.  That could be
+done by ParaScope itself.
+
+If we want to walk the Uplevel_Refs, that is an array of hash tables, each
+a mapping from obj-id to access tree.  Object_Ids are stored in the
+Object_Id field of Object_Sem infos.  Object_Ids contains syms, which can
+get us back to sem_infos, where we can get the locator via the Info field,
+which points to an Object_Location_Info.  This in turn contains
+an Object_Locator and a level.  We could simplify these into object_locators
+by incorporating the level.  They would all be enclosing_param/enclosing_local
+locators.  We could add these locators to the Routine structure.  We would
+not need to use this information in the interpreter, so it does not need
+to be part of an imported/compiled routine.  We could think about putting
+some of this information on the Begin_Nested_Block_Op, but it would have
+to be filled in later, by incorporating further nested blocks, with appropriate
+level fixes.
+
+----
+
+When optimizing, we need to fix the Start/Add_Parallel* operations to
+store the parameters into the area following the TCB, and retrieve the result.
+Alternatively, we flush everthing.
+
+----
+
+When there is a call on a nested function from inside a loop, where the
+nested function updates some global initialized outside of the loop, but
+not otherwise referenced, we have a problem (this showed up in init_points.psl
+of kmeans_fast example, where X is read/updated by Use_Num function).  
+When we encounter the call on the nested procedure,
+we flush all of the VNs.  Unfortunately, some of those VNs hold out-of-date
+information.  We should either flush before we enter the loop (which would
+be more efficient unless we know we will never need to flush inside the
+loop), or we flush before and reload after the call on the nested func, but
+that is somewhat silly because we have no local use of the VN later.
+Ideally we flush before a loop if anywhere inside the loop there is a
+nested call that needs the value.  It would sure help to know whether a
+value is "live" at any given point.  
+
+Let's think about doing this "precisely."  We really don't want to flush the
+VN from outside the loop at a point inside the loop, both for efficiency,
+and for correctness.  We want to flush before entering a loop if:
+  a) the value is read as an up-level reference.
+  b) the read happens inside the loop (though if it happens after the loop,
+     no harm done).
+
+More generally we may want to flush immediately if the value is read by
+an up-level reference.  Then we can ignore calls on nested procedures.
+Store_Address is also relevant here.  If we flush just before a Store_Address
+we want to be sure we aren't flushing something that is out of date.
+Eventually, if something is referenced with a store_address, we want to
+put it in its own memory cell.  But in the near term, we could "write through"
+items that are referenced in a store address.  Ideally we would have an
+associated "initial" VN for a store address, and store through when that
+value number is stored into that location.
+
+Loops are important here.  If we keep track of what Locator/VN combinations are
+up-level read or used with a store-address, and we propagate that to each
+enclosing loop, then when we are about to enter such a loop, we can do
+a flush of any relevant VNs.
+
+-----------------  17-Aug-2015
+
+We are now bumping into a problem where there are two different VNs that
+both hold the content of the same locator, when they held unrelated values.
+One fix would be to use non-overlapping locators for all local variables
+and temps.  This could increase the size of the stack quite a bit, which
+at least currently still shows up in compiled code.  A second approach is
+to try to notice when a new value is stored into a locator that has an
+associated VN, and somehow mark the VN as de-inited.  That seems the
+simplest.  A third alternative is to keep track of "liveness" of VN/locator
+pairs, though that becomes a challenge even to define what we mean, much
+less maintain the data structures.
+
+------------ 18-Aug-2015
+
+Next problem: VN1 contains Locator1, then value of Locator1 changed in
+then/else parts, then need to flush Locator1, we end up storing VN1
+rather than the current value.  Do we need to look at the "phi" nodes
+to dominate the first load, or can we presume that any assignment can
+flush the prior value in the locator?
+
+-------------- 19-Aug-2015
+
+It may be time to bite the bullet and produce a good map of what "live"
+value (if any) is in every memory cell at any given instruction.  For
+each locator/value-number combination, it would be nice to know the
+set of instruction indices where that combination is "live."
+If we keep track of value numbers that hold the contents of a locator
+and might be the only copy, at a given instruction we want to know whether
+the value number is "live" in that locator.
+
+So how do we do this?  In ParaScope, we know when we associate a value number
+with the contents of a locator.  We have "fetch" associations and "store"
+associations.  The "store" associations are made with every locator that
+has its (address) value number computed in a given instruction.
+The "fetch" associations are only made when "Remember_Fetched_Value" is called.
+
+It seems like not much more work to produce a complete map of where locators
+are live, and what values they contain.
+
+-------------  20-Aug-2015
+
+We would use this data as follows vn_il.psl:
+
+We would still record when we keep a value in a VN and don't store it into
+memory.  At that point we should verify that the locator/VN combination
+matches our database.  If we already have a different VN in the locator,
+we should remember that old combo as well if there is a later instruction
+that has that VN in the locator.  If not, we can remove the old one.
+If the new locator/VN combo's lifetime ends immediately, then there is no
+need to remember it at all.
+
+When we get to the point of checking whether we should save the contents
+of a locator, we see whether any of the combos associated with the locator
+are still live at the current point.  We can delete those that are never
+live later than the current point.  If we save the value, we can delete
+the locator/VN combo if the current point dominates all later places where
+the locator/VN combo is live (which may be hard to check).  
+Alternatively, we leave it in the "flush" places and considered it 
+having been flushed if one of the flush places dominates
+the next point where we check that locator/VN combo.
+
+We don't really need to know when the locator/VN combo is added to the set
+of un-stored locator/VN combos, except to check whether it is live at some
+later point.
+
+So how do we build up this database of locator/VN live ranges?  The traditional
+way of doing liveness is to do local liveness (forward), building up a local
+kill set, and then doing a global propagation to build up the global
+live-out set.  If we do this after value numbering, then we should be able
+to include the value number at each point.  Each member of the local kill
+set could actually be a mapping from locator to VN.  Actually, by working
+backwards we can build this up.  We already have the fetched VNs mapping.
+If we also update the Store VNs mapping to only hold changes to the
+contents of a locator, then we have the info we need.
+
+------------  21-Aug-2015
+
+OK, we have updated Store_VNs to be augmented only when Value stored at
+locator actually changes.  That gives us the instruction where the
+Locator/VN becomes live.  By walking backward we know when it becomes
+live, because a Fetch causes it to be live.
+
+------------- 12-Sep-2015
+
+We decided to switch over to using address VNs from locators as indexes
+into the value stored in a given address at a given point.  However, that
+creates a problem with Locators that involve a level of indirection.
+More generally going back and forth between locators and addresses is a pain.
+In ParaScope we have a temporary mapping from locator to address.  Perhaps
+we should save that for use by VN_IL when needing to convert a locator to
+an address VN.
+
+------------ 29-Feb-2016
+
+Getting bogged down in turning locators into value numbers, because we re-use
+locators.  Simpler would be to assign each local object an additional unique
+identifier that is never re-used.  This would mean that the interpreter
+and the compiler have very different models.  We would still need to know
+how to deal with up-level references.  For constants and IN parameters, we
+could have the value both in memory and in a register without having to
+worry about reconciling them.  For variables, we need to worry about phi's
+and making sure that changes performed in nested procedures are properly
+accounted for.
+
+We also have complexity associated with composite objects.  Might there be
+a way to simplify that as well?  The distinction between origin-id and value number is painful in ParaScope.  Why is it necessary?  It is because we lose track of the identity of an object when we copy it around, e.g., just to pass it as
+a parameter.
+
+----------- 2-Mar-2016
+
+Each constant will be assigned a value number, plus optionally an offset
+in the "frame" record.
+
+Each variable will be assigned a value number for its address, which will be
+an offset in the frame record if the object is referenced up-level.
+
+So what about temps?  Each distinct object will be assigned a unique id,
+including each distinct path, starting at a local variable, including.
+When we store into a local variable, we will indicate that.  When we
+are just moving a temp to a different location, we will indicate that.
+Each call will be assigned a unique id, and allocated separately.  When we
+are passing a parameter, we will indicate which parameter of a call it is.
+
+Examples:
+   (Store_Str_Lit_Op, Dest => (Loc, 3), Str_Val => "blah")
+dest => call#1, param_offset 0
+   (Call_Op, Params => (Loc, 3), Static_Link => ...
+source => call#1, nodest
+   (Copy_Word_Op, Dest => (Loc, 4), Source => (Const_Area, 107), ..
+dest => call#3, param_offset 1
+   (Call_Op, Params => (Loc, 3), ...
+source => call#3, dest => call#4, param_offset 0
+   (Call_Op, Params => (Loc, 3), ...
+source => call#4, nodest
+   (copy_word, Dest => (Loc, 6), source => (Param, 0) [non-null])
+dest => call#8, param_offset 1, Source => local params, offset 0
+   (call, params => (loc, 5)
+source => call#8, dest => call#9, off 1
+   (store-int-lit, dest => (Loc, 6)
+dest => call#9, off 2
+   (call, params => (loc, 4)
+source => call#9, dest => call#10, off1
+   (store int-lit, dest => loc, 5)
+dest => call#10, off2
+   (call, params => (loc, 3) ...
+source => call#10, dest => temp 11
+   (if_op, source => (loc, 3)
+source => temp11
+   (store_int_lit, dest => (loc, 3), dest_name => "Repeat"
+dest => var12 (has a dest-name)
+   (skip_op)
+   (store_local_null, dest => (loc, 3), dest_name => "Repeat"
+dest => var12 (has a dest-name)
+   (store_addr_op, dest => loc, 5
+dest => call#13, off 1, source_addr => local params, 0 [non-null]
+   (store_int, dest => loc, 6
+dest => call#13, off 2
+   (call, params => loc, 4
+source => call#13, dest => temp14
+   (copy_word, dest => loc, 4, source => base-reg 4, 0
+source => cont of temp14, dest => call#15, off 1
+   (call, params => (loc, 3)
+source => call#15, dest => var12
+?? (declare, source => (loc, 3), name => "blah", type => "blah", scope => ...)
+?? (start scope line#/name of first decl in scope)
+?? (end scope line#/name of last decl in scope)
+   (copy, dest => (loc, 4), source => (loc, 3), ...
+source => var12, dest => temp16
+   (is_null, dest => (loc, 4), source => (loc, 4)
+source => temp16, dest => temp 17
+   (if_op, source => (loc, 4)
+source => temp17
+
+
+
+Idea: Add a "declare" operator that
+      gives a name and a scope# to a local var or const
+
+---------  Parallelizing the Compiler (and ParaScope?)  17-April-2016
+
+We have work that needs to be performed single-threaded, and so can use
+non-concurrent, per-file data.  We have work that is per-top-level-op (TLO),
+and can use non-concurrent, per-TLO data.  And we have work that is
+TLO-specific, that must be integrated with other TLO work, so needs to use
+concurrent, per-file data, or needs a pre-allocated "slot" in some per-file
+container.
+
+A problem with using a concurrent table for per-file data is that it will
+be non-deterministic.  A problem with using a per-LTO table is that it will
+contain redundant entries.  We could use a level of indirection or do
+"relocation" as we combine operations into a single file.
+At run-time we want to have a single table per file.
+The relocation could be represented by a special character sequence (e.g."%%")
+or by a table of lines that end with a per-file-table offset (that is where
+they tend to be).  The latter seems significantly more efficient.  Each time
+we print an LTO, we do the get-local-index operations as needed.
+
+So our conclusion is that we don't need any concurrent data structures.
+We can do almost everything per-LTO, and then do final per-file processing
+over the LTOs in order.  There is a top-level array of LTO information,
+but each item will only be referenced by a single pico-thread at a time.
+
+Current per-file data in LLVM_Printer:
+
+   var PFT : Reflection::Per_File_Table<Reflection::Type_Descriptor>
+      -- per file, cacheable
+   type Per_File_Constants is
+     Reflection::Per_File_Table<Reflection::Streamable_Value>
+   var PFC : Per_File_Constants  -- per file, cacheable
+   var PFS : Per_File_String_Table<>  --  per file, cacheable
+   
+   //  Map from names of constants to their values
+   var Constants : Map<String, Reflection::Streamable_Value> := [];
+       -- unordered
+
+   -----  hidden data:
+
+   //  Temporary Vector of llvm code
+   //  The whole vector is one PSIR instruction
+   //    Each String is one llvm instruction
+   //  Added to buffer after a PSIR instr is finished compiling
+   var Buffer : ZVector<String> := [];  -- per LLVM func
+                                        --  (actually, per statement)
+
+   //  ZVector of lines of llvm code
+   //  One entry per PSIR insruction
+   var LLVM : ZVector<ZVector<String>> := [];  --  ordered
+
+   //  Current Indentation level of the llvm code
+   var Indent : String := "";  -- per TLO
+
+   //  Set of labels
+   //  Because the set has no duplicates, won't get double labels
+   var Labels : Set<Int> := [];  --  per Op
+   
+   //  Set of Declarations
+   var Decls : Set<String> := [];  --  unordered
+
+   //  Set of constant declarations
+   var Const_Decls : Set<String> := [];  --  unordered
+
+   //  Keep track of locally defined funcs, so we know what to declare
+   var Local_Funcs : Set<String> := [];  --  unordered
+
+   //  PSIR PC within current function
+   var PC : Int := 0;   -- per LLVM func
+
+   //  "" if not inside function
+   //  Otherwise, it's name of function being defined
+   var Fn_Name : String := "";  --  per Op
+
+   //  "" if not inside block
+   //  Otherwise, it's name of block being defined
+   var Block_Name : String := "";  -- per Op
+
+   //  Index into LLVM (array) at the start of this func
+   var Fn_Start : Int := 0;  
+
+   //  How much to indent upon entering a func
+   var Fn_Indent : Int := 0;  -- per TLO
+
+   //  Keep track of locations of #Begin_Nested_Block_Ops
+   //  (and some information about them)
+   var Nested_Blocks : Map<Int, Reflection::Code_Block_Info> := [];  -- per Op
+
+   var Constant_Streams : optional
+     Map<String, Info_Stream<Reflection::Streamable_Value>> := null
+
+   interface Op_Info<> is
+      const Module_Name_Local_Index : Int;
+      const Op_Name_Local_Index     : Int;
+      const Has_Internal_Precond    : Bool;
+      const Uses_Queuing            : Bool;
+   end interface Op_Info;
+
+   //  module-name-local-index and operation-name-local-index,
+   //  has_internal_precond, uses_queuing
+   var Module_Op_Info : Map<String, Op_Info> := [];
+
+   //  Metadata Nodes created during compilation to be
+   //  Printed during Dump()
+   //  Contains entire assignment statement and newline
+   //  Ex: "!1 = metadata !{i32 0}\n"
+   var MD_Nodes : ZVector<String> := [];
+
+   //  Map from Line and Col to metadata name (!4 for example).
+   //  Use Create_Key() to make key for this map
+   //  from the Line and Column numbers
+   var Source_Position_Nodes : Map<Int, String> := [];
+
+   //  Subprogram metadata node names
+   //  Names only here, Assignment statement is in MD_Nodes
+   var Subprogram_MDs : ZVector<String> := [];
+   
+   //  Initially is Number of nodes assigned manually at end of Dump()
+   //  Increments on each new creation afterwards
+   var Num_MD_Nodes : Int := 5;
+
+   //  A debug metadata node with the subprogram descriptor of the
+   //  function currently being compiled
+   var Current_Subprogram_MD : String := "";
+
+   //  A debug metadata node with Source Position of current PSVM Instruction
+   var Current_Source_Position_MD : String := "";
+
+   //  Flag to indicate whether we're done compiling instructions
+   //  and onto top of file initializations
+   var Top_Of_File : Bool := #false;
+
+--------  Parallelizing compiling further 1-May-2016
+
+Change name of LLVM_Printer to LLVM_Top_Level_Op.
+LLVM_Printer will be used before and after, and will have array
+of TLOs.  The "Dump" routine of TLO will be split into two (or given
+an extra parameter), so we can combine various parts together.
+We need to provide a relocation amount, or per-file tables to do lookups
+and create an indirection for strings.
+
+Start with LLVM_Printer and/or compiler.  Create array of TLOs.
+Do a "for" loop over the TLOs, compiling each one.
+ 
+
+--------- Using Source/Dest-ID info to produce better LLVM code
+
+Here we repeat and then edit what we wrote on March 2nd, above:
+
+Each constant will be assigned a value number, plus optionally an offset
+in the "frame" record.
+
+Each variable will be assigned a value number for its address, which will be
+an offset in the frame record if the object is referenced up-level.
+
+So what about temps?  Each distinct object will be assigned a unique id,
+including each distinct path, starting at a local variable, including.
+When we store into a local variable, we will indicate that.  When we
+are just moving a temp to a different location, we will indicate that.
+Each call will be assigned a unique id, and allocated separately.  When we
+are passing a parameter, we will indicate which parameter of a call it is.
+
+NOTE: When we are calling a built-in, we don't want to allocate a param vec
+nor store parameters into it.  We want to use temps.  We generally want
+to know what LLVM register to use for each local stack element and each
+local parameter.  For each built-in operation, we could assign an LLVM
+register "prefix" which we then concatenate with the parameter offset
+to produce the full LLVM register name to use during the operation.
+
+How does this relate to Load_Via_Locator and Store_Via_Locator?  For each
+instruction, we could associate an LLVM register with each locator.
+For calls, we could always use the above approach suggested for built-ins,
+and then create the param vec at the call point if it is *not* a built-in.
+
+At some point it might be simpler to just change the PSVM so that it more
+nearly matches the LLVM.  But that will make the interpreter more complex,
+presumably.
+
+The linear stack is already a pain in the PSVM, and we end up having to
+shuffle things around to create room when we need it.  Would it be easier
+to use an LLVM model with stack assignments added after the fact
+for the interpreter?  We don't want to distinguish built-ins from out-of-line
+calls in the PSVM, probably.  Need to run some examples!
+
+----------- 24-May-2016 -----------
+
+We have incorporated the "VM_Obj_Id" information directly into Object_Locaors.
+Hopefully this will work better than separate Source_Id/Dest_Id fields.
+We have a number of places where we construct Object_Locators, including
+some from generated code, so we need to decide what information is really
+important.  Many of the constructed ones are type or routine locators, and
+it is not clear we need to make any change there.  If we just focus on data
+objects, in particular local variables, parameters, components of either of
+the above, then we should cover most of the interesting cases.
+
+We need to make this data available in the compiler, so we need something
+in the Reflection API which takes an object-locator and returns the VM-Obj-ID
+stuff.  We should probably write some code that uses the VM-obj-id before we
+spend a lot of time designing its final structure.
+
+Note that we ended up changing the streaming routines for Object_Locator
+to ignore the VM_Obj_Id part, so we need to be sure that is appropriate.
+In particular, global constants, and constants in type descriptors, are
+referenced that way.
+
+The place to write the code is in Get_Locator_Ptr and/or Load_Via_Locator
+and Store_Via_Locator.
+
+---------  26-May-2016
+
+One question is whether we declare types for frame records, or just
+treat them as an array of i64's, and do bitcasts to get a pointer.
+Type names seem to need to be unique within a file.
+The first three slots in a frame record are special, one points to the parent,
+one points to the parameters, and one points to the storage region.
+If we did everything strongly typed, we would need a frame-record
+struct for each routine with nested routines or nested o-o-l blocks.
+Each frame struct would have its own parent (or enclosing type desc) and
+its own parameter list as named fields, followed by a storage region pointer,
+followed by i64 or i64* depending on whether it is a constant or a variable.
+We could go farther and use i64* for "large" objects, but that might be
+trouble for nulls and special string values.
+frame or a type descas fields
+
+---------- 24-June-2016
+
+We are beginning to update Get_Locator_Ptr.  Initial extra info in locator:
+
+*) Local_Area:
+     VM_Is_Indir  --  Whether locator is a variable and hence slot in stack
+               --  points to allocated memory.
+     VM_Name   --  LLVM register (i64 or i64*) used for local const/var
+[what about phys/logical base registers?  are they i64* or i64?]
+
+*) Enclosing_Local_Areas
+     VM_Is_Indir  --  As above
+     VM_Off    --  offset into frame record
+
+*) Base_Registers -- These are used for referencing fields of an object.
+                  -- If Virt_Is_Phys, this does an inttoptr
+                  -- If not, it passes to psc_large_obj_addr.
+     VM_Name   --  LLVM register (i64)
+     
+*) Phys_Base_Registers  -- These are used for a simple level of indirection.
+                        -- This just does a bitcast
+     VM_Name   --  LLVM register (i64*)
+
+Load_Via_Locator:
+
+  Currently this passes the buck to Get_Locator_Ptr when
+  Num_Indir + Ptr_Level == 0, followed by a load.  That won't
+  work anymore, because Get_Locator_Ptr doesn't work for local
+  constants (no level of indirection).
+
+  if Num_Indir + Ptr_Level > 0, then we recurse for Num_Indir times.
+  If Num_Indir is 0, then we pass the buck to Get_Locator_Ptr and
+  bitcast the result as appropriate.  Again, that won't work if
+  we have a local constant.  We clearly need to check for Local_Area
+  directly in Load_Via_Locator.
+
+Store_Via_Locator:
+
+  Store_Via_Locator takes just a Ptr_Level parameter, to indicate the
+  type of value being stored.
+  If Ptr_Level is zero, then it just passes the buck to Get_Locator_Ptr
+  and stores into the result.  Again, this will need to special case
+  the initialization of a Local_Area constant, and put out a
+  register-to-register move, which is best done using a bitcast.
+  If Ptr_Level is > zero, it still uses Get_Locator_Ptr, but does some
+  conversion on the address so can store a pointer.  That will not work
+  for initializing a local constant.
+
+Calls:
+  Need to allocate space for parameters/result and copy values into
+  parameter vector.
+
+Initialization of frame
+
+* Allocate frame record of proper size, as header followed by
+  two arrays of i64 and i64*; header is pointer to frame, params, stg-rgn
+  (where is master allocated?).  Perhaps put all vars first so i64* array can
+  include header and master part as well.
+* Identify first use of a locator as a store, or emit a special Declare
+  op, so alloca can be performed for variables, and if necessary,
+  also store into frame record (for vars and consts).
+* LLVM registers are mostly i64, unless created via a store-address or alloca,
+  in which case are i64*.
+* Parameter list is array of i64, may need to convert for by-ref parameters.
+  Alternatively, could use i64* for by-ref parameters.
+
+----  25 June 2016
+
+PROBLEM: We have many routines that return Object_Locators, and these
+are producing simple 64-bit integers.  Should we define a new
+Extended_Obj_Locator type for locators in instructions, such as
+Instr.Source(), ...?  Or should we have a separate parameter that
+carries the extra information?  Or should we bite the bullet and change
+all of these routines to create large objects?
+
+If we want to create large objects, we will need the type descriptor
+to implement the imported routines.  It is not clear how to get that,
+given only the static link for type Instruction.  Conceivably we could add
+some components types to the instruction module, and then "know" which
+component corresponds to an Object_Locator.
+
+We can also simply do a lookup for PSL::Reflection::Object_Locator.
+
+We may want have a "Simple_Locator" which is like the current one, with an
+Object_Locator having the extended information.  The Create routine might
+create a simple one.  On the other hand, if the Create routine is in the
+Object_Locator class, then there is no trouble getting the type descriptor.
+
+------ 5 July 2016
+
+OK, we have changed all built-in routines to generate more complex
+Object_Locators.
+
+Now we need to initialize the VM_Obj_Id info to have the Indir = 0/1
+and the Num to be the appropriate value.
+
+OK, so we need to bump the local-object counter, and make sure it appears
+in the Object_Locator.  We need to set the Indir bit if it is a variable.
+In the LLVM code generator, we need to do the alloca at the right time for
+each variable.  For up-level-referenced objects, we need to put them into
+the frame record, after creating an appropriate-sized frame record.
+
+Question: Should PSL front end, or LLVM generator, lay out frame records
+and assign offsets?  We have the "TLO" structure in compiler.psl now,
+so it makes sense to do the pre-pass there, and keep the PSL front end
+as simple as possible.
+
+--------- 6 July 2016
+
+OK, now we are starting to assign local-object numbers.  We have added
+one call on Assign_VM_Obj_Id in Obj_Decl_Action, but now as we get into
+code where these are used or initialized, and it gets more complicated.
+
+Examples:
+  Initializing a variable.  We set it to null (unless small and has an
+initial value), and then call a function, passing the address of the new
+variable as the start of the parameter list.  One initial challenge is that
+even if the object is declared as a constant, we will need to consider it
+a variable from LLVM's point of view if we first initialize it to null
+and then overwrite it.  We could optimize the null initialization away,
+but that is probably too much to do right away.
+
+Another thing to notice is that some functions never declare local variables,
+but just use parameters.  Those will be referenced via the parameter list
+for the initial version, so no particular enhancement there.
+
+There are various things which start out as variables, but then become
+constants.  We could have two numbers, one to use during its initial
+initialization, and then one to use thereafter.
+
+Operations calls are important.  What do those look like?
+Could we have a sequential set of LLVM registers for the parameters?
+For each output, we store a null, or already have the target, or nothing.
+(We store nothing if non-optional, small, or 2nd... output, or by-ref.)
+For each input, we call Emit_Code_For_Resolved_Tree which stores result at
+Visitor.Target_Local_Offset and then bumps Target_Local_Offset, unless
+Is_Lvalue_Context, in which case it stores address in Is_Lvalue_Context
+and always bumps Target_Local_Offset.
+
+One challenge is that the LLVM register for the output(s) is possibly
+written (to initialize to null) and then read after the call.  But the
+read after the call could directly reference the ultimate target register
+number.  But we would need to know what register number that is, so it can be
+read again later.
+
+Currently we store LLVM register numbers in Object_Locators.  When we
+call Emit_Code_For_Resolved_Tree, we probably have a register number
+we would like it to initialize (typically corresponds to case of having
+a target object, though we don't create those for small objects).
+Suppose we use the target object.  What happens when there isn't one?
+Then we want it to return a register number?  How often does that happen?
+On an operation call, we want it to use sequential numbers, I believe.
+A call only has one locator for the parameters.  That should be the
+register number used for the result, after the call.
+The registers used for the assignments into the parameters should be
+different, but computable from that.  If output is inited to null, then
+we will initialize the zeroth parameter from that register.  In any case
+we will init the input parameter slots, from registers numbered sequentially
+greater than the one used in the parameters.  So this implies that even
+when we don't have a target, we might have a target register.
+
+What about things like "if" statements?  These can have a target,
+which is used for both then and else parts.  That clearly implies
+the need for a variable.  However, the variable could be local to
+the "if" statement, with the result copied into the target LLVM reg
+afterward.
+
+We could use the VM_Obj_Id part of the Target_Object, even if the rest
+is null.  We need a way to see if is null without doing a full record compare.
+[DONE]
+
+We may need to associated two different LLVM reg-nums with an operation call,
+because the result of the call needs to be stored in an LLVM reg specified from
+"above," while the parameters need to be put into registers that can be
+assigned sequentially.
+
+A parallel call is worse, since the parameters are stored after the
+space allocated for the TCB, and the result isn't available until after
+waiting for the call to complete.
+
+So let's assume that we have two LLVM reg-nums associated with a call.
+One represents the first of a sequence of reg-nums that are used for
+initializing the parameters before the call.
+The second one is where the result should be stored, presuming there is
+an output.  If the call has no outputs, then the second one is not needed.
+The second one is determined from context, while the first one is chosen
+when processing the call node, before initializing any of the parameters.
+
+This same approach can be used for parallel calls, though we somehow
+need to figure out when to copy from the output slot into the associated
+LLVM reg.  It could be deferred until the LLVM reg is used, presumably,
+though that is a bit of an annoying special case.
+
+So general approach is to set up a target LLVM register in the Visitor
+record.  This is then incorporated into the VM-info for the locator
+for the result of the computation.  This is also needed at the point
+where the result is used, which is most often as a parameter, but
+could be other places where a Source locator is specified.
+
+Could we have both an indirect and a direct reg for same eventually-constant
+object?  That is, we use the indirect reg when setting it to null and when
+initializing it, but then load into direc reg for all future use.
+What about ref const?  How can we handle that if value is in a reg?
+We could copy it into a temp alloca, or define "ref const" to not actually
+be a physical "ref" at all.  What are ref consts good for?  They are good
+for returning references to existing objects, rather than copying them.
+But that doesn't actually require a pointer in general; it just requires
+an accessibility check.
+
+----------- 10 July 2016
+
+Parallel calls/blocks have complex VM reg needs.  
+There are three kinds of parallel calls/blocks, plus a check block:
+1) Parallel call -- parameters evaluated before invocation, and
+appended to TCB
+2) Parallel block for call -- parameters are evaluated inside nested
+block, space for outputs follows TCB
+In this case, Emit_Call calls Emit_Nested_Block_For_Call, which calls Emit_Call
+recursively, with Suppress_Derefs True.  Ultimately this means
+Move_Outputs gets called twice, the first time has Suppress_Derefs true.
+The first one moves outputs if necessary for the internal call.
+Then there is an explicit move (done by Emit_Nested_Block_For_Call rather
+than Move_Outputs) from the internal call list to the parameters of the
+nested block.  Finally there is another move output by the outer
+Emit_Call which does the implicit dereference, if any, and moves
+to the original target.
+In general the Move_Outputs after a call does an implicit dereference,
+and then moves the outputs if there were finalizable
+temps, or the output is by-ref and the target object happens to be
+at the same location.
+
+So how does this relate to VM registers?
+The Parallel_Op that invokes the nested block has a TCB locator where
+we can specify a target VM and a list of VMs.  There are only outputs
+in this case, and they are left uninitialized before the call.
+The target object of the original call is used for the inner call.  The
+question is do we
+do an up-level assignment for the output, or just assign into the
+parameter slot.  Probably the latter.  So we need to assign a new VM reg
+for the inner call, and then use that in the copy back to the param
+area.  This implies that either the target reg or one of the "param" registers
+should be used.  Since we don't need the target at the point of a
+start/add_parallel[_call], we might as well use the target reg for the
+TCB.
+The Master is a special case, and it is allocated on the stack if needed,
+and pointed-to from location 3 in the frame record.  It is updated during
+the execution, so it cannot be in the frame record, since we treat
+the frame record as immutable once initialized.
+[First 3 items of frame record (local area) are up-link, param-link,
+ stg-rgn-index]
+
+In general it seems we may want a register for the TCB itself, since it
+is referenced by a separate instruction which follows the "wait_for_parallel."
+Since the outputs are copied back at a separate point, we can use the
+normal "reg num" for the TCB itself, and use the target reg num in the
+instruction after the wait_for_parallel.
+
+Trying to share Move_Outputs may be difficult.  We need to remember
+the VM pointing to the TCB, and the offset to the first parameter.
+If we presume that if the TCB-VM is specified, then we are talking
+about a parallel call, then the code can create the appropriate
+VM_Obj_Id which is indirect through the base reg + param offset.
+This implies we need to recognize that case where we have both Num
+and Offset specified.  Not obvious whether we want to specify indir.
+Probably not unless there is yet another level of indirection.
+A component is always local base reg num + offset.
+
+Move_Outputs also implements implicit dereference.  So how does that work?
+We better have a separate VM reg for the call in that case.
+
+3) Parallel block for loop body, "||", etc. -- loop parameter(s) follow(s) TCB.
+Note that non-parallel loops have a similar problem.
+Question: Do the loop parameters need to be variables?
+Answer: It depends -- a value iterator has access to the old value when
+defining the new value, so that sounds like a variable, at least
+for sequential loops.
+Also, a continue statement can effectively assign into the next value for
+the loop parameter, so that also needs a variable.
+Loops include calls, with all of that complexity.
+4) Emit_Block_For_Check -- has one output
+
+--------- 11 July 2016
+
+Gack -- we have been using the "VM_Obj_Id" field of the Target_Object
+to indicate where we want the result placed.  But we actually need the
+target object itself to pass to Store_Null_Of_Same_Rgn, etc.
+So we need a separate field in the visitor to indicate the target VM reg.
+The Target_Object needs to include its own VM_Obj_Id info.  It is generally
+going to be a variable.
+
+--------  13 July 2016
+
+We need to set up a Target_VM_Info for Emit_Nested_Block_For_Call and
+for Emit_Parallel_Call.  What about Target_Object?  This isn't being
+set, which is fine for normal operands.  Target_Object is used in
+Emit_Call_Operands (actually, in Init_Outputs), and then set to null.
+That is in the New_Visitor local of Emit_Call.  The Visitor parameter
+of Emit_Call retains its Target_Object.
+
+We are not setting up targets correctly for for-loops and elsewhere.
+
+---------  30 July 2016
+
+We are finally getting around to laying out frame records.  Slots 0-3
+are taken with the static link, the link to the parameters, the link to
+the storage region, and the link to the master.  The other slots need to
+be used for up-level referenced LLVM registers.  We need to go through
+the instructions and notice all up-level references.  It may be simplest
+to just have a "Pass" parameter and use that to decide what to do.  Note
+that we do a bottom up (post order) walk of the tree of operations, but
+we do a top-down (pre-order or in-order) walk of the tree of nested
+blocks of a given operation.  In the PSVM instructions, we know the
+number of uplevels, based on the use of Enclosing_Local_Areas vs.
+Local_Area, but we don't know the specific operation/block.  Hence, we
+will need to keep a stack or equivalent while doing the walk.  During
+the walk, we will keep track of which VM registers are referenced.  We
+can then assign them offsets and mark them so that when they get
+defined, we immediately store them into the frame record.  We also need
+to determine the size of the frame record needed.
+
+As far as the data structure required, we need a way to add an element
+into the tree structure, enter/exit, and look up an element by the key. 
+The key could be a combination of a routine (index)/decl and a
+nested-block PC offset.
+
+NOTE: We are creating separate constants for differently named values of
+universal types.  That hardly seems necessary!
+
+We need a code-block key, a data structure such as a code-block tree
+(similar to a symbol table), which keeps track of depth, and lets you do
+relative and perhaps absolute level-based retrievals.  We need to be
+able to create it in the first place, and re-walk it one or more other
+times.
+
+Operations:
+  Create_Tree() -> Node_Tree
+  Root_Id(Node_Tree) -> Node_Id
+  Add_Child(var Node_Tree, Parent_Node_Id, Node_Key)
+    -> Node_Id or null if exists
+  Find_Ancestor(Node_Tree, Node_Id, Level) -> Node_Id or null
+  Depth(Node_Tree, Node_Id) -> Nat
+  Find_Child(Node_Tree, Parent_Node_Id, Node_Key) -> optional Node_Id
+  Get_Child(var Node_Tree, Parent_Node_Id, Node_Key) -> Node_Id (may create)
+  Num_Nodes(Node_Tree) (starts out at 1)
+  
+Use maps to store information about nodes. What we need initially is set
+of VM registers that are up-level referenced, and then we will determine
+size of frame record and assign them offsets. Need for Master record,
+and whether needs to be stored in slot 3, might be a separate piece of
+data.
+
+var Uplevel_Referenced: Map<Node_Id, Set<VM-Reg>>
+var VM_Reg_Offsets: Map<Node_Id, Map<VM-Reg, Frame-Offset>>
+
+---------- 1 Aug 2016
+
+We are struggling with a way to uniquely identify each nested block so
+we have a key for the LLVM func node tree, which we use for setting up
+the frame records based on up-level references.  Source position is not
+ideal because the left and right operands of "||" have the same source
+position currently.  Each region is unique, and we have enclosing region
+links. We need to determine the key
+when walking the tree of nested regions, since that is how we find the
+nested operations, and also when walking the generated code, since that
+is how we find the nested blocks.  With nested blocks, we want to know
+what is the enclosing block/operation.  We know the level, but we don't know
+the encloser.
+
+Simplest would be to store the starting PC offset in the associated region,
+though that seems somewhat upside down.
+
+Another option is to assign each region a unique index, and have a mapping
+back from the index to regions.  Currently the symbol world and the interpreter
+are not connected.  But we could simply convert the index type between
+the two.  Region_At_Index could be similar to Routine_At_Index.
+
+--------- 2 Aug 2016
+
+We don't seem to be pre-computing components of a class aggregate.  See
+Initial_State in Solution_State in N_Queens.
+
+---------- 31 Aug 2016
+
+The re-write of the LLVM code generator didn't speed things up much.  One possibility is that having non-overlapping parameter lists caused inefficiencies, because the result of one call needs to be moved to be a parameter of the next call.  When the parameter lists were overlapping, there was no such problem.  One possibility would be to somehow distinguish the part of the frame devoted to outgoing parameter lists and the part devoted to local variables.  We would assign VM registers to the latter part, but use regular unadorned "local_area" locators for outgoing parameter lists.  If there is a target_VM_num specified, we would use that for the final result of a call, but we would never assign registers for the incoming values of the parameter list.  By separating the outgoing parameter area from the locals, things might generally be easier to manage, particularly as far as finding room for finalizable temps, etc.  Probably simplest to have a new Area_Base_Indicator for outgoing parameters.  This would of course require passing two offsets, one for the outgoing parameters, and one for the local variables, which is a bit of a pain!
+
+Inlining and/or specializing an instantiation is another obvious way to improve efficiency.  This is particularly obvious with Countable_Ranges, where the "+", "-", and "=?" operators are indirect call.
+
+Finally there is the case of indirect calls more generally, where we should be expanding these calls in-line rather than calling the run-time support for them.  If polymorphic objects are involved it could get tricky, but for generic formals it should be relatively straightforward (though we might need wrappers then when instantiating with a polymorphic type).  We could start by putting a fast-path into the out-of-line code, and calling different out-of-line routines based on information we have at the call site.
+
+INLINING:
+
+Inlining is a big topic, and the first question is whether it should be done when generating PSVM instructions or when generating LLVM.  The LLVM compiler supposedly does it already when in -O2, but I haven't noticed its effects.  And we want to do it across source files, and perhaps do it semi-automatically.
+
+Doing in when generating PSVM is somewhat tricky, given the possibility of cyclic dependencies.  Doing it later means understanding the PSVM instructions enough to know what is required.  The main goal would be to turn parameters into local variables.  Suppose we did that?  Replace each use of Param_Area with a reference to the appropriate VM register.  Is there anything else that needs to be done?  The static link can be different, and possibly we need a separate region.  But we could disallow inlining functions that need a new region, or simply merge the regions.
+
+The static link could be the enclosing scope, but chances are that LLVM could inline nested routines itself pretty effectively.  The other possibility is that the static link refers to a type.  This is the main case where we want to do inlining.
+
+---
+
+Trying to create a fast path for certain operations:
+
+get_type_desc_or_op_map, takes the static link and a locator (e.g. type_area, 1)
+  This starts by looking up the static chain for a type descriptor.
+  At compile-time we know how many steps this should take, and 
+  can do it directly, so we could have a version that bypasses this.
+  Then based on whether it is using Type_Area or Enclosing_Type_Area, we
+  follow the appropriate number of Enclosing_Type_Area links.  Again, we
+  can do this at compile-time.  Then, depending on the offset, which can be
+  0 for "self," 1..999 for formal parameter types, 1000..1999 for actual of
+  formal, 2000..9999 for nested types, 10_000..19_999 for operations,
+  20_000 .. 29_999 for constants, 30_000 .. 39_999 for corresponding poly types.
+  In almost all of these cases, we can expand these at compile-time using
+  appropriate information available from "reflection" routines.
+  
+  So the logic of this routine can always be expanded at compile-time.
+  Furthermore, in some cases we will know the resulting type descriptor at
+  compile-time, because we are inlining and the caller knows the type 
+  descriptor for the module enclosing the operation being inlined. 
+  
+execute_compiled_indirect_call_op, takes *many* parameters.  At a minimum
+  we should split this into multiple routines each taking fewer parameters.
+  If we have a Code_Address but not an operation descriptor, then we bypass
+  the call on Find_Routine_Context.  Otherwise, we call Find_Routine_Context
+  which does most of the hard work.
+  
+  Note that Routine_And_TDesc_For_Call already has the logic for getting
+  a routine address and static link for a call at compile time. 
+  
+Find_Routine_Context
+  This checks whether the static link is in the parameter area.  That means
+  we have a polymorphic parameter.  This case can be quite complicated, with
+  checks that two polymorphic parameters have the same type id, etc.
+  Ideally we can leave those cases out of line.
+  Then we check whether it is an operation descriptor, in which case we fetch
+  the operation descriptor from the locator, or an
+  operation of the type (locator of the form "(type_area, 1X_XXX)"), in which
+  case we call Nth_Operation_Of_Type.  
+  
+  Either of these can result in a routine index, in which case we call 
+  Nth_Routine to get the actual routine.  In some cases the static link 
+  comes from the operation table, namely, when it is an inherited routine.  
+  If this is a dispatching call, then additional logic is required.
+  
+  In some cases, an operation descriptor already has the address and static
+  link, in which case there is no need to call Nth_Routine.  In that case, 
+  there is probably no reason to go out of line at all.
+  
+----
+
+We can also combine calls on get_type... when we have two in the same routine.
+
+Specializing uses of get_type_desc_or_op_map:
+
+ This is only called in one place, and the input "static_link" is
+ guaranteed to be a non-null type-desc.  We know at the call point
+ whether the type base is Enclosing_Type_Areas vs. Type_Area, so we
+ could have two separate routines for those two cases.
+ 
+In set.psi.ll, common cases are: 
+  [Enclosing_Type_Area+1, Param + 1], 
+  [Type_Area, Nested_Types + {1,2}], 
+  [Type_Area, Param + 1]
+  
+We could also special-case choosing a parameter vs. choosing a nested
+type vs. some other thing.  If we are ultimately going to expand them
+inline, it is not clear how far we want to go.
+
+We could create a "get_formal_type_or_op_map" routine, which would take
+a type descriptor and return the given type parameter.  Similarly,
+get_nested_type_or_op_map.
+
+The "Enclosing_Type" pointer is at a non-zero offset, so we currently never
+do that inline.  Clearly we could.
+
+Specializing uses of execute_compiled_indirect_call_op:
+
+The most common is presumably "call_nth_operation_of_type". Another
+would be "call_through_op_desc".  We might have a routine index or a
+routine address.  There is already such a routine, but it has a fair
+amount of overhead, in part because it separates inputs and outputs.  It
+is only used in GTK, and it could clearly be altered to take a R/W param
+list instead.
+
+-----  7 Sep 2016
+
+We should inline calls, including "parallel calls" if the target is
+small enough.  We should inline parallel block if the included call is
+relatively short.
+
+If there are no references to a master record, we should not wait on it.
+
+We should have a way to suppress checks even if they are generated in
+the PSVM (e.g. check_non_null, check_block).
+
+We should do more profiling.  Doing a bit shows that most of the time is
+spent in Allocate_From_Unshared_Stg_Rgn, and looking deeper, it seems
+most of the time is spent in the inlined version of
+Basic_Allocate_From_Stg_Rgn, in particular in the loop looking for a
+chunk that has adequate space.  That is somewhat surprising given that
+we put a chunk on the head of the list when we allocate it, and when we
+allocate from it.  It might be more efficient to not fiddle with the
+links every time, but rather keep the list circularly linked, and
+remember the place where we last looked.  Note that borrowing/returning
+chunks from enclosing regions also fiddles with the links, so we need to
+update all of those places as well.
+
+But the fiddling with the links doesn't seem to be the issue.  The issue
+seems to be that we are often allocating objects that are too big for
+the current chunk.  But fiddling might still be taking some time.  We
+should try to keep track of how often we skip over a chunk because it is
+full.
+
+---------- 11-Sep-2016
+
+Inlining -- we need to determine how many PSVM instructions the calling routine has if we want to come up with a unique identifier of the instructions in an inlining.  Num_Instrs gives that.
+
+A bigger problem may be labels.  We use them as an index into the LLVM array.  How is that going to work?  And the LLVM array continues across functions, which makes it even harder.  We could use an index that is a vector of integers instead of a single integer.  We could define an ordering so that they come out as we desire.  The first index could be a function index.
+
+We could define a mapping from index in LLVM (and keep it a simple vector) to/from the vector of PCs
+
+We also need to "uniquify" the VM register numbers (and names).  These don't need to be sequential, but they might want to use the same approach, namely a vector of integers.
+
+--------- 24-Sep-2016
+
+The basic interface is to "push" the context, and continue to generate instructions.
+
+The context includes at a minimum a separate LLVM vector of vector of strings.
+at the end of the inlining, these are combined into a single vector and all
+treated as the result of a single call instruction.
+
+Labels remain a challenge.
+
+We should go step by step through several different examples, including
+examples with skipping and labels.  We may have to deal with the labels
+before we finish the inlining.
+
+-------- 25-Sep-2016
+
+We need to set up something for the OUT parameter, and initialize it properly
+from the VM register specified, if Out_Param_Is_Inited.
+It needs to be accessible via Param 0 inside, and via the appropriate
+VM register outside.
+
+--------  16-Oct-2016
+
+If_Op immediately after a compare_op should be special-cased; very similar to
+to_bool.
+
+If_Op immediately after not_null_op or is_null_op should be special cased?
+We are already handling 0 and 1 specially.  Main thing would be to avoid the
+
+xor operation.  If_op immediately after "not" should be special cased.
+
+We should check what happens on inlining as far as knowing what is being
+called.
+
+is_null_value should be expanded by compiler.  May want to put a rep-clause
+on type descriptors.
+
+--------- 7-Nov-2016
+
+We should simplify integration between ParaSail and C/Ada.  In the case where
+the parameters are ParaSail objects, or 64-bit integers/enums, or opaque types,
+we should be able to import using a simpler interface.  Ideally the Ada/C
+code would use "normal" parameters and results, and the user would only
+have to "Export" their Ada code (or make their C code global), and perhaps
+register their routine by name.  The interpreter would know how to call such
+a routine, as would the compiler.  We might also want the compiler to start
+using such an interface for certain routines that use no tasking and need
+no local storage region.  Note that such routines would also be ineligible
+for a parallel call, unless the compiler/interpreter created the appropriate
+wrapper.
+
+From a user's perspective they would write a normal Ada routine, write the
+corresponding ParaSail interface, and say import(#Xyz, Language => #C,
+Link_Name => "link-name-string").
+where the second parameter is #C, #Ada, or #ParaSail.  The link-name string 
+would default to "_psc_Xyz" for #ParaSail, and "Xyz" for C, and "xyz" for Ada.
+
+They would also have to register
+the routine for use by the interpreter, and allow for it to be linked into
+the interpreter.  We could provide a package for the user to edit as they
+see fit, adding "with" clauses or local Ada "Import" and "Linker_Options"
+pragmas, etc.  
+
+We would also want to provide some libraries for picking apart, and putting
+together, ParaSail objects.  Of course creating objects would be tricky
+without a region, but those are generally passed in.  Finding the current
+context would be the other challenge.  We could create some per-thread
+storage and update that as part of init/finalize stg_rgn.
+
+More generally, we should perhaps generate code with two entry points for
+routines with no need for Context or Static_Link, one which takes the usual
+interface, and then loads the parameters into registers and passes them the
+LLVM way.  We could also have a case where Static_Link is needed, but
+Context is not needed or can be referenced as an up-level.  Static link could
+be the last parameter in that case.
+
+--------- 10-December-2016
+
+In fact, perhaps we could always spawn a parallel block and then have
+that do the parallel call.  Then only parallel blocks would need a
+special interface.
+
+---------- 17-December-2016
+
+Optimizing the call sequence.  We have special handling for inlined call.  We
+could do something analogous for "fast call."  We should probably generalize
+to the notion of "calling convention."  We need to worry about up-level
+references to parameters.
+
+----------- 26-Dec-2016
+
+OK, we have turned off parallel calls except when a queued call, or a call
+on an operation of a concurrent object of a non-concurrent type (i.e. a
+"potentially-queued" operation).  To handle these latter cases, we may need
+to produce a wrapper type which provides a set of queued operations, which
+then make a "normal" call on the underlying operations.  Alternatively,
+we make normal calls, and then a wrapper operation is only created if there
+is an "internal" precondition.
+
+Indirect calls could be a challenge.  We may want a routine that returns
+the address of the routine to be called, rather than one that actually
+performs the call.  The unwrapping process of polymorphic operands
+will need to be handled differently.  We could use the old-style array of
+parameters, and then copy them into registers for the actual call.
+We may also end up with a different static link when we call an inherited
+routine.  This begins to sound pretty complicated.  We could have several
+specialized versions internally for doing the call, handling up to some
+number of parameters, then the remainders would be in the parameter block.
+hard to do!
+
+-----  28-Dec-2016
+
+We could change queued calls to always provide a direct-call
+interface which then bundles up the parameters.  But does that really help?
+The bigger problem is "regular" calls which become locking, and then
+presume their preconditions will be satisfied.  We don't need to support
+that right away.
+
+Regular "locked" calls could evaluate all of the parameters, and then make
+a call which gets the lock, but how does the unlock happen?  Upon return?
+In the absence of exceptions, that seems fine.  And as long as a lock is held,
+there is no abort possible.  That would mean an explicit lock/unlock around
+the call.  That would add code at the call site, but such calls should be
+rare in any case.  It also avoids having to generate special code for 
+internal calls.  Queued calls become the big special case then.  These really
+need the special calling convention.
+
+Now we have dispatching calls.  We could pass in the polymorphic
+parameter and static link and get back the address to call, the
+unwrapped parameter, and the static link.  We would need to check
+the second/third polymorphic parameters explicitly.  Alternatively, we have
+special interfaces for those, given that it is unlikely we would have more
+than 2 or 3 polymorphic parameters.
+
+We also have calls where the type is a formal parameter of a module.
+These are similar, except there is no unwrapping to be done.  All we
+need is the address to call and the static link to use.
+
+If we cannot figure out what is the actual operation, we use indirect_call(),
+which ultimately either calls Execute_Nth_Op or Execute_Compiled_Indirect_Call
+or Call_Through_Operation_Desc.
+
+If we can figure out the actual operation we are calling,
+in some cases we still go out of line to get the type descriptor
+(generally only when the PSVM specifies a known routine).
+
+So what is the simplest way to get the parameters loaded properly?
+And how do we deal with the initial value of the "output" parameter?
+I suppose it ends up being an implicit parameter, but where in the
+list of parameters?  Simplest would certainly be to pass it first,
+since that is how it appears in the PSVM.  The convention seems relevant
+here.  On the other hand, it seems sub-optimal to pass it in the first
+parameter since that requires different conventions for other languages
+which don't expect it, and we might not know whether the caller is
+expecting it.  Static link also needs to be passed, and context.
+
+---
+
+At some point we should also try to optimize the creation of "leaf" objects
+so they are allocated on the stack.  Their header should indicate region 0.
+This is similar to the way that TCBs are allocated.
+
+
+----   3-Jan-2017
+
+Still not clear what is best strategy for concurrent objects of non-concurrent
+type.  Caller in general knows whether there is an "internal" precondition,
+so it can do a different sort of call.  But it also needs something to call,
+which could, conceivably, be a special routine (like a nested block) which
+copies the parameters from the parameter block into "normal" parameters.
+
+Note that we need a different way of handling up-level references to parameters
+once we start passing them in registers.  Get_Locator_Ptr and Load_Via_Locator
+will need some changes, as will Store_Via_Locator.  Currently something
+is considered a "local constant" if its base is the local area.  That is
+fine for Store_Via_Locator, as we will set up %_Param_Area to point at a slot
+allocated for the Output, if there is one.  But for Load_Via_Locator we would
+like to use the appropriate param LLVM reg when the base is the Param_Area.
+Any use of Enclosing_Param_Area will need to be treated like an up-level
+reference, since presumably we won't be storing a pointer to the parameter
+area when the routine starts.  This is all done in Process_One_Locator.
+We probably want another set of up-level-ref'ed parameters, e.g.
+TLO.Uplevel_Params[func_node].  Currently, when in Store_Via_Locator,
+it initializes the frame-record variable as well if VM-reg is up-level
+referenced.  For a parameter, we will need to do that right at the
+beginning, since there is no explict store into them.  The Output parameter
+will always be referenced via the %_Param_Area.
+
+While we are at it, we should decide whether it is necessary to store the
+static link and/or the param area pointer.  In process_one_locator, we
+should decide whether we need to have a stored copy of the static link
+or the param-area pointer.  Initialize_Stg_Rgn might be one reason, if it
+looks at either of them.
+
+Note that we store a pointer to the master in the LLVM frame record only for
+up-level references to the master.  It should not be needed if there are no
+nested blocks that use it.  It is not usable by nested operations.
+
+We should also decide whether we need to create a frame at all.  We create
+a master if we have a stg-rgn, but it is conceivable that we don't need one.
+Null_For_Local_Stg_Rgn fetches the storage region index from the local area;
+it is stored there by initialize_stg_rgn.  Beware that when we do inlining,
+we presume that there is both a master/stg-rgn if we inline a function
+that needs either.  The uplevel referencing stuff doesn't take inlining
+into account, so it neeeds to work without creating any new uplevels.
+
+Note that inlining is somewhat similar to a register-based parameter passing
+convention in that we don't presume there is a parameter block.
+Get_Adjusted_VM_Num_And_Name handles the special case.  It could conceivably
+handle the non-standard conventions, though we still need to change the
+function prototype, everywhere it appears, and perhaps do conversions in
+some places (e.g. in the Local_Funcs table).  When we "register compiled
+operations" perhaps we should only register those that have the appropriate
+conventions?  No, we need them all because we put their routine index into
+the operation tables.
+
+--------- 9-Jan-2017
+
+Getting back to optimizing space in generated llvm, the simplest seems to be to
+take advantage of linkonce_odr or weak_odr linkage types to reduce duplicate
+type descriptors and string literals.  Content-based coalescing would be
+great, but that seems to be only supported on Darwin (MacOS).  Strings are
+a bit tricky as the stream representation uses string indices instead of
+strings, and that makes it harder to know how to create identical type
+descriptors.  However, it is not really necessary to create identical type
+descriptors so long as we know who they belong to, and whether they need to
+be installed, or simply referenced.  They could have a reference to their
+own file name, for example, to make it clear which file is supposed to 
+install them.  Or alternatively, they could have a link to their local
+string table, and a check could made whether that is the current file's
+string table.
+
+--------  26-July-2017
+
+We should go back to being example driven to jump start this process.
+Start with "Fib" and work from there.
+
+We need to declare Fib as taking registers, and need to pass them.
+We also need to figure out how to call Fib from the command-line interface.
+Perhaps top-level functions should *not* use parameters in registers,
+as that interferes with calling from the command line.  Perhaps only nested
+routines and operations of modules should pass parameters in registers.
+Those are the ones we care about, presumably.
+
+So let's not start with Fib.  Let's start with kmeans.  We need to set the
+Convention properly.  Standalone operations will use External_Default
+convention.  
+
+Perhaps "Parallel_Default" is a misnomer as a convention.  We might want
+to call it "Queued_Default."  For locking operations, we could do the lock
+at the call site, or do what GNAT does and export a locking and a non-locking
+interface.  When we have a concurrent object of a non-concurrent module,
+we should do the locking externally.  
+This may make it harder to eventually support exceptions.  We could require
+that any locking/queuing call use parameters passed in memory, which would
+be loaded into registers after getting the lock.  This would give a lot
+more flexibility.  We could pass in the convention as a separate parameter
+along with a parameter count, or have special versions for different
+conventions/number of parameters.  A parallel call could also work that
+way, with lots of options for handling different conventions.
+
+For dispatching calls, the entry in the dispatching table could be
+a wrapper of the directly callable routine.  The dispatching table entries
+for a given operation all need to use the same calling convention.
+
+The return value should probably always come back in the result register.
+That is easy enough to arrange, and incurs relatively little overhead.
+
+-------- 27-July-2017
+
+To reiterate the plan: we will allow routines to have various calling
+conventions, all of which can be represented by an enumeration and one or more
+counts (e.g. number of 64-bit int parameters, number of 64-bit float
+parameters).  Any runtime routine that does calls will take the calling
+convention specifier and the parameters in a block.  We can always return a
+single 64-bit result in the normal "result" register.  But let's hold off
+on that for now, to reduce the amount of disruption.
+
+So we should systematically add convention parameters to operations,
+probably as separate variants to avoid disrupting what works now.
+We probably also want to be able to set defaults on a module-wide
+basis or source-code-wide basis, so we don't have to necessarily
+recompile the world.
+
+----------- 29-Aug-2017
+
+We now keep track of which parameters are up-level referenced.
+We will need that information for calling conventions that pass parameters
+in registers.  To get started, we need to:
+1) emit an appropriate parameter profile in the LLVM when declaring a function;
+1a) copy parameters into a frame record if up-level referenced
+2) emit parameters at a call site in registers
+3) handle direct refs to parameters of the current routine
+4) handle up-levels refs to parameters of an enclosing routine
+
+Should probably start with (3), then (2), then (4), and finally (1) and (1a) in
+the usual "top-down," consumer-before-producer way.
+
+---------- 26-Jan-2018
+
+What register number/name should we use for parameters that are passed in
+registers?  The ParaSail front end assigns local registers.
+and so long as we properly match up the PSVM with the LLVM, we will see
+that the VM numbers in the PSVM show up as %_loc_XXX in the LLVM.
+
+For inlines, we add a sufficiency large multiple of 100 for each 
+level of inlining to the local register numbers from the PSVM.
+
+How can we create unique VM numbers for parameters?
+
+We could make them negative, I suppose.  But we already
+do smething special for inlining.  Perhaps we just pretend as though
+we have a first level of inlining.  We can offset by base amount, which
+is next power of 100 above number of parameters.
+We could make them very large (i.e. 1_000_000 + param), and then
+have them displayed as %_param_XXX (or eventually, by their Ada name).
+
+For the output parameter, we need to decide what to do.  Currently
+for inlining we don't do anything special in Get_Adjusted_VM_Num_And_Name,
+but we do do something special in Get_Locator_Ptr, using Output_Param_Name().
+
+If we presume for the output parameter, we pass in the address of a properly
+initialized object, that is the simplest.  But that is hardly the
+most efficient.  If we need a region passed in, we will want that for sure.
+If we don't know whether the result type is large or small, we need
+to assume the worst.  The question is whether the code *inside* cares.
+Best would be to have an additional parameter which we don't always
+provide or need.  
+
+It is not entirely clear whether LLVM requires a perfect
+match between the declared type of a function and the type used at the
+point of a call.  For now, let's presume no.  If necessary, we could provide
+one or more wrappers that take additional parameters and ignore them.
+
+Internally, how should we handle the output parameter?  Should its initial
+value be an extra parameter that we generally ignore?
+And how do we handle it internally?  It seems silly for the caller to
+allocate space for it, because then we definitely need to use indirect
+assignments.  Instead, we should create a local via alloca, initialized from
+the "extra" parameter if that value is needed.  We store into that same
+local any time we refer to the output.  And finally at the end we
+return that as the result, via "<val> = load <ty> <ty>* %_output;"
+"ret <ty> <val>".  We already have essentially this code for inlined
+routines within Inline_Call().
+
+--------- 1 Feb 2018 -------
+
+Output parameter --
+
+The PSVM has both a VM Num for the result, and a set of VM nums for the
+parameters, including the output parameter(s).  Do we want to change that?
+How are these used in the generated LLVM now?  If Output_Inited_Null is
+true, then the output parameter is initialized to null, by a prior
+Store...Null_Op.  Otherwise, the output parameter VM is ignored.  The
+result VM might be indicated as indirect, and space for that will
+need to be allocated, and the address of the space loaded into the
+given register.
+
+We should shift the order of the parameters, with the initial value for
+the output coming in after the inputs.  We still need to decide where
+the context and the static link go.  We could use convention for some
+of this.  Static link is pretty common.  The initial value of the
+output is related, normally, to a storage region, and that implies
+the use of a context for allocation.  The static link is relevant
+even if no allocation is being performed, and is certainly needed
+for nested subprograms.
+
+For "null" functions, the code becomes a simple copy from the
+initial value of the output to its result register.
+
+So, order could be:  input params, static link, context, initial output
+
+If passing params in registers, then we should produce a different
+declaration for the LLVM function, both at the call site and at the
+definition point.  We also need to deal with the tables of functions
+which won't now all have the same type.
+
+---------- 23-Feb-2018 -------
+
+We now need to implement indirect calls.  We probably should change the
+interface to take the address and convention-desc as separate parameters.
+We could put these last so the code for the routine would not need to move
+the three default operands in the param-list approach.
+
+A case statement on the value of the convention-desc would take us to various
+conversions of the address and appropriate use of Params[N].
+
+---------- 24-Feb-2018 ------
+
+We need to carry the conv-desc into the generated code tables.
+The Uses_Queuing could perhaps be integrated into the convention-desc
+rather than having a separate table for it.  Note that the convention
+itself has a queuing-default, but I believe that is a bit different,
+as that indicates that a call on the routine itself might be queued,
+whereas uses_queuing means that the routine might use queuing internally,
+by *calling* something that might be queued, and hence the pico-thread
+spawned to do the call must be treated differently for scheduling purposes.
+
+OK, we have added Uses_Queuing to the conv-desc, so now we need
+to emit a table of conv-desc into the LLVM, and read it back in
+and use it when creating a Routine to represent a registered
+operation.
+
+----------- 5-June-2018 -----------
+
+Trying to optimize LLVM by expanding run-time support routines inline.
+For Null, we want to know whether type is known to be large or small.
+Want to fetch formal type, or enclosing type, even if not all parameters known.
+Need to be careful to not get confused with LLVM register name (string).
+Need to have enclosing routine to fetch enclosing type.
+Get_Type_Desc does the work, if you give it the current type desc and type locator.  Find_Enclosing_Module, then get current instance.
+
+NOTE: We really would prefer to store info on nested types, rather than
+component types, since there are no references to component types, per se,
+except for wrappers (single-component types).  On the other hand, the
+component's types are represented in the PSVM as a nested type if any
+aspect of it depends on a formal type.
+
+--------- 18-November-2018 ----------
+
+Allocating objects on the stack:
+
+If an object is initialized by calling a
+function (e.g. "var R : Countable_Range<Integer> := X .. Y"), we initialize
+it to Null with a local storage region, and then call the function which 
+allocates the result object in the stg-rgn identified by the Result
+parameter.  However, if we inline the function, we might have more
+flexibility.  For now, let's assume we only do this for instances of
+a non-array type, or an array type of small, known size.  Basically, something
+where the initialization with nulls can be done without a loop.
+We might want to build the object directly in the result, even if that
+was not how it was written.  Currently it seems that something like
+"return (First => Left, Last => Right)" is being created in a temp.
+But so long as we know it is for a local stg-rgn, allocating on the
+stack would seem to work.  Probably also don't do it for a concurrent object.
+For an object in a loop, we need to be sure that a "move" actually moves it.
+A move to another local object could be done without actually moving it,
+so long as the new home is shorter lived (both region-wise and lifetime).
+
+We probably want to track whether a given local register or local variable
+contains a local object/local null, and propagate this through copy-word
+and load/store-via-locator.  Then, when about to call new_object, if we know
+the existing object is local, we can do the local-object optimization.
+
+Copy_Large_Object needs to work, whether the old object or the new object
+is on the stack.  Note that we already allow the root object of a polymorphic
+object to be from a different stg-rgn than the rest of the object.
+
+Move_Object checks for storage region match.  What stg-rgn are we going
+to use?  Can we have one shared "very-local" stg-rgn record?  Need to
+recognize it early on, whenever we are about to change it.
+
+Could we have a special value of the Lock field to indicate "local"?  
+We are considering eliminating the lock field (in favor of an additional
+level of indirection or an implicit type extension), so perhaps not the
+best idea.
+
+---------  28-Nov-2018 -------
+
+We are trying to keep better track of which type descriptors are known at
+compile time.  Note that we generally know the current routine's type
+descriptor (called "Enc_Type_Desc" in Compile_One_Instr, which is also
+the name of an operation defined on Routines), but this might be one
+where All_Parameters_Known is false.  When we inline a call, we might
+know more precisely what is the type descriptor, based on the static link
+we pass to it.  When we create an object,
+it is important that All_Parameters_Known is true, since objects are not
+permitted to carry partially-instantiated types.  Even worse would be the
+use of a formal type, since for those we don't even know whether the type is
+small or large.
+
+When we use a Zero_Base'd type locator, it should always have
+All_Parameters_Known true, because we don't want to actually pass
+around partially-instantiated type descriptors at run time.
+In looking at the compiler front end, this seems to be true, namely,
+we don't emit a zero-based type locator unless we have all-parameters-known.
+Instead, we emit something relative to the current type descriptor.
+
+For creating a null, we are OK with using a non-fully-instantiated type desc
+but we don't want to use it to substitute for a "real" type descriptor
+in other contexts.  So we need to be careful with compile-time-known
+but not-fully-instantiated type descs.  In particular, Load_Known_Type_Desc
+should complain when All_Parameters_Known is false.
+
+------ 12-Feb-2019
+
+We should generalize the attempt to allocate objects in the stack, and
+generally allocate all optional objects (other than basic arrays which
+can always grow?) in the enclosing object.  We definitely still want
+to identify the region, but with some kind of flag that indicates the
+object's space is taken care of by some enclosing object or stack frame.
+For basic arrays of non-optional objects, we will want to store the
+size of the elements somewhere, to use as a "stride."
+
+Some day we might figure out how to suppress the object header, but for
+now we will always leave room for the header.  To get rid of it we
+would need to construct a null of the right region rather than
+ever passing in the object as a whole.  Presumably we only need the
+region when the object has some optional component, so we could
+presumably always use that optional component for the region indicator.
+We would also need to skip past the header for optional components, or point
+at one before a non-optional component.
+
+Copying a large object will get more complicated, especially of we don't
+store headers for non-optional components, unless we create
+a pre-flattened list of (sub)components (which is not a bad idea).
+
+Locks should be moved into a separate level of object, similar to what
+we do for polymorphic objects.  Of course, we might then turn around
+and flatten the single component, but we would still have at least two
+object headers.
+
+We could take the polymorphic object as the model for locked objects.
+It would be a polymorphic locked object, essentially treating it as
+being something that "implements" the locked interface.  But every
+object will implement the locked interface, similar to the assignable
+interface.  It doesn't require any additional operations.  We still need
+to figure out where to bury the lock number, or the actual lock object.
+It could use the size field -- we shouldn't be copying lock objects.
+We currently play some games with sharing a lock across a wrapper.  Not
+sure how that will play out.
+
+--------- 2-June-2019 -----
+
+We are working on speeding up work-stealing, by effectively bypassing it
+when there are sufficient picothreads on the queue.
+
+We are ending up with deadlock on the AdaMagic version, presumably because
+we are never noticing the "need more sharable threads" flag.
+Can we avoid this by using a protected object more cleverly?
+[June 18] Actually, the problem was that we were putting a queuing thread of
+a shared master onto the unshared-thread queue.  It seems OK to put
+a thread that never queues on the unshared-thread queue, even if its
+master is shared.  But if it might queue, we can get ourselves
+into trouble.
+
+As far as allocating on the stack, it is OK to allocate an optional object
+on the stack, since it is OK to add stack objects to the reclamation
+table.  This only works for objects in the local region.

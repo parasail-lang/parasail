@@ -1,0 +1,398 @@
+interface Stable_Marriage<Last_Id : Univ_Integer := 64> is
+
+    type Group1_Id is new Integer<1 .. Last_Id>;
+    type Group2_Id is new Integer<1 .. Last_Id>;
+    type Ranking is new Integer<1 .. Last_Id>;
+    // Ranking#first =>  most preferred, Ranking#last => least preferred
+
+    type Ranking_Of_Group1 is Array<Group1_Id, Indexed_By => Ranking>;
+    type Ranking_Of_Group2 is Array<Group2_Id, Indexed_By => Ranking>;
+
+    type Ranking_Of_Group2_By_Group1 is
+      Array<Ranking_Of_Group2, Indexed_By => Group1_Id>;
+    type Ranking_Of_Group1_By_Group2 is
+      Array<Ranking_Of_Group1, Indexed_By => Group2_Id>;
+
+    type G1_To_G2_Map is Array<Grout2_Id, Indexed_By => Group1_Id>;
+    type G2_To_G1_Map is Array<Group1_Id, Indexed_By => Group2_Id>;
+
+    func Is_Permutation_1 (R1 : Ranking_Of_Group1) -> Boolean
+      {Is_Permutation_1 == (for all G1 in Group1_Id =>
+         (for some Rank in Ranking => (R1 [Rank] == G1)))};
+
+    func Is_Permutation_2 (R2 : Ranking_Of_Group2) -> Boolean
+      {Is_Permutation_2 == (for all G2 in Group2_Id =>
+         (for some Rank in Ranking => (R2 [Rank] == G2)))};
+
+    type Inverted_Ranking_Of_Group1 is Array<Ranking, Indexed_By => Group1_Id>;
+    type Inverted_Ranking_Of_Group2 is Array<Ranking, Indexed_By => Group2_Id>;
+
+    func Invert_1 (R1 : Ranking_Of_Group1)
+      {Is_Permutation_1 (R1)}
+      -> Inv : Inverted_Ranking_Of_Group1
+      {(for all Rank in Ranking => (Inv [R1 [Rank]] == Rank)) and
+        (for all G1 in Group1_Id => (R1 [Inv [G1]] == G1))};
+
+    func Invert_2 (R2 : Ranking_Of_Group2)
+      {Is_Permutation_2 (R2)}
+      -> Inv : Inverted_Ranking_Of_Group2
+      {(for all Rank in Ranking => (Inv [R2 [Rank]] == Rank)) and
+       (for all G2 in Group2_Id => (R2 [Inv [G2]] == G2))};
+
+    func Invert_Map (G2_To_G1 : G2_To_G1_Map) 
+      {for all G1 in Group1_Id =>
+       (for some G2 in Group2_Id => (G2_To_G1 (G2) == G1))}
+      -> G1_To_G2 : G1_To_G2_Map
+      {(for all G1 in Group1_Id => (G2_To_G1 [G1_To_G2 [G1]] == G1)) and
+       (for all G2 in Group2_Id => (G1_To_G2 [G2_To_G1 [G2]] == G2))};
+
+    func Is_Preferred_1 (G1_A, G1_B : Group1_Id; R1 : Ranking_Of_Group1)
+      {Is_Permutation_1 (R1)}
+      -> Boolean
+      {Is_Preferred_1 == (Invert_1 (R1) [G1_A] <= Invert_1 (R1) [G1_B])};
+
+    func Is_Preferred_2 (G2_A, G2_B : Group2_Id; R2 : Ranking_Of_Group2)
+      {Is_Permutation_2 (R2)}
+      -> Boolean
+      {Is_Preferred_2 == (Invert_2 (R2) [G2_A] <= Invert_2 (R2) [G2_B])};
+
+    // note that Is_Prefered_x returns True if first two arguments are equal
+
+    func Matching
+      (Ranking_1 : Ranking_Of_Group2_By_Group1;
+       Ranking_2 : Ranking_Of_Group1_By_Group2)
+      {(for all G1 in Group1_Id => (Is_Permutation_2 (Ranking_1 [G1]))) and
+         (for all G2 in Group2_Id => (Is_Permutation_1 (Ranking_2 [G2])))}
+      -> Match : G2_To_G1_Map
+      {(for all G1 in Group1_Id =>
+         (for some G2 in Group2_Id => (Match [G2] == G1))) and
+       (for all G1 in Group1_Id =>
+         (for all G2 in Group2_Id =>
+           ((Is_Preferred_2 (Invert_Map (Match) [G1], G2, Ranking_1 [G1])) or
+            (Is_Preferred_1 (Match [G2], G1, Ranking_2 [G2])))))};
+
+end interface Stable_Marriage;
+
+class Stable_Marriage is
+
+  exports
+    func Is_Permutation_1 (R1 : Ranking_Of_Group1) -> Boolean is
+        var Seen : Set<Group1_Id> := [];
+    
+        for Rank in Ranking loop
+            {(for all G1 in Group1_Id =>
+               (G1 in Seen) ==
+                (for some Prev in 1 .. Rank - 1 =>
+                  (R1 [Prev] == G1)))}
+            Seen += R1 [Rank];
+        end loop;
+        return Seen == [..];
+    end func Is_Permutation_1;
+
+    func Is_Permutation_2 (R2 : Ranking_Of_Group2) -> Boolean is
+        var Seen : Set<Group2_Id> := [];
+    
+        for Rank in Ranking loop
+            {(for all G2 in Group2_Id =>
+               (G2 in Seen) ==
+                (for some Prev in 1 .. Rank - 1 =>
+                  (R2 [Prev] == G2)))}
+            Seen += R2 [Rank];
+        end loop;
+        return Seen == [..];
+    end func Is_Permutation_2;
+
+    func Invert_1 (R1 : Ranking_Of_Group1)
+      -> Inv : Inverted_Ranking_Of_Group1 is
+
+        for Rank in Ranking loop
+	    {(for all Prev in 1 .. Rank - 1 =>
+               (Inv [R1 [Prev]] == Prev)) and
+             (for all G1 in Group1_Id =>
+                 ((for some Prev_2 in 1 .. Rank - 1 =>
+                    (R1 [Prev_2] == G1)) ==> (R1 [Inv [G1]] == G1)))}
+            Inv [R1 [Rank]] := Rank;
+        end loop;
+    end func Invert_1;
+
+    func Invert_2 (R2 : Ranking_Of_Group2)
+      -> Inv : Inverted_Ranking_Of_Group2 is
+    
+        for Rank in Ranking loop
+            {(for all Prev in 1 .. Rank - 1 =>
+                 (Inv [R2 [Prev]] == Prev)) and
+             (for all G2 in Group2_Id =>
+                 ((for some Prev_2 in 1 .. Rank - 1 =>
+                    (R2 [Prev_2] == G2)) ==> (R2 [Inv [G2]] == G2)))}
+            Inv [R2 [Rank]] := Rank;
+        end loop;
+    end func Invert_2;
+
+    func Is_Preferred_1 (G1_A, G1_B : Group1_Id; R1 : Ranking_Of_Group1)
+      -> Boolean is
+        const Inverted : Inverted_Ranking_Of_Group1 := Invert_1 (R1);
+        return Inverted [G1_A] <= Inverted [G1_B];
+    end func Is_Preferred_1;
+
+    func Is_Preferred_2 (G2_A, G2_B : Group2_Id; R2 : Ranking_Of_Group2)
+      -> Boolean is
+        const Inverted : Inverted_Ranking_Of_Group2 := Invert_2 (R2);
+        return Inverted [G2_A] <= Inverted [G2_B];
+    end func Is_Preferred_2;
+
+    func Invert_Map (G2_To_G1 : G2_To_G1_Map) -> 
+      G1_To_G2 : G1_To_G2_Map is
+        for G2 in Group2_Id loop
+            //# assert
+            //#   (for all Prev in 1 .. G2 - 1 =>
+            //#       (G1_To_G2 [G2_To_G1 [Prev]] == Prev)) and
+            //#   (for all G1 in Group1_Id =>
+            //#     ((for some Prev2 in 1 .. G2 - 1 =>
+            //#        (G2_to_G1 [Prev2] == G1)) ==>
+            //#      (G2_to_G1 [G1_To_G2 [G1]] == G1)));
+            G1_To_G2 [G2_To_G1 [G2]] := G2;
+        end loop;
+    end func Invert_Map;
+
+    func Matching
+      (Ranking_1 : Ranking_Of_Group2_By_Group1;
+       Ranking_2 : Ranking_Of_Group1_By_Group2)
+      -> G2_To_G1_Map is
+
+        type Inverted_Ranking
+          is Array<Inverted_Ranking_Of_Group1, Indexed_By => Group2_Id>;
+
+        type Group2_Set is Set<Group2_Id>;
+
+        var Ranking_2_Inverted : Inverted_Ranking;
+          // constant after initialization
+
+        var Proposals_Made : Array<Count, Indexed_By => Group1_Id> := [.. => 0];
+
+        var Unmatched_G1_Set : Set<Group1_Id> := [..];  // initially all ids
+
+        var Unmatched_G2_Set : Set<Group2_Id> := [..];  // initially all ids
+
+        var Result : G2_To_G1_Map;
+
+        func Invert (R2 : Ranking_Of_Group1_By_Group2)
+          -> Result : Inverted_Ranking
+          {(for all G2 in Group2_Id =>
+             (Result [G2] == Invert_1 (R2 [G2])))}
+        is
+            for G2 in Group2_Id loop
+              //# assert
+              //#   (for all Prev in 1 .. G2 - 1 =>
+              //#     (Result [Prev] == Invert_1 (R2 [Prev])));
+              Result [G2] := Invert_1 (R2 [G2]);
+            end loop;
+            return Result;
+        end func Invert;
+
+        func Invariant_Holds() -> Boolean
+        // only for annotations; replace with better mechanism someday
+        //# global
+        //#   Proposals_Made,
+        //#   Unmatched_G2_Set,
+        //#   Unmatched_G1_Set,
+        //#   Result,
+        //#   Ranking_1,
+        //#   Ranking_2,
+        //#   Ranking_2_Inverted;
+
+        //# return
+        //#  (Ranking_2_Inverted == Invert (Ranking_2)) and
+        //#
+
+        //# -- for every G1, every G2 that the G1 has proposed to and
+        //# -- been rejected by is matched with someone that the G2
+        //# -- would not leave fot this G1.
+
+        //#  (for all G1_Id in Group1_Id =>
+        //#    ((Proposals_Made [G1_Id] <= 1) or else
+        //#     (for all Rank in 1 .. Ranking [Proposals_Made [G1_Id - 1]] =>
+        //#        (Ranking_1 [G1_Id] [Rank] not in Unmatched_G2_Set) and
+        //#        (not Is_Preferred_1
+        //#          (G1_Id, Result [Ranking_1 [G1_Id] [Rank]],
+        //#           Ranking_2 [Ranking_1 [G1_Id] [Rank]))))) and
+        //#
+
+        //# -- every G1 who has never proposed to anyone is in the
+        //# -- unmatched pool
+
+        //#  (for all G1_Id in Group1_Id =>
+        //#    ((Proposals_Made (G1_Id) == 0) ==> G1_Id in Unmatched_G1_Set))
+        //#
+
+        //# -- every G1 who is not in the unmatched pool is currently
+        //# -- matched with their Rth choice, where R is the number
+        //# -- of proposals this G1 has made.
+
+        //#  (for all G1_Id in Group1_Id =>
+        //#    (G1_Id not in Unmatched_G1_Set ==> 
+        //#       (Result [Ranking_1 [G1_Id]
+        //#               [Ranking [Proposals_Made [G1_Id]]]] == G1_Id)));
+        is
+
+        //# hide Invariant_Holds;
+        //
+        // This function is for use in annotations only; it is never called
+        // (although it is called in commented-out Assert pragmas which may
+        // be uncommented for Ada debugging).
+
+            var Holds : Boolean := True;
+
+            if Ranking_2_Inverted != Invert (Ranking_2) then
+                Holds := False;
+            end if;
+
+            for G1 in Group1_Id loop
+               if Proposals_Made [G1] > 1 then
+                   for Rank in 1 .. Ranking [Proposals_Made [G1] - 1] loop
+                       if Ranking_1 [G1] [Rank] in Unmatched_G2_Set or else
+                        Is_Preferred_1
+                          (G1, Result [Ranking_1 [G1] [Rank]],
+                           Ranking_2 [Ranking_1 [G1] [Rank]]) then
+                           Holds := False;
+                       end if;
+                   end loop;
+               end if;
+            end loop;
+
+            for G1 in Group1_Id loop
+
+                if G1 not in Unmatched_G1_Set then
+                    if Proposals_Made [G1] == 0 then
+                        Holds := False;
+                    elsif Result [Ranking_1 [G1]
+                                   [Ranking [Proposals_Made [G1]]]] != G1 then
+                        Holds := False;
+                    end if;
+                end if;
+            end loop;
+
+            // Could strengthen this check (including #return annotation)
+            // to verify that the cardinalities of
+            // Unmatched_G1_Set and of Unmatched_G2_Set are equal.
+            // This doesn't seem to be necessary.
+            //
+            // Could also snapshot some subset of previous state
+            // and then assert that things are moving in the right direction
+            // (e.g., sum of all Proposals_Made counts is strictly increasing).
+
+            return Holds;
+        end func Invariant_Holds;
+
+        func Make_One_Proposal()
+        //# global in out
+        //#   Proposals_Made,
+        //#   Unmatched_G1_Set,
+        //#   Unmatched_G2_Set,
+        //#   Result;
+        //# in
+        //#   Ranking_1, Ranking_2_Inverted, Ranking_2;
+
+        //# derives
+        //#   Unmatched_G1_Set, Result
+        //#     from Ranking_1, Ranking_2_Inverted,
+        //#       Unmatched_G1_Set, Unmatched_G2_Set, Proposals_Made, Result &
+        //#   Proposals_Made from *, Unmatched_G1_Set &
+        //#   Unmatched_G2_Set
+        //#     from Ranking_1, Unmatched_G1_Set, Unmatched_G2_Set,
+        //#       Proposals_Made &
+        //#   null from Ranking_2; -- named only in annoctations
+
+        //# pre
+
+            //# Invariant_Holds
+            //#   (Proposals_Made,
+            //#    Unmatched_G2_Set,
+            //#    Unmatched_G1_Set,
+            //#    Result,
+            //#    Ranking_1,
+            //#    Ranking_2,
+            //#    Ranking_2_Inverted);
+
+        //# post
+
+            //# Invariant_Holds
+            //#   (Proposals_Made,
+            //#    Unmatched_G2_Set,
+            //#    Unmatched_G1_Set,
+            //#    Result,
+            //#    Ranking_1,
+            //#    Ranking_2,
+            //#    Ranking_2_Inverted);
+
+        // Note that pre- and post- conditions are identical,
+        // which implies that this spec could be implemented by
+        // a null procedure. We are not trying to construct a
+        // termination proof at this point, so there is no need
+        // to prove that forward progress is being made at each
+        // iteration. One approach for proving termination is to
+        // note that the sum of all the Proposals_Made counts
+        // increases with each call to Make_One_Proposal, and
+        // that this sum cannot exceed Last_Id ** 2.
+
+        is
+            var G1 : Group1_Id;
+            var G2 : Group2_Id;
+            var Accepted : Boolean;
+            var Rank : Ranking := Ranking#first;
+            var Already_Asked : Count;
+        
+            // pragma Assert (Invariant_Holds);
+            G1 := Take_One(Unmatched_G1_Set);
+
+            Already_Asked := Proposals_Made [G1];
+            if Already_Asked != 0 then
+                Rank += Ranking [Already_Asked];
+            end if;
+
+            G2 := Ranking_1 [G1] [Rank];
+            Proposals_Made [G1] += 1;
+
+            if G2 in Unmatched_G2_Set then
+               // accept first proposal
+               Accepted := True;
+               Unmatched_G2_Set -= G2;
+            elsif Ranking_2_Inverted [G2] [G1] <
+                  Ranking_2_Inverted [G2] [Result [G2]] then
+               Accepted := True;
+               // previous match for G2 returns to Unmatched_G1_Set
+               Unmatched_G1_Set += Result [G2];
+            else
+               // G2 prefers current match to G1
+               Accepted := False;
+               Unmatched_G1_Set += G1;
+            end if;
+
+            if Accepted then
+               Result [G2] := G1;
+            end if;
+            // pragma Assert (Invariant_Holds);
+
+            //# accept F, 30, Ranking_2, "named only in annotations";
+        end func Make_One_Proposal;
+
+	////////////////
+    
+        Ranking_2_Inverted := Invert (Ranking_2);
+
+        while Count(Unmatched_G1_Set) > 0 loop
+            //# assert
+            //# Invariant_Holds
+            //#   (Proposals_Made,
+            //#    Unmatched_G2_Set,
+            //#    Unmatched_G1_Set,
+            //#    Result,
+            //#    Ranking_1,
+            //#    Ranking_2,
+            //#    Ranking_2_Inverted);
+            Make_One_Proposal();
+        end loop;
+
+        return Result;
+    end func Matching;
+
+end class Stable_Marriage;

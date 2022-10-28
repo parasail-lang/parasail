@@ -1,0 +1,475 @@
+proc Invert_Params(In_File_Name : Univ_String) is
+    --  Procedure to read a javallel program and invert the parameter
+    --  layout.
+
+    const Debug : Boolean := #False
+
+    const Seps : Array<Set<Univ_Character>, Indexed_By => Boolean> :=
+      [ #False => ',' | ':' | ';' | ')', #True => ',' | ';' | ')' ]
+         --  Index is "Seen_Quest" which determines whether ':' is
+         --  to be ignored.
+    const Semi_Or_RParen : Set<Univ_Character> := ';' | ')'
+    const Semi_RParen_Or_Eq : Set<Univ_Character> := ';' | ')' | '='
+    const White_Space : Set<Univ_Character> := ' ' | '\t' | '\n'
+    const LParen_Or_Quote : Set<Univ_Character> := '(' | ''' | '"'
+    var Line_Num := 0
+    
+    func Sep_By_Space(S1, S2 : Univ_String) return Result : Univ_String is
+        --  Return S1 and S2 with exactly one space between them, including
+        --  any spaces at end of S1 or beginning of S2.
+        --  As a special case, if S1 is the empty string, treat it as though
+        --  it ended in a space, and if S2 is the empty string, treat it
+        --  as though it starts with a space.
+
+        const S2_Needs_Space := (|S2| > 0 and then S2[1] /= ' ')
+
+        if |S1| > 0 and then S1[|S1|] /= ' ' then
+            --  Need to add a space
+            if S2_Needs_Space then
+                Result := S1 & ' ' & S2
+            else
+                Result := S1 & S2
+            end if
+        else
+            -- Already have a space, or S1 is the empty string
+            if S2_Needs_Space then
+                Result := S1 & S2
+            elsif |S2| > 0 then
+                --  Extra space, remove it from head of S2
+                Result := S1 & S2[1 <.. |S2|]
+            elsif |S1| > 0 then
+                --  Extra space, remove it from end of S1
+                Result := S1[1 ..< |S1|]
+            else
+                --  Both S1 and S2 are the empty string
+                Result := ""
+            end if
+        end if
+    end func Sep_By_Space
+
+    var Line : optional Univ_String
+    var Len : Univ_Integer := 0
+
+    proc Skip_To_Char
+      (var Index : Univ_Integer; End_Char : Univ_Character) is
+      --  Advance "Index" up to a a character matching End_Char
+      --  Start by incrementing Index.
+      --  When all done, either Index > Len or Line[Index] = End_Char
+        const Orig_Index := Index
+
+        Index += 1
+        while Index <= Len and then Line[Index] /= End_Char loop
+            if Line[Index] = '\\' then
+                --  Skip over the next char, even if it matches End_Char
+                Index += 1
+            end if
+            Index += 1
+        end loop
+
+        if Index <= Len then
+            if Debug then
+                Put_Line ("Just skipped >>" & Line[Orig_Index .. Index] & "<<")
+            end if
+        else
+            Put_Line ("Unterminated string >>" & Line[Orig_Index .. Len] & "<<")
+        end if
+    end proc Skip_To_Char
+
+    var IO := A2X.Core.IO.Get_IO()
+    var In_File := File_Input_Stream.Open(IO, In_File_Name);
+    if In_File is null then
+        Put_Line(In_File_Name & " not found")
+        return
+    end if
+    var Out_File := File_Output_Stream.Create(IO, In_File_Name & ".inverted")
+
+    Put_Line ("Inverting params in '" & In_File_Name & "' to produce '" &
+      In_File_Name & ".inverted'");
+
+    --  Read up to first '('
+    var Right_Paren_Index : Univ_Integer := 1
+
+    Scan_For_Left_Paren:
+    loop
+        --  We are looking for an opening '('.
+        --  At this point, Len is length of Line,
+        --  and Right_Paren_Index is index in Line of last ')';
+        --  Right_Paren_Index = Len if no right-paren in the Line.
+        --  All characters up through Right_Paren_Index have already
+        --  been put out to Out_File.
+
+        if Right_Paren_Index >= Len then
+            --  Reached end of line
+            if Right_Paren_Index = Len then
+                --  Emit a new line
+                Out_File.New_Line()
+            end if
+            Line_Num += 1
+            Line := In_File.Get_Line()
+            if Line is null then
+                Put_Line("All done");
+                Out_File.Close()
+                return
+            end if
+            if Debug then
+                Put_Line("Just read line " & Line_Num & ": " & Line)
+            end if
+            Len := |Line|
+            Right_Paren_Index := 0;
+        end if;
+
+        --  Start looking after right paren
+        var Start := Right_Paren_Index + 1
+
+        Inner:
+        while Start <= Len loop
+            case Line[Start] is
+              when '(' =>
+                exit loop Inner
+              when '"' | ''' =>
+                const End_Char := Line[Start]
+                Skip_To_Char (Start, End_Char)
+              when '/' =>
+                if Start < Len and then Line[Start+1] = '/' then
+                    --  We found a comment, skip rest of line
+                    Start := Len
+                end if
+              when others =>
+                null
+            end case
+            Start += 1
+        end loop Inner
+
+        if Start > Len then
+            --  No '(' on this line
+            Out_File.Put_Line (Line[Right_Paren_Index <.. Len])
+            Out_File.Flush ()
+            Right_Paren_Index := Len + 1
+            continue loop Scan_For_Left_Paren
+        end if
+
+        --  OK, at this point, we have found a left paren
+        --  Put out up to the start of the parameter
+        Out_File.Put(Line[Right_Paren_Index <.. Start])
+        Out_File.Flush ()
+
+        --  Move past the '('
+        Start += 1
+
+        --  Transform each parameter, as follows:
+        --  Save words until reach a comma or a ':' (or a ';' or ')').
+        --  Last word is the param id.  Any prior words are qualifiers
+        --  such as "var" or "ref".  Add Id to a vector of parameter names.
+        --  If reached a comma, gather up Ids until reach ':'.
+        --  Once we reach a ':', gather up words until we reach a ';' or ')'.
+        --  These words are the type specifier.  
+        --  If we don't find a ':' before reaching ';' or ')' then this isn't
+        --  a parameter, so we just dump all of words as they were originally.
+        --  If we do find a ':' then for each Id, emit the type qualifiers,
+        --  the type specifiers, and the id, followed by a ','.
+        --  If we had found a ';', tranform the next parameter.
+
+        proc Advance_Index (var Index : Univ_Integer) is
+          --  Advance Index, reading in new lines as needed
+          --  and dumping any comments encountered.
+          --  If '(' is encountered, scan for matching ')'
+          --  If '"' or ''' encountered, scan for end of char/string
+          --  On return, Line[Index] is next potentially interesting character
+            var Paren_Count := 0
+
+            if Debug then
+                Put_Line ("--> Advance_Index, Index = " & Index &
+                  ", Len = " & Len);
+            end if
+
+            --  Loop to skip over end-of-line, comments, nested parens, and
+            --  char/string literals.
+            while Index >= Len 
+              or else Line[Index .. Index+1] = "//"
+              or else Line[Index] in LParen_Or_Quote
+              or else Paren_Count > 0
+            loop
+                if Index <= Len then
+                    --  Check for strings, chars, or nested parentheses
+                    case Line[Index] is
+                      when '/' =>
+                        if Index < Len and then Line[Index+1] = '/' then
+                            --  Found a comment
+                            Put_Line("Comment found in middle of param spec: " &
+                              Line[Index .. Len])
+                            Out_File.Put_Line(' ' & Line[Index .. Len])
+                            Out_File.Flush ()
+                            --  Remove comment part of line and append Next_Line
+                            Line := Line[1 ..< Index]
+                            Len  := |Line|
+                        elsif Paren_Count > 0 then
+                            --  Inside parentheses, keep going
+                            Index += 1
+                            continue loop
+                        end if
+                      when '(' =>
+                        --  Count the nesting of parens
+                        Paren_Count += 1
+                        Index += 1
+                        continue loop
+                      when ''' | '"' =>
+                        --  Skip past a char or string
+                        const End_Char := Line[Index]
+                        Skip_To_Char (Index, End_Char)
+                        Index += 1
+                        if Index <= Len then
+                            --  Return pointing at character after string/char
+                            return
+                        end if
+                      when ')' =>
+                        --  Paren count should be positive
+                        assert Paren_Count > 0
+                        Paren_Count -= 1
+                        Index += 1
+                        if Paren_Count = 0 and then Index <= Len then
+                            --  Return pointing at character after ')'
+                            return
+                        else
+                            --  Keep looking for final matching ')'
+                            continue loop
+                        end if
+                        
+                      when others =>
+                        if Paren_Count > 0 then
+                            --  Inside parentheses, keep going
+                            Index += 1
+                            continue loop
+                        end if
+                        --  Some random character at end of the line
+                        assert Index = Len
+                    end case
+                end if
+
+                --  Reached end of line or a comment, read in another line
+                Line_Num += 1
+                const Next_Line := In_File.Get_Line()
+                if Next_Line is null then
+                    --  All done; put out the rest of the line
+                    Out_File.Put_Line (Line[Start .. Len])
+                    Put_Line("All done");
+                    Out_File.Close()
+
+                    --  Indicate we are done by setting Line to null
+                    Line := null
+                    return  --  Return now
+                end if
+                if Debug then
+                    if Paren_Count > 0 then
+                        Put("Paren_Count = " & Paren_Count & ", ")
+                    end if
+                    Put_Line("Advance_Index just read line " & Line_Num &
+                      ": " & Next_Line)
+                end if
+
+                --  Extend "Line" to include the new one,
+                --  Append a newline and Next_Line
+                Line &= '\n' & Next_Line
+                Index := Len + 1  --  Skip over the newline
+                Len := |Line|
+            end loop
+            Index += 1
+            assert Len = |Line|
+            assert Index <= Len
+            if Debug then
+                Put_Line ("<-- Advance_Index, Index = " & Index &
+                  ", Len = " & Len);
+            end if
+        end proc Advance_Index
+
+        Handle_One_Param_Spec:
+        loop
+            --  At this point, "Start" points immediately after a '(' or ';'
+            --  We have put out to Out_File all characters up to "Start"
+            var Id_List : Vector<Univ_String> := []
+        
+            var Param_Start := Start
+            var Type_Start := Start
+            var Type_Quals := ""
+            var Seen_Quest : Boolean := #False  -- Whether seen a '?'
+
+            Handle_One_Param_Id:
+            loop
+                --  At this point, "Param_Start" points immediately after '('
+                --  or ';' if this is the first Id of a group with the same
+                --  type (|Id_List| = 0), or immediately after a ',' if not
+                --  first (|Id_List| > 0).
+                var Last_Word := Param_Start
+                var End_Id := Param_Start
+
+                --  Look for end of parameter
+                while Line[End_Id] not in Seps[Seen_Quest] loop
+
+                    if Line[End_Id] = '?' then
+                        Seen_Quest := #True
+                    end if
+
+                    if End_Id > Last_Word
+                      and then Line[End_Id-1] in White_Space
+                      and then Line[End_Id] not in White_Space
+                    then
+                        --  Ok, we have the start of another word
+                        Last_Word := End_Id
+                    end if
+
+                    --  Move on to next character, reading lines as needed
+                    --  and ignoring comments.
+                    Advance_Index (End_Id)
+                    if Line is null then
+                        return
+                    end if
+                end loop
+        
+                --  Ok, we have reached the end of an Id
+                if |Id_List| = 0 then
+                    --  If is first Id, then
+                    --  Save the type qualifiers, if any.
+                    Type_Quals := Line[Param_Start ..< Last_Word]
+                    --  Add the Id to a list
+                    Id_List := [ Line[Last_Word ..< End_Id] ]
+                else
+                    --  If not first id, then save everything since ','
+                    Id_List &= Line[Param_Start ..< End_Id]
+                end if
+
+                case Line[End_Id] is
+                  when ')' =>
+                    --  No ':' encountered.  Must not be a parameter, or has
+                    --  no separate "id," or has already been inverted;
+                    --  restart scanning for opening '('
+                    Out_File.Put (Line[Start .. End_Id])
+                    Out_File.Flush ()
+                    Right_Paren_Index := End_Id
+                    continue loop Scan_For_Left_Paren
+
+                  when ';' =>
+                    --  No ':' encountered.   Must be a parameter with no
+                    --  separate "id" (or must have already been inverted).
+                    --  Look at next parameter.
+                    Out_File.Put (Line[Start ..< End_Id] & ',')
+                    Out_File.Flush ()
+                    Start := End_Id
+                    Advance_Index (Start)
+                    if Line is null then
+                        return
+                    end if
+                    continue loop Handle_One_Param_Spec
+
+                  when ',' =>
+                    --  OK, we have a list of parameters with the same type
+                    --  Need to gather them up
+
+                    Param_Start := End_Id
+                    Advance_Index (Param_Start)
+                    if Line is null then
+                        return
+                    end if
+                    continue loop Handle_One_Param_Id
+
+                  when ':' =>
+                   --  OK, we are about to read the type.
+                   Type_Start := End_Id
+                   Advance_Index (Type_Start)
+                   if Line is null then
+                       return
+                   end if
+                   exit loop Handle_One_Param_Id  -- We have all of the ids
+                end case
+
+            end loop Handle_One_Param_Id
+            --  Read the type info, starting at "Type_Start"
+
+            --  Absorb the white space
+            while Type_Start > Len
+              or else Line[Type_Start] in White_Space
+            loop
+                Advance_Index (Type_Start)
+                if Line is null then
+                    return
+                end if
+            end loop
+            --  Scan for ')', ';', or '='
+
+            var Type_End := Type_Start
+            while Line[Type_End] not in Semi_RParen_Or_Eq loop
+                Advance_Index (Type_End)
+                if Line is null then
+                    return
+                end if
+            end loop
+
+            --  Ok type specifier goes from Type_Start to Type_End-1
+            var Type_Spec := Line[Type_Start ..< Type_End]
+
+            --  Gather up the default value, if any
+            var Default_End := Type_End
+            if Line[Default_End] = '=' then
+                while Line[Default_End] not in Semi_Or_RParen loop
+                    Advance_Index (Default_End)
+                    if Line is null then
+                        return
+                    end if
+                end loop
+            end if
+
+            var Default_Val := Line[Type_End ..< Default_End]
+
+            --  For each Id in Id_List, emit type qualifier, type-spec, and Id
+            var Sep := ""
+            if Start > 1 and then Line[Start-1] /= '(' then
+                Sep := " "
+            end if
+            for each Id of Id_List forward loop
+                Out_File.Put(Sep_By_Space (Sep,
+                  Sep_By_Space(Type_Quals,
+                  Sep_By_Space (Type_Spec,
+                  Sep_By_Space(Id, Default_Val)))))
+                Out_File.Flush ()
+                Sep := ","
+            end loop
+
+            case Line[Default_End] is
+              when ')' =>
+                --  Ok, we are done with the parameters of this method
+                --  Put out a ')' and start scanning for a left paren
+                Out_File.Put(")")
+                Out_File.Flush ()
+                Right_Paren_Index := Default_End
+                continue loop Scan_For_Left_Paren
+
+              when ';' =>
+                --  We are done with this param
+                if Default_End < Len then
+                    --  Not yet at end of line
+                    Out_File.Put(",")
+                    Out_File.Flush()
+                    Start := Default_End+1
+                else
+                    --  Reached end of line
+                    Out_File.Put_Line(",")
+                    Out_File.Flush()
+
+                    --  Read in a new line
+                    Line_Num += 1
+                    Line := In_File.Get_Line()
+                    exit loop Scan_For_Left_Paren when Line is null
+                    Len := |Line|
+                    if Debug then
+                        Put_Line ("End of line after ';', line " & Line_Num &
+                          " is " & Line)
+                    end if
+                    Start := 1
+                end if
+                --  Fall through to loop around
+            end case
+        end loop Handle_One_Param_Spec
+
+    end loop Scan_For_Left_Paren
+
+    Put_Line ("All done.")
+    Out_File.Close()
+end proc Invert_Params

@@ -1,0 +1,423 @@
+class PSC::Info_Stream is
+  exports
+   //  String vector representation matching LLVM array literal
+   func To_String_Vec(S : Info_Stream) -> Result : ZVector<Univ_String> is
+      Result := ["\n["];
+      var Chars_This_Line := 0;
+      for (each E of S; Sep := "i8 " then ", i8 ") forward loop
+         const E_Str : Univ_String := To_String(E)
+         const Len := Length(Sep) + Length(E_Str);
+         Chars_This_Line += Len;
+         if Chars_This_Line > 79 then
+            Result |= "\n";
+            Chars_This_Line := Len;
+         end if;
+         Result |= Sep;
+         Result |= E_Str;
+      end loop;
+      Result |= "]";
+   end func To_String_Vec;
+end class PSC::Info_Stream
+
+class PSC::Reflection is
+    const Debug : Boolean := #false
+  exports
+
+    concurrent class Environment is
+        var Outermost_Region : Region
+      exports
+        func Get_Current_Env() -> optional Environment is
+            return (Outermost_Region => null)
+        end func Get_Current_Env
+
+        func Outermost_Region(Env : Environment) -> optional Region is
+            return Env.Outermost_Region
+        end func Outermost_Region
+
+    end class Environment
+
+    class Object_Locator is
+        const Location : Univ_Integer
+        const VM_Info : Univ_Integer  // VM_Name in low order bits 0-30
+                                      // VM_Is_Indir is bit 31.
+                                      // VM_Param_Name is based on high bits
+      exports
+        func Create(Base : Area_Base_Indicator; Offset : Offset_Within_Area)
+          -> Object_Locator is
+            {Base in Area_Base_Indicator}  // Should be redundant
+            {Offset in Offset_Within_Area}  // Should be redundant
+            return (Location => [[Base]] * 2**32 + [[Offset]], VM_Info => 0)
+        end func Create
+
+        func Base(Object_Locator) -> Area_Base_Indicator is
+            return Object_Locator.Location / 2**32
+        end func Base
+
+        func Offset(Object_Locator) -> Offset_Within_Area is
+            return Object_Locator.Location mod 2**16
+        end func Offset
+
+        op "+"(Left : Object_Locator; Right : Offset_Within_Area)
+          -> Object_Locator is
+          //  Add additional offset to locator
+            {Left.Location mod 2**16 + Right < 2**16}
+            return (Location => Left.Location + [[Right]],
+                    VM_Info => Left.VM_Info)
+        end op "+"
+
+        func Decode_Base(Base : Area_Base_Indicator) -> Univ_String is
+            case Base of
+              [Zero_Base] => return "Zero_Base"
+              [Local_Area] => return "Local_Area"
+              [Param_Area] => return "Param_Area"
+              [Type_Area] => return "Type_Area"
+              [Const_Area] => return "Const_Area"
+              [Enclosing_Param_Areas.First ..  Enclosing_Param_Areas.Last] => 
+                 //  deref SL n times then follow 1th ptr to param area
+                 return "Enclosing_Param_Areas_" | 
+                   (Base - Enclosing_Param_Areas.First)
+              [Enclosing_Local_Areas.First ..  Enclosing_Local_Areas.Last] => 
+                 //  dereference the static link this many times
+                 return "Enclosing_Local_Areas_" | 
+                   (Base - Enclosing_Local_Areas.First)
+              [Enclosing_Type_Areas.First ..  Enclosing_Type_Areas.Last] => 
+                 //  Deref SL till 0 then
+                 //  follow enclosing type area link N times
+                 return "Enclosing_Type_Areas_" | 
+                   (Base - Enclosing_Type_Areas.First)
+              [Base_Registers.First ..  Base_Registers.Last] => 
+                 //  Using a local variable as a pointer to another data area
+                 //  Large objects use this
+                 return "Base_Registers_" | 
+                   (Base - Base_Registers.First)
+              [Phys_Base_Registers.First ..  Phys_Base_Registers.Last] => 
+                 //  Using a local variable as a pointer to another data area
+                 //  Large objects use this
+                 return "Phys_Base_Registers_" | 
+                   (Base - Phys_Base_Registers.First)
+              [..] =>
+                 return "?" | Base | "?"
+            end case
+        end func Decode_Base
+
+        func Is_Null_Locator(Loc : Object_Locator) -> Boolean is
+            return Base(Loc) == Zero_Base and then Offset(Loc) == 0
+        end func Is_Null_Locator
+
+        func VM_Num(Object_Locator) -> VM_Reg_Num is
+          //  LLVM register num associated with Local_Area locator
+          //  as well as Base_Register and Phys_Base_Register.
+          //  For a call, this is the name of the reg used for the
+          //  result of the call.
+           return Object_Locator.VM_Info mod 2**31
+        end func VM_Num
+
+        func VM_Name(Object_Locator) -> Univ_String is
+          //  LLVM register name associated with Local_Area locator
+          //  as well as Base_Register and Phys_Base_Register
+          //  For a call, this is the name of the reg used for the
+          //  result of the call.
+           const Num := VM_Num(Object_Locator)
+
+           {Num > 0}
+           return "%_loc_" | Num
+        end func VM_Name
+
+        func VM_Param_Num(Locator : Object_Locator;
+                          Param_Offset : Offset_Within_Area) -> VM_Reg_Num is
+          //  LLVM register num associated with ingoing parameter at
+          //  given offset
+           return [[Locator.VM_Info / 2**32 + Param_Offset]]
+        end func VM_Param_Num
+
+        func VM_Param_Name(Locator : Object_Locator;
+                           Param_Offset : Offset_Within_Area) -> Univ_String is
+          //  LLVM register name associated with ingoing parameter at
+          //  given offset
+           return "%_loc_" | (Locator.VM_Info / 2**32 + Param_Offset)
+        end func VM_Param_Name
+
+        func VM_Is_Indir(Object_Locator) -> Boolean is
+          //  Indicates type of VM_Name reg is i64* rather than i64.
+          //  When used in [Enclosing_]Local_Area, implies a level of
+          //  indirection should be inserted automatically.
+           return Object_Locator.VM_Info mod 2**32 >= 2**31
+        end func VM_Is_Indir
+
+        func VM_Is_Component(Object_Locator) -> Boolean is
+          //  Indicates that we are fetching a component.  VM_Is_Indir
+          //  indicates whether extra level of indirection needed after
+          //  fetching component.  VM_Name gives VM reg for base of
+          //  object.
+           return Object_Locator.VM_Info < 0
+        end func VM_Is_Component
+
+        func VM_Component_Offset(Object_Locator) -> Offset_Within_Area is
+          //  Returns offset relative to base of object when
+          //  fetching a component.
+           { VM_Is_Component(Object_Locator) }
+           return (Object_Locator.VM_Info + 2**62 + 2**62) / 2**32
+        end func VM_Component_Offset
+
+        //  For Imageable
+        func To_String(Object_Locator) -> Univ_String is
+            const Prefix := '(' | Decode_Base(Base(Object_Locator)) | ", " |
+              Offset(Object_Locator)
+
+            case Base(Object_Locator) of
+              [Local_Area |
+               Enclosing_Local_Areas.First ..  Enclosing_Local_Areas.Last |
+               Base_Registers.First ..  Base_Registers.Last |
+               Phys_Base_Registers.First ..  Phys_Base_Registers.Last] => 
+                 if Object_Locator.VM_Info == 0 then
+                    return Prefix | ")"
+                 elsif Object_Locator.VM_Is_Component() then
+                    return Prefix | ", " |
+                      (Object_Locator.VM_Is_Indir()? "*": "") |
+                       Object_Locator.VM_Num() | "[" |
+                       Object_Locator.VM_Component_Offset() | "])"
+                 else
+                    const Num_Part :=
+                       (Object_Locator.VM_Is_Indir()? "*" : "") |
+                        Object_Locator.VM_Num()
+                    const First_Param_Num := Object_Locator.VM_Info / 2**32
+
+                    if First_Param_Num > 0 then
+                       return Prefix | ", " | Num_Part | ", " |
+                         First_Param_Num | "..)"
+                    else
+                       return Prefix | ", " | Num_Part | ")"
+                    end if
+                 end if
+
+              [..] =>
+                 return Prefix | ")"
+            end case
+                
+        end func To_String
+              
+        func From_String(Univ_String) -> optional Object_Locator is
+            return null  //  TBD
+        end func From_String
+
+        op "=?"(Left, Right : Object_Locator) -> Ordering is
+            const Base_Comp := Base(Left) =? Base(Right)
+            if Base_Comp == #equal then
+                return Offset(Left) =? Offset(Right)
+            else
+                return Base_Comp
+            end if
+        end op "=?"
+
+        func Hash(Val : Object_Locator) -> Univ_Integer is
+            return Hash(Base(Val)) + Hash(Offset(Val))
+        end func Hash
+    end class Object_Locator
+
+    class Source_Position is
+        const File_Line_Col : Univ_Integer
+      exports
+        func To_String(Source_Position) -> Univ_String is
+          // Convert source-pos into a string
+            return File(Source_Position) | ":" | Line(Source_Position) |
+              ":" | Col(Source_Position)
+        end func To_String
+
+        func From_String(Str : Univ_String) -> optional Source_Position is
+          // Parse string into a source-position
+            var To_File : Univ_String := ""
+            var To_Line : Univ_Integer := 0
+            var To_Col : Univ_Integer := 0
+            var Colons : Vector<Univ_Integer> := []
+
+            for I in 1..Length(Str) forward loop
+                if Str[I] == ':' then
+                    Colons |= I
+                end if
+            end loop
+
+            case Length(Colons) of
+              [0] =>
+                // Assume is line number if no colons
+                To_Line := From_String(Str)
+              [1] =>
+                // If first character is a digit, assume is line:col
+                if Str[1] in '0' .. '9' then
+                    //  line:col
+                    To_Line := From_String(Str[1 ..< Colons[1]])
+                    To_Col := From_String(Str[Colons[1] <.. Length(Str)])
+                else
+                    //  file:line
+                    To_File := Str[1 ..< Colons[1]]
+                    To_Line := From_String(Str[Colons[1] <.. Length(Str)])
+                end if
+              [2] =>
+                // file:line:col
+                To_File := Str[1 ..< Colons[1]]
+                To_Line := From_String(Str[Colons[1] <..< Colons[2]])
+                To_Col := From_String(Str[Colons[2] <.. Length(Str)])
+              [..] =>
+                // Unknown formatting
+                return null
+            end case
+
+            return Create(To_File, Line => To_Line, Col => To_Col)
+        end func From_String
+    end class Source_Position
+
+    class Type_Descriptor is
+        const TD : Univ_Integer
+
+        func Init_Stream(Desc : Type_Descriptor; var Per_File_String_Table)
+          -> Basic_Array<optional Univ_Integer>
+        //  Produce a byte-stream representation of the type descriptor
+        //  Update the Per-File string table as appropriate
+          is import (#type_desc_init_stream)
+
+      exports
+        func Dependent_Globals(TD : Type_Descriptor)
+          -> Result : Vector<Type_Descriptor> is
+        //  Get vector of other type descriptors on which this depends
+           var Seen_Already : Set<Univ_String> := []
+           Result := []
+
+           func Add_If_Not_Null (Other_TD : optional Type_Descriptor) is
+              if Other_TD not null then
+                 const TD_Name := Other_TD.Name()
+
+                 if TD_Name not null and then TD_Name not in Seen_Already then
+                    Result |= Other_TD
+                    Seen_Already |= TD_Name
+                 end if
+              end if
+           end func Add_If_Not_Null
+
+           Add_If_Not_Null (Corresponding_Polymorphic_Type(TD))
+
+           if Has_Op_Map(TD) then
+              //  Add the "actual" type for which this is an op-map
+              Add_If_Not_Null (Actual_Type(TD))
+           else
+              //  Add all of the dependent types
+              Add_If_Not_Null (Parent_Type(TD))
+              Add_If_Not_Null (Enclosing_Type(TD))
+              Add_If_Not_Null (Root_Type_Desc(TD))
+              for each P of Parameters(TD) {P.Data not null} loop
+                 Add_If_Not_Null (P.Data.Type_Desc)
+              end loop
+              for each Actual of Actuals_Of_Formals(TD)
+                {Actual.Data not null} loop
+                 Add_If_Not_Null (Actual.Data.Type_Desc)
+              end loop
+              for each C of Components(TD) loop
+                 Add_If_Not_Null (C.Type_Desc)
+              end loop
+              for each T of Nested_Types(TD) loop
+                 Add_If_Not_Null (T)
+              end loop
+              for each C of Nested_Objs(TD) loop
+                 Add_If_Not_Null (C.Data.Type_Desc)
+              end loop
+              for each Op of Operations(TD) loop
+                 //const Routine := Routine_At_Index(Op.Index);
+                 //Print(Module_Name(Routine) | "::");
+                 //Println(Name(Routine));
+                 Add_If_Not_Null (Op.Type_Desc)
+              end loop
+           end if
+           if Debug then
+              Println("Compute Dependent_Globals(" | TD.Name() | "=" |
+                TD.Index() | ")")
+              for each DG of Result forward loop
+                 Println(" " | DG.Name() | "=" | DG.Index());
+              end loop
+           end if
+        end func Dependent_Globals
+
+        func Stream(Desc : Type_Descriptor; var Per_File_String_Table)
+          -> Info_Stream <Type_Descriptor> is
+        //  Produce a byte-stream representation of the type descriptor
+        //  Update the Per-File string table as appropriate
+
+            //  Return an info stream for the type descriptor
+            return ((Desc, #type_desc_stream,
+              Cache => Init_Stream (Desc, Per_File_String_Table)))
+                           //  Initialize the stream
+        end func Stream
+
+    end class Type_Descriptor
+
+    class Streamable_Value is
+        var Const_Val : Univ_Integer
+        func Init_Stream(Val : Streamable_Value; var Per_File_String_Table)
+          -> Basic_Array<optional Univ_Integer>
+          is import(#const_value_init_stream)
+        //  Initialize the byte-stream representation of the value
+        //  Update the Per-File string table as appropriate
+      exports
+        func Stream(Val : Streamable_Value; var Per_File_String_Table)
+          -> Info_Stream <Streamable_Value> is
+        //  Produce a byte-stream representation of the value
+        //  Update the Per-File string table as appropriate
+
+            //  Return an info stream for the value
+            return ((Val, #const_value_stream,
+              Cache => Init_Stream(Val, Per_File_String_Table)))
+                        //  Initialize the stream for the value
+        end func Stream
+    end class Streamable_Value
+
+    class Per_File_Table is
+       //  Table of streamable global objects
+       
+       var Elem_Indices : Map<Element_Type::Name_Type, Local_Index> := []
+       var Elems : Vector<Element_Type> := []
+
+      exports
+
+       func Create() -> Per_File_Table is
+       //  Create an empty per-file table
+          return ()  //  Allow everything to default
+       end func Create
+
+       func Get_Local_Index
+         (var Table : Per_File_Table; Elem : Element_Type) -> Local_Index is
+       //  Return a local index to be used in LLVM code, as an index
+       //  into a run-time table which will be initialized when the compiled
+       //  module is loaded at run-time.  Indices are 1 .. Num_Elems().
+          const Name := Unique_Name(Elem)
+
+          if Name in Table.Elem_Indices then
+             //  Already in the table; return assigned index
+             return Table.Elem_Indices[Name]
+          else
+             //  Not already in the table; add to table and return new index
+             Table.Elems |= Elem
+             const Result := |Table.Elems|
+             Table.Elem_Indices[Name] := Result
+
+             if Debug then
+                Println ("Get_Local_Index(" | Name | ")=" | Result);
+             end if
+
+             //  Before we return, we recursively add all dependent elements
+             for each Dep of Dependent_Globals(Elem) loop
+                const Ignore := Get_Local_Index (Table, Dep);
+             end loop
+
+             //  Now return the new index
+             return Result
+          end if
+       end func Get_Local_Index
+
+       func Num_Elems(Table : Per_File_Table) -> Local_Index
+       //  Number of elements in the table
+         is ( |Table.Elems| )
+       
+       func Nth_Elem(Table : Per_File_Table; Local_Index) -> Element_Type
+       //  Nth element in the table
+         is (Table.Elems[Local_Index])
+
+    end class Per_File_Table
+
+end class PSC::Reflection

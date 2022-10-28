@@ -1,0 +1,21 @@
+abstract project Shared_Compiled is
+
+   --  for Object_Dir use "fast_obj";
+   for Object_Dir use "slow_obj";
+   -- for Exec_Dir use "..";
+
+   package Builder is
+      for Default_Switches ("ada") use ("-s", "-O0", "-g", "-k", "-gnatN");
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("ada") use
+           ("-gnatE", "-fstack-check",
+            "-O0", "-g", "-gnatU", "-gnatN"); -- "-gnat95" no longer supported
+   end Compiler;
+
+   package Linker is
+      for Default_Switches ("ada") use ("-O0", "-g", "-L/usr/lib", "-L.", "-ltermcap","-latomic");
+   end Linker;
+
+end Shared_Compiled;

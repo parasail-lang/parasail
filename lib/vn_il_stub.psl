@@ -1,0 +1,127 @@
+// VN_IL: VN-Based Intermediate Language
+
+// Copyright (C) 2011-2015, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+import PSC::Reflection
+
+class PSC::VN_IL_Type is
+  //  "Stub" implementation of VN_IL_Type
+   var Dummy : Univ_Integer := 0
+
+ exports
+   func Analyze(Item : Reflection::Decl {Kind(Item) == #operation})
+     -> optional VN_IL_Type is
+      //  Analyze and create a VN-based representation of the given operation
+      return null  //  This is a stub
+   end func Analyze
+
+   func Start_Nested_Block(var VN_IL : VN_IL_Type) is
+      //  Start of a nested block; No VNs are initialized.
+      null  //  This is a stub
+   end func Start_Nested_Block
+
+   func Contents_Of_Locator
+     (var VN_IL : VN_IL_Type; Instr_Index : Code_Index;
+      Locator : Reflection::Object_Locator;
+      Addr : Univ_String;
+      Num_Indir, Ptr_Level : Univ_Integer := 0)
+     -> optional VN_Id is
+     //  Return VN representing contents of Locator
+     //  Addr string is remembered for later indirect store.
+      return null  //  this is a "stub"
+   end func Contents_Of_Locator
+
+   func Target_For_Store
+     (var VN_IL : VN_IL_Type; Instr_Index : Code_Index;
+      Locator : Reflection::Object_Locator;
+      Ptr_Level : Univ_Integer := 0) -> optional VN_Id is
+     //  Return VN into which value should be copied.
+      return null  //  this is a "stub"
+   end func Target_For_Store
+
+   func Object_Was_Copied
+     (var VN_IL : VN_IL_Type; Instr_Index : Code_Index;
+      Locator : Reflection::Object_Locator) is
+     //  About to store into object at given locator, and we don't
+     //  want it to look like its VN is already properly initialized.
+      null
+   end func Object_Was_Copied
+
+   func Target_For_Store_Indir
+     (var VN_IL : VN_IL_Type; Addr : Univ_String) -> optional VN_Id is
+     //  Return VN into which value should be copied rather than
+     //  stored via Addr.
+      return null  //  this is a "stub"
+   end func Target_For_Store_Indir
+
+   func VN_Is_Inited (VN_IL : VN_IL_Type;
+                      VN : VN_Id; Instr_Index : Code_Index) -> Boolean is
+     //  Return True if VN has been initialized at a place that dominates
+     //  the instruction at the given index.
+      return #false  //  this is a "stub"
+   end func VN_Is_Inited
+
+   func VN_Inited_Here (var VN_IL : VN_IL_Type;
+                        VN : VN_Id; Instr_Index : Code_Index;
+                        Parallel_Output_Addr : optional Univ_String := null) is
+     //  Record the index of the instruction where VN is being init'ed.
+     //  If Parallel_Output_Addr is non-null, then load into VN has been
+     //  deferred, and is currently residing in LLVM register named
+     //  by Parallel_Output_Addr string.
+      null  // this is a "stub"
+   end func VN_Inited_Here
+
+   func Value_Only_In_VN (var VN_IL : VN_IL_Type;
+                        VN : VN_Id; Instr_Index : Code_Index;
+                        Locator : Reflection::Object_Locator) is
+     //  Indicate that only the VN holds the value of the identified memory
+     //  location and hence the VN might need to be flushed
+     //  to that memory cell at some later point.
+      null  //  this is a "stub"
+   end func Value_Only_In_VN
+
+   func VN_Name (VN_IL : VN_IL_Type;
+                 VN : VN_Id; Instr_Index : Code_Index) -> Univ_String is
+     //  Return "%vn_" | VN | Suffix where Suffix = "" or "_2", "_3", ...
+     //  depending on which initialization of VN dominates the instruction
+     //  at the given index.  If there is no such initialization, use the
+     //  next sequential index.
+      return "%vn_" | VN  //  this is a "stub"
+   end func VN_Name
+
+   func VN_Is_Parallel_Output
+           (VN_IL : VN_IL_Type;
+            VN : VN_Id; Instr_Index : Code_Index) -> Boolean is
+     //  Return #true if VN is an output from a parallel operation and has
+     //  not yet been loaded because operation might still be in process.
+      return #false  // this is a "stub"
+   end func VN_Is_Parallel_Output
+
+   func VN_Parallel_Output_Addr
+           (VN_IL : VN_IL_Type;
+            VN : VN_Id; Instr_Index : Code_Index) -> optional Univ_String is
+     //  For VNs that have not yet been loaded because they are the output
+     //  from a parallel operation, return the name of the LLVM register
+     //  pointing at their contents.
+      return null  // this is a "stub"
+   end func VN_Parallel_Output_Addr
+
+   func Map_Of_VNs_To_Flush
+     (VN_IL : VN_IL_Type; Instr_Index : Code_Index;
+      B_Or_A : Before_Or_After)
+     -> Map<Reflection::Object_Locator, VN_Id> is
+     //  Return map from Locator to VN for each VN needing to be flushed
+     //  Before/After given instruction is performed
+      return []  //  this is a "stub"
+   end func Map_Of_VNs_To_Flush
+
+   func VNs_Flushed_Here
+     (var VN_IL : VN_IL_Type; Instr_Index : Code_Index;
+      VNs_To_Flush : Map<Reflection::Object_Locator, VN_Id>) is
+     //  Mark VNs as having been flushed at given instruction
+      null  // this is a "stub"
+   end func VNs_Flushed_Here
+
+end class PSC::VN_IL_Type

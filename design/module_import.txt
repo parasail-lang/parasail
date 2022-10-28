@@ -1,0 +1,201 @@
+What is the meaning of:
+
+   import M1::M2::M3;   
+
+and
+
+   import M1::M2::*;
+
+and
+   import *;
+
+Default is "import (own-prefix::)*, PSL::Core::*, PSL::Containers::*"
+
+When at least one "import" is specified,
+"import (own-prefix::)*" is replaced by "import own-prefix".
+
+All names in an import clause become directly visible?
+Or just the first before a "::" and the last unless ends with *?
+
+=> It seems desirable to only change the import clauses and the
+names of the modules, and nothing else, when changing where
+a module or set of modules appears in a tree.
+
+Do we want some kind of "import M1::M2::M3 as M4;"?
+Does this deserve a new reserved word of "as"?
+
+Is there some other reserved word that would work ("is", "==", "=>"?)
+
+How about:
+   import M4 => M1::M2::M3, M5 => M6::M7;
+
+-----------
+
+We now store an "Import_Clauses" on each top-level module
+and operation.  How should we use it?
+
+As indicated above, every module gets PSL::Core::* and PSL::Containers::*,
+and if they don't specify any explicit imports, then get "*".
+
+How exactly are these interpreted?  Big questions:
+
+  1) If we import X::Y, then 
+      a) do we get visibility to separately
+         compiled modules like X::Y::Z?
+      b) Presumably "Y" is directly visible (if not hidden by some other Y).
+         Is "X" also directly visible?  What about X::Q?  Do we
+  2) If we import X::Y::* then
+      a) Presumably all modules with names like "X::Y::Z" are directly
+         visible as "Z".
+      b) Do we get access to separately compiled module Z::Q?
+
+In general, we need to know for each module, whether we get 
+  a) direct visibility on its module name
+  b) selection visibility on its module name
+  c) no visibility on its module name
+and
+  d) direct visibility on all of its children's module names
+  e) selection visibility on all of its children's module names
+  f) only specific children's module names are visible
+and
+  g) selection visibility on all of its descendants' module names
+  h) only specific descendants' module names are visible
+
+So given import X::Y::Z, we get
+  X -- (a)(f)(h)
+  Y -- (b)(f)(h)
+  Z -- (a)(f)(h)
+
+Given import X::Y::*, we get
+  X -- (a)(f)(h)
+  Y -- (b)(d)(g)
+
+---
+
+We could say that if you specify X::Y but not any specific
+children, then you get them all.  This is roughly equivalent
+to pruning out anything that is a prefix of anything else.
+However, specifying a specific child makes that particular
+child directly visible, in addition to making it visible.
+
+What about ambiguities?
+
+A specifically named child takes precedence over a name brought
+in by "*".  If two specifically named modules have the same
+simple name, then neither becomes directly visible, or equivalently,
+we have ambiguity.  Ambiguity is probably simpler to explain.
+
+Let's go with "import X::Y" gives access to all children
+of Y, just like "import X::Y::*" but without direct naming
+of the children.
+Naaahh.  "import X::Y" only makes X::Y visible, and makes Y
+directly visible.  You can always write "X::Y::*" if you want
+them all to be visible.
+
+So the algorithm is:
+
+  0) Do a lookup in enclosing scopes.
+
+  1) If not found in enclosing scopes,
+     a) consider top-level names first (never ambiguous),
+     b) then consider specific names made directly visible,
+        (ambiguous if more than one)
+     c) then other names made directly
+        visible by a "*" (ambiguous if more than one).
+
+There is an implicit import on every unit of:
+   import PSL::Container::*, PSL::Core::*
+
+There is also an implicit import of siblings:
+   import <prefix_of_unit_name>*
+in the absence of any explicit "import" clauses.
+
+------------------ Implementation issues 12/21/12 --------------
+
+How/where do we implement "import" clauses?
+We now store them as the Import_Clauses attribute of Module and 
+Operation Trees.
+
+We should presumably process them at some point, to make sure
+they make sense.  This should probably happen before we start
+processing the associated module or operation.
+
+Currently top-level modules and operations are added to the
+library-level region.  We have some special handling for these
+when it comes to worrying about homonyms.
+
+Lookup_In_Region_Chain and Next_Homonym_In_Region_Chain are the two routines
+used for essentially all lookups.  Set_Identifier_Sem_Info is where
+most of the lookups take place, though Get_Type also does some,
+as does Lookup_Full_Module_Name.
+
+Contexts where we want a module name are relatively few, including
+"import" clauses themselves, instantiation, and places where type
+names are permitted.  But type names can also substitute for the set
+represented by the type, so we are back to a lot of contexts.
+
+Contexts where we want an operation name are much more common, particularly
+since operations can be passed as parameters.
+
+So where is the best place to deal with this?  Currently the region-chain
+lookups use the Symbols package, but that may not be appropriate for
+handling the "Imports" clauses.  Though perhaps we just need a way of
+specifying the current Imports clauses for use by the Symbols package.
+
+We need to identify stand-alone module/operations rather than merely
+those in the library-level region.  Do we want "import"
+clauses to be carried over from interface to class, and from
+enclosing unit to nested unit?  What do other languages do here?
+My sense is that with languages like Java, the imports are strictly
+local to the file, and don't get inherited from implemented interfaces,
+etc.
+
+One challenge is that for Next_Homonym_In_Region_Chain we aren't passing
+in the starting-point region.  We probably should, but sometimes we don't
+have that.  Get_Type and Lookup_Full_Module_Name already take a region.
+Check_For_Dups does not, and probably will need to, or it can simply
+use the region of the new symbol.  And it probably doesn't want to
+complain about stand-alone units (currently it special-cases
+"top-level" but should probably switch to special-casing all
+stand-alone/separately-compiled units).
+
+So let's suppose we try to do it in the region-chain lookup/next-homonym
+routines.  How would that work?
+
+Once we get to the library-level region, we don't want to look in that
+region, as it has too much in it.  Instead at that point we switch
+over to the innermost import clauses.  At some point we may want to
+preprocess the import clauses.  Let's assume that at least they have
+been resolved to some degree, though even that seems unnecessary.
+
+We always start with the top-level names in the import clauses.
+If we find what we want, we return that.  But now we have a question
+of dealing with limitations on selective visibility after "::".  We
+can't just rely on Lookup_In_Region if we have a "gag" on what
+regions we can look at.   Perhaps we shouldn't put stand-alone units
+in their regions at all, or we should put them in and take them back
+out (though that will interfere with parallel computation).  We can
+fill in the enclosing-region chain, but not actually put them in the
+region.
+
+*** TBD: ***
+In any case, we need to provide some kind of an import "filter" on
+searches within a given region, to implement the selective visibility
+after a "::".  This implies we need to pass in a filter or some indication
+of the originating region.  By default in a call on Lookup_In_Region, it
+seems we can ignore stand-alone declarations.  This implies we might
+want a separate lookup routine for case where we are doing a qualified-name
+lookup.
+
+*** TBD: ***
+When looking for a corresponding interface, we use "Next_Homonym_In_Region,"
+but this will need to handle the "A::B::C" situation.  In particular,
+it should include all imports.
+
+Should it be OK to separately compile the class even though the
+interface is nested?  Seems useful.  Vice-versa would not be good.
+
+*** TBD: ***
+When reach library-level region and don't find an interpretation,
+we need to consider the items made directly visible via an
+import clause.

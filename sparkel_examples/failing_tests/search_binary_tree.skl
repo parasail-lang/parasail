@@ -1,0 +1,34 @@
+package Binary_Tree is
+   type Binary_Tree is private;
+
+   func Search_Binary_Tree
+     (Root          : Binary_Tree; 
+      Desired_Value : Integer) return Binary_Tree;
+end Binary_Tree;
+
+package body Binary_Tree is
+
+   type Binary_Tree is record
+      Data    : Integer;
+      Left    : Binary_Tree;
+      Right   : Binary_Tree;
+   end record;
+
+exports
+
+   func Search_Binary_Tree
+     (Root          : Binary_Tree; 
+      Desired_Value : Integer) return Binary_Tree
+   is
+     const Result : Binary_Tree;
+
+     for X => Root then X.Left || X.Right while X not null parallel loop
+ 	if X.Value = Desired_Value then
+ 	    exit loop with Result => X.Id;
+ 	end if;
+     end loop with Result => null;
+
+     return Result;
+   end func Search_Binary_Tree;
+
+end Binary_Tree;

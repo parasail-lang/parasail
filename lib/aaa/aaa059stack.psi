@@ -1,0 +1,98 @@
+
+interface PSL::Containers::Stack<Element_Type is Assignable<>> 
+  implements Indexable<Element_Type, Univ_Integer> is
+  // Stack implemented on top of an Extendable Stack,
+  // indexed by Univ_Integer, 0..Depth-1, [0] = top of stack
+    op "[]"() -> Stack
+    op "indexing"(ref S : Stack; Index : Univ_Integer) -> 
+      ref Element_Type
+    op "index_set"(S : Stack) -> Countable_Range<Univ_Integer>
+    func Bounds(S : Stack) -> Countable_Range<Univ_Integer> is "index_set"
+    func Push(var S : Stack; Elem : Element_Type)
+    op "|="(var S : Stack; Elem : Element_Type) is Push
+    op "<|="(var S : Stack; var Elem : optional Element_Type)
+    func Pop(var S : Stack) -> Element_Type
+    func Pop(var S : Stack)  //  Ignore result of pop
+    func Top(ref S : Stack) -> ref Element_Type is (S[0])
+    func Depth(S : Stack) -> Univ_Integer
+    func Is_Empty(S : Stack) -> Boolean
+    op "magnitude"(Stack) -> Univ_Integer is Depth
+end interface PSL::Containers::Stack
+
+class PSL::Containers::Stack is
+  // Stack implemented on top of an Extendable Stack,
+  // indexed by Univ_Integer, 0..Depth-1, [0] = top of stack
+    var Data : Vector<Element_Type> := []
+    var Depth : Univ_Integer := 0;
+ exports
+    op "[]"() -> Stack
+      is (Data => [], Depth => 0)
+
+    op "indexing"(ref S : Stack; Index : Univ_Integer) -> ref Element_Type
+      is (S.Data[S.Depth - Index])
+
+    op "index_set"(S : Stack) -> Countable_Range<Univ_Integer>
+      is (0 .. S.Depth-1)
+
+    func Push(var S : Stack; Elem : Element_Type) is
+       S.Depth += 1
+       if |S.Data| < S.Depth then
+          S.Data |= Elem
+       else
+          S.Data[S.Depth] := Elem
+       end if
+    end func Push
+
+    op "<|="(var S : Stack; var Elem : optional Element_Type) is
+       S.Depth += 1
+       if |S.Data| < S.Depth then
+          S.Data <|= Elem
+       else
+          S.Data[S.Depth] <== Elem
+       end if
+    end op "<|="
+
+    func Pop(var S : Stack) -> Result : Element_Type is
+       {S.Depth > 0}
+
+       Result <== S.Data[S.Depth]
+       S.Depth -= 1
+    end func Pop
+
+    func Pop(var S : Stack) is //  Ignore result of pop
+      //  Just pop the stack, but don't return the element there.
+       {S.Depth > 0}
+       S.Data[S.Depth] := null
+       S.Depth -= 1
+    end func Pop
+
+    func Is_Empty(S : Stack) -> Boolean is (S.Depth == 0)
+
+    func Depth(S : Stack) -> Univ_Integer is (S.Depth)
+end class PSL::Containers::Stack
+
+func PSL::Test::Test_Stack(Args : Basic_Array<Univ_String>) is
+    var S : Stack<Univ_String> := []
+    for each A of Args forward loop
+       S |= A
+       Println("Pushing " | A)
+       Println("Stack depth now " | S.Depth())
+    end loop
+
+    if |S| > 0 then
+       Println("Top of stack = " | S.Top())
+       Println("Bottom of stack = " | S[|S|-1])
+    else
+       Println("Stack is empty")
+    end if
+
+    for I in 1 .. S.Depth() loop
+       Println("Popping " | S.Pop())
+       Println("Stack depth now " | S.Depth())
+    end loop
+
+    Println("Pushing and then popping \"hi there\"");
+    S.Push("hi there");
+    S.Pop();
+    Println("Stack depth now " | S.Depth())
+end func PSL::Test::Test_Stack

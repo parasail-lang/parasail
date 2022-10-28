@@ -1,0 +1,267 @@
+$Revision: 1.1 $ $Date: 2012/03/05 19:24:50 $
+
+We are having challenges with global constants.
+The general idea is to do compile-time evaluation by
+generating a small "routine" and invoking it.
+One problem is establishing the right static link
+(i.e. enclosing type).  For the "nested" constants,
+it makes sense to use the type whose type descriptor
+is being initialized.  But of course, we may have one
+constant referring to an earlier one; can we do it
+in a "lazy" fashion, where if we find a constant that
+is not yet initialized, we can do so then and there?
+We would need to support Evaluate_Tree being called
+recursively.
+
+-----------
+
+10/26/2014 -- reduce recomputation of constants
+
+One challenge -- Each file that refers to a constant needs a representation
+of it.  We would rather only have one copy, and only reconstruct one of them.
+We need to assign a global address on the fly, in the same way we deal with
+strings and type descriptors.
+
+The named global constants don't have this problem, since they are associated
+with a particular file.  But type descriptors *do* have this problem.  They
+have a canonical name, which helps, but can't easily be at a "known" address
+because we wouldn't know which object module to associate them with, unless
+we can play some game in the linker, where there is exactly one of them
+allocated.
+
+In any case, compile-time known constants don't have a canonical name.
+We probably need to put them in a hash table at run time, and have a level
+of indirection as we do for strings.  The streams can be used for comparison,
+or we can have the linker ensure there is exactly one stream.  But that is
+not easy because we don't have a globally-unique name for them, unless
+we use some cryptographically-safe hash value.
+
+Each expression has an indicator of whether it is complile-time known.
+In Evaluate_Tree, and when generating code, we always just refer to a compile-
+time known value, but we must ensure that it actually gets initialized.
+
+--------
+
+10/27/2014
+
+We should start with "small" compile-time-known constants.  These should be
+replaced with their value wherever they appear.  For larger constants, we can
+assign them a unique ID, which will allow us to reduce our hashing problem,
+since we won't have to hash the entire expression, merely one level at a 
+time.  Essentially we will be doing value numbering of compile-time-known
+expressions, in a bottom-up fashion.  We have an ordering problem, because
+the evaluation may call arbitrary code, so even for small objects, we need
+to postpone this evaluation until code-gen is done.  So we need a level of
+indirection in the generated code, with values being fetched from a table.
+But the compiler should go through this level of indirection and just load
+the constant.
+
+If we do eventually start doing "large" objects, we probably won't want to
+do the top-level expression initializing a variable, as it will have been
+targeted to the region, and we would end up having to mark every subcomponent
+with the appropriate region  Non-var Parameters are generally just going to be
+thrown away, unless they are marked as "for X" which effectively makes
+them variables, so they can also be allocated in the "global-constant" region.
+
+As far as identifying large constants, using the approach used for strings
+seems reasonable, where we have a local table for each source file, and
+a mapping from local ID to global ID.  Of course one challenge is that
+large constants might be very large, and we may not want to precompute them
+if that would create a huge object module.  Hence, for some objects, it would
+be better to create them when needed.  But we still only need to create them
+once in a given program.
+
+This increases the urgency of sharing space in the executable for the stream
+representation, and only creating one copy of the object in memory.
+This only works if the name is canonical, and that will be hard for random
+large compile-time-known objects.  
+
+We should certainly be able to hoist computation of local named constants.
+These should be as easy to hoist as code, or even easier, since overloading
+is not permitted.  Note that for both, we may have a problem with uniquely
+distinguishing items that are not overloaded, but are in unnamed nested scopes.
+We could disallow such duplication, as it clearly could be confusing to the
+human reader as well.  We clearly want to allow loop variable names to be
+duplicated in unnamed, sibling "for" loops, so it is perhaps in appropriate
+to disallow constants.
+
+-------
+
+So let's focus on small compile-time-known values for now.  If we assign
+compile-time known values unique IDs, and in some cases actually compute
+the value and store it somewhere.  It could be in global region, but doesn't
+really need to be unless there is a "ref const".  Which argues for "ref const"
+when the type is "small" being equivalent to simply "const."  But ignoring
+that optimization for now, let's simply put the value in the global region.
+Furthermore, as we should remember, trying to do these type-kind-specific
+optimizations cause trouble when compiling generic code, since we don't
+know whether a type parameter to a module is large or small, in the same
+way we don't know whether the type is concurrent, or contains a "ref" (at
+least for an "Any<>").
+
+Evaluate_Tree needs a Decl_Region, to pass on to First_Pass/Second_Pass/
+Code_Gen.  It shouldn't need it for much, but that at least implies we will
+want to preserve something.  At a minimum this is needed for the 
+determination of the enclosing module.  I think we could probably use
+the outermost region.
+
+Evaluate_Global_Constants presumes that a global constant has an
+associated symbol, and uses that symbol's enclosing region.
+It sets the "Name" field from the associated symbol's "Full_Name," unless it
+is merely a copy of some other global constant, in which case the "Name"
+is the subtree image of the reference to the other global constant.
+I wonder if this works in the presence of multiple levels of indirection?
+Probably not!
+
+Perhaps we should value number all compile-time-known constants, and then
+use the value number as an indication of the order in which to evaluate
+these constants.  But we might not want to actually evaluate all such
+constants.  That means we still need to do things somewhat on an as-needed
+basis.  We can walk the tree, and when we find one with all of its prerequisites
+already evaluated, we go ahead and evaluate it, or put it on a list of
+to-be-evaluated expressions.
+
+This presumes we actually want to evaluate and *save* every compile-time-known
+expression, no matter how large.  Instead we might prefer to evaluate, use,
+and then reclaim certain large CTK expressions.  So certain CTK expressions
+would be considered too big to be preserved, e.g. if they involve an array
+of large size.  We could have an adjustable cutoff in number of words, for
+types that have a maximum possible size (i.e. don't involve an array
+or a recursive type).  We could try to compute the maximum size of a type.
+A "known to be small" type is of course of maximum size one.  A polymorphic
+type is always of indefinite size.
+
+So in the dynamic pre-code-gen/code-gen phases, when we come upon an expression
+we would check whether it is CTK and whether it will be pre-computed.
+Certainly any global named constant will be precomputed.  Type-specific
+constants are only computed if the type is computed.  And even global named
+constants might not be used in a particular program, so probably shouldn't
+presume it exists except in modules where it is referred to by a name.
+So that comes down to named objects and sufficiently small objects.
+An expression that happens to be used to initialize some named object doesn't
+automatically exist everywhere.
+
+So expressions should be marked as CTK, plus an indication if they are small
+enough to be precomputed unconditionally, and where they now exist in the
+global area, if at all, because they were small or they were used to
+initialize a named object.  When generating llvm code, each file would
+have stream (or simple 64-bit value) representations of all CTK expressions
+they reference anonymously because they are sufficiently small.  For
+expressions referenced by name, they would presume that at the place where
+the named constant is declared, there would be a stream representation
+of its value.  That same representation could be shared by all named
+constants in the same source file.
+
+---------- 11/10/2014 ------------
+
+How with the compiler represent references to global constants, and how
+will they be reconstructed when the program starts up?
+
+Right now we call _psc_reconstruct_value, passing in a stream and a string
+table, and the result is the global virtual address of the object.
+
+We probably need a new routine which uses the stream value to compute a hash
+code, or perhaps already has a hash code computed, and just does an equality
+check, and returns the global address.  We need to store the value locally,
+and can just use the address of the object if we need to pass by reference.
+We could create a local table of object values.
+
+---
+
+What will things look like in the PSVM instructions?  It will just be a
+reference to the Const_Area.  We then call Const_Info_At_Locator, which
+ultimately selects from Compile_Time_Known_Consts.  This table is created
+in the dynamic phase, by iterating through the Sem_Ptrs in the
+Compile_Time_Known_Const_Table (which is an expandable vector).
+Currently these are either Sym_Reference_Infos or Object_Semantic_Infos.
+If we have an anonymous constant, we will have a different kind of sem
+info, probably a Computation_Semantic_Info which is not a Sym_Reference_Info
+nor an Object_Semantic_Info.
+
+The const_info will have a null name field, so it will know it is an
+anonymous constant.
+
+----------
+
+We have two distinct types, Streamable_Value and Const_Info.  
+Streamable_Value has a Unique_Name operation and it is designed to be 
+used with Per_File_Tables.  From a locator or from a Streamable_Value,
+we can get a Const_Info, but we don't have any way of going back from
+a Const_Info to the corresponding Streamable_Value.  One approach might
+be to add a Streamable_Value_For_Locator operation, which could be used
+for anonymous constants.  Another approach would be to eliminate
+the distinction, and have only one type.
+
+As far as the Unique_Name, we could use the value itself, or the
+Const_Area offset.  The Const_Area offset seems like a better Unique_Name,
+presuming all of the objects we are talking about live in the Const_Area.
+
+----------
+
+We have now changed Streamable_Value so you can get a locator from it,
+by representing it as an offset-within-const_area.
+Unique_Name returns the offset within area.
+
+--------------------------------
+
+We have a new set of problems relating to order of evaluation.
+The problem is that when evaluating a complex constant, we may need nested
+constants of a type descriptor.  We could postpone certain evaluations, or
+try to order them.  If we are in the middle of an Evaluate_Tree, we don't
+want to create new constants, since they won't get initialized in time
+since we are going to execute the routine immediately.  We also cannot
+use constants that have not yet been initialized when calling code generated
+earlier.  One possibility is to be prepared to evaluate them on the fly.
+We won't want to create the same function twice, so we need some place to
+save the function or save the value.  That argues for a more flexible way
+of storing global constants, or creating the array earlier.
+
+This is a bit of a morass!  Doing essentially everything on demand might
+be simpler.  We could create a more efficient array representation after
+everything is complete.
+
+----
+
+When generating code for Evaluate_Tree, we don't want to create new
+global anonymous constants.  We could include a flag in the Visitor to
+indicate this, or in the Operation (perhaps the operation kind + null name?).
+
+---------
+
+Should unwrap type before deciding whether is a string constant, so can
+handle ZStrings.
+For named constants, should see whether can re-use parameterless computation
+of anon constant (e.g. "const Debugging : Boolean := #false" in Basic_Map).
+We are recomputing nested constants of types even if their values are the same.
+
+------------------
+
+When a local constant is passed by reference in some compile-time-known
+expression, we need to replace that local constant with a re-computation
+of it, which is not always easy to pass by reference.
+
+Alternatively, we go ahead and assign a global constant area for
+a local constant, but don't actually use it unless we need it as part of
+computing some other compile-time constant.
+
+This might address the above question about using anonymous constant
+expressions rather than giving each named constant its own global area.
+
+Named, non-global constants with compile-time-known initialization
+expression will have their initial value entered into the constant table,
+but marked as not to be computed unless needed.  It would only be referenced
+from anonymous parameterless computations.
+
+Is there a reason we don't go ahead and save these as "real" global constants?
+If there are multiple uses of the same expression within the same file?  Small
+and string constants can be initialized directly, rather than by using a
+stream.  Large, non-string constants can be initialized by copying from
+anonymous constants.
+
+For now, let's do the following:
+Create anonymous global constants for the initial value of local constants,
+and create a parameterless routine to compute the value.  However, have a
+separate flag which is False initially, but will be set to True if some use
+is made of the anonymous global constant by another parameterless computation.
+It will still not be used from "normal" code, and hence will never be
+seen by the LLVM code generator.

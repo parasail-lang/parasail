@@ -1,0 +1,20 @@
+Loop with "while" in each iterator
+I, J = 5, 10
+I, J = 4, 9
+I, J = 3, 8
+I, J = 2, 7
+I, J = 1, 6
+Loop with conditional "continue"
+I, J = 5, 10
+I, J = 4, 9
+I, J = 3, 8
+I, J = 2, 7
+I, J = 1, 6
+I, J = 0, 5
+Loop with conditional "exit"
+I, J = 5, 10
+I, J = 4, 9
+I, J = 3, 8
+I, J = 2, 7
+I, J = 1, 6
+I, J = 0, 5

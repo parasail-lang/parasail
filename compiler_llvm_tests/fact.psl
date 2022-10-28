@@ -1,0 +1,7 @@
+func Fact(N : Univ_Integer) -> Univ_Integer is
+   if N <= 1 then
+      return 1;
+   else
+      return N * Fact(N - 1);
+   end if;
+end func Fact;

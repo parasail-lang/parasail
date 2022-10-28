@@ -1,0 +1,16 @@
+func Mem(Vec : ZVector<Univ_Integer>; X : Univ_Integer) -> Boolean is
+   func Hd(V : ZVector<Univ_Integer>) -> Univ_Integer is
+      return V[0];
+   end func Hd;
+   func Tl(V : ZVector<Univ_Integer>) -> ZVector<Univ_Integer> is
+      return V[1 ..< Length(V)];
+   end func Tl;
+   func Contains(V : ZVector<Univ_Integer>) -> Boolean is
+      if Length(V) == 0 then
+         return #false;
+      else
+         return (Hd(V) == X or else Contains(Tl(V)));
+      end if;
+   end func Contains;
+   return Contains(Vec);
+end func Mem;

@@ -1,0 +1,6478 @@
+// Javallel Prototype Standard Library
+
+// Copyright (C) 2011-2013, AdaCore, New York, NY
+// To be used only for Personal, Academic, or Evaluation Purposes
+// Not for Commercial Production Use.
+// Report errors at http://javallel.org
+
+interface java<> {
+}
+
+interface java.lang<> {
+}
+
+interface java.util<> {
+}
+
+interface java.test<> {
+}
+
+interface java.lang.Any<> {
+}
+
+interface java.lang.Assignable<> {
+}
+
+class interface java.lang.Boolean<> {
+    Boolean "from_univ"(UnivEnumeration Lit) is import(#bool_from_univ)
+
+    UnivEnumeration "to_univ"(Boolean Val) 
+      is import(#bool_to_univ)
+
+    Ordering "=?"(Boolean Left, Boolean Right)
+      is import("=?")
+	// NOTE: #true > #false
+
+    Boolean "not"(Boolean) is import("not")
+    Boolean "and"(Boolean Left, Boolean Right) is import("and")
+    Boolean "or"(Boolean Left, Boolean Right) is import("or")
+    Boolean "xor"(Boolean Left, Boolean Right) is import("xor")
+
+    void "and="(var Boolean Left, Boolean Right)
+    void "or="(var Boolean Left, Boolean Right)
+    void "xor="(var Boolean Left, Boolean Right)
+
+    UnivInteger hash(Boolean Val)
+      is import(#identity)
+
+    // For Imageable
+    UnivString toString(optional Boolean Val)
+    optional Boolean fromString(UnivString Str)
+
+}
+
+class interface java.util.Set<java.lang.Hashable<> as ElementType> {
+  // A hashed-set module
+    Set "[]"()
+
+    Set singleton(ElementType Elem)
+
+    Set "|"(ElementType Left, ElementType Right)
+    Set "|"(Set Left, ElementType Right)
+    Set "|"(ElementType Left, Set Right)
+    Set "|"(Set Left, Set Right)
+
+    void "|="(var Set Left, Set Right)
+
+    void "|="(var Set Left, ElementType Right)
+	// Add element to Set.
+
+    void "<|="(var Set Left, var optional ElementType Right)
+	// Move element into Set.
+
+    void "<|="(var Set Left, var Set Right)
+	// Move all elements of Right into Left, leaving Right empty.
+
+    Boolean<> "in"(ElementType Left, Set Right)
+
+    Ordering "=?"(Set Left, Set Right)
+	// Return #equal if Left and Right have the same elements
+	// Return #less if Left is a proper subset of Right
+	// Return #greater if Left is a proper superset of Right
+	// Return #unordered otherwise
+
+    Set "or"(Set Left, Set Right) is "|"  // Union
+    void "or="(var Set Left, Set Right) is "|="
+
+    Set "+"(Set Left, Set Right) is "|"   // Union
+    void "+="(var Set Left, Set Right) is "|="
+    void "+="(var Set Left, ElementType Right) is "|="   // aka Include
+
+    Set "and"(Set Left, Set Right)
+	// Intersection
+    void "and="(var Set Left, Set Right)
+
+    Set "xor"(Set Left, Set Right)
+	// Symmetric difference
+    void "xor="(var Set Left, Set Right)
+
+    Set "-"(Set Left, Set Right)
+	// Set difference
+
+    void "-="(var Set Left, Set Right)
+	// Compute Set difference
+
+    void "-="(var Set S, ElementType Elem)   // aka Exclude
+	// Remove one element, if present
+
+    UnivInteger count(Set S)
+
+    UnivInteger "magnitude"(Set) is count
+
+    Boolean<> isEmpty(Set S)
+
+    optional ElementType removeAny(var Set S)
+      // Remove and return an arbitrary element of the Set S
+
+    void dumpStatistics(Set S)
+      // A debugging routine to show bucket sizes of Set
+
+}
+
+class interface java.lang.UnivEnumeration<> {
+    Ordering "=?"(UnivEnumeration Left, UnivEnumeration Right) 
+      is import(#unordered_compare)
+    void print(UnivEnumeration Val) 
+      is import(#print_univ_enum)
+
+    UnivString toString(UnivEnumeration Val)
+      is import(#to_string_enum)
+
+    optional UnivEnumeration fromString(UnivString Str)
+      is import(#from_string_enum)
+
+    UnivInteger hash(UnivEnumeration Val)
+      is import(#hash_enum)
+
+    Boolean<> "in"(UnivEnumeration Left, Set<UnivEnumeration> Right)
+      is in Set<UnivEnumeration>
+
+}
+
+interface java.lang.Optional<> {
+    Optional "null"()
+    Boolean "is null"(Optional)
+}
+
+class interface java.lang.Ordering<> {
+  // Enumeration type used to represent value of "=?" operator
+    Ordering "from_univ"(UnivEnumeration Lit) is import(#ordering_from_univ)
+
+    UnivEnumeration "to_univ"(Ordering Val) 
+      is import(#ordering_to_univ)
+
+    Boolean "to_bool"(Ordering Ord, UnivInteger Mask) 
+      is import(#ordering_to_bool)
+
+    Ordering "=?"(Ordering Left, Ordering Right) is import("=?")
+
+    UnivInteger hash(Ordering Val)
+      is import(#identity)
+
+    // For Imageable
+    UnivString toString(Ordering Val)
+    optional Ordering fromString(UnivString Str)
+
+    // Operators for Countable
+    Ordering "+"(UnivInteger Left, Ordering Right) 
+      is import("+")
+    Ordering "+"(Ordering Left, UnivInteger Right) 
+      is import("+")
+    UnivInteger "-"(Ordering Left, Ordering Right) 
+      is import("-")
+    Ordering "-"(Ordering Left, UnivInteger Right) 
+      is import("-")
+
+    optional Ordering min(optional Ordering Left, optional Ordering Right)
+      is import(#min)
+    optional Ordering max(optional Ordering Left, optional Ordering Right)
+      is import(#max)
+
+    // TBD: These should be properties some day (e.g. Ordering#first).
+    Ordering first()
+    Ordering last()
+
+    CountableSet<Ordering> ".."(Ordering Left, Ordering Right)
+    CountableSet<Ordering> "<.."(Ordering Left, Ordering Right)
+    CountableSet<Ordering> "..<"(Ordering Left, Ordering Right)
+    CountableSet<Ordering> "<..<"(Ordering Left, Ordering Right)
+    CountableSet<Ordering> "|"(Ordering Left, Ordering Right)
+}
+
+class java.lang.Ordering {
+    type OrderingSet is CountableSet<Ordering>
+
+  public
+    Ordering first() {
+	return #less
+    }
+
+    Ordering last() {
+	return #unordered
+    }
+
+    UnivString toString(Ordering Val) {
+	switch Val {
+	  case #less :
+	    return "#less"
+	  case #equal :
+	    return "#equal"
+	  case #greater :
+	    return "#greater"
+	  case #unordered :
+	    return "#unordered"
+	}
+    }
+
+    optional Ordering fromString(UnivString Str) {
+	switch Str {
+	  case "#less" :
+	    return #less
+	  case "#equal" :
+	    return #equal
+	  case "#greater" :
+	    return #greater
+	  case "#unordered" :
+	    return #unordered
+	  default :
+	    return null
+	}
+    }
+
+    // NOTE: For implementation reasons, we put these here rather than defining
+    //       them in the interface using "is in CountableSet<Ordering>"
+    CountableSet<Ordering> ".."(Ordering Left, Ordering Right) {
+	return OrderingSet.".."(Left, Right)
+    }
+
+    CountableSet<Ordering> "<.."(Ordering Left, Ordering Right) {
+        return OrderingSet."<.."(Left, Right)
+    }
+
+    CountableSet<Ordering> "..<"(Ordering Left, Ordering Right) {
+        return OrderingSet."..<"(Left, Right)
+    }
+    CountableSet<Ordering> "<..<"(Ordering Left, Ordering Right) {
+        return OrderingSet."<..<"(Left, Right)
+    }
+
+    CountableSet<Ordering> "|"(Ordering Left, Ordering Right) {
+	return OrderingSet."|"(Left, Right)
+    }
+}
+
+interface java.lang.Comparable<> implements Assignable<> {
+    Ordering "=?"(Comparable Left, Comparable Right)
+}
+
+interface java.lang.Ordered<> implements Comparable<> {
+  // The "=?" operator on Ordered types never returns #unordered
+  // They also provide a min and max operator.
+
+  // Note that min and max may be given null operands.
+  // They each return null if both operands are null, and return the
+  // non-null operand if only one of the operands is null.
+  // This allows null to be used as the initial value when computing
+  // the "max" or "min" of a possibly-empty sequence, rather than
+  // having to start with the equivalent of negative or positive infinity.
+
+    type FullOrdering is Ordering
+      // {> FullOrdering in #less | #equal | #greater <}
+
+    FullOrdering "=?"(Ordered Left, Ordered Right)
+
+    optional Ordered min(optional Ordered Left, optional Ordered Right)
+    optional Ordered max(optional Ordered Left, optional Ordered Right)
+}
+
+interface java.lang.Hashable<> implements Comparable<> {
+    // Types which aren't ordered nevertheless are often
+    // hashable, which makes it possible to create an efficient
+    // set or map using them as the index type.
+    Ordering "=?"(Hashable Left, Hashable Right)
+    UnivInteger hash(Hashable Val)
+}
+
+class interface java.util.CountableSet<Countable<> as ElementType> {
+    CountableSet "[]"()
+
+    CountableSet singleton(ElementType Elem)
+
+    CountableSet ".."(ElementType Left, ElementType Right)
+    CountableSet "<.."(ElementType Left, ElementType Right)
+    CountableSet "..<"(ElementType Left, ElementType Right)
+    CountableSet "<..<"(ElementType Left, ElementType Right)
+
+    CountableSet "|"(ElementType Left, ElementType Right)
+    CountableSet "|"(CountableSet Left, ElementType Right)
+    CountableSet "|"(ElementType Left, CountableSet Right)
+    CountableSet "|"(CountableSet Left, CountableSet Right)
+
+    void "|="(var CountableSet Left, ElementType Right)
+    void "|="(var CountableSet Left, CountableSet Right)
+
+    void "<|="(var CountableSet Left, var optional ElementType Right)
+        // Move element into set, leaving Right null afterward.
+
+    void "<|="(var CountableSet Left, var CountableSet Right)
+	// Move all elements of Right into Left, leaving Right empty.
+
+    CountableSet "-"(CountableSet Left, CountableSet Right)
+      // Set difference
+    CountableSet "-"(CountableSet Left, ElementType Right)
+      // Remove one element
+    void "-="(var CountableSet S, ElementType Elem)
+      // Remove the given element from the set, if present
+    void "-="(var CountableSet Left, CountableSet Right)
+      // Remove all elements of Right from Left, if present
+
+    CountableSet "or"(CountableSet Left, CountableSet Right) is "|"   // union
+    void "or="(var CountableSet Left, CountableSet Right) is "|="
+
+    CountableSet "+"(CountableSet Left, CountableSet Right) is "|"   // Union
+    void "+="(var CountableSet Left, CountableSet Right) is "|="
+    void "+="(var CountableSet Left, ElementType Right) is "|="
+   
+    CountableSet "and"(CountableSet Left, CountableSet Right)
+	// Intersection
+    void "and="(var CountableSet Left, CountableSet Right)
+
+    CountableSet "xor"(CountableSet Left, CountableSet Right)
+	// Symmetric difference
+    void "xor="(var CountableSet Left, CountableSet Right)
+
+    Boolean "in"(ElementType Left, CountableSet Right)
+
+    Ordering "=?"(CountableSet Left, CountableSet Right)
+	// Return #equal if Left and Right have the same elements
+	// Return #less if Left is a proper subset of Right
+	// Return #greater if Left is a proper superset of Right
+	// Return #unordered otherwise
+
+    UnivInteger count(CountableSet S)
+
+    UnivInteger "magnitude"(CountableSet) is count
+
+    Boolean isEmpty(CountableSet S)
+
+    optional ElementType first(CountableSet S)
+    optional ElementType last(CountableSet S)
+
+    optional ElementType removeFirst(var CountableSet S)
+	// Remove first element of set (lowest value)
+
+    optional ElementType removeLast(var CountableSet S)
+	// Remove last element of set (highest value)
+
+    optional ElementType removeAny(var CountableSet S)
+	// Remove an arbitrary element of set
+
+}
+
+interface java.lang.Countable<> implements Ordered<> {
+    Countable "+"(Countable Left, UnivInteger Right)
+    Countable "+"(UnivInteger Left, Countable Right)
+
+    Countable "-"(Countable Left, UnivInteger Right)
+    UnivInteger "-"(Countable Left, Countable Right)
+
+    Ordered.FullOrdering "=?"(Countable Left, Countable Right)
+
+    Countable first()
+
+    Countable last()
+
+    optional Countable min(optional Countable Left, optional Countable Right)
+    optional Countable max(optional Countable Left, optional Countable Right)
+
+    UnivInteger hash(Countable Val)
+
+    CountableSet<Countable> ".."(Countable Left, Countable Right)
+      is in CountableSet<Countable>
+    CountableSet<Countable> "<.."(Countable Left, Countable Right)
+      is in CountableSet<Countable>
+    CountableSet<Countable> "..<"(Countable Left, Countable Right)
+      is in CountableSet<Countable>
+    CountableSet<Countable> "<..<"(Countable Left, Countable Right)
+      is in CountableSet<Countable>
+    CountableSet<Countable> "|"(Countable Left, Countable Right)
+      is in CountableSet<Countable>
+}
+    
+class interface java.lang.UnivInteger<> {
+    UnivInteger "+"(UnivInteger Right)
+      is import(#identity)
+
+    UnivInteger "-"(UnivInteger Right)
+      is import(#negate)
+
+    UnivInteger "abs"(UnivInteger Right)
+      is import("abs")
+
+    UnivInteger "magnitude"(UnivInteger) is "abs"
+
+    UnivInteger "+"(UnivInteger Left, UnivInteger Right) as Result 
+      is import("+")
+
+    UnivInteger "-"(UnivInteger Left, UnivInteger Right) as Result
+      is import("-")
+
+    UnivInteger "*"(UnivInteger Left, UnivInteger Right) as Result 
+      is import("*")
+
+    UnivInteger "/"(UnivInteger Left, UnivInteger Right) as Result
+      is import("/")
+
+    UnivInteger "**"(UnivInteger Left, UnivInteger Right)
+      is import("**")
+
+    UnivInteger "mod"(UnivInteger Left, UnivInteger Right)
+      is import("mod")
+
+    UnivInteger "rem"(UnivInteger Left, UnivInteger Right)
+      is import("rem")
+
+
+    void "+="(var UnivInteger Left, UnivInteger Right) 
+      is import("+=")
+
+    void "-="(var UnivInteger Left, UnivInteger Right) 
+      is import("-=")
+
+    void "*="(var UnivInteger Left, UnivInteger Right) 
+      is import("*=")
+
+    void "/="(var UnivInteger Left, UnivInteger Right) 
+      is import("/=")
+
+    void "**="(var UnivInteger Left, UnivInteger Right) 
+      is import("**=")
+
+
+    Ordering "=?"(UnivInteger Left, UnivInteger Right)
+      is import("=?")
+
+    UnivInteger ">>"(UnivInteger, UnivInteger) is import(">>")
+
+    UnivInteger "<<"(UnivInteger, UnivInteger) is import("<<")
+
+    optional UnivInteger min(optional UnivInteger Left, optional UnivInteger Right)
+      is import(#min)
+    optional UnivInteger max(optional UnivInteger Left, optional UnivInteger Right)
+      is import(#max)
+
+    UnivInteger hash(UnivInteger Val)
+      is import(#identity)
+
+    void print(UnivInteger X) is import(#print_int)
+
+    UnivString toString(UnivInteger Val)
+      is import(#to_string_int)
+
+    optional UnivInteger fromString(UnivString Str)
+      is import(#from_string_int)
+
+    UnivInteger first() is
+      import(#univ_integer_first)
+
+    UnivInteger last() is
+      import(#univ_integer_last)
+
+    CountableSet<UnivInteger> ".."(UnivInteger Left, UnivInteger Right)
+      is in CountableSet<UnivInteger>
+    CountableSet<UnivInteger> "<.."(UnivInteger Left, UnivInteger Right)
+      is in CountableSet<UnivInteger>
+    CountableSet<UnivInteger> "..<"(UnivInteger Left, UnivInteger Right)
+      is in CountableSet<UnivInteger>
+    CountableSet<UnivInteger> "<..<"(UnivInteger Left, UnivInteger Right)
+      is in CountableSet<UnivInteger>
+    CountableSet<UnivInteger> "|"(UnivInteger Left, UnivInteger Right)
+      is in CountableSet<UnivInteger>
+}
+
+class interface java.lang.CountableRange<Countable<> as BoundType> {
+    // Simple contiguous CountableRange of integers (i.e. an interval)
+    final BoundType First
+    final BoundType Last
+    CountableRange ".."(BoundType Left, BoundType Right)
+    CountableRange "<.."(BoundType Left, BoundType Right)
+    CountableRange "..<"(BoundType Left, BoundType Right)
+    CountableRange "<..<"(BoundType Left, BoundType Right)
+    Boolean "in"(BoundType Val, CountableRange Int)
+    UnivInteger length(CountableRange R)
+    UnivInteger "magnitude"(CountableRange) is length
+    CountableRange "[..]"()
+    CountableRange "[]"()
+    CountableRange singleton(BoundType Bound)
+
+    optional BoundType removeFirst(var CountableRange S)
+    optional BoundType removeLast(var CountableRange S)
+    optional BoundType removeAny(var CountableRange S)
+}
+
+class java.lang.CountableRange {
+public  // check that indent of 0 works
+    CountableRange ".."(BoundType Left, BoundType Right) {
+	return (First => Left, Last => Right)
+    }
+
+    CountableRange "<.."(BoundType Left, BoundType Right) {
+	return (First => Left+1, Last => Right)
+    }
+
+    CountableRange "..<"(BoundType Left, BoundType Right) {
+	return (First => Left, Last => Right-1)
+    }
+
+    CountableRange "<..<"(BoundType Left, BoundType Right) {
+	return (First => Left+1, Last => Right-1)
+    }
+
+    Boolean "in"(BoundType Val, CountableRange Int) {
+	return Val >= Int.First and then Val <= Int.Last
+    }
+
+    UnivInteger length(CountableRange R) {
+	return R.Last - R.First + 1
+    }
+
+    CountableRange "[]"() {
+	return BoundType.first()+1 .. BoundType.first()
+    }
+
+    CountableRange "[..]"() {
+        return BoundType.first() .. BoundType.last()
+    }
+
+    CountableRange singleton(BoundType Bound) {
+	return Bound .. Bound
+    }
+
+    optional BoundType removeFirst(var CountableRange S) as Result {
+	if S.First <= S.Last {
+	    Result = S.First
+	    S = (First => S.First+1, Last => S.Last)
+	} else {
+	    Result = null
+	}
+    }
+	
+    optional BoundType removeLast(var CountableRange S) as Result {
+	if S.First <= S.Last {
+	    Result = S.Last
+	    S = (First => S.First, Last => S.Last-1)
+	} else {
+	    Result = null
+	}
+    }
+
+    optional BoundType removeAny(var CountableRange S) as Result {
+	if S.First <= S.Last {
+	    if (S.Last - S.First) mod 2 == 0 {
+		return removeFirst(S)
+	    } else {
+		return removeLast(S)
+	    }
+	} else {
+	    return null
+	}
+    }
+
+}
+
+class interface java.lang.UnivCharacter<> {
+    void print(UnivCharacter C) is import(#print_char)
+
+    UnivCharacter "+"(UnivCharacter Left, UnivInteger Right)
+      is import("+")
+    UnivCharacter "+"(UnivInteger Left, UnivCharacter Right)
+      is import("+")
+
+    UnivCharacter "-"(UnivCharacter Left, UnivInteger Right)
+      is import("-")
+    UnivInteger "-"(UnivCharacter Left, UnivCharacter Right)
+      is import("-")
+
+    UnivString "*"(UnivInteger Left, UnivCharacter Right)
+	// Produce specified number of "Right" chars in a row
+    UnivString "*"(UnivCharacter Left, UnivInteger Right)
+	// Produce specified number of "Left" chars in a row
+
+    Ordering "=?"(UnivCharacter Left, UnivCharacter Right)
+      is import("=?")
+
+    UnivString toString(UnivCharacter Val)
+      is import(#to_string_char)
+
+    optional UnivCharacter fromString(UnivString Str)
+      is import(#from_string_char)
+
+    UnivInteger hash(UnivCharacter Val)
+      is import(#identity)
+
+    UnivCharacter first()
+
+    UnivCharacter last()
+
+    optional UnivCharacter min(optional UnivCharacter Left, optional UnivCharacter Right)
+      is import(#min)
+    optional UnivCharacter max(optional UnivCharacter Left, optional UnivCharacter Right)
+      is import(#max)
+
+    CountableSet<UnivCharacter> ".."(UnivCharacter Left, UnivCharacter Right)
+      is in CountableSet<UnivCharacter>
+    CountableSet<UnivCharacter> "<.."(UnivCharacter Left, UnivCharacter Right)
+      is in CountableSet<UnivCharacter>
+    CountableSet<UnivCharacter> "..<"(UnivCharacter Left, UnivCharacter Right)
+      is in CountableSet<UnivCharacter>
+    CountableSet<UnivCharacter> "<..<"(UnivCharacter Left, UnivCharacter Right)
+      is in CountableSet<UnivCharacter>
+    CountableSet<UnivCharacter> "|"(UnivCharacter Left, UnivCharacter Right)
+      is in CountableSet<UnivCharacter>
+}
+    
+class java.lang.UnivCharacter {
+  public
+    UnivString "*"(UnivInteger Left, UnivCharacter Right) {
+	// Produce specified number of "Right" chars in a row
+	return Left * toString(Right)   // Just pass the buck to the string op
+    }
+
+    UnivString "*"(UnivCharacter Left, UnivInteger Right) {
+	// Produce specified number of "Left" chars in a row
+	return Right * toString(Left)   // Just pass the buck to the string op
+    }
+
+    UnivCharacter first() {
+	return '\0'
+    }
+
+    UnivCharacter last() {
+	return '\0' + 2**31-1
+    }
+}
+
+interface java.lang.Imageable<> {
+    UnivString<> toString(Imageable Val)
+
+    optional Imageable fromString(UnivString<> Str)
+
+    // NOTE: We include Hashable<> operations here
+    //       so that Set<Imageable+> works nicely.
+    //       Clearly if something is Imageable it is possible
+    //       to implement "=?" and Hash using the string image,
+    //       so we might as well requires these operations too.
+
+    Ordering "=?"(Imageable Left, Imageable Right)
+    UnivInteger hash(Imageable Val)
+}
+
+class interface java.lang.UnivString<> {
+    void print(UnivString) is import(#print_string)
+    void println(UnivString) is import(#println_string)
+    optional UnivString readln() is import(#read_string)
+
+    UnivString "*"(UnivInteger Left, UnivString Right)
+	// Produce specified number of "Right" strings in a row
+    UnivString "*"(UnivString Left, UnivInteger Right)
+	// Produce specified number of "Left" strings in a row
+
+    UnivString "+"(UnivString Left, UnivString Right) 
+      is import(#concat_string)
+
+    Ordering "=?"(UnivString Left, UnivString Right)
+      is import(#string_compare)
+
+    void "+="(var UnivString Left, UnivString Right)
+      is import(#assign_concat_string)
+
+    UnivCharacter "indexing"(UnivString Str, UnivInteger<> Index)
+	// a "read-only" element, indexed 0 ..< |Str|
+
+    CountableSet<UnivInteger> "index_set"(UnivString Str)
+        // Return set of indices for string
+
+    UnivString "slicing"(UnivString Str,
+      CountableRange<UnivInteger> IndexSet)
+	// a "read-only" slice
+
+    UnivInteger length(UnivString Str)
+      is import(#string_length)
+
+    UnivInteger "magnitude"(UnivString)
+      is import(#string_length)
+
+    UnivInteger hash(UnivString Val)
+      is import(#identity)
+
+    UnivString "+"(UnivString Left, Imageable<> as RightType Right)
+
+    UnivString "+"(Imageable<> as LeftType Left, UnivString Right)
+
+    void "+="(var UnivString Left, Imageable<> as RightType Right)
+
+    // Operations to convert to/from a Vector of UnivCharacter's
+    Vector<UnivCharacter> toVector(UnivString Str)
+    UnivString fromVector(Vector<UnivCharacter> Vec)
+
+  implements for Imageable
+    // These operations are needed so UnivString satifies
+    // requirements of "Imageable" interface, but these
+    // operations are not directly callable, to avoid ambiguities.
+
+    UnivString toString(UnivString Val)
+      is import (#identity)
+    optional UnivString fromString(UnivString Str)
+      is import (#identity)
+
+}
+    
+class java.lang.UnivString {
+    UnivCharacter indexing1ToN(UnivString Str, UnivInteger<> Index)
+      is import(#string_indexing)  // indexing 1..|Str|
+
+    UnivString slicing1ToN(UnivString Str,
+      CountableRange<UnivInteger> IndexSet) is import(#string_slicing) // indexing 1..|Str|
+
+  public
+
+    UnivCharacter "indexing"(UnivString Str, UnivInteger<> Index) {
+	// a "read-only" element, indexed 0 ..< |Str|
+        return indexing1ToN(Str, Index+1)
+    }
+
+    CountableSet<UnivInteger> "index_set"(UnivString Str) {
+        // Return set of indices for string
+        return 0..<|Str|
+    }
+
+    UnivString "slicing"(UnivString Str,
+      CountableRange<UnivInteger> IndexSet) {
+	// a "read-only" slice, indexed 0..|Str|-1
+        return slicing1ToN(Str, IndexSet.First <.. IndexSet.Last+1)
+    }
+
+    UnivString "*"(UnivInteger Left, UnivString Right) {
+	// Produce specified number of "Right" strings in a row
+	if Left <= 0 {
+	    return ""
+	} else if Left == 1 {
+	    return Right
+	} else {
+	    // Recurse to produce half-length, and then combine
+	    final UnivString Partial = (Left/2) * Right
+	    if Left mod 2 == 1 {
+		return Partial + Partial + Right
+	    } else {
+		return Partial + Partial
+	    }
+	}
+    }
+
+    UnivString "*"(UnivString Left, UnivInteger Right) {
+	// Produce specified number of "Left" strings in a row
+	return Right * Left   // Just pass the buck to other "*"
+    }
+
+    UnivString "+"(UnivString Left, Imageable<> as RightType Right) {
+        if Right is null {
+            return Left + "null"
+        } else {
+            return Left + RightType.toString(Right)
+        }
+    }
+
+    UnivString "+"(Imageable<> as LeftType Left, UnivString Right) {
+        if Left is null {
+            return "null" + Right
+        } else {
+            return LeftType.toString(Left) + Right
+        }
+    }
+
+    void "+="(var UnivString Left, Imageable<> as RightType Right) {
+        if Right is null {
+            Left += "null"
+        } else {
+            Left += RightType.toString(Right)
+        }
+    }
+
+    Vector<UnivCharacter> toVector(UnivString Str) {
+        return [for I in 0 ..< |Str| => Str[I]]
+    }
+
+    UnivString fromVector(Vector<UnivCharacter> Vec) {
+        return (for I in 0 ..< |Vec| forward => <""> + Vec[I])
+    }
+}
+
+class interface java.lang.Random<> {
+    Random start(UnivInteger Seed = 1)
+      // Start a new random number sequence with a standard multiplier/modulus
+
+    Random start(UnivInteger Seed,
+       UnivInteger Mult, UnivInteger Mod)
+      // Start a new random number sequence with given multiplier and modulus
+
+    UnivInteger next(var Random Seq)
+      // Get next value in random number sequence
+}
+
+class java.lang.Random {
+    var UnivInteger LastValue
+    final UnivInteger Mult
+    final UnivInteger Mod
+    final Boolean Debugging = #false
+
+public  // check that indent of 0 works
+
+    Random start(UnivInteger Seed) {
+      // Start a new random number sequence with a standard multiplier/modulus
+	return (LastValue => Seed,
+	  Mult => 7**5, Mod => 2**31 - 1)
+    }
+
+    Random start(UnivInteger Seed,
+      UnivInteger Mult, UnivInteger Mod) {
+      // Start a new random number sequence with given multiplier and modulus
+	if Debugging {
+	    println("Random: Seed = " + Seed + ", Mult = " + Mult + 
+	      ", Mod = " + Mod)
+	}
+	return (LastValue => Seed, Mult => Mult, Mod => Mod)
+    }
+
+    UnivInteger next(var Random Seq) {
+      // Get next value in random number sequence
+	Seq.LastValue = Seq.LastValue * Seq.Mult mod Seq.Mod
+	return Seq.LastValue
+    }
+}
+
+void java.test.testString() {
+    final UnivString U = "tab\t"
+    final T = U[3]
+    println("U = " + U + ", length(U) = " + length(U) + ", U[4] = '" + T + "'")
+    final UnivString X = "this is a string"
+    final Y = X[2]
+    {> Y == 'i' <} // string indexing problem
+    final Z = X[5..6]
+    {> Z == "is" <} // string slicing problem, expected 'is', found Z 
+    println("X = " + X + ", X[2] = " + Y + ", X[5..6] = " + Z)
+
+    println("About to indent 4 and then print 'hello'")
+    println(4 * " " + "hello")
+
+    final UnivString SevenXs = "x" * 7
+    {> SevenXs == "xxxxxxx" <} // Char multiplication check
+
+    println("Here are seven x's: " + SevenXs)
+    
+    print("Here are 6 y's: ")
+    println('y' * 6)
+}
+
+interface java.lang.Sequence<Assignable<> as ElementType> {
+    optional ElementType removeFirst(var Sequence S)
+      // Returns null when sequence is empty
+}
+
+class interface java.lang.Direction<> {
+    // This is passed to the "to_sequence" operator to generate
+    // appropriate direction of sequence
+    Direction "from_univ"(UnivEnumeration Lit) 
+      is import(#direction_from_univ)
+
+    UnivEnumeration "to_univ"(Direction Val) 
+      is import(#direction_to_univ)
+
+    Ordering "=?"(Direction Left, Direction Right)
+      is import("=?")
+}
+
+class interface java.lang.Integer
+  <CountableRange<UnivInteger> Range = -2**62 .. +2**62> {
+    // NOTE: We restrict Integer to this range so UnivInteger can use
+    //       values outside this range as indices into an extended-range
+    //       integer table.
+    Integer "from_univ"(UnivInteger Lit) 
+      is import(#integer_from_univ)
+
+    UnivInteger "to_univ"(Integer Val) 
+      is import(#integer_to_univ)
+
+    Integer "+"(Integer Right)
+      is import(#identity)
+
+    Integer "-"(Integer Right)
+      is import(#negate)
+
+    Integer "abs"(Integer Right)
+      is import("abs")
+
+    Integer "magnitude"(Integer) is "abs"
+
+    Integer "+"(Integer Left, Integer Right) as Result 
+      is import("+")
+
+    Integer "-"(Integer Left, Integer Right) as Result
+      is import("-")
+
+    Integer "*"(Integer Left, Integer Right) as Result 
+      is import("*")
+
+    Integer "/"(Integer Left, Integer Right) as Result
+      is import("/")
+
+    Integer "mod"(Integer Left, Integer Right)
+      is import("mod")
+
+    Integer "rem"(Integer Left, Integer Right)
+      is import("rem")
+
+    Integer "**"(Integer Left, Integer Right) as Result
+      is import("**")
+
+    void "+="(var Integer Left, Integer Right) 
+      is import("+=")
+
+    void "-="(var Integer Left, Integer Right) 
+      is import("-=")
+
+    void "*="(var Integer Left, Integer Right) 
+      is import("*=")
+
+    void "/="(var Integer Left, Integer Right) 
+      is import("/=")
+
+    void "**="(var Integer Left, Integer Right) 
+      is import("**=")
+
+    Ordering "=?"(Integer Left, Integer Right)
+      is import("=?")
+
+    Integer ">>"(Integer, Integer) is import(">>")
+
+    Integer "<<"(Integer, Integer) is import("<<")
+
+    optional Integer min(optional Integer Left, optional Integer Right)
+      is import(#min)
+    optional Integer max(optional Integer Left, optional Integer Right)
+      is import(#max)
+
+    UnivInteger hash(Integer Val)
+      is import(#identity)
+
+    void print(Integer X) is import(#print_int)
+
+    UnivString toString(Integer Val)
+      is import(#to_string_int)
+
+    optional Integer fromString(UnivString Str)
+      is import(#from_string_int)
+
+    Integer first()
+
+    Integer last()
+
+    CountableRange<Integer> "[..]"() is in CountableRange<Integer>
+
+    CountableSet<Integer> ".."(Integer Left, Integer Right)
+      is in CountableSet<Integer>
+    CountableSet<Integer> "<.."(Integer Left, Integer Right)
+      is in CountableSet<Integer>
+    CountableSet<Integer> "..<"(Integer Left, Integer Right)
+      is in CountableSet<Integer>
+    CountableSet<Integer> "<..<"(Integer Left, Integer Right)
+      is in CountableSet<Integer>
+    CountableSet<Integer> "|"(Integer Left, Integer Right)
+      is in CountableSet<Integer>
+  implements for Countable
+    // These operations are needed so Integer satifies
+    // requirements of "Countable" interface, but these
+    // operations are not directly callable (if they were callable,
+    // we would have ambiguity when adding an integer to an int-literal).
+
+    Integer "+"(Integer Left, UnivInteger Right) as Result 
+      is import("+")
+
+    Integer "+"(UnivInteger Left, Integer Right) as Result 
+      is import("+")
+
+    Integer "-"(Integer Left, UnivInteger Right) as Result 
+      is import("-")
+
+    UnivInteger "-"(Integer Left, Integer Right) as Result
+      is import("-")
+
+}
+
+class java.lang.Integer {
+    final UnivInteger Content;  // So this ends up as a wrapper
+  public
+    Integer first() {
+	return Range.First
+    }
+
+    Integer last() {
+	return Range.Last
+    }
+
+}
+    
+class java.lang.Boolean {
+  public
+    void "and="(var Boolean Left, Boolean Right) {
+	Left = Left and Right
+    }
+
+    void "or="(var Boolean Left, Boolean Right) {
+	Left = Left or Right
+    }
+
+    void "xor="(var Boolean Left, Boolean Right) {
+	Left = Left xor Right
+    }
+
+    UnivString toString(optional Boolean Val) {
+	if Val is null {
+            return "null"
+        } else if Val {
+	    return "#true"
+	} else {
+	    return "#false"
+	}
+    }
+
+    optional Boolean fromString(UnivString Str) {
+	if Str == "#true" {
+	    return #true
+	} else if Str == "#false" {
+	    return #false
+	} else {
+	    return null
+	}
+    }
+
+}
+
+void java.test.testBoolean(UnivEnumeration UX, UnivEnumeration UY) {
+    final Boolean X = UX
+    final Boolean Y = UY
+
+    println(X + " and " + Y + " = " + (X and Y))
+    println(X + " or " + Y + " = " + (X or Y))
+    println(X + " xor " + Y + " = " + (X xor Y))
+
+    var XX = X
+    XX and= Y
+    println(X + " and= " + Y + " = " + XX)
+    XX = X
+    XX or= Y
+    println(X + " or= " + Y + " = " + XX)
+    XX = X
+    XX xor= Y
+    println(X + " xor= " + Y + " = " + XX)
+}
+
+class interface java.lang.BasicList<Assignable<> as ListElem> {
+    var ListElem Elem
+    var optional BasicList Next
+
+    BasicList "|"(ListElem Left, ListElem Right)
+    BasicList "|"(ListElem Left, BasicList Right)
+    BasicList "|"(BasicList Left, BasicList Right)
+    BasicList "|"(BasicList Left, ListElem Right)
+
+    void "|="(var BasicList Left, BasicList Right)
+    void "|="(var BasicList Left, ListElem Right)
+    UnivInteger length(optional BasicList L)
+    UnivInteger "magnitude"(optional BasicList L) is length
+
+    optional BasicList "[]"() is (null)
+
+    optional ListElem removeFirst(var BasicList L)
+    optional ListElem removeLast(var BasicList L)
+    optional ListElem removeAny(var BasicList L)
+}
+
+class java.lang.BasicList {
+  public
+    BasicList "|"(ListElem Left, ListElem Right) {
+        return (Elem => Left, Next => (Elem => Right, Next => null))
+    }
+
+    BasicList "|"(ListElem Left, BasicList Right) {
+        return (Elem => Left, Next => Right)
+    }
+
+    BasicList "|"(BasicList Left, BasicList Right) {
+        if Left is null {
+            // Left is null, so just return Right
+            return Right
+        } else {
+            // Recurse with tail of left Basic_list
+            return (Elem => Left.Elem, Next => Left.Next | Right)
+        }
+    }
+
+    BasicList "|"(BasicList Left, ListElem Right) {
+        return Left | (Elem => Right, Next => null)
+    }
+
+    void "|="(var BasicList Left, BasicList Right) {
+        if Left is null {
+            Left = Right
+        } else {
+            // Recurse with tail of Basic_list
+            Left.Next |= Right
+        }
+    }
+
+    void "|="(var BasicList Left, ListElem Right) {
+        // Just pass the buck
+        Left |= (Elem => Right, Next => null)
+    }
+
+    UnivInteger length(optional BasicList L) as Result {
+        Result = 0
+        for Lst => L then Lst.Next while Lst not null {
+            Result++
+        }
+    }
+
+    optional ListElem removeFirst(var BasicList L) as Result {
+        if L is null {
+            return null
+        } else {
+            Result = L.Elem
+            L <== L.Next
+              // carve off L.Next and set L to that
+        }
+    }
+
+    optional ListElem removeLast(var BasicList L) as Result {
+        if L is null {
+            return null
+        } else if L.Next is null {
+            Result = L.Elem
+            L = null
+        } else {
+            // Recurse to remove last element
+            return removeLast(L.Next)
+        }
+    }
+
+    optional ListElem removeAny(var BasicList L) as Result {
+        // Easiest to remove first element
+        return removeFirst(L)
+    }
+
+}
+
+
+void java.test.testList(UnivInteger X, UnivInteger Y) {
+    type UnivList is BasicList<UnivInteger>
+
+    void println(UnivList L) {
+        // print a univ Basic_list
+        var N = L
+        while N not null {
+            final UnivInteger E = N.Elem
+            print("" + E)
+            N = N.Next
+            if N not null {
+                print(", ")
+            }
+        }
+
+        print("\n")
+    }
+
+    void printlnIt(UnivList L) {
+        // print a univ Basic_list using destructive iterator
+        print("Forward: ")
+        var F = L
+        while F not null {
+            final UnivInteger E = removeFirst(F)
+            print("" + E)
+            if F not null {
+                print(", ")
+            }
+        }
+
+        print("\n")
+
+        print("Reverse: ")
+        var R = L
+        while R not null {
+            final UnivInteger Z = removeLast(R)
+            print("" + Z)
+            if R not null {
+                print(", ")
+            }
+        }
+
+        print("\n")
+    }
+
+    var UnivList L1 = (Elem => X, Next => null)
+    var UnivList L2 = (Elem => Y, Next => null)
+    var L3 = L1 | L2
+
+    println("Combining " + X + " and " + Y + " produces ")
+    println(L3)
+    println("Combining X | Y | X | X | Y | Y produces ")
+    printlnIt(L3 | X | L3 | Y)
+}
+
+class interface java.lang.ClosedInterval<Comparable<> as BoundType> {
+    // This provides a simple "closed" interval X..Y
+    // If a type is countable, then half-open or fully open intervals
+    // can be converted into the equivalent closed interval.
+    var BoundType Low
+    var BoundType High
+    Boolean "in"(BoundType Left, ClosedInterval Right)
+    Ordering "=?"(ClosedInterval Left, ClosedInterval Right)
+}
+
+class java.lang.ClosedInterval {
+  public
+    Boolean "in"(BoundType Left, ClosedInterval Right) {
+        return Left >= Right.Low and then Left <= Right.High
+    }
+
+    Ordering "=?"(ClosedInterval Left, ClosedInterval Right) {
+        // Compare two intervals, and consider them #unordered
+        // if they overlap at all, unless they are identical.
+        // If they don't overlap, then return #less or #greater as appropriate.
+
+        if Left.High < Right.Low {
+            return #less
+        } else if Left.Low > Right.High {
+            return #greater
+        } else if Left.Low == Right.Low and then
+          Left.High == Right.High {
+            return #equal
+        } else {
+            return #unordered
+        }
+    }
+
+}
+
+class interface java.lang.Interval<Comparable<> as BoundType> {
+    // This supports closed, half-open, and open intervals.
+    // This is appropriate for uncountable types where you
+    // can't normalize all intervals into closed intervals.
+    var BoundType Low
+    var Boolean LowIsOpen
+    var BoundType High
+    var Boolean HighIsOpen
+
+    Interval singleton(BoundType Val)
+      // Return interval consisting of a single value
+
+    Boolean isEmpty(optional Interval IV)
+      // Return True if interval is null or it represents
+      // no values
+
+    Boolean "in"(BoundType Left, Interval Right)
+
+    Ordering "=?"(Interval Left, Interval Right)
+      // "#greater" means Left is strictly greater than Right
+      // "#less" means Left is strictly less than Right
+      // "#equal" means Left and Right are the same interval
+      // "#unordered" means anything } else {
+
+    optional Interval "and"(Interval Left, Interval Right)
+      // Return intersection of the two intervals
+
+    void "and="(var optional Interval Left, Interval Right)
+      // Intersect Right into Left
+
+    Boolean isStrictlyWithin(optional Interval Left, optional Interval Right)
+      // Return #true if Left is strictly within Right,
+      // meaning low bound of Left is higher, and high bound is lower.
+      // NOTE: If #true, then removing Right from Left will produce two 
+      //       non-overlapping intervals.
+
+    optional Interval "-"(Interval Left, Interval Right)
+      // Subtract out Right interval from Left interval
+      // Right must not be strictly within Left, since
+      // that would require returning two intervals.
+
+    void "-="(var optional Interval Left, Interval Right) 
+      {> not isStrictlyWithin(Right, Left) <}
+      // Subtract Right interval from Left
+
+    Boolean overlaps(optional Interval Left, optional Interval Right)
+      // Return True if intervals overlap
+
+    Interval "or"(Interval Left, Interval Right)
+      // Return union of two intervals.  Must have some overlap
+      // to ensure that result can be represented as a single interval.
+    Interval "|"(Interval Left, Interval Right) is "or"
+
+    void "or="(var optional Interval Left, Interval Right) 
+      {> overlaps(Left, Right) <}
+      // Compute union of two intervals.  Must have some overlap
+      // to ensure that result can be represented as a single interval.
+    void "|="(var optional Interval Left, Interval Right) 
+      {> overlaps(Left, Right) <} is "or="
+
+    void "<|="(var optional Interval Left, var optional Interval Right) {> overlaps(Left, Right) <}
+      // Compute union of two intervals; leave Right empty.  
+      // Must have some overlap to ensure that result can be 
+      // represented as a single interval.
+
+}
+
+class java.lang.Interval {
+  public
+    Interval singleton(BoundType Val) {
+      // Return interval consisting of a single value
+	return (Low => Val, LowIsOpen => #false,
+	  High => Val, HighIsOpen => #false)
+    }
+
+    Boolean isEmpty(optional Interval IV) {
+      // Return True if interval is null or it represents
+      // no values
+	return IV is null or else
+	  IV.Low > IV.High or else
+	  (IV.Low == IV.High and then (IV.LowIsOpen or IV.HighIsOpen))
+    }
+
+    Boolean "in"(BoundType Left, Interval Right) {
+        switch Left =? Right.Low {
+          case #less: return #false
+          case #equal: return not Right.LowIsOpen
+          case #greater:
+            switch Left =? Right.High {
+              case #less: return #true
+              case #equal: return not Right.HighIsOpen
+              case #greater: return #false
+            }
+        }
+    }
+
+    Ordering "=?"(Interval Left, Interval Right) {
+        // Compare two intervals, and consider them #unordered
+        // if they overlap at all, unless they are identical.
+        // If they don't overlap, then return #less or #greater as appropriate.
+        // Return #unordered if any of the comparisons return #unordered.
+
+        // First check for perfect equality
+        if Left.Low == Right.Low and then
+          Left.High == Right.High and then
+          Left.LowIsOpen == Right.LowIsOpen and then
+          Left.HighIsOpen == Right.HighIsOpen {
+            // NOTE: We are considering X..Y-1 != X..<Y since
+            //       we don't require countable elements.
+            return #equal
+        }
+
+        switch Left.High =? Right.Low {
+          case #unordered:
+            return #unordered
+          case #less:
+            return #less
+          case #equal:
+            if Left.HighIsOpen or else Right.LowIsOpen {
+                // No overlap
+                return #less
+            } else {
+                // We have already ruled out #equal
+                return #unordered
+            }
+          case #greater:
+            // Not clearly less, see whether clearly greater.
+            switch Left.Low =? Right.High {
+              case #unordered:
+                return #unordered
+              case #less:
+                // We have already ruled out #equal
+                return #unordered
+              case #equal:
+                if Left.LowIsOpen or else Right.HighIsOpen {
+                    // No overlap
+                    return #greater
+                } else {
+                    // We have already ruled out #equal
+                    return #unordered
+                }
+              case #greater:
+                return #greater
+            }
+        }
+    }
+
+    optional Interval "and"(Interval Left, Interval Right) {
+      // Return intersection of the two intervals
+	var BoundType NewLow
+	var BoundType NewHigh
+        var Boolean NewLowIsOpen
+	var Boolean NewHighIsOpen
+	
+	switch Left.Low =? Right.Low {
+	  case #less : 
+	    NewLow = Right.Low
+	    NewLowIsOpen = Right.LowIsOpen
+	  case #greater : 
+	    NewLow = Left.Low
+	    NewLowIsOpen = Left.LowIsOpen
+	  case #equal : 
+	    NewLow = Left.Low
+	    NewLowIsOpen = Left.LowIsOpen or Right.LowIsOpen
+	  case #unordered : 
+	    return null
+	}
+
+	switch Left.High =? Right.High {
+	  case #less : 
+	    NewHigh = Left.High
+	    NewHighIsOpen = Left.HighIsOpen
+	  case #greater : 
+	    NewHigh = Right.High
+	    NewHighIsOpen = Right.HighIsOpen
+	  case #equal : 
+	    NewHigh = Left.High
+	    NewHighIsOpen = Left.HighIsOpen or Right.HighIsOpen
+	  case #unordered : 
+	    return null
+	}
+
+	return (Low => NewLow, LowIsOpen => NewLowIsOpen,
+	  High => NewHigh, HighIsOpen => NewHighIsOpen)
+    }
+
+    void "and="(var optional Interval Left, Interval Right) {
+      // Intersect Right into Left
+	if Left not null {
+	    Left = Left and Right
+	}
+    }
+
+    Boolean isStrictlyWithin(optional Interval Left, optional Interval Right) {
+      // Return #true if Left is strictly within Right,
+      // meaning low bound of Left is higher, and high bound is lower.
+      // NOTE: If #true, then removing Right from Left will produce two 
+      //       non-overlapping intervals.
+	if Right is null or else Left is null {
+	    return #false
+	}
+	return (Left.Low > Right.Low or else 
+	  (Left.Low == Right.Low and then Left.LowIsOpen > Right.LowIsOpen))
+	  and then
+	    (Left.High < Right.High or else
+	     (Left.High == Right.High and then
+	      Left.HighIsOpen > Right.HighIsOpen))
+    }
+
+    optional Interval "-"(Interval Left, Interval Right) as Result {
+      // Subtract out Right interval from Left interval
+      // Right must not be strictly within Left, since
+      // that would require returning two intervals.
+	var BoundType NewLow
+	var BoundType NewHigh
+        var Boolean NewLowIsOpen
+	var Boolean NewHighIsOpen
+	
+	switch Left.Low =? Right.Low {
+	  case #less : 
+	    // Return left part of Left
+	    Result = (Low => Left.Low, LowIsOpen => Left.LowIsOpen,
+	      High => Right.Low, HighIsOpen => not Right.LowIsOpen)
+	  case #greater : 
+	    // Return right part of Left
+	    Result = (Low => Right.High, LowIsOpen => not Right.HighIsOpen,
+	      High => Left.High, HighIsOpen => Left.HighIsOpen)
+	  case #equal : 
+	    if Left.LowIsOpen >= Right.LowIsOpen {
+		// Return right part of Left
+		Result = (Low => Right.High, 
+		  LowIsOpen => not Right.HighIsOpen,
+		  High => Left.High, 
+		  HighIsOpen => Left.HighIsOpen)
+	    } else {
+		// Only one element is left
+		return (Left.Low, #false, Left.Low, #false)
+	    }
+	  case #unordered : 
+	    return null
+	}
+
+	if Result.Low > Result.High {
+	    // Empty interval
+	    return null
+	} else if Result.Low == Result.High and then
+	  (Result.LowIsOpen or Result.HighIsOpen) {
+	    // Empty interval
+	    return null
+	} else {
+	    return Result
+	}
+    }
+
+    void "-="(var optional Interval Left, Interval Right) 
+      {> not isStrictlyWithin(Right, Left) <} {
+      // Subtract Right interval from Left
+	if Left not null {
+	    Left = Left - Right
+	}
+    }
+
+    Boolean overlaps(optional Interval Left, optional Interval Right) {
+	if Left is null or else Right is null {
+	    return #false
+	} else {
+	    switch Left =? Right {
+	      case #equal | #unordered : return #true
+	      case #less | #greater : return #false
+	    }
+	}
+    }
+
+    Interval "or"(Interval Left, Interval Right) as Result {
+      // Return union of two intervals.  Must have some overlap
+      // to ensure that result can be represented as a single interval.
+	
+	Result = Left
+	Result or= Right
+    }
+
+    void "or="(var optional Interval Left, Interval Right) 
+      {> overlaps(Left, Right) <} {
+      // Compute union of two intervals.  Must have some overlap
+      // to ensure that result can be represented as a single interval.
+	var RightCopy for Left = Right
+	Left <|= RightCopy
+    }
+
+    void "<|="(var optional Interval Left, var optional Interval Right) {> overlaps(Left, Right) <} {
+      // Compute union of two intervals; leave Right empty.  
+      // Must have some overlap to ensure that result can be 
+      // represented as a single interval.
+	if Left is null {
+	    Left <== Right
+	} else if Right not null {
+	    var RightCopy <== Right
+		// Make copy and null out Right, so
+		// we don't end up with Right partially nulled out
+	    
+	    switch Left.Low =? RightCopy.Low {
+	      case #less : 
+		// No change to Left.Low
+		null
+	      case #greater : 
+		Left.Low <== RightCopy.Low
+		Left.LowIsOpen = RightCopy.LowIsOpen
+	      case #equal : 
+		Left.LowIsOpen and= RightCopy.LowIsOpen
+	    }
+
+	    switch Left.High =? RightCopy.High {
+	      case #less : 
+		Left.High <== RightCopy.High
+		Left.HighIsOpen = RightCopy.HighIsOpen
+	      case #greater : 
+		// No change to Left.High
+		null
+	      case #equal : 
+		Left.HighIsOpen and= RightCopy.HighIsOpen
+	    }
+	}
+    }
+
+}
+
+void java.test.testInterval(UnivInteger X, UnivInteger Y, UnivInteger Z) {
+    var Interval<UnivInteger> YUpToZ = 
+      (Low => Y, LowIsOpen => #false, High => Z, HighIsOpen => #true)
+
+    println(X + " in " + Y + "..<" + Z + " = " + (X in YUpToZ))
+
+    var ClosedInterval<UnivInteger> YToZ = (Low => Y, High => Z)
+
+    println(X + " in " + Y + ".." + Z + " = " + (X in YToZ))
+
+    var ClosedInterval<UnivInteger> OneToX =
+      (Low => 1, High => X)
+
+    println(1 + ".." + X + "=?" + Y + ".." + Z + " = " + 
+      (OneToX =? YToZ))
+
+}
+
+class interface java.lang.AATree<Comparable<> as Element> {
+
+    // This module implements a balanced "AA" tree, originally
+    // described by Arne Andersson in the "Proceedings of the Workshop
+    // on Algorithms and Data Structures," pp 60-71, Springer Verlag, 1993.
+    // The following algorithm and descriptions were taken from the
+    // WikiPedia article on AATree {
+    //       http://en.wikipedia.org/wiki/AA_tree
+    // Note that various additional checks for a null tree have been added.
+
+    // Only two operations are needed for maintaining balance in an AA tree.
+    // These operations are called skew and split. Skew is a right rotation
+    // when an insertion or deletion creates a left horizontal link. Split
+    // is a conditional left rotation when an insertion or deletion creates two
+    // horizontal right links, which once again corresponds to two
+    // consecutive red links in red-black trees.
+
+    optional AATree "[]"()
+        // create an empty tree
+
+    void insert(var optional AATree T, Element X)
+        // input: X, the value to be inserted, and 
+        // T, the root of the tree to insert it into.
+        // output: A balanced T' including X.
+
+    void delete(var optional AATree T, Element X)
+        // input: X, the value to delete, and T, 
+        // the root of the tree from which it should be deleted.
+        // output: T', balanced, without the value X.
+
+    Boolean "in"(Element X, optional AATree T)
+
+    optional Element overlapping(optional AATree T, Element X)
+        // input: X, the value to find, and T, 
+        // the root of the tree to be searched.
+        // output: the element equal to or "unordered" relative to X.
+
+    void "|="(var optional AATree T, Element X) is insert
+
+    void "<|="(var optional AATree T, var optional Element X)
+	// Move X into AATree, leaving X null.
+
+    optional Element first(optional AATree T)
+      // Return first (smallest) element in tree
+
+    optional Element last(optional AATree T)
+      // Return last (greatest) element in tree
+
+    optional Element removeFirst(var optional AATree T)
+      // Remove first (smallest) element in tree
+
+    optional Element removeLast(var optional AATree T)
+      // Remove last (greatest) element in tree
+
+    optional Element removeAny(var optional AATree T)
+      // Remove some element from tree
+
+    UnivInteger count(optional AATree T)
+      // Return a count of the nodes in the tree
+
+    UnivInteger "magnitude"(AATree) is count
+
+    Boolean isEmpty(optional AATree T)
+      // Return True if the tree is empty
+
+}
+
+class java.lang.AATree {
+    var Element Value
+    var UnivInteger Level = 0
+    var optional AATree Left
+    var optional AATree Right
+
+    AATree node(var optional Element Value, UnivInteger Level,
+      optional AATree Left, optional AATree Right) {
+        // create a new tree; move Value into it.
+        return (Value <== Value, Level => Level, Left => Left, Right => Right)
+    }
+
+    Boolean isLeaf(optional AATree T) {
+        return T not null and then
+          T.Left is null and then T.Right is null
+    }
+
+    ref optional AATree leftmost(ref optional AATree T) {
+        for (L => T) {
+            if (L not null and then L.Left not null) {
+                // Continue with Left until we reach null
+                continue with L => L.Left
+            } else {
+                // Found left-most
+                return L
+            }
+        }
+    }
+
+    optional Element successor(optional AATree T) {
+        // Return element in tree greater than but closest to T.Value
+        if T.Right not null {
+            final Succ = leftmost(T.Right)
+            {> Succ not null <}
+            return Succ.Value
+        } else {
+            return null
+        }
+    }
+
+    ref optional AATree rightmost(ref optional AATree T) {
+        for (R => T) {
+            if (R not null and then R.Right not null) {
+                // Keep following down Right side
+                continue with R => R.Right
+            } else {
+                // Found right-most
+                return R
+            }
+        }
+    }
+
+    optional Element predecessor(optional AATree T) {
+        // Return element in tree less than but closest to T.Value
+        if (T.Left not null) {
+            return rightmost(T.Left).Value
+        } else {
+            return null
+        }
+    }
+
+    void skew(var optional AATree T) {
+      // input: T, a node representing an AA tree that needs to be rebalanced.
+      // output: T' Another node representing the rebalanced AA tree.
+
+        if T not null and then
+          T.Left not null and then
+          T.Left.Level == T.Level {
+            // The current T.Left becomes new root
+
+            // Exchange value of T.Left with root
+            T.Value <=> T.Left.Value
+           
+            // Move old root and T.Left.Right over to right side of tree
+            T.Left.Right <=> T.Right
+            T.Left.Left <=> T.Right
+            T.Left <=> T.Right
+        }
+    }
+
+    void split(var optional AATree T) {
+        // input: T, a node representing an AA tree that needs to be rebalanced.
+        // output: T' Another node representing the rebalanced AA tree.
+
+        if T not null and then
+          T.Right not null and then
+          T.Right.Right not null and then
+          T.Level == T.Right.Right.Level {
+            // T.Right becomes the new root
+            // Exchange value and level between root and T.Right
+            T.Value <=> T.Right.Value
+            T.Level <=> T.Right.Level
+
+            // Move old root and T.Right.Left to left side of tree
+            T.Left <=> T.Right.Right
+            T.Right.Left <=> T.Right.Right
+            T.Left <=> T.Right
+
+            // Increment level
+            T.Level++
+        }
+    }
+
+    void decreaseLevel(var optional AATree T) {
+        // input: T, a tree for which we want to remove links that skip levels.
+        // output: T with its level decreased.
+
+        if T is null {
+            return
+        }
+           
+        var UnivInteger ShouldBe = 1
+
+        if T.Left not null {
+            ShouldBe = T.Left.Level + 1
+        }
+
+        if T.Right not null {
+            ShouldBe = min(ShouldBe, T.Right.Level + 1)
+        }
+            
+        if ShouldBe < T.Level {
+            T.Level = ShouldBe
+            if T.Right not null and then
+              ShouldBe < T.Right.Level {
+                T.Right.Level = ShouldBe
+            }
+        }
+    }
+
+  public
+
+    optional AATree "[]"() {
+        // create an empty tree
+        return null
+    }
+
+    // Insertion begins with the normal binary tree search and insertion
+    // procedure. Then, as the call stack unwinds (assuming a recursive
+    // implementation of the search), it's easy to check the validity of the
+    // tree and perform any rotations as necessary. If a horizontal left link
+    // arises, a skew will be performed, and if two horizontal right links
+    // arise, a split will be performed, possibly incrementing the level of the
+    // new root node of the current subtree. Note, in the code as given above,
+    // the increment of T.Level. This makes it necessary to continue checking
+    // the validity of the tree as the modifications bubble up from the leaves.
+    
+    void "<|="(var optional AATree T, var optional Element X) {
+	// Move X into AATree, leaving X null.
+        // input: X, the value to be inserted, and 
+        // T, the root of the tree to insert it into.
+        // output: A balanced T' including X.
+
+        // Do the normal binary tree insertion procedure. 
+        // Set the result of the recursive call to the correct 
+        // child in switch a new node was created or the
+        // root of the subtree changes.
+
+        if T is null {
+            // create a new leaf node with X.
+            T = node(X, 1, null, null)
+            return
+        }
+
+        switch X =? T.Value {
+          case #less:
+            T.Left <|= X
+          case #greater:
+            T.Right <|= X
+          case #equal | #unordered:
+            // Note that the switch of X == T.Value is unspecified. 
+            // As given, an insert will have no effect. 
+            // The implementor may desire different behavior.
+	    X = null
+            return
+        }
+
+        // Perform skew and then split. 
+        // The conditionals that determine whether or
+        // not a rotation will occur or not are inside 
+        // of the procedures, as given above.
+
+        skew(T)
+        split(T)
+    }
+
+    void insert(var optional AATree T, Element X) {
+	// Just pass the buck to the "<|=" operation
+	var XCopy for T = X
+	T <|= XCopy
+    }
+
+    // As in most balanced binary trees, the deletion of an internal node can
+    // be turned into the deletion of a leaf node by swapping the internal node
+    // with either its closest predecessor or successor, depending on which are
+    // in the tree or on the implementor's whims. Retrieving a predecessor {
+    // simply a matter of following one left link and then all of the remaining
+    // right links. Similarly, the successor can be found by going right once
+    // and left until a null pointer is found. Because of the AA property of
+    // all nodes of level greater than one having two children, the successor
+    // or predecessor node will be in level 1, making their removal trivial.
+    // 
+    // To re-balance a tree, there are a few approaches. The one described by
+    // Andersson in his original paper is the simplest, and it is described
+    // here, although actual implementations may opt for a more optimized
+    // approach. After a removal, the first step to maintaining tree validity
+    // is to lower the level of any nodes whose children are two levels below
+    // them, or who are missing children. Then, the entire level must be skewed
+    // and split. This approach was favored, because when laid down
+    // conceptually, it has three easily understood separate steps {
+    // 
+    //     Decrease the level, if appropriate.
+    //     Skew the level.
+    //     Split the level.
+    // 
+    // However, we have to skew and split the entire level this time instead of
+    // just a node, complicating our code.
+
+    void delete(var optional AATree T, Element X) {
+        // input: X, the value to delete, and T, 
+        // the root of the tree from which it should be deleted.
+        // output: T', balanced, without the value X.
+
+        if T is null {
+            // Not in tree -- should we complain?
+            return
+        }
+
+        switch X =? T.Value {
+          case #less:
+            delete(T.Left, X)
+          case #greater:
+            delete(T.Right, X)
+          case #equal:
+            // If we're a leaf, easy, otherwise reduce to leaf switch. 
+            if isLeaf(T) {
+                T = null
+            } else if T.Left is null {
+                // Get successor value and delete it from right tree,
+                // and set root to have that value
+                final Succ = successor(T)
+                delete(T.Right, Succ)
+                T.Value = Succ
+            } else {
+                // Get predecessor value and delete it from left tree,
+                // and set root to have that value
+                final Pred = predecessor(T)
+                delete(T.Left, Pred)
+                T.Value = Pred
+            }
+          case #unordered:
+            // Not in tree; should we complain?
+            return
+        }
+
+        // Rebalance the tree. Decrease the level of all nodes in this level if
+        // necessary, and then skew and split all nodes in the new level.
+
+        if T is null {
+            return
+        }
+
+        decreaseLevel(T)
+        skew(T)
+        skew(T.Right)
+        if T.Right not null {
+            skew(T.Right.Right)
+        }
+        split(T)
+        split(T.Right)
+    }
+
+    Boolean "in"(Element X, optional AATree T) as Result {
+        for (P => T while P not null) {
+            switch X =? P.Value {
+              case #less:
+                continue with P => P.Left
+              case #greater:
+                continue with P => P.Right
+              case #equal:
+                return #true
+              case #unordered:
+                return #false
+            }
+        }
+        return #false   // Not found
+    }
+
+    optional Element first(optional AATree T) {
+      // Return first (smallest) element in tree
+        if T is null {
+            return null
+        } else {
+            return leftmost(T).Value
+        }
+    }
+
+    optional Element last(optional AATree T) {
+      // Return last (greatest) element in tree
+        if T is null {
+            return null
+        } else {
+            return rightmost(T).Value
+        }
+    }
+
+
+    optional Element removeFirst(var optional AATree T) as Result {
+      // Remove first (smallest) element in tree
+        Result = first(T)
+        if Result not null {
+            delete(T, Result)
+        }
+    }
+
+    optional Element removeLast(var optional AATree T) as Result {
+      // Remove last (greatest) element in tree
+        Result = last(T)
+        if Result not null {
+            delete(T, Result)
+        }
+    }
+
+    optional Element removeAny(var optional AATree T) as Result {
+      // Remove some element from tree
+        if T is null {
+            return null
+        }
+        Result = T.Value
+        if Result not null {
+            delete(T, Result)
+        }
+    }
+
+    Boolean isEmpty(optional AATree T) {
+      // Return True if the tree is empty
+        return T is null
+    }
+
+    UnivInteger count(optional AATree T) {
+      // Return a count of the nodes in the tree
+        if T is null {
+            return 0
+        } else {
+            return count(T.Left) + count(T.Right) + 1
+        }
+    }
+
+    optional Element overlapping(optional AATree T, Element X) {
+        // input: X, the value to find, and T, 
+        // the root of the tree to be searched.
+        // output: the element equal to or "unordered" relative to X.
+        if T is null or else T.Value is null {
+            return null
+        } else {
+            switch X =? T.Value {
+              case #less:
+                return overlapping(T.Left, X)
+              case #greater:
+                return overlapping(T.Right, X)
+              case #equal | #unordered:
+                // close enough
+                return T.Value
+            }
+        }
+    }
+
+}
+
+void java.test.testAATree
+  (UnivInteger A, UnivInteger B, UnivInteger C) {
+    type UnivTree is AATree<UnivInteger>
+    var UnivTree T = []
+    var UnivInteger X = A
+
+    insert(T, A)
+    println("Count = " + count(T) + " after insert of " + A)
+    insert(T, B)
+    println("Count = " + count(T) + " after insert of " + B)
+    insert(T, C)
+    println("Count = " + count(T) + " after insert of " + C)
+
+    insert(T, A)
+    println("Count = " + count(T) + " after another insert of " + A)
+
+    println(A + " in T = " + (A in T))
+    println(B + " in T = " + (B in T))
+    println(C + " in T = " + (C in T))
+    println("7 in T = " + (7 in T))
+
+    for (E = removeFirst(T) then removeFirst(T) while E not null) {
+        println("removeFirst = " + E)
+    }
+
+    println("Count after loop : " + count(T))
+
+    for (I in 1..10 forward) {
+        insert(T, I)
+        println("Count = " + count(T) + " after insert of " + I)
+    }
+
+    for (L = removeLast(T) then removeLast(T) while L not null) {
+        println("removeLast = " + L)
+    }
+
+    println("Count after loop : " + count(T))
+
+    for (J in 1..10 reverse) {
+        insert(T, J)
+        println("Count = " + count(T) + " after insert of " + J)
+    }
+
+    println("Count after loop : " + count(T))
+
+    println("overlapping(T, 5) = " + overlapping(T, 5))
+
+    for (Z = removeAny(T) then removeAny(T) while Z not null) {
+        println("removeAny = " + Z)
+    }
+
+    println("Count after loop : " + count(T))
+
+    for (K in 1..10) {
+        insert(T, K)
+        println("Count = " + count(T) + " after insert of " + K)
+    }
+
+    for (F = removeFirst(T) then removeFirst(T) while F not null) {
+        println("removeFirst = " + F)
+    }
+
+    println("Count after loop : " + count(T))
+
+}
+
+interface java.util.Keyed<Hashable<> as KeyType> {
+    ref final KeyType keyOf(ref final Keyed KV)
+    Boolean hasValue(Keyed KV)
+	// Return #true if Keyed object has a non-null value
+    Keyed keyOnly(KeyType Key)
+	// Return a Keyed object given a key, having no associated value
+}
+
+class interface java.util.KeyValue
+  <Assignable<> as KeyType, Assignable<> as ValueType> 
+  implements Keyed<KeyType> {
+  // This supports the use of [Key => Value] as a way to
+  // add a single element to an existing indexable container of some sort.
+    var optional KeyType Key
+    var optional ValueType Value
+    KeyValue "[]"()
+    ref var ValueType "var_indexing"(ref var KeyValue KV, KeyType Index)
+    ref final KeyType keyOf(ref final KeyValue KV)
+    Boolean hasValue(KeyValue KV)
+	// Return #true if KeyValue object has a non-null value
+    KeyValue keyOnly(KeyType Key)
+	// Return a KeyValue object given a key, having no associated value
+}
+
+class java.util.KeyValue {
+  public
+    KeyValue "[]"() {
+	return (Key => null, Value => null)
+    }
+
+    ref var ValueType "var_indexing"(ref var KeyValue KV, KeyType Index) {
+	KV.Key = Index
+	return KV.Value
+    }
+
+    ref final KeyType keyOf(ref final KeyValue KV) {
+	return KV.Key
+    }
+
+    Boolean hasValue(KeyValue KV) {
+	// Return #true if KeyValue object has a non-null value
+	return KV.Value not null
+    }
+
+    KeyValue keyOnly(KeyType Key) {
+	// Return a KeyValue object given a key, having no associated value
+	return [Key => null]
+    }
+}
+
+class interface java.util.BasicMap<Keyed<> as KVType> {
+  // A basic hashed-map module
+
+    BasicMap "[]"()
+
+    void "|="(var BasicMap Left, KVType Right)
+	// Add Key=>Value to BasicMap, replacing pre-existing BasicMapping
+	// for Key, if any.
+
+    void "<|="(var BasicMap Left, var optional KVType Right)
+	// Move Key=>Value into BasicMap, replacing pre-existing BasicMapping
+	// for Key, if any, leaving Right null.
+
+    void "+="(var BasicMap Left, KVType Right) is "|="
+	// A synonym for adding a key=>value KVType
+
+    Boolean "in"(KVType.KeyType Left, BasicMap Right)
+	// Return True if given key has a BasicMapping in the BasicMap
+
+    void "-="(var BasicMap M, KVType.KeyType Key)   // aka Exclude
+	// Remove BasicMapping for Right, if present
+
+    Set<KVType.KeyType> "index_set"(BasicMap M)
+	// Return set of keys with BasicMappings
+
+    ref KVType "indexing"(ref BasicMap M, KVType.KeyType Key)
+	// Used for references to M[Key]; requires the Key to be in M.
+
+    ref var optional KVType "var_indexing"(ref var BasicMap M, KVType.KeyType Key)
+	// Used for assignments to M[Key]; Key is added to M if not present
+
+    optional KVType removeAny(var BasicMap M)
+	// Remove one BasicMapping from the BasicMap.  
+	// Return null if BasicMap is empty
+
+    UnivInteger count(BasicMap M)
+	// Number of BasicMappings in the table
+
+    UnivInteger "magnitude"(BasicMap) is count
+
+    Boolean isEmpty(BasicMap M)
+	// Return True if map has no mappings
+
+    void dumpStatistics(BasicMap M)
+      // A debugging routine to show bucket sizes of BasicMap
+
+}
+
+class java.util.BasicMap {
+  // A basic hashed-map module
+
+  // A BasicMap is represented as a hash table, where each bucket {
+  // a linked list of key/value KVTypes.
+  // When key/value KVTypes are deleted from the BasicMap they end 
+  // up as "null"s in the list.  
+  // We expand the table when the Count gets to be twice
+  // that of the length of the table.
+
+    interface HashBucket<> {
+      // a simple linked-list is used as a hash bucket
+	var optional KVType Elem
+	var optional HashBucket Tail
+    }
+
+    var UnivInteger Count
+    var optional BasicArray<optional HashBucket<>> Table
+    final InitialTableSize = 4
+    final Boolean Debugging = #false
+    
+    BasicMap empty(UnivInteger TableSize) {
+	// create an empty BasicMap with the given table size
+        return (Count => 0, Table => create(TableSize, null))
+    }
+
+    void moveOne(var BasicMap To, var optional KVType Elem) {
+	// Move Element into table, without expanding table.
+	// Elem is set to null as a result.
+	final Index = hash(keyOf(Elem)) mod |To.Table|
+	ref Bucket => To.Table[Index]
+
+	if Bucket is null {
+	    // Bucket is now empty, so create bucket
+	    // with Elem as its only element.
+	    Bucket = (Elem <== Elem, Tail => null)
+	} else {
+	    // See whether Elem already in bucket
+	    var Boolean HasEmptySlot = #false
+	    for (B => Bucket then B.Tail while B not null) {
+		if (B.Elem is null) {
+		    // Remember there is an empty slot
+		    HasEmptySlot = #true
+		} else if (keyOf(Elem) == keyOf(B.Elem)) {
+		    // Already there; replace it in switch Value is different.
+		    B.Elem <== Elem
+		    return
+		}
+	    }
+
+	    if (HasEmptySlot) {
+		// Fill in the empty slot
+		for (B => Bucket then B.Tail while B not null) {
+		    if B.Elem is null {
+			// Use the empty slot
+			B.Elem <== Elem
+			break
+		    }
+		}
+	    } else {
+		// Make old bucket the new tail of the new bucket.
+		Bucket = (Elem <== Elem, Tail <== Bucket)
+	    }
+	}
+
+	To.Count++
+    }
+
+    void addOne(var BasicMap To, KVType Elem) {
+	// Add Element to table, without expanding it
+	var ElemCopy for To = Elem
+
+	// Just pass the buck to "MoveOne"
+	moveOne(To, ElemCopy)
+    }
+
+    void expandTable(var BasicMap Expanding) {
+	// Expand table of given BasicMap.
+	if Debugging {
+	    println(" Expanding hash table, Count = " + Expanding.Count +
+	      ", Length = " + |Expanding.Table|)
+	}
+	var OldBasicMap <== Expanding
+	Expanding = empty(2 * |OldBasicMap.Table|)
+	// Move elements into new table
+	for {
+	    var Elem for Expanding = removeAny(OldBasicMap)
+		// "for Expanding" means to allocate Elem in
+		// region associated with Expanding.
+	    if (Elem is null) {
+		break
+	    }
+	    moveOne(Expanding, Elem)
+	}
+	if Debugging {
+	    println(" After expansion, Count = " + Expanding.Count +
+	      ", Length = " + |Expanding.Table|)
+	}
+    }
+
+  public
+    BasicMap "[]"() {
+        return (Count => 0, Table => null)
+    }
+
+    void "|="(var BasicMap Left, KVType Right) {
+	if not hasValue(Right) {
+	    // Putting in Key => null is equivalent to deleting Key
+	    Left -= keyOf(Right)
+	    return
+	}
+
+	if Left.Table is null {
+	    Left = empty(InitialTableSize)
+	} else if Left.Count >= 2*length(Left.Table) {
+	    // Expand table if averaging 2 or more per hash bucket
+	    expandTable(Left)
+	}
+        addOne(Left, Right)
+    }
+
+    void "<|="(var BasicMap Left, var optional KVType Right) {
+	// Move Key=>Value into BasicMap, replacing pre-existing BasicMapping
+	// for Key, if any, leaving Right null.
+	if not hasValue(Right) {
+	    // Putting in Key => null is equivalent to deleting Key
+	    Left -= keyOf(Right)
+	    Right = null
+	    return
+	}
+
+	if Left.Table is null {
+	    Left = empty(InitialTableSize)
+	} else if Left.Count >= 2*length(Left.Table) {
+	    // Expand table if averaging 2 or more per hash bucket
+	    expandTable(Left)
+	}
+        moveOne(Left, Right)
+    }
+
+    Boolean "in"(KVType.KeyType Left, BasicMap Right) {
+	if (Right.Count == 0) {
+	    // Empty BasicMap
+	    return #false
+	}
+	final Index = hash(Left) mod length(Right.Table)
+	ref Bucket => Right.Table[Index]
+	if (Bucket is null) {
+	    // Hash bucket is empty
+	    return #false
+	}
+	// Scan for Elem in hash bucket
+	for (B => Bucket then B.Tail while B not null) {
+	    if (B.Elem not null and then
+	      hasValue(B.Elem) and then
+	      keyOf(B.Elem) == Left) {
+		// Found it
+		return #true
+	    }
+	}
+	// Not in BasicMap
+	return #false
+    }
+
+    void "-="(var BasicMap M, KVType.KeyType Key) {
+      // Remove the given key from the BasicMap, if present
+	if M.Count == 0 {
+	    // Empty BasicMap
+	    return
+	}
+
+	final Index = hash(Key) mod length(M.Table)
+	ref Bucket => M.Table[Index]
+	if Bucket is null {
+	    // Hash bucket is empty
+	    return
+	}
+
+	// Scan for Key in bucket
+	for (B => Bucket then B.Tail while B not null) {
+	    if (B.Elem not null and then
+	      keyOf(B.Elem) == Key) {
+		// Found it.  Map it to null, and decrement BasicMap count.
+		B.Elem = null
+		M.Count--
+		return
+	    }
+	}
+	// Not found
+    }
+   
+    Set<KVType.KeyType> "index_set"(BasicMap M) as Result {
+	// Return set of keys with non-null BasicMappings
+	Result = []
+        if M.Count == 0 {
+            return
+        }
+	for (each Bucket of M.Table) {
+	    for (B => Bucket then B.Tail while B not null) {
+		if (B.Elem not null and then
+		  hasValue(B.Elem)) {
+		    Result |= keyOf(B.Elem)
+		}
+	    }
+	}
+    }
+
+    ref KVType "indexing"(ref BasicMap M, KVType.KeyType Key) {
+	// Used for references to M[Key]; requires the Key to be in M.
+	{> M not null; M.Count > 0 <}
+	final Index = hash(Key) mod length(M.Table)
+	// Scan for Key in bucket
+	for (B => M.Table[Index] then B.Tail while B not null) {
+	    if (B.Elem not null and then
+	      keyOf(B.Elem) == Key) {
+		// Found it.  Return reference to element of KVType
+		{> hasValue(B.Elem) <}
+		return B.Elem
+	    }
+	}
+	{> #false <}
+    }
+
+    ref var optional KVType "var_indexing"(ref var BasicMap M, KVType.KeyType Key) {
+	// Used for assignments to M[Key]; Key is added to M if not present
+	if (M.Table not null) {
+	    final Index = hash(Key) mod length(M.Table)
+	    // Scan for Key in bucket
+	    for (B => M.Table[Index] then B.Tail while B not null) {
+		if (B.Elem not null and then
+		  keyOf(B.Elem) == Key) {
+		    // Found it.  Return reference to element of KVType
+		    return B.Elem
+		}
+	    }
+	}
+
+	// Not in table.  Add it, and then return reference
+	if (M.Table is null) {
+	    M = empty(InitialTableSize)
+	} else if (M.Count >= 2*length(M.Table)) {
+	    // Expand table if averaging 2 or more per hash bucket
+	    expandTable(M)
+	}
+
+	// Add [Key => null] to front of appropriate bucket.
+	final Index = hash(Key) mod length(M.Table)
+	ref Bucket => M.Table[Index]
+	Bucket = (Elem => keyOnly(Key), Tail <== Bucket)
+	M.Count++
+
+	// Return ref to new element
+	return Bucket.Elem
+    }
+
+    UnivInteger count(BasicMap M) {
+        if M is null {
+            return 0
+        } else {
+            return M.Count
+        }
+    }
+
+    Boolean isEmpty(BasicMap M) {
+	// Return True if map has no mappings
+	return M.Count == 0
+    }
+
+    optional KVType removeAny(var BasicMap M) as Result {
+	if M.Count == 0 {
+	    // BasicMap is empty
+	    return null
+	} else {
+	    // Find a non-empty bucket and pull out an item.
+	    for each Bucket of M.Table {
+		if Bucket not null {
+		    for B => Bucket then B.Tail while B not null {
+			if B.Elem not null {
+			    // Found an item, remove from Bucket and return
+			    Result <== B.Elem
+			    M.Count--
+			    return
+			}
+		    }
+		    // This bucket is completely empty, so might
+		    // as well empty it out.
+		    Bucket = null
+		}
+		// Go on to the next bucket, this one's empty
+	    }
+	    // Should never get here
+	    return null
+	}
+    }
+
+    void dumpStatistics(BasicMap M) {
+      // A debugging routine to show bucket sizes of BasicMap
+	println("BasicMap statistics: Count = " + M.Count)
+	if M.Table is null {
+	    println(" Table is null")
+	} else {
+	    println(" Table of length " + length(M.Table))
+	    for each [I => Bucket] of M.Table forward {
+		print("  Bucket #" + I)
+		if Bucket is null {
+		    println(" is null")
+		} else {
+		    var Len = 0
+		    var Holes = 0
+		    for B => Bucket then B.Tail while B not null {
+			Len++
+			if B.Elem is null {
+			    // This list has a hole
+			    Holes++
+			}
+		    }
+		    if Holes > 0 {
+			println(" of length " + Len + " with " + 
+			  Holes + " holes")
+		    } else {
+			println(" of length " + Len)
+		    }
+		}
+	    }
+	}
+    }
+
+}
+
+void java.test.testBasicMap(UnivEnumeration X, UnivString Y,
+  UnivEnumeration A, UnivString B) {
+    type EnumStringKVType is KeyValue<UnivEnumeration, UnivString>
+    type EnumStringBasicMap is BasicMap<EnumStringKVType>
+
+    var EnumStringBasicMap M = [X => [X => Y], A => [A => B]]
+
+    println("Count = " + count(M))
+
+    for each KV of M {
+	ref final K => KV.Key
+	ref final V => KV.Value
+	println("BasicMapping " + K + " => " + V)
+	println(K + " in M = " + (K in M))
+    }
+
+    println("#xy in M = " + (#xy in M))
+
+    M |= [X => null]
+
+    println("Count after deletion = " + count(M))
+
+    for each KV of M {
+	ref final K => KV.Key
+	ref final V => KV.Value
+	println("BasicMapping " + K + " => " + V)
+    }
+
+    M |= [X => "a new value"]
+
+    println("Count after addition = " + count(M))
+
+    for each KV of M {
+	ref final K => KV.Key
+	ref final V => KV.Value
+	println("BasicMapping " + K + " => " + V)
+    }
+
+    M |= [X => "a third value"]
+
+    println("Count after replacement = " + count(M))
+
+    for each KV of M {
+	ref final K => KV.Key
+	ref final V => KV.Value
+	println("BasicMapping " + K + " => " + V)
+    }
+
+    M -= A
+
+    println("Count after deletion = " + count(M))
+
+    for each KV of M {
+	ref final K => KV.Key
+	ref final V => KV.Value
+	println("BasicMapping " + K + " => " + V)
+    }
+
+    var Ran = Random.start(hash(A))
+    var BasicMap<KeyValue<UnivInteger, UnivInteger>> MUI = []
+
+    println("Adding 100 random KVTypeings to BasicMap.")
+    for I in 1..100 {
+	final Key = next(Ran) mod 100
+	final Value = next(Ran) mod 100
+	MUI[Key] = [Key => Value]
+    }
+    println("BasicMap is now of count = " + count(MUI))
+
+    for each [K => KV] of MUI {
+	ref final V => KV.Value
+	println("BasicMapping " + K + " => " + V)
+	println("MUI[" + K + "] = " + MUI[K].Value)
+    }
+
+    var I = 0
+    for KVType in MUI {
+	I++
+	print(" [" + keyOf(KVType) + " => " + KVType.Value + "]")
+	if I mod 5 == 0 {
+	    print('\n')
+	}
+    }
+    if I mod 5 != 0 {
+	print('\n')
+    }
+
+}
+
+class java.util.Set {
+  // A hashed-set module
+
+  // A Set is represented as a hash table, where each bucket is a linked list.
+  // When elements are deleted from the Set they end up a "null"s in the
+  // list.  We expand the table when the Count gets to be twice
+  // that of the length of the table.
+
+    class interface KVWrapper<> implements Keyed<ElementType> {
+      // create a wrapper for a key that implements the Keyed interface
+	var ElementType Key
+	ref final ElementType keyOf(ref final KVWrapper KV)
+	Boolean hasValue(KVWrapper KV)
+	    // Return #true if KVWrapper object has a non-null value
+	KVWrapper keyOnly(ElementType Key)
+	    // Return a KVWrapper object given a key, 
+	    // having no associated value
+    }
+
+    class KVWrapper {
+      // create a wrapper for a key that implements the Keyed interface
+      public
+	ref final ElementType keyOf(ref final KVWrapper KV) {
+	    return KV.Key
+	}
+
+	Boolean hasValue(KVWrapper KV) {
+	    // Return #true if KVWrapper object has a non-null value
+	    return #true
+	}
+
+	KVWrapper keyOnly(ElementType Key) {
+	    // Return a KVWrapper object given a key, 
+	    // having no associated value.
+	    // NOTE: This is not really meaningful for sets, since there
+	    //       isn't a value.
+	    return (Key => Key)
+	}
+    }
+	
+    var BasicMap<KVWrapper<>> Data
+	// Set is represented as a map from keys to nothing.
+
+  public
+    Set "[]"() {
+        return (Data => [])
+    }
+
+    Set singleton(ElementType Elem) as Result {
+	Result = []
+	Result.Data |= (Key => Elem)
+    }
+
+    Set "|"(ElementType Left, ElementType Right) as Result {
+	Result = []
+	Result.Data |= (Key => Left)
+	Result.Data |= (Key => Right)
+    }
+
+    Set "|"(Set Left, ElementType Right) as Result {
+	Result = Left
+	Result |= Right
+    }
+
+    Set "|"(ElementType Left, Set Right) as Result {
+	Result = Right
+	Result |= Left
+    }
+
+    Set "|"(Set Left, Set Right) as Result {
+	// Union, iterate over smaller Set
+	if count(Left.Data) <= count(Right.Data) {
+	    Result = Right
+	    Result |= Left
+	} else {
+	    Result = Left
+	    Result |= Right
+	}
+    }
+
+    void "|="(var Set Left, Set Right) {
+        if count(Left.Data) == 0 {
+            Left = Right
+        } else {
+	    for Elem in Right {
+		Left |= Elem
+	    }
+	}
+    }
+
+    void "|="(var Set Left, ElementType Right) {
+	Left.Data |= (Key => Right)
+    }
+
+    void "<|="(var Set Left, var optional ElementType Right) {
+	// Move Right into Set Left
+	var KVWrapper KV = (Key <== Right)
+	Left.Data <|= KV
+    }
+
+    void "<|="(var Set Left, var Set Right) {
+	// Move all elements of Right into Left, leaving Right empty.
+	for {
+	    // Extract element from Right, in region for Left
+	    var Elem for Left = removeAny(Right)
+	    if Elem is null {
+		// All done
+		return
+	    }
+	    // Move element into Left
+	    Left <|= Elem
+	}
+    }
+
+    Boolean "in"(ElementType Left, Set Right) {
+	return Left in Right.Data
+    }
+
+    Ordering "=?"(Set Left, Set Right) {
+	// Return #equal if Left and Right have the same elements
+	// Return #less if Left is a proper subset of Right
+	// Return #greater if Left is a proper superset of Right
+	// Return #unordered otherwise
+        var Overlaps = 0
+        var Missing = 0
+        for Elem in Left {
+            if Elem not in Right {
+                Missing++
+            } else {
+                Overlaps++
+            }
+        }
+
+        if Missing > 0 {
+            // Can't be equal, but Left might be a proper superset
+            if Overlaps < count(Right.Data) {
+                return #unordered
+            } else {
+                // Left is a superset
+                return #greater
+            }
+        } else {
+            // Might be equal or Left might be a proper subset
+            if Overlaps < count(Right.Data) {
+                // Left is a proper subset of Right
+                return #less
+            } else {
+                return #equal
+            }
+        }
+    }
+
+    Set "and"(Set Left, Set Right) as Result {
+	// Intersection, iterate over smaller Set
+	if count(Left.Data) < count(Right.Data) {
+	    // Left is smaller
+	    Result = []
+	    for Elem in Left {
+		if Elem in Right {
+		    Result |= Elem
+		}
+	    }
+	} else {
+	    // Left is bigger
+	    Result = Left
+	    for Elem in Right {
+		if Elem in Left {
+		    Result |= Elem
+		}
+	    }
+	}
+    }
+
+    void "and="(var Set Left, Set Right) {
+	// Intersection, iterate over smaller Set
+	if count(Left.Data) <= count(Right.Data) {
+	    // Left is smaller
+	    for Elem in Left {
+		if Elem not in Right {
+		    Left -= Elem
+		}
+	    }
+	} else {
+	    // Left is bigger
+	    var Set Result for Left = []
+	    for Elem in Right {
+		if Elem in Left {
+		    Result |= Elem
+		}
+	    }
+	    Left <== Result
+	}
+    }
+
+    Set "xor"(Set Left, Set Right) as Result {
+	// Symmetric difference
+	// Want elements that are only in one of the two inputs
+	if count(Left.Data) < count(Right.Data) {
+	    // Swap order to shorten iteration
+	    Result = Right
+	    Result xor= Left
+	} else {
+	    Result = Left
+	    Result xor= Right
+	}
+    }
+    
+    void "xor="(var Set Left, Set Right) {
+	// Want elements that are only in one of the two inputs
+	for Elem in Right {
+	    if Elem in Left {
+		Left -= Elem
+	    } else {
+		Left += Elem
+	    }
+	}
+    }
+
+    Set "-"(Set Left, Set Right) as Result {
+	// Set difference, iterate over smaller Set
+	if count(Left.Data) < count(Right.Data) {
+	    // Left is smaller, build up 
+	    Result = []
+	    for Elem in Left {
+		if Elem not in Right {
+		    Result |= Elem
+		}
+	    }
+	} else {
+	    // Left is bigger, tear down
+	    Result = Left
+	    Result -= Right
+	}
+    }
+
+    void "-="(var Set Left, Set Right) {
+	// Compute Set difference
+	for Elem in Right {
+	    Left -= Elem
+	}
+    }
+
+    void "-="(var Set S, ElementType Elem) {
+      // Remove the given element from the Set, if present
+	S.Data -= Elem
+    }
+   
+    UnivInteger count(Set S) {
+	return count(S.Data)
+    }
+
+    Boolean isEmpty(Set S) {
+	return isEmpty(S.Data)
+    }
+
+    optional ElementType removeAny(var Set S) as Result {
+	var ResultWrapper for Result = removeAny(S.Data)
+	if ResultWrapper is null {
+	    return null
+	} else {
+	    Result <== ResultWrapper.Key
+	}
+    }
+
+    void dumpStatistics(Set S) {
+      // A debugging routine to show bucket sizes of Set
+	dumpStatistics(S.Data)
+    }
+
+}
+
+void java.test.testSet(UnivInteger A, UnivInteger X, UnivInteger Y, UnivInteger Z) {
+    var Set<UnivInteger> S = X | Y | Z
+    if A in S {
+        println(A + " is in " + X + "|" + Y + "|" + Z)
+    } else {
+        println(A + " is *not* in " + X + "|" + Y + "|" + Z)
+    }
+
+    final SaveSet = S
+
+    final Set<UnivInteger> CSet = [Z, Y, X]
+    println("[Z, Y, X] =? (X | Y | Z) --> " +
+      ( CSet =? S ))
+
+    var Ran = Random.start(A)
+    println("Adding 100 random digits to Set.")
+    for I in 1..100 {
+	S |= next(Ran) mod 100
+    }
+    println("Set is now of count = " + count(S))
+    println("Contents of Set:")
+    var I = 1
+    for Elem in S {
+	print(Elem + " ")
+	if I mod 10 == 0 {
+	    print('\n')
+	}
+	I++
+    }
+    if count(S) mod 10 != 0 {
+	print('\n')
+    }
+    println("S Before adding random elements =? now --> " +
+      (SaveSet =? S))
+    println("S =? S --> " + (S =? S))
+
+    var Set<UnivInteger> SmallSet = []
+    SmallSet += -1
+    SmallSet or= [2]
+
+    println("S =? (-1 | 2) --> " + (S =? SmallSet))
+    println("[2 , -1] =? (-1 | 2) --> " + ([2, -1] =? SmallSet))
+
+    println("S =? [] --> " + (S =? []))
+
+    println("count(S) = " + count(S))
+    
+    final BeforeExclude = S
+    S -= X
+    println("After exclude(S, " + X + "), count(S) = " + count(S))
+    println("BeforeExclude =? After Exclude --> " + (BeforeExclude =? S))
+
+    dumpStatistics(S)
+}
+
+
+class java.util.CountableSet {
+
+    type ElementInterval is ClosedInterval<ElementType>
+
+    var optional AATree<ElementInterval> Items
+
+  public
+    CountableSet "[]"() {
+        return (Items => [])
+    }
+
+    CountableSet singleton(ElementType Elem) as Result {
+	Result = []
+	Result.Items |= (Low => Elem, High => Elem)
+    }
+
+    CountableSet ".."(ElementType Left, ElementType Right) as Result {
+        Result = []
+        if Left <= Right {
+            Result.Items |= (Low => Left, High => Right)
+        }
+    }
+    
+    CountableSet "<.."(ElementType Left, ElementType Right) as Result {
+        Result = []
+        if Left < Right {
+            Result.Items |= (Low => Left+1, High => Right)
+        }
+    }
+    
+    CountableSet "<..<"(ElementType Left, ElementType Right) as Result {
+        Result = []
+        if Left < Right-1 {
+            Result.Items |= (Low => Left+1, High => Right-1)
+        }
+    }
+    
+    CountableSet "..<"(ElementType Left, ElementType Right) as Result {
+        Result = []
+        if Left < Right {
+            Result.Items |= (Low => Left, High => Right-1)
+        }
+    }
+    
+    CountableSet "|"(ElementType Left, ElementType Right) as Result {
+        Result = []
+        if Left >= Right-1 and then Left <= Right + 1 {
+            // Can combine elements into a single interval
+            if Left <= Right {
+                Result.Items |= (Low => Left, High => Right)
+            } else {
+                Result.Items |= (Low => Right, High => Left)
+            }
+        } else {
+            // Make each element its own interval
+            Result.Items |= (Low => Left, High => Left)
+            Result.Items |= (Low => Right, High => Right)
+        }
+    }
+
+    CountableSet "|"(CountableSet Left, ElementType Right) as Result {
+        Result = Left
+        Result |= Right
+    }
+
+    CountableSet "|"(ElementType Left, CountableSet Right) {
+        return Right | Left
+    }
+
+    CountableSet "|"(CountableSet Left, CountableSet Right) as Result {
+        Result = Left
+        Result |= Right
+    }
+
+    void "|="(var CountableSet Left, ElementType Right) {
+        final ElementInterval RightIV = (Low => Right, High => Right)
+        final LeftIV = overlapping(Left.Items, RightIV)
+        if LeftIV is null {
+            // Nothing overlaps, need to add it (might want to merge someday)
+            Left.Items |= RightIV
+        }
+    }
+
+    void "<|="(var CountableSet Left, var optional ElementType Right) {
+        // Move element into set, leaving Right null afterward.
+	// NOTE: No copy minimization done for countable types.
+	Left |= Right
+	Right = null
+    }
+
+    void "<|="(var CountableSet Left, var CountableSet Right) {
+	// Move all elements of Right into Left, leaving Right empty.
+        if count(Left.Items) == 0 {
+            Left.Items <== Right.Items
+        } else {
+            // Iterate through the tree
+	    for {
+		// Extract interval from Right
+		var RightIV for Left = removeAny(Right.Items)
+
+		if RightIV is null {
+		    return   // All done
+		}
+
+                // See whether it overlaps with an existing interval
+                // in Left tree
+                var LeftIV for Left = overlapping(Left.Items, RightIV)
+                while LeftIV not null {
+                    if LeftIV.Low <= RightIV.Low and then
+                      LeftIV.High >= RightIV.High {
+                        // RightIV is subsumed; nothing to add in
+                        RightIV = null
+                        break
+                    } else {
+                        // Need to delete LeftIV and incorporate
+                        // into RightIV
+                        delete(Left.Items, LeftIV)
+                        if LeftIV.Low < RightIV.Low {
+                            RightIV.Low = LeftIV.Low
+                        }
+                        if LeftIV.High > RightIV.High {
+                            RightIV.High = LeftIV.High
+                        }
+
+                        // Now see if there is anything still overlapping
+                        LeftIV = overlapping(Left.Items, RightIV)
+                    }
+                }
+
+                if RightIV not null {
+                    // Add RightIV
+                    Left.Items <|= RightIV
+                }
+
+            }
+        }
+    }
+
+    void "|="(var CountableSet Left, CountableSet Right) {
+	// Pass the buck to the "<|=" operation
+	var RightCopy for Left = Right
+	Left <|= RightCopy
+    }
+
+    CountableSet "-"(CountableSet Left, CountableSet Right) as Result {
+      // Set difference
+	Result = Left
+	Result -= Right
+    }
+
+    CountableSet "-"(CountableSet Left, ElementType Right) as Result {
+      // Remove one element
+        Result = Left
+        Result -= Right
+    }
+        
+    void "-="(var CountableSet S, ElementType Elem) {
+      // Remove the given element from the set, if present
+	final IV = overlapping(S.Items, (Low => Elem, High => Elem))
+	  // Get interval, if any, which overlaps given element
+
+	if IV not null {
+	    // Delete interval and put back after removing Elem
+	    delete(S.Items, IV)
+	    if IV.High > IV.Low {
+		// We need to put something back
+		if IV.Low == Elem {
+		    S.Items |= (Low => IV.Low + 1, High => IV.High)
+		} else if IV.High == Elem {
+		    S.Items |= (Low => IV.Low, High => IV.High-1)
+		} else {
+		    // Elem is in the middle, put back intervals
+		    // on either side.
+		    S.Items |= (Low => IV.Low, High => Elem-1)
+		    S.Items |= (Low => Elem+1, High => IV.High)
+		}
+	    }
+	}
+
+    }
+
+    void "-="(var CountableSet Left, CountableSet Right) {
+      // Remove all elements of Right from Left, if present
+	for Elem in Right {
+	    Left -= Elem
+	}
+    }
+
+    CountableSet "and"(CountableSet Left, CountableSet Right) as Result {
+	// Intersection
+	Result = []
+	for Elem in Right {
+	    if Elem in Left {
+		Result += Elem
+	    }
+	}
+    }
+
+    void "and="(var CountableSet Left, CountableSet Right) {
+	// Intersection
+	for Elem in Left {
+	    if Elem not in Right {
+		Left -= Elem
+	    }
+	}
+    }
+
+    CountableSet "xor"(CountableSet Left, CountableSet Right) as Result {
+	// Symmetric difference
+	Result = Left
+	Result xor= Right
+    }
+
+    void "xor="(var CountableSet Left, CountableSet Right) {
+	// Symmetric difference
+	// Want elements that are only in one of the two inputs
+	for Elem in Right {
+	    if Elem in Left {
+		Left -= Elem
+	    } else {
+		Left += Elem
+	    }
+	}
+    }
+
+    Boolean "in"(ElementType Left, CountableSet Right) {
+        return overlapping(Right.Items, (Low => Left, High => Left)) not null
+    }
+
+    Ordering "=?"(CountableSet Left, CountableSet Right) {
+	// Return #equal if Left and Right have the same elements
+	// Return #less if Left is a proper subset of Right
+	// Return #greater if Left is a proper superset of Right
+	// Return #unordered otherwise
+        var Overlaps = 0
+        var Missing = 0
+        for Elem in Left {
+            if Elem not in Right {
+                Missing++
+            } else {
+                Overlaps++
+            }
+        }
+
+        if Missing > 0 {
+            // Can't be equal, but Left might be a proper superset
+            if Overlaps < count(Right) {
+                return #unordered
+            } else {
+                // Left is a superset
+                return #greater
+            }
+        } else {
+            // Might be equal or Left might be a proper subset
+            if Overlaps < count(Right) {
+                // Left is a proper subset of Right
+                return #less
+            } else {
+                return #equal
+            }
+        }
+    }
+
+    UnivInteger count(CountableSet S) as Result {
+        // Return count of items in set
+
+        Result = 0
+
+        // Copy items and then iterate through them to build up count
+        var Items = S.Items
+        var NextIV = removeAny(Items)
+        while NextIV not null {
+            Result += NextIV.High - NextIV.Low + 1
+            NextIV = removeAny(Items)
+        }
+    }
+
+    Boolean isEmpty(CountableSet S) {
+	return isEmpty(S.Items)
+    }
+
+    optional ElementType first(CountableSet S) {
+        final FirstIV = first(S.Items)
+        if FirstIV is null {
+            return null
+        } else {
+            return FirstIV.Low
+        }
+    }
+
+    optional ElementType last(CountableSet S) {
+        final LastIV = last(S.Items)
+        if LastIV is null {
+            return null
+        } else {
+            return LastIV.High
+        }
+    }
+
+    optional ElementType removeFirst(var CountableSet S) as Result {
+        // Return first element of set
+
+        // Get first interval in tree
+        var FirstIV = removeFirst(S.Items)
+        if FirstIV is null {
+            // Tree is empty
+            return null
+        }
+
+        // See whether interval has more than one value in it
+        if FirstIV.High > FirstIV.Low {
+            // Need to put back the remainder
+            S.Items |= (Low => FirstIV.Low+1, High => FirstIV.High)
+        }
+
+        // Return first item
+        return FirstIV.Low
+    }
+
+    optional ElementType removeLast(var CountableSet S) as Result {
+        // Remove last element of set
+
+        // Get Last interval in tree
+        var LastIV = removeLast(S.Items)
+        if LastIV is null {
+            // Tree is empty
+            return null
+        }
+
+        // See whether interval has more than one value in it
+        if LastIV.High > LastIV.Low {
+            // Need to put back the remainder
+            S.Items |= (Low => LastIV.Low, High => LastIV.High-1)
+        }
+
+        // Return Last item
+        return LastIV.High
+    }
+
+    optional ElementType removeAny(var CountableSet S) {
+        // Remove any element of set
+
+        // Get any interval in tree
+        var AnyIV = removeAny(S.Items)
+        if AnyIV is null {
+            // Tree is empty
+            return null
+        }
+
+        // See whether interval has more than one value in it
+        if AnyIV.High > AnyIV.Low {
+            // Need to remove one to return and put back the remainder
+            if (AnyIV.High - AnyIV.Low) mod 2 == 0 {
+                // Return high bound when high-low is even
+                // NOTE: We do this to avoid having algorithms become
+                //       dependent on always getting values in ascending 
+                //       or descending order.
+                S.Items |= (Low => AnyIV.Low, High => AnyIV.High-1)
+                return AnyIV.High
+            } else {
+                // Return low bound when high-low is odd
+                S.Items |= (Low => AnyIV.Low+1, High => AnyIV.High)
+                return AnyIV.Low
+            }
+        } else {
+            // Return only item in interval
+            return AnyIV.Low
+        }
+
+    }
+
+}
+
+void java.test.testCountableSet(Integer A, Integer X, Integer Y, Integer Z) {
+    var CountableSet<Integer> S = X | Y..Z
+    println(A + " in " + X + "|" + Y + ".." + Z + "=" + ( A in S ))
+
+    final CountableSet<Integer> Agg = [X, Y, Z]
+    final CountableSet<Integer> Or = Y | Z | X
+
+    println(" [X, Y, Z] =? (Y | Z | X) --> " + ( Agg =? Or ))
+
+    for J in S {
+        println("removeAny(S) = " + J)
+    }
+
+    S = []
+
+    for I in 1..10 forward {
+        S += I
+        println("Adding " + I + " to S, Count = " + count(S))
+    }
+
+    for K in S {
+        println("removeAny(S) = " + K)
+    }
+
+    println("count(S) = " + count(S))
+    S -= 7
+    println("After S -= 7, count(S) = " + count(S))
+
+    var Xor = S xor [2, 5, 12, 15]
+    print("S xor [2, 5, 12, 15] = ")
+    for J in Xor forward {
+	print(J + " ")
+    }
+    print('\n')
+}
+
+class interface java.util.OrderedSet<Comparable<> as ElementType> {
+  // A set abstraction that supports efficiently storing potentially
+  // large ranges of values
+    OrderedSet "[]"()
+
+    OrderedSet singleton(ElementType Elem)
+	// Return a set consisting of a single element
+
+    OrderedSet ".."(ElementType Left, ElementType Right)
+	// Closed interval of values
+    OrderedSet "<.."(ElementType Left, ElementType Right)
+	// open-Closed interval of values
+    OrderedSet "..<"(ElementType Left, ElementType Right)
+	// Closed-open interval of values
+    OrderedSet "<..<"(ElementType Left, ElementType Right)
+	// open interval of values
+
+    OrderedSet "|"(ElementType Left, ElementType Right)
+    OrderedSet "|"(OrderedSet Left, ElementType Right)
+    OrderedSet "|"(ElementType Left, OrderedSet Right)
+    OrderedSet "|"(OrderedSet Left, OrderedSet Right)
+
+    void "|="(var OrderedSet Left, ElementType Right)
+    void "|="(var OrderedSet Left, OrderedSet Right)
+
+    void "<|="(var OrderedSet Left, var optional ElementType Right)
+        // Move element into set, leaving Right null afterward.
+
+    void "<|="(var OrderedSet Left, var OrderedSet Right)
+	// Move all elements of Right into Left, leaving Right empty.
+
+    OrderedSet "-"(OrderedSet Left, OrderedSet Right)
+      // Set difference
+    void "-="(var OrderedSet S, ElementType Elem)
+      // Remove the given element from the set, if present
+    void "-="(var OrderedSet Left, OrderedSet Right)
+      // Remove all elements of Right from Left, if present
+
+    OrderedSet "or"(OrderedSet Left, OrderedSet Right) is "|"   // union
+    void "or="(var OrderedSet Left, OrderedSet Right) is "|="
+
+    OrderedSet "+"(OrderedSet Left, OrderedSet Right) is "|"   // Union
+    void "+="(var OrderedSet Left, OrderedSet Right) is "|="
+    void "+="(var OrderedSet Left, ElementType Right) is "|="
+   
+    OrderedSet "and"(OrderedSet Left, OrderedSet Right)
+	// Intersection
+    void "and="(var OrderedSet Left, OrderedSet Right)
+
+    OrderedSet "xor"(OrderedSet Left, OrderedSet Right)
+	// Symmetric difference
+    void "xor="(var OrderedSet Left, OrderedSet Right)
+
+    Boolean "in"(ElementType Left, OrderedSet Right)
+
+    Ordering "=?"(OrderedSet Left, OrderedSet Right)
+	// Return #equal if Left and Right have the same elements
+	// Return #less if Left is a proper subset of Right
+	// Return #greater if Left is a proper superset of Right
+	// Return #unordered otherwise
+
+    Boolean isEmpty(OrderedSet S)
+
+    optional ElementType lowerBound(OrderedSet S)
+	// Lower bound of set
+    Boolean lowerBoundIsOpen(OrderedSet S)
+	// Whether lower bound is "open" or "closed"
+
+    optional ElementType upperBound(OrderedSet S)
+	// Upper bound of set
+    Boolean upperBoundIsOpen(OrderedSet S)
+	// Whether upper bound is "open" or "closed"
+
+    optional Interval<ElementType> removeFirst(var OrderedSet S)
+	// Remove first interval of set (lowest low bound)
+
+    optional Interval<ElementType> removeLast(var OrderedSet S)
+	// Remove last interval of set (highest high bound)
+
+    optional Interval<ElementType> removeAny(var OrderedSet S)
+	// Remove an arbitrary interval of set
+
+}
+
+class java.util.OrderedSet {
+
+    type ElementInterval is Interval<ElementType>
+
+    var optional AATree<ElementInterval> Items
+
+    void removeInterval(var OrderedSet S, ElementInterval RemoveIV) {
+      // Remove the given interval from the set, if present
+	if RemoveIV.Low > RemoveIV.High {
+	    // Nothing to remove
+	    return
+	}
+
+	  // Find an interval within the AATree that overlaps
+	for RemainingIV = RemoveIV while RemainingIV not null {
+	    // Get overlap, if any
+	    var IV = overlapping(S.Items, RemainingIV)
+
+	    if IV is null {
+		// No overlap, nothing left to remove
+		break
+	    }
+	
+	    // Found an overlapping interval; delete it and add back what's left
+	    delete(S.Items, IV)
+	    if isStrictlyWithin(RemainingIV, IV) {
+		// Add back left and right remnants
+		// RemainingIV is fully subsumed.
+		S.Items |= (Low => IV.Low, LowIsOpen => IV.LowIsOpen, 
+		  High => RemainingIV.Low, 
+		  HighIsOpen => not RemainingIV.LowIsOpen)
+		S.Items |= (Low => RemainingIV.High, 
+		  LowIsOpen => not RemainingIV.HighIsOpen,
+		  High => IV.High, 
+		  HighIsOpen => IV.HighIsOpen)
+		// we are all done now
+		break
+	    }
+
+	    // May be something left
+	    final Overlap = IV and RemainingIV
+	    IV -= Overlap
+
+	    if not isEmpty(IV) {
+		// Worth putting the interval back
+		S.Items |= IV
+	    }
+
+	    continue with RemainingIV => RemainingIV - Overlap
+
+	}
+
+    }
+
+    Boolean isSubset(OrderedSet Left, OrderedSet Right) {
+	// Return True if Left is a subset of Right
+	for LeftIV in Left {
+	    for RemainingIV = LeftIV while not isEmpty(RemainingIV) {
+		final RightIV = overlapping(Right.Items, RemainingIV)
+		if RightIV is null {
+		    // Found some values that are not in Right
+		    return #false
+		}
+
+		// Loop around with what is left
+		continue with RemainingIV => RemainingIV - RightIV
+	    }
+	}
+	// Everything in Left was found in Right
+	return #true
+    }
+
+  public
+    OrderedSet "[]"() {
+        return (Items => [])
+    }
+
+    OrderedSet singleton(ElementType Elem) as Result {
+	// Return a set consisting of a single element
+	Result = []
+	Result.Items |= singleton(Elem)
+    }
+
+    OrderedSet ".."(ElementType Left, ElementType Right) as Result {
+        Result = []
+        if Left <= Right {
+            Result.Items |= (Low => Left, LowIsOpen => #false, 
+	      High => Right, HighIsOpen => #false)
+        }
+    }
+    
+    OrderedSet "<.."(ElementType Left, ElementType Right) as Result {
+        Result = []
+        if Left < Right {
+            Result.Items |= (Low => Left, LowIsOpen => #true,
+	      High => Right, HighIsOpen => #false)
+        }
+    }
+    
+    OrderedSet "<..<"(ElementType Left, ElementType Right) as Result {
+        Result = []
+        if Left < Right {
+            Result.Items |= (Low => Left, LowIsOpen => #true,
+	      High => Right, HighIsOpen => #true)
+        }
+    }
+    
+    OrderedSet "..<"(ElementType Left, ElementType Right) as Result {
+        Result = []
+        if Left < Right {
+            Result.Items |= (Low => Left, LowIsOpen => #false,
+	      High => Right, HighIsOpen => #true)
+        }
+    }
+    
+    OrderedSet "|"(ElementType Left, ElementType Right) as Result {
+        Result = []
+	Result |= Left
+	if Left != Right {
+	    Result |= Right
+        }
+    }
+
+    OrderedSet "|"(OrderedSet Left, ElementType Right) as Result {
+        Result = Left
+        Result |= Right
+    }
+
+    OrderedSet "|"(ElementType Left, OrderedSet Right) {
+        return Right | Left
+    }
+
+    OrderedSet "|"(OrderedSet Left, OrderedSet Right) as Result {
+        Result = Left
+        Result |= Right
+    }
+
+    void "|="(var OrderedSet Left, ElementType Right) {
+        final ElementInterval RightIV = singleton(Right)
+        final LeftIV = overlapping(Left.Items, RightIV)
+        if LeftIV is null {
+            // Nothing overlaps, need to add it (might want to merge someday)
+            Left.Items |= RightIV
+        }
+    }
+
+    void "<|="(var OrderedSet Left, var optional ElementType Right) {
+        // Move element into set, leaving Right null afterward.
+	// TBD: No copy minimization done at the moment
+	Left |= Right
+	Right = null
+    }
+
+    void "|="(var OrderedSet Left, OrderedSet Right) {
+        if count(Left.Items) == 0 {
+            Left = Right
+        } else {
+            // Make a copy of the Right set
+            var RightCopy for Left = Right
+
+	    // Merge all of its intervals into Left
+	    Left <|= RightCopy
+	}
+    }
+
+    void "<|="(var OrderedSet Left, var OrderedSet Right) {
+	// Move all elements of Right into Left, leaving Right empty.
+        if count(Left.Items) == 0 {
+            Left.Items <== Right.Items
+        } else {
+            // Iterate through the tree
+	    for {
+		// Extract interval from Right
+		var RightIV for Left = removeAny(Right.Items)
+		if RightIV is null {
+		    return
+		}
+
+                // See whether it overlaps with an existing interval
+                // in Left tree
+                var LeftIV for Left = overlapping(Left.Items, RightIV)
+                while LeftIV not null {
+		    // Incorporate left interval into RightIV
+		    RightIV |= LeftIV
+
+		    if RightIV == LeftIV {
+			// RightIV fully subsumed by existing interval
+			RightIV = null
+			break
+		    }
+
+		    // Need to delete LeftIV 
+		    delete(Left.Items, LeftIV)
+
+		    // Now see if there is anything still overlapping
+		    LeftIV = overlapping(Left.Items, RightIV)
+                }
+
+                if not isEmpty(RightIV) {
+                    // Add RightIV
+                    Left.Items <|= RightIV
+                }
+
+            }
+        }
+    }
+
+    OrderedSet "-"(OrderedSet Left, OrderedSet Right) as Result {
+      // Set difference
+	Result = Left
+	Result -= Right
+    }
+
+    void "-="(var OrderedSet S, ElementType Elem) {
+      // Remove the given element from the set, if present
+	removeInterval(S, singleton(Elem))
+    }
+
+    void "-="(var OrderedSet Left, OrderedSet Right) {
+      // Remove all intervals of Right from Left, if present
+	for IV in Right {
+	    removeInterval(Left, IV)
+	}
+    }
+
+    OrderedSet "and"(OrderedSet Left, OrderedSet Right) as Result {
+	// Intersection
+
+	// Add elements that are in both Right and Left into result
+	Result = []
+	for RightIV in Right {
+	    for RemainingIV = RightIV while RemainingIV not null {
+		var LeftIV = overlapping(Left.Items, RemainingIV)
+
+		if LeftIV is null {
+		    break
+		}
+
+		// Compute overlap, add into result, and then loop
+		// around after removing it from RemainingIV
+		final Overlap = RemainingIV and LeftIV
+
+		Result.Items |= Overlap
+
+		continue with RemainingIV => RemainingIV - Overlap
+	    }
+	}
+    }
+
+    void "and="(var OrderedSet Left, OrderedSet Right) {
+	// Intersection
+	Left = Left and Right
+    }
+
+    OrderedSet "xor"(OrderedSet Left, OrderedSet Right) {
+	// Symmetric difference
+
+	return (Left - Right) or (Right - Left)
+    }
+
+    void "xor="(var OrderedSet Left, OrderedSet Right) {
+	// Symmetric difference
+	// Want elements that are only in one of the two inputs
+	final OnlyInRight = Right - Left
+	Left -= Right
+	Left += OnlyInRight
+    }
+
+    Boolean "in"(ElementType Left, OrderedSet Right) {
+        return overlapping(Right.Items, singleton(Left)) not null
+    }
+
+    Ordering "=?"(OrderedSet Left, OrderedSet Right) {
+	// Return #equal if Left and Right have the same elements
+	// Return #less if Left is a proper subset of Right
+	// Return #greater if Left is a proper superset of Right
+	// Return #unordered otherwise
+	if isSubset(Left, Right) {
+	    if isSubset(Right, Left) {
+		return #equal
+	    } else {
+		return #less
+	    }
+	} else if isSubset(Right, Left) {
+	    return #greater
+	} else {
+	    return #unordered
+	}
+    }
+
+    Boolean isEmpty(OrderedSet S) {
+        // Return count of items in set
+	return count(S.Items) == 0
+    }
+
+    optional ElementType lowerBound(OrderedSet S) {
+        final FirstIV = first(S.Items)
+        if FirstIV is null {
+            return null
+        } else {
+            return FirstIV.Low
+        }
+    }
+
+    Boolean lowerBoundIsOpen(OrderedSet S) {
+        final FirstIV = first(S.Items)
+        if FirstIV is null {
+            return #true   // TBD: or null?
+        } else {
+            return FirstIV.LowIsOpen
+        }
+    }
+
+    optional ElementType upperBound(OrderedSet S) {
+        final LastIV = last(S.Items)
+        if LastIV is null {
+            return null
+        } else {
+            return LastIV.High
+        }
+    }
+
+    Boolean upperBoundIsOpen(OrderedSet S) {
+        final LastIV = last(S.Items)
+        if LastIV is null {
+            return #true   // TBD: or null?
+        } else {
+            return LastIV.HighIsOpen
+        }
+    }
+
+    optional Interval<ElementType> removeFirst(var OrderedSet S) {
+	// Remove first interval of set (lowest low bound)
+	return removeFirst(S.Items)
+    }
+
+    optional Interval<ElementType> removeLast(var OrderedSet S) {
+	// Remove last interval of set (highest high bound)
+	return removeLast(S.Items)
+    }
+
+    optional Interval<ElementType> removeAny(var OrderedSet S) {
+	// Remove an arbitrary interval of set
+	return removeAny(S.Items)
+    }
+
+}
+
+void java.test.testOrderedSet(UnivReal A, UnivReal X, UnivReal Y, UnivReal Z) {
+    var OrderedSet<UnivReal> S = X | Y..Z
+    println(A + " in " + X + "|" + Y + ".." + Z + "=" + ( A in S ))
+
+    final OrderedSet<UnivReal> Agg = [X, Y, Z]
+    final OrderedSet<UnivReal> Or = Y | Z | X
+    final Map<Boolean, UnivString> OpenInd = [#false => "", #true => "<"]
+
+    println(" [X, Y, Z] =? (Y | Z | X) --> " + ( Agg =? Or ))
+
+    S = []
+
+    var R = 0.0
+    for I in 1..10 forward {
+	R += 1.0
+        S += R
+        println("Adding " + R + " to S, isEmpty(S) = " + isEmpty(S))
+    }
+
+    var Xor = S xor [2.0, 5.0, 12.0, 15.0]
+    print("S xor [2.0, 5.0, 12.0, 15.0] = ")
+    for IV in Xor forward {
+	if IV.Low != IV.High {
+	    print(IV.Low + OpenInd[IV.LowIsOpen] + ".." + 
+	      OpenInd[IV.HighIsOpen] + IV.High + " ")
+	} else {
+            print(IV.Low + " ")
+	}
+    }
+    print('\n')
+}
+
+class interface java.lang.UnivReal<> {
+    UnivReal "+"(UnivReal Right)
+      is import(#identity)
+
+    UnivReal "-"(UnivReal Right)
+      is import(#real_negate)
+
+    UnivReal "abs"(UnivReal Right)
+      is import(#real_abs)
+
+    UnivReal "magnitude"(UnivReal) is "abs"
+
+    UnivReal "+"(UnivReal Left, UnivReal Right) as Result 
+      is import(#real_add)
+
+    UnivReal "-"(UnivReal Left, UnivReal Right) as Result
+      is import(#real_subtract)
+
+    UnivReal "*"(UnivReal Left, UnivReal Right) as Result 
+      is import(#real_multiply)
+
+    UnivReal "*"(UnivReal Left, UnivInteger Right)
+      is import(#real_int_multiply)
+
+    UnivReal "*"(UnivInteger Left, UnivReal Right)
+
+    UnivReal "/"(UnivReal Left, UnivReal Right) as Result
+      is import(#real_divide)
+
+    UnivReal "/"(UnivReal Left, UnivInteger Right)
+      is import(#real_int_divide)
+
+    UnivReal "**"(UnivReal Left, UnivInteger Right)
+      is import(#real_exp)
+
+    void "+="(var UnivReal Left, UnivReal Right) 
+      is import(#real_assign_add)
+
+    void "-="(var UnivReal Left, UnivReal Right) 
+      is import(#real_assign_subtract)
+
+    void "*="(var UnivReal Left, UnivReal Right) 
+      is import(#real_assign_multiply)
+
+    void "/="(var UnivReal Left, UnivReal Right) 
+      is import(#real_assign_divide)
+
+    void "**="(var UnivReal Left, UnivInteger Right) 
+      is import(#real_assign_exp)
+
+
+    Ordering "=?"(UnivReal Left, UnivReal Right)
+      is import(#real_compare)
+
+    optional UnivReal min(optional UnivReal Left, optional UnivReal Right)
+      is import(#real_min)
+    optional UnivReal max(optional UnivReal Left, optional UnivReal Right)
+      is import(#real_max)
+
+    UnivReal sqrt(UnivReal Val {> Val >= 0.0 <})
+
+    UnivInteger hash(UnivReal Val)
+      is import(#identity)
+
+    void print(UnivReal X) is import(#print_real)
+
+    UnivString toString(UnivReal Val)
+      is import(#to_string_real)
+
+    optional UnivReal fromString(UnivString Str)
+      is import(#from_string_real)
+
+    UnivInteger roundToInt(UnivReal Real)
+      is import(#round_to_int)
+
+    UnivReal intToReal(UnivInteger Int)
+      is import(#int_to_real)
+
+    Boolean "in"(UnivReal Left, OrderedSet<UnivReal> Right)
+      is in OrderedSet<UnivReal>
+
+}
+
+class java.lang.UnivReal {
+  public
+    UnivReal "*"(UnivInteger Left, UnivReal Right) {
+        // Hand off to built-in real * int op
+        return Right * Left
+    }
+
+    UnivReal sqrt(UnivReal Val {> Val >= 0.0 <}) as Result {
+	{> Val >= 0.0 <}
+	Result = Val / 2.0
+	while Result > 0.0 and then Result * Result / Val 
+	  not in 0.9999999999999 .. 1.00000000000001 {
+	    Result = (Val / Result + Result)/2.0
+	}
+    }
+
+}
+    
+void java.test.testReal() {
+    var X = 3.5
+    var Y = 5.22
+    var Z = X + Y
+
+    println("X = " + X + ", Y = " + Y + ", X + Y = " + Z)
+    var Teeny = 0.000023
+    println("Teeny = " + Teeny)
+    var Small = 0.005
+    println("Small = " + Small)
+    var Medium = 235.123
+    println("Medium = " + Medium)
+    var Big = 11.0**5
+    println("Big = " + Big)
+    var Huge = 13.0**15
+    println("Huge = " + Huge)
+
+    println("Y in 1.0 .. 6.0 = " + ( Y in 1.0 .. 6.0 ))
+    
+    println("Y in 1.0 ..< 5.22 = " + ( Y in 1.0 ..< 5.22 ))
+
+    println("sqrt(2.0) = " + sqrt(2.0))
+
+    var Neg = -2.0
+    println("sqrt(-2.0) = " + sqrt(Neg))
+}
+
+interface java.lang.Indexable
+  <Assignable<> as ElemType, Countable<> as IndexType> {
+    // An indexable container
+    ref ElemType "indexing"(ref Indexable A, IndexType Index)
+    UnivInteger length(Indexable A)
+    UnivInteger "magnitude"(Indexable) is length
+    CountableSet<IndexType> "index_set"(Indexable A)
+    CountableSet<IndexType> bounds(Indexable A) is "index_set"
+}
+
+class interface java.util.BasicArray<Assignable<> as ElementType> {
+  // Builtin array type, not extendable, indexed by UnivInteger, 0..<Length
+    BasicArray create(UnivInteger<> Length, optional ElementType Val) 
+      is import(#basic_array_create)
+    ref ElementType "indexing"(ref BasicArray V, UnivInteger<> Index)
+    ref var ElementType "var_indexing"(ref var BasicArray V, UnivInteger<> Index)
+    UnivInteger<> length(BasicArray V)
+      is import(#basic_array_length)
+    UnivInteger<> "magnitude"(BasicArray) is length
+    BasicArray "|"(BasicArray Left, BasicArray Right)
+    CountableSet<UnivInteger> "index_set"(BasicArray A)
+}
+
+class java.util.BasicArray {
+  // Builtin array type, not extendable, indexed by UnivInteger, 0..<Length
+
+    // Built-in operations use indices 1..N
+    ref ElementType indexing1ToN(ref BasicArray V, UnivInteger<> Index) is import(#basic_array_indexing)
+    ref var ElementType varIndexing1ToN(ref var BasicArray V, UnivInteger<> Index) is import(#basic_array_indexing)
+
+  public
+
+    ref ElementType "indexing"(ref BasicArray V, UnivInteger<> Index) {
+        // Implement using 1..N version
+        return indexing1ToN(V, Index+1)
+    }
+
+    ref var ElementType "var_indexing"(ref var BasicArray V, UnivInteger<> Index) {
+        // Implement using 1..N version
+        return varIndexing1ToN(V, Index+1)
+    }
+
+    BasicArray "|"(BasicArray Left, BasicArray Right) as Result {
+        final LeftLen = length(Left)
+
+        if LeftLen == 0 {
+            return Right
+        }
+
+        Result = create(LeftLen + length(Right), null)
+
+        // Copy the Left elements
+        for I in 0..<LeftLen parallel {
+            Result[I] = Left[I]
+        }
+
+        // Copy the Right elements
+        
+        for J in 0..<length(Right) parallel {
+            Result[LeftLen + J] = Right[J]
+        }
+    }
+            
+    CountableSet<UnivInteger> "index_set"(BasicArray A) {
+	return 0..<length(A)
+    }
+}
+
+void java.test.testBasicArray() {
+    var BasicArray<UnivInteger<>> A = create(3, 7)
+    A[0] = 42
+    A[1] += 6
+    A[2] += A[1]
+    print("The answer is: " + (A[0] + A[1] + A[2]) + "\n")
+    print("length(A) = " + length(A) + "\n")
+
+    var B = A | A
+    print("length(B) = " + length(B) + ", B[4] = " + B[4] + "\n")
+    for I in 0..<length(B) forward {
+        print("B[" + I + "] = " + B[I] + ", ")
+    }
+    print("\n")
+}
+    
+class interface java.lang.Vector<Assignable<> as ElementType> 
+  implements Indexable<ElementType, UnivInteger> {
+  // Extendable vector, indexed by UnivInteger, 0..<Length
+    Vector "[]"()
+    Vector create(UnivInteger Length, ElementType Value)
+    ref ElementType "indexing"(ref Vector V, UnivInteger Index)
+    Vector "slicing"(Vector V, CountableRange<UnivInteger> IndexSet)  // a "read-only" slice
+    CountableSet<UnivInteger> "index_set"(Vector V)
+    void "|="(var Vector V, ElementType Elem)
+    void "|="(var Vector V, Vector Right)
+    void "<|="(var Vector V, var optional ElementType Elem)
+    Vector "|"(Vector Left, Vector Right)
+    Vector "|"(Vector Left, ElementType Right)
+    UnivInteger length(Vector V)
+    UnivInteger "magnitude"(Vector) is length
+}
+    
+class java.lang.Vector {
+  // Extendable vector, indexed by UnivInteger, 0..<Length
+    final InitialSize = 4
+    var UnivInteger Count = 0
+    var optional BasicArray<optional ElementType> Data
+
+    void expandByOne(var Vector V) {
+        // Expand size by one
+        if V.Data is null {
+            V.Data = create(InitialSize, null)
+        } else if V.Count == length(V.Data) {
+            // Double the size
+            var OldData <== V.Data
+            V.Data = create(2*V.Count, null)
+            for I in 0..<V.Count {
+                V.Data[I] <== OldData[I]
+            }
+            OldData = null
+        }
+        V.Count++
+    }
+
+    void expandCount(var Vector V, UnivInteger NewCount) {
+        // Expand count to new count, putting nulls in new slots
+        if V.Data is null {
+            V.Data = create(max(NewCount, InitialSize), null)
+        } else if length(V.Data) < NewCount {
+            var OldData <== V.Data
+            V.Data = create(max(NewCount, 2*length(OldData)), null)
+            for I in 0..<V.Count {
+                V.Data[I] <== OldData[I]
+            }
+            OldData = null
+        }
+        V.Count = NewCount
+    }
+
+  public
+    Vector "[]"() {
+        return (Count => 0, Data => null)
+    }
+
+    Vector create(UnivInteger Length, ElementType Value) {
+        return (Count => Length, Data => create (Length, Value))
+    }
+
+    UnivInteger length(Vector V) {
+        return V.Count
+    }
+
+    ref ElementType "indexing"(ref Vector V, UnivInteger Index) {
+        {> vector_index_out_of_bounds: Index in 0..<V.Count <}
+        return V.Data[Index]
+    }
+
+    Vector "slicing"(Vector V, CountableRange<UnivInteger> IndexSet) {
+      // a "read-only" slice
+        return [for I in IndexSet => V[I]]
+    }
+
+    CountableSet<UnivInteger> "index_set"(Vector V) {
+        return 0..<length(V)
+    }
+
+    void "<|="(var Vector V, var optional ElementType Elem) {
+        expandByOne(V)
+        V.Data[V.Count-1] <== Elem
+    }
+
+    void "|="(var Vector V, ElementType Elem) {
+        expandByOne(V)
+        V.Data[V.Count-1] = Elem
+    }
+    
+    void "|="(var Vector V, Vector Right) {
+        final OrigCount = V.Count
+        if OrigCount == 0 {
+            // Just copy right
+            V = Right;
+        } else {
+            // Grow V, and then copy in Right
+            expandCount(V, V.Count + Right.Count)
+            for I in 0..<Right.Count {
+                V[I+OrigCount] = Right[I]
+            }
+        }
+    }
+
+    Vector "|"(Vector Left, Vector Right) as Result {
+        // Copy left into result, and then add in the Right elements
+        if Left.Count == 0 {
+            // Left is null vector; result is determined by Right
+            Result = Right
+        } else {
+            // Start with Left
+            Result = Left
+            Result |= Right
+        }
+    }
+
+    Vector "|"(Vector Left, ElementType Right) as Result {
+        Result = Left
+        Result |= Right
+    }
+
+}
+
+void java.test.testVector() {
+    var Vector<UnivInteger> V = []
+    var Vector<UnivInteger> U = []
+    V |= 23
+    U |= 24
+    V = V | U
+    println("V = " + V[0] + ", " + V[1])
+    for I in 1..10 {
+        V |= I
+    }
+    for I in 0..<length(V) forward {
+        println("V[" + I + "] = " + V[I])
+    }
+    println("\"indexing\"(V, 11) = 33;")
+    "indexing"(V, 11) = 33
+    for I in 0..<length(V) forward {
+        println("V[" + I + "] = " + V[I])
+    }
+    final Slice = V[3..7]
+    println("Slice = V[3..7]")
+    for I in 0..<length(Slice) forward {
+        println("Slice[" + I + "] = " + Slice[I])
+    }
+}
+
+class interface java.util.Slice<Indexable<> as ArrayType> {
+  // A sliceable array.
+    final ArrayType.IndexType First
+    final ArrayType.IndexType Last
+
+    UnivInteger length(Slice S)
+        // Return length of slice (i.e. Last - First + 1)
+
+    UnivInteger "magnitude"(Slice) is length
+        // Allows use of |...| operator
+
+    ref Slice "slicing"(ref ArrayType A)
+        // Convert an array into a slice covering 1..length(A)
+
+    ref Slice "slicing"(ref ArrayType A,
+      CountableRange<ArrayType.IndexType> Bounds)
+        // Slice of an array
+
+    ref Slice "slicing"(ref Slice S,
+      CountableRange<ArrayType.IndexType> Bounds)
+        // Slice of a slice
+
+    ref ArrayType.ElemType "indexing"(ref Slice S, ArrayType.IndexType Index)
+        // Index into a slice
+
+    CountableSet<ArrayType.IndexType> "index_set"(Slice S)
+}
+
+class java.util.Slice {
+    ref ArrayType Arr;
+  public
+    UnivInteger length(Slice S) {
+        // Return length of slice (i.e. Last - First + 1)
+        return S.Last - S.First + 1
+    }
+
+    ref Slice "slicing"(ref ArrayType A) {
+        // Convert an array into a slice covering whole array
+        final ABounds = "index_set"(A)
+        return (First => first(ABounds), Last => last(ABounds), Arr => A)
+    }
+
+    ref Slice "slicing"(ref ArrayType A,
+      CountableRange<ArrayType.IndexType> Bounds) {
+        // Slice of an array
+        final ABounds = "index_set"(A)
+        {> Bounds.First > Bounds.Last or else 
+          (Bounds.First >= first(ABounds) and then
+            Bounds.Last <= last(ABounds)) <} //slice out of bounds
+        return (First => Bounds.First, Last => Bounds.Last, Arr => A)
+    }
+
+    ref Slice "slicing"(ref Slice S,
+      CountableRange<ArrayType.IndexType> Bounds) {
+        // Slice of a slice
+        {> Bounds.First > Bounds.Last or else 
+          (Bounds.First >= S.First and then Bounds.Last <= S.Last) <}
+          // slice out of bounds
+        return (First => Bounds.First, Last => Bounds.Last, Arr => S.Arr)
+    }
+
+    ref ArrayType.ElemType "indexing"(ref Slice S, ArrayType.IndexType Index) {
+        // Index into a slice
+        {> Index >= S.First and then Index <= S.Last <}
+          // array index out of bounds
+        return S.Arr[Index]
+    }
+    
+    CountableSet<ArrayType.IndexType> "index_set"(Slice S) {
+        return S.First .. S.Last
+    }
+}
+
+class interface java.lang.Enum<Vector<UnivEnumeration> Literals> {
+    Enum "from_univ"(UnivEnumeration Univ)
+    optional UnivEnumeration "to_univ"(optional Enum Val) as Result
+    // {> Result is null or else (for some Lit of Literals => Lit == Result) <}
+
+    Ordering "=?"(Enum Left, Enum Right)
+      is import("=?")
+
+    // Functions for Imageable
+    UnivString toString(Enum Val)
+    optional Enum fromString(UnivString Str)
+
+    // Operators for Countable
+    Enum "+"(UnivInteger Left, Enum Right) 
+      is import("+")
+    Enum "+"(Enum Left, UnivInteger Right) 
+      is import("+")
+    UnivInteger "-"(Enum Left, Enum Right) 
+      is import("-")
+    Enum "-"(Enum Left, UnivInteger Right) 
+      is import("-")
+
+    // TBD: These should be properties some day (e.g. Color#first).
+    Enum first()
+    Enum last()
+    CountableRange<Enum> range() is "[..]" in CountableRange<Enum>
+
+    CountableRange<Enum> "[..]"() is in CountableRange<Enum>
+
+    UnivInteger hash(Enum Val)
+      is import(#identity)
+
+    CountableSet<Enum> ".."(Enum Left, Enum Right)
+      is in CountableSet<Enum>
+    CountableSet<Enum> "<.."(Enum Left, Enum Right)
+      is in CountableSet<Enum>
+    CountableSet<Enum> "..<"(Enum Left, Enum Right)
+      is in CountableSet<Enum>
+    CountableSet<Enum> "<..<"(Enum Left, Enum Right)
+      is in CountableSet<Enum>
+    CountableSet<Enum> "|"(Enum Left, Enum Right)
+      is in CountableSet<Enum>
+
+    optional Enum min(optional Enum Left, optional Enum Right)
+      is import(#min)
+    optional Enum max(optional Enum Left, optional Enum Right)
+      is import(#max)
+}
+
+class java.lang.Enum {
+    final UnivInteger Value
+  public
+    Enum "from_univ"(UnivEnumeration Univ) {
+        for I in 0 ..< |Literals| {
+            if Literals[I] == Univ {
+                return (Value => I)
+            }
+        }
+	{> bad_enum_literal: #false <}
+        return null
+    }
+
+    optional UnivEnumeration "to_univ"(optional Enum Val) as Result {
+    // {> Result is null or else (for some Lit of Literals => Lit == Result) <}
+	if Val is null {
+	    return null
+	} else {
+	    return Literals[Val.Value]
+	}
+    }
+
+    // Functions for Imageable
+    UnivString toString(Enum Val) {
+	return UnivEnumeration.toString([[Val]])
+    }
+
+    optional Enum fromString(UnivString Str) {
+	return UnivEnumeration.fromString(Str)
+    }
+
+    Enum first() {
+        return (Value => 0)
+    }
+
+    Enum last() {
+        return (Value => |Literals| - 1)
+    }
+
+}
+
+void java.test.testEnum() {
+    type Color is Enum< [#red, #green, #blue] >
+    type DayOfWeek is
+       Enum< [#Monday, #Tuesday, #Wednesday, #Thursday, 
+        #Friday, #Saturday, #Sunday] >
+
+    for Color C in Color.first() .. Color.last() forward {
+        println("Next color = " + C)
+    }
+
+    for C2 in Color reverse {
+        println("Prev color = " + C2)
+    }
+
+    for D3 in DayOfWeek {
+        println("Random day of week = " + D3)
+    }
+
+    {> #Monday in DayOfWeek <}
+
+}
+
+class interface java.util.Map
+  <Hashable<> as KeyType, Assignable<> as ValueType> {
+  // A hashed-map module
+    type Pair is KeyValue<KeyType, ValueType>
+
+    Map "[]"()
+
+    void "|="(var Map Left, Pair Right)
+	// Add Key=>Value to Map, replacing pre-existing mapping
+	// for Key, if any.
+
+    Map "|"(Map Left, Pair Right)
+	// Add Key=>Value to Map, replacing pre-existing mapping
+	// for Key, if any in result.
+
+    void "<|="(var Map Left, var optional Pair Right)
+	// Move Key/Value pair into map, leaving Right null
+
+    void "<|="(var Map Left, var Map Right)
+	// Move key/value pairs from Right into Left, leaving Right empty,
+	// replacing any pre-existing entries with the same key.
+
+    void "+="(var Map Left, Pair Right) is "|="
+	// A synonym for adding a key=>value pair
+
+    Boolean "in"(KeyType Left, Map Right)
+	// Return True if given key has a mapping in the Map
+
+    void "-="(var Map M, KeyType Key)   // aka Exclude
+	// Remove mapping for Right, if present
+
+    Set<KeyType> "index_set"(Map M)
+	// Return set of keys with mappings
+
+    Set<KeyType> keys(Map M) is "index_set"
+
+    ref ValueType "indexing"(ref Map M, KeyType Key)
+	// Used for references to M[Key]; requires the Key to be in M.
+
+    ref var optional ValueType "var_indexing"(ref var Map M, KeyType Key)
+	// Used for assignments to M[Key]; Key is added to M if not present
+
+    optional Pair removeAny(var Map M)
+	// Remove one mapping from the Map.  Return null if Map is empty
+
+    UnivInteger count(Map M)
+	// Number of mappings in the table
+
+    UnivInteger "magnitude"(Map) is count
+
+    Boolean isEmpty(Map M)
+	// Return True if no mappings in the table
+
+    void dumpStatistics(Map M)
+      // A debugging routine to show bucket sizes of Map
+
+}
+
+class java.util.Map {
+  // A hashed-map module
+
+    var BasicMap<KeyValue<KeyType, ValueType>> Data
+
+  public
+    Map "[]"() {
+        return (Data => [])
+    }
+
+    Map "|"(Map Left, Pair Right) as Result {
+	// Add Key=>Value to Map, replacing pre-existing mapping
+	// for Key, if any in result.
+        Result = Left
+        Result.Data |= Right
+    }
+
+    void "|="(var Map Left, Pair Right) {
+	// Add Key=>Value to Map, replacing pre-existing mapping
+	// for Key, if any.
+	Left.Data |= Right
+    }
+
+    void "<|="(var Map Left, var optional Pair Right) {
+	// Move Key/Value pair into map, leaving Right null
+	Left.Data <|= Right
+    }
+
+    void "<|="(var Map Left, var Map Right) {
+	// Move key/value pairs from Right into Left, leaving Right empty,
+	// replacing any pre-existing entries with the same key.
+	for {
+	    var RightElem for Left = removeAny(Right)
+	    if RightElem is null {
+		return   // All done
+	    }
+
+	    Left.Data <|= RightElem
+	}
+    }
+
+    Boolean "in"(KeyType Left, Map Right) {
+	return Left in Right.Data
+    }
+
+    void "-="(var Map M, KeyType Key) {
+      // Remove the given key from the Map, if present
+	M.Data -= Key
+    }
+   
+    Set<KeyType> "index_set"(Map M) as Result {
+	// Return set of keys with non-null mappings
+        if M.Data is null {
+            return []
+        } else {
+           return "index_set"(M.Data)
+        }
+    }
+
+    ref ValueType "indexing"(ref Map M, KeyType Key) {
+	// Used for references to M[Key]; requires the Key to be in M.
+	return M.Data[Key].Value
+    }
+
+    ref var optional ValueType "var_indexing"(ref var Map M, KeyType Key) {
+	// Used for assignments to M[Key]; Key is added to M if not present
+	return "var_indexing"(M.Data, Key).Value
+    }
+
+    UnivInteger count(Map M) {
+	return count(M.Data)
+    }
+
+    Boolean isEmpty(Map M) {
+	// Return True if no mappings in the table
+	return isEmpty(M.Data)
+    }
+
+    optional Pair removeAny(var Map M) as Result {
+	return removeAny(M.Data)
+    }
+
+    void dumpStatistics(Map M) {
+      // A debugging routine to show bucket sizes of Map
+	dumpStatistics(M.Data)
+    }
+
+}
+
+void java.test.testMap(UnivEnumeration X, UnivString Y,
+  UnivEnumeration A, UnivString B) {
+    type EnumStringMap is Map<UnivEnumeration, UnivString>
+
+    var EnumStringMap M = [X => Y, A => B]
+
+    println("Count = " + count(M))
+
+    for each [K => V] of M {
+	println("Mapping " + K + " => " + V)
+	println(K + " in M = " + (K in M))
+    }
+
+    println("#xy in M = " + (#xy in M))
+
+    M |= [X => null]
+
+    println("Count after deletion = " + count(M))
+
+    for each [K => V] of M {
+	println("Mapping " + K + " => " + V)
+    }
+
+    M |= [X => "a new value"]
+
+    println("Count after addition = " + count(M))
+
+    for each [K => V] of M {
+	println("Mapping " + K + " => " + V)
+    }
+
+    M |= [X => "a third value"]
+
+    println("Count after replacement = " + count(M))
+
+    for each [K => V] of M {
+	println("Mapping " + K + " => " + V)
+    }
+
+    M -= A
+
+    println("Count after deletion = " + count(M))
+
+    for each [K => V] of M {
+	println("Mapping " + K + " => " + V)
+    }
+
+    var Ran = Random.start(hash(A))
+    var Map<UnivInteger, UnivInteger> MUI = []
+
+    println("Adding 100 random pairings to Map.")
+    for I in 1..100 {
+	final Key = next(Ran) mod 100
+	final Value = next(Ran) mod 100
+	MUI[Key] = Value
+    }
+    println("Map is now of count = " + count(MUI))
+
+    for each [K => V] of MUI {
+	println("Mapping " + K + " => " + V)
+	println("MUI[" + K + "] = " + MUI[K])
+    }
+
+    for (Pair in MUI; I in 1..60 forward) {
+	print(" [" + Pair.Key + " => " + Pair.Value + "]")
+	if I mod 5 == 0 {
+	    print('\n')
+	}
+    }
+
+    if count(MUI) > 60 {
+	println(" ...")
+    } else if count(MUI) mod 5 != 0 {
+	print('\n')
+    }
+
+}
+
+class interface java.lang.Float<UnivInteger Digits = 15> {
+  // A floating point type that provides at least the
+  // given number of digits of precision.
+
+    Float "from_univ"(UnivReal Univ)
+      is import(#identity)
+
+    UnivReal "to_univ"(Float Val)
+      is import(#identity)
+
+    Float "+"(Float Right)
+      is import(#identity)
+
+    Float "-"(Float Right)
+      is import(#real_negate)
+
+    Float "abs"(Float Right)
+      is import(#real_abs)
+
+    Float "magnitude"(Float) is "abs"
+
+    Float "+"(Float Left, Float Right) as Result 
+      is import(#real_add)
+
+    Float "-"(Float Left, Float Right) as Result
+      is import(#real_subtract)
+
+    Float "*"(Float Left, Float Right) as Result 
+      is import(#real_multiply)
+
+    Float "*"(Float Left, UnivInteger Right) as Result 
+      is import(#real_int_multiply)
+
+    Float "*"(UnivInteger Left, Float Right) as Result
+
+    Float "/"(Float Left, Float Right) as Result
+      is import(#real_divide)
+
+    Float "/"(Float Left, UnivInteger Right) as Result
+      is import(#real_int_divide)
+
+    Float "**"(Float Left, UnivInteger Right)
+      is import(#real_exp)
+
+    void "+="(var Float Left, Float Right) 
+      is import(#real_assign_add)
+
+    void "-="(var Float Left, Float Right) 
+      is import(#real_assign_subtract)
+
+    void "*="(var Float Left, Float Right) 
+      is import(#real_assign_multiply)
+
+    void "/="(var Float Left, Float Right) 
+      is import(#real_assign_divide)
+
+    void "**="(var Float Left, UnivInteger Right) 
+      is import(#real_assign_exp)
+
+
+    Ordering "=?"(Float Left, Float Right)
+      is import(#real_compare)
+
+    optional Float min(optional Float Left, optional Float Right)
+      is import(#real_min)
+    optional Float max(optional Float Left, optional Float Right)
+      is import(#real_max)
+
+    UnivInteger hash(Float Val)
+      is import(#identity)
+
+    UnivInteger roundToInt(Float Val)
+      is import(#round_to_int)
+
+    Float intToFloat(UnivInteger Int)
+      is import(#int_to_real)
+
+    void print(Float X) is import(#print_real)
+
+    UnivString toString(Float Val)
+      is import(#to_string_real)
+
+    optional Float fromString(UnivString Str)
+      is import(#from_string_real)
+
+    Boolean "in"(Float Left, OrderedSet<Float> Right)
+      is in OrderedSet<Float>
+	// "in" defined in OrderedSet
+
+    
+}
+
+class java.lang.Float {
+    final UnivReal Value
+  public
+    Float "*"(UnivInteger Left, Float Right) as Result {
+        // Hand off to built-in real*int op
+        return Right * Left
+    }
+}
+    
+void java.test.testFloat() {
+    type MyFloat is Float<Digits => 8>
+
+    var MyFloat X = 3.5
+    var MyFloat Y = 5.22
+    var MyFloat Z = X + Y
+
+    println("X = " + X + ", Y = " + Y + ", X + Y = " + Z)
+    var Teeny = 0.000023
+    println("Teeny = " + Teeny)
+    var Small = 0.005
+    println("Small = " + Small)
+    var Medium = 235.123
+    println("Medium = " + Medium)
+    var Big = 11.0**5
+    println("Big = " + Big)
+    var Huge = 13.0**15
+    println("Huge = " + Huge)
+
+    var MyFloat X2 = 3.5 * 2
+
+    println("X * 2 = " + X * 2 + ", 2 * X = " + 2 * X + ", X2 = " + X2)
+    println("X / 2 = " + X / 2 )
+
+    if X in 1.5 ..< 3.6 {
+	println("X *is* in 1.5 ..< 3.6")
+    } else {
+	println("X *not* in 1.5 ..< 3.6??")
+    }
+
+    println("X in 1.5 ..< 3.5 = " + (X in 1.5 ..< 3.5) )
+}
+
+class interface java.lang.Fixed<UnivReal Delta> {
+  // Fixed point types, represented as an integer
+  // multiple of the given Delta
+    Fixed "from_univ"(UnivReal Univ)
+    optional UnivReal "to_univ"(optional Fixed Val)
+
+    Fixed "+"(Fixed Right)
+      is import(#identity)
+
+    Fixed "-"(Fixed Right)
+      is import(#negate)
+
+    Fixed "abs"(Fixed Right)
+      is import("abs")
+
+    Fixed "magnitude"(Fixed) is "abs"
+
+    Fixed "+"(Fixed Left, Fixed Right)
+      is import("+")
+    Fixed "-"(Fixed Left, Fixed Right)
+      is import("-")
+    Fixed "*"(Fixed Left, UnivReal Right)
+      is import(#fixed_real_mul)
+    Fixed "*"(UnivReal Left, Fixed Right)
+      is import(#real_fixed_mul)
+    Fixed "*"(Fixed Left, UnivInteger Right)
+      is import("*")
+    Fixed "*"(UnivInteger Left, Fixed Right)
+      is import("*")
+    Fixed "/"(Fixed Left, UnivReal Right)
+      is import(#fixed_real_div)
+    Fixed "/"(Fixed Left, UnivInteger Right)
+      is import("/")
+
+    void "+="(var Fixed Left, Fixed Right) 
+      is import("+=")
+
+    void "-="(var Fixed Left, Fixed Right) 
+      is import("-=")
+
+    void "*="(var Fixed Left, Fixed Right) 
+      is import("*=")
+
+    void "/="(var Fixed Left, UnivInteger Right) 
+      is import("/=")
+
+    void "/="(var Fixed Left, UnivReal Right)
+
+    Ordering "=?"(Fixed Left, Fixed Right)
+      is import("=?")
+
+    optional Fixed min(optional Fixed Left, optional Fixed Right)
+      is import(#min)
+    optional Fixed max(optional Fixed Left, optional Fixed Right)
+      is import(#max)
+
+    UnivInteger hash(Fixed Val)
+      is import(#identity)
+
+    UnivInteger roundToInt(Fixed Val)
+
+    void print(Fixed X)
+
+    UnivString toString(Fixed Val)
+
+    optional Fixed fromString(UnivString Str)
+
+    Boolean "in"(Fixed Left, OrderedSet<Fixed> Right) is in OrderedSet<Fixed>
+    
+}
+
+class java.lang.Fixed {
+    final UnivInteger Value
+
+  public
+    Fixed "from_univ"(UnivReal Univ) {
+	return (Value => UnivReal.roundToInt(Univ/Delta))
+    }
+
+    optional UnivReal "to_univ"(optional Fixed Val) {
+	if Val is null {
+	    return null
+	} else {
+	    return Delta * intToReal(Val.Value)
+	}
+    }
+
+    void "/="(var Fixed Left, UnivReal Right) {
+	Left = Left / Right
+    }
+
+    void print(Fixed X) {
+	var UnivReal Val = [[X]]
+	print(Val)
+    }
+
+    UnivString toString(Fixed Val) {
+	return UnivReal.toString([[Val]])
+    }
+
+    optional Fixed fromString(UnivString Str) {
+	return UnivReal.fromString(Str)
+    }
+
+    UnivInteger roundToInt(Fixed Val) {
+	return UnivReal.roundToInt([[Val]])
+    }
+
+}
+
+void java.test.testFixed(UnivReal X) {
+    type MyFixed is Fixed<Delta => 1.0E-6>
+
+    var MyFixed XTI = X
+    final MyFixed Minute = 60.0
+    println("X = " + XTI)
+    println("X * 2 = " + (XTI*2))
+    println("X + X = " + (XTI + XTI))
+    println("X - X = " + (XTI - XTI))
+    println("X / 2 = " + (XTI / 2))
+    println("X / 2.0 = " + (XTI / 2.0))
+    println("X * 3.0 = " + (XTI * 3.0))
+    println("5.0 * X = " + (5.0 * XTI))
+    println("-5.0 * X = " + (-5.0 * XTI))
+    println("-5.0 = " + -5.0)
+    println("Minute = " + Minute)
+    println("-5.0*Minute = " + -5.0*Minute)
+
+    println("roundToInt(X) = " + roundToInt(XTI))
+
+    final OrderedSet<MyFixed> Rng = 1.0 ..< 5.0
+
+    print("Rng = ")
+    final Map<Boolean, UnivString> OpenInd = [#false => "", #true => "<"]
+    for IV in Rng forward {
+	if IV.Low != IV.High {
+	    print(IV.Low + OpenInd[IV.LowIsOpen] + ".." + 
+	      OpenInd[IV.HighIsOpen] + IV.High + " ")
+	} else {
+            print(IV.Low + " ")
+	}
+    }
+    print('\n')
+
+    println("X = " + XTI)
+    println("X in Rng = " + (XTI in Rng))
+
+    if XTI in 1.0 ..< 5.0 {
+	println("X in 1.0 ..< 5.0")
+    } else {
+	println("X not in 1.0 ..< 5.0")
+    }
+
+    println("X in 1.0 ..< 5.0 = " + (XTI in 1.0 ..< 5.0))
+
+}
+
+class interface java.util.Array
+  <Assignable<> as ElemType, Countable<> as IndexedBy> 
+  implements Indexable<ElemType, IndexedBy> {
+  // An array abstraction where the index type is not necessarily
+  // UnivInteger, but instead can be any Countable type (e.g. Enum<...>)
+
+    Array create(CountableRange<IndexedBy> Bounds,
+      optional ElemType InitialValue)
+
+    UnivInteger length(Array Arr)
+    UnivInteger "magnitude"(Array) is length
+
+    CountableRange<IndexedBy> bounds(Array Arr)
+
+    ref ElemType "indexing"(ref Array Arr, IndexedBy Index)
+    ref var ElemType "var_indexing"(ref var Array Arr, IndexedBy Index)
+    CountableSet<IndexedBy> "index_set"(Array Arr)
+    void "<|="(var Array Left, var optional ElemType Right)
+    Array "|"(Array Left, KeyValue<IndexedBy, ElemType> Right)
+    Array "[]"()
+}
+
+class java.util.Array {
+  // An array abstraction where the index type is not necessarily
+  // UnivInteger, but instead can be any Countable type (e.g. Enum<...>)
+    type ElemArray is BasicArray<ElemType>
+    var ElemArray Data
+    final CountableRange<IndexedBy> Bounds
+  public
+
+    Array create(CountableRange<IndexedBy> Bounds,
+      optional ElemType InitialValue) {
+	return (Data => create(length(Bounds), InitialValue),
+	  Bounds => Bounds)
+    }
+
+    UnivInteger length(Array Arr) {
+	return length(Arr.Data)
+    }
+
+    CountableRange<IndexedBy> bounds(Array Arr) {
+	return Arr.Bounds
+    }
+
+    ref ElemType "indexing"(ref Array Arr, IndexedBy Index) {
+	return Arr.Data[ Index - Arr.Bounds.First ]
+    }
+
+    ref var ElemType "var_indexing"(ref var Array Arr, IndexedBy Index) {
+	if length(Arr) == 0 {
+	    // create a one-element array
+	    Arr = (Data => create(1, null),
+	      Bounds => Index .. Index)
+	} else if Index < Arr.Bounds.First {
+	    // Extend below
+	    Arr = (Data => 
+	      ElemArray.create(Arr.Bounds.First - Index, null) | Arr.Data,
+	      Bounds => Index .. Arr.Bounds.Last)
+	} else if Index > Arr.Bounds.Last {
+	    // Extend above
+	    Arr = (Data => 
+	      Arr.Data | ElemArray.create(Index - Arr.Bounds.Last, null),
+	      Bounds => Arr.Bounds.First .. Index)
+	}
+	return Arr.Data[ Index - Arr.Bounds.First ]
+    }
+
+    CountableSet<IndexedBy> "index_set"(Array Arr) {
+        return Arr.Bounds.First .. Arr.Bounds.Last
+    }
+
+    void "<|="(var Array Left, var optional ElemType Right) {
+	// Add Right onto Array
+	if length(Left) == 0 {
+	    Left = (Data => create(1, null),
+	      Bounds => IndexedBy.first() .. IndexedBy.first())
+	    Left[IndexedBy.first()] <== Right
+	} else {
+	    Left[Left.Bounds.Last + 1] <== Right
+	}
+    }
+    
+    Array "|"(Array Left, KeyValue<IndexedBy, ElemType> Right) as Result {
+	Result = Left
+	Result[Right.Key] = Right.Value
+    }
+
+    Array "[]"() as Result {
+	return (Data => create(0, null),
+	  Bounds => IndexedBy.first()+1 .. IndexedBy.first())
+	    // Bounds not meaningful when empty
+    }
+
+}
+
+void java.test.testArray() {
+    type Color is Enum< [#red, #green, #blue] >
+    type RCB is Array<Integer<Range => 0..0xFF>, IndexedBy => Color>
+
+    final RCB Red = [#red => 0x33, #green => 0, #blue => 0]
+    final RCB Blue = [#red => 0, #green => 0, #blue => 0x33]
+    final RCB Yellow = [0, 0x33, 0x33]
+    final RCB White = [0xFF, 0xFF, 0xFF]
+    
+    final Vector<RCB> RCBs = [Red, Blue, Yellow, White]
+
+    for each C of RCBs {
+	println("#red => " + C[#red] + ", #green => " + C[#green] +
+	  ", #blue => " + C[#blue])
+    }
+}
+
+class interface java.util.IndexPair
+  <Countable<> as Index1Type, Countable<> as Index2Type> {
+  // Two countable indices which can be combined to form an 2D array index
+    final Index1Type Index1
+    final Index2Type Index2
+
+    optional IndexPair nthPair
+      (CountableRange<Index1Type> Bounds1,
+       CountableRange<Index2Type> Bounds2,
+       UnivInteger N)
+      // Return Nth Pair given bounds for each of 2 index types
+      // when N goes from 1 to length(Bounds1) * length(Bounds2)
+      // presuming second index varies fastest.
+      // Return null if N out of range.
+
+    optional UnivInteger pairPosition
+      (CountableRange<Index1Type> Bounds1,
+       CountableRange<Index2Type> Bounds2,
+       IndexPair Pair)
+      // Return position of Pair within bounds (starting at 0)
+      // presuming Pair.Index1 in Bounds1 and Pair.Index2 in Bounds2
+      // and second index varies fastest.
+      // Return null if Pair out of range.
+
+}
+
+class java.util.IndexPair {
+  public
+    optional IndexPair nthPair
+      (CountableRange<Index1Type> Bounds1,
+       CountableRange<Index2Type> Bounds2,
+       UnivInteger N) {
+      // Return Nth Pair given bounds for each of 2 index types
+      // when N goes from 1 to length(Bounds1) * length(Bounds2).
+      // Return null if N out of range.
+        final Len2 = length (Bounds2)
+        if N <= 0 or else N > length(Bounds1) * Len2 {
+            return null
+        } else {
+            final I1 = (N-1) / Len2
+            final I2 = (N-1) rem Len2
+            return (Index1 => Bounds1.First + I1,
+                    Index2 => Bounds2.First + I2)
+        }
+    }
+
+    optional UnivInteger pairPosition
+      (CountableRange<Index1Type> Bounds1,
+       CountableRange<Index2Type> Bounds2,
+       IndexPair Pair) {
+      // Return position of Pair within bounds (starting at 0)
+      // presuming Pair.Index1 in Bounds1 and Pair.Index2 in Bounds2
+      // and second index varies fastest.
+      // Return null if Pair out of range.
+        if Pair.Index1 not in Bounds1 or else Pair.Index2 not in Bounds2 {
+            return null
+        } else {
+            return (Pair.Index1-Bounds1.First) * length(Bounds2) + 
+              (Pair.Index2-Bounds2.First)
+        }
+    }
+
+}
+
+class interface java.util.IndexPairSet<IndexPair<> as Pair> {
+  // Set of index pairs
+    IndexPairSet create(CountableRange<Pair.Index1Type> Bounds1,
+                CountableRange<Pair.Index2Type> Bounds2)
+
+    IndexPairSet "[]"()
+
+    UnivInteger count(IndexPairSet)
+
+    Boolean isEmpty(IndexPairSet)
+
+    optional Pair first(IndexPairSet)
+    optional Pair last(IndexPairSet)
+    
+    optional Pair removeFirst(var IndexPairSet)
+    optional Pair removeLast(var IndexPairSet)
+    optional Pair removeAny(var IndexPairSet)
+}
+
+class java.util.IndexPairSet {
+  // Set of index pairs
+    final CountableRange<Pair.Index1Type> Bounds1
+    final CountableRange<Pair.Index2Type> Bounds2
+    var UnivInteger First
+    var UnivInteger Last
+
+    Pair nthPair(IndexPairSet, UnivInteger N) {
+      // Return Nth Pair of original IndexPairSet
+      // when N goes from 1 to length(Bounds1) * length(Bounds2).
+      // Return null if N out of range.
+        return nthPair(IndexPairSet.Bounds1, IndexPairSet.Bounds2, N)
+    }
+
+  public
+    IndexPairSet create(CountableRange<Pair.Index1Type> Bounds1,
+                CountableRange<Pair.Index2Type> Bounds2) {
+        return (Bounds1 => Bounds1, Bounds2 => Bounds2,
+                First => 1, Last => length(Bounds1) * length(Bounds2))
+    }
+
+    IndexPairSet "[]"() {
+        return
+          (Bounds1 =>
+             Pair.Index1Type.first()+1 .. Pair.Index1Type.first(),
+           Bounds2 =>
+             Pair.Index2Type.first()+1 .. Pair.Index2Type.first(),
+           First => 1,
+           Last => 0)
+    }
+
+    UnivInteger count(IndexPairSet) {
+        return IndexPairSet.Last - IndexPairSet.First + 1
+    }
+
+    Boolean isEmpty(IndexPairSet) {
+        return IndexPairSet.First > IndexPairSet.Last
+    }
+
+    optional Pair first(IndexPairSet) {
+        return nthPair(IndexPairSet, IndexPairSet.First)
+    }
+
+    optional Pair last(IndexPairSet) {
+        return nthPair(IndexPairSet, IndexPairSet.Last)
+    }
+
+    optional Pair removeFirst(var IndexPairSet) as Result {
+        if isEmpty(IndexPairSet) {
+            Result = null
+        } else {
+            Result = nthPair(IndexPairSet, IndexPairSet.First)
+            IndexPairSet.First++
+        }
+    }
+
+    optional Pair removeLast(var IndexPairSet) as Result {
+        if isEmpty(IndexPairSet) {
+            Result = null
+        } else {
+            Result = nthPair(IndexPairSet, IndexPairSet.Last)
+            IndexPairSet.Last--
+        }
+    }
+
+    optional Pair removeAny(var IndexPairSet) {
+        if count(IndexPairSet) mod 2 == 1 {
+            return removeFirst(IndexPairSet)
+        } else {
+            return removeLast(IndexPairSet)
+        }
+    }
+
+}
+
+class interface java.util.Array2D
+  <Assignable<> as ElemType, Countable<> as Index1, Countable<> as Index2> {
+  // A 2-D array abstraction where the index types are not necessarily
+  // UnivInteger, but instead can be any Countable type (e.g. Enum<...>)
+
+    Array2D create(CountableRange<Index1> Bounds1,
+      CountableRange<Index2> Bounds2,
+      optional ElemType InitialValue)
+
+    type Indices is IndexPair<Index1, Index2>
+    type SetOfIndices is IndexPairSet<Indices>
+
+    UnivInteger length1(Array2D Arr)
+    UnivInteger length2(Array2D Arr)
+
+    CountableRange<Index1> bounds1(Array2D Arr)
+    CountableRange<Index2> bounds2(Array2D Arr)
+
+    // Indexing operations using an index pair
+    ref ElemType "indexing"(ref Array2D Arr, Indices)
+    ref var ElemType "var_indexing"(ref var Array2D Arr, Indices)
+
+    // Indexing operations using two individual indices
+    ref ElemType "indexing"(ref Array2D Arr, Index1, Index2)
+    ref var ElemType "var_indexing"(ref var Array2D Arr, Index1, Index2)
+
+    // Set of index pairs that cover the 2D array.
+    SetOfIndices "index_set"(Array2D Arr)
+
+    Array2D "[]"()
+}
+
+class java.util.Array2D {
+  // An array abstraction where the index type is not necessarily
+  // UnivInteger, but instead can be any Countable type (e.g. Enum<...>)
+    type ElemArray is BasicArray<optional ElemType>
+    var ElemArray Data
+    final CountableRange<Index1> Bounds1
+    final CountableRange<Index2> Bounds2
+  public
+
+    Array2D create(CountableRange<Index1> Bounds1,
+      CountableRange<Index2> Bounds2,
+      optional ElemType InitialValue) {
+	return
+          (Data => create(length(Bounds1) * length(Bounds2), InitialValue),
+	   Bounds1 => Bounds1, Bounds2 => Bounds2)
+    }
+
+    UnivInteger length1(Array2D Arr) {
+	return length(Arr.Bounds1)
+    }
+
+    UnivInteger length2(Array2D Arr) {
+	return length(Arr.Bounds2)
+    }
+
+    CountableRange<Index1> bounds1(Array2D Arr) is (Arr.Bounds1)
+    CountableRange<Index2> bounds2(Array2D Arr) is (Arr.Bounds2)
+
+    // Indexing operations using an index pair
+    ref ElemType "indexing"(ref Array2D Arr, Indices) {
+        {>  Indices.Index1 in Arr.Bounds1; Indices.Index2 in Arr.Bounds2 <}
+	return Arr.Data[pairPosition(Arr.Bounds1, Arr.Bounds2, Indices)]
+    }
+
+    ref var ElemType "var_indexing"(ref var Array2D Arr, Indices) {
+        return "var_indexing"(Arr, Indices.Index1, Indices.Index2)
+    }
+
+    // Indexing operations using two individual indices
+    ref ElemType "indexing"(ref Array2D Arr, Index1, Index2) {
+        {>  Index1 in Arr.Bounds1; Index2 in Arr.Bounds2 <}
+	return Arr.Data
+          [Indices.pairPosition(Arr.Bounds1, Arr.Bounds2, (Index1, Index2))]
+    }
+
+    ref var ElemType "var_indexing"(ref var Array2D Arr, Index1, Index2) {
+        if Index1 not in Arr.Bounds1 or else Index2 not in Arr.Bounds2 {
+            // Extend array to include Index1 and Index2
+            var OldArr <== Arr
+            Arr = create
+              (Bounds1 => min(OldArr.Bounds1.First, Index1) ..
+                 max(OldArr.Bounds1.Last, Index1),
+               Bounds2 => min(OldArr.Bounds2.First, Index2) ..
+                 max(OldArr.Bounds2.Last, Index2),
+               InitialValue => null)
+
+            // Move over old data
+            for I in OldArr.Bounds1 {
+                for J in OldArr.Bounds2 {
+                    // Explicitly use "indexing" to avoid infinite recursion
+                    "indexing"(Arr, I, J) <== OldArr[I, J]
+                }
+            }
+
+            // Reclaim old data space
+            OldArr = null
+        }
+
+        //  Now return ref to appropriate element
+	return "indexing"(Arr, Index1, Index2)
+    }
+
+    // Set of index pairs that cover the 2D array.
+    SetOfIndices "index_set"(Array2D Arr) {
+        return create(Arr.Bounds1, Arr.Bounds2)
+    }
+
+    Array2D "[]"() {
+	return (Data => create(0, null),
+	  Bounds1 => Index1.first()+1 .. Index1.first(),
+          Bounds2 => Index2.first()+1 .. Index2.first())
+	    // Bounds not meaningful when empty
+    }
+
+}
+
+void java.test.testArray2D() {
+    type Shade is Enum< [#white, #black] >
+    type ChessBoard is Array2D<Shade,
+      Index1 => Integer<1..8>, Index2 => Integer<1..8>>
+
+    final ChessBoard.SetOfIndices BoardIndices = create(1..8, 1..8)
+    var ChessBoard CB = [for Ix in BoardIndices =>
+      (if (Ix.Index1 - Ix.Index2) mod 2 == 0 then #white else #black)]
+
+    for each [Ix => C] of CB forward {
+	println("CB[" + Ix.Index1 + ", " + Ix.Index2 + "] = " + C)
+
+        {>  CB[Ix.Index1, Ix.Index2] == C <}
+    }
+}
+
+class interface java.lang.Time<> {
+  // Time in nanoseconds since Jan 1, 1970
+
+    type TimeInterval is new
+      Fixed<Delta => 1.0E-9>
+
+    final TimeInterval Second = 1.0
+    final TimeInterval Millisecond = 1.0/1000
+    final TimeInterval Microsecond = 1.0/10**6
+    final TimeInterval Nanosecond = 1.0/10**9
+
+    final TimeInterval Minute = 60.0
+    final TimeInterval Hour = 60 * Minute
+    final TimeInterval Day = 24 * Hour
+
+    type MonthEnum is Enum< 
+       [#Jan, #Feb, #Mar, #Apr, #May, #Jun,
+        #Jul, #Aug, #Sep, #Oct, #Nov, #Dec] >
+
+    Time create(UnivInteger Year, MonthEnum Month,
+      UnivInteger DayOfMonth,
+      TimeInterval TimeOfDay = 0.0,
+      TimeInterval TimeZone = 0.0)
+
+    Time zero()
+
+    Time "+"(Time Left, TimeInterval Right)
+      is import("+")
+    Time "+"(TimeInterval Left, Time Right)
+      is import("+")
+    Time "-"(Time Left, TimeInterval Right)
+      is import("-")
+    TimeInterval "-"(Time Left, Time Right)
+      is import("-")
+
+    Ordering "=?"(Time Left, Time Right)
+      is import("=?")
+
+    optional Time min(optional Time Left, optional Time Right)
+      is import(#min)
+    optional Time max(optional Time Left, optional Time Right)
+      is import(#max)
+
+    TimeInterval secondsSince1970(Time)
+      is import(#identity)
+
+}
+
+class java.lang.Time {
+    final TimeInterval Since_1970 
+
+    type YearKind is Enum< [#normal, #leap] >
+
+    final Array<Array<UnivInteger, IndexedBy => YearKind>,
+      IndexedBy => MonthEnum> MonthBase = 
+	[#Jan => [0, 0], #Feb => [31, 31], #Mar => [59, 60], #Apr => [90, 91],
+         #May => [120, 121], #Jun => [151, 152], #Jul => [181, 182],
+         #Aug => [212, 213], #Sep => [243, 244], #Oct => [273, 274],
+         #Nov => [304, 305], #Dec => [334, 335]]
+
+    YearKind kindOfYear(UnivInteger Year) {
+	if Year mod 4 == 0 and then
+	  (Year mod 100 != 0 or else Year mod 400 == 0) {
+	    // Every 100 years leap year is omitted, 
+	    // except for multiples of 400 which *are* leap years.
+	    return #leap
+	} else {
+	    return #normal
+	}
+    }
+
+    UnivInteger leapsBefore(UnivInteger Year) {
+	// Number of leap years before this year, starting from 1970
+	if Year < 2101 {
+	    return (Year-1969)/4
+	} else {
+	    // Every 100 years leap year is omitted, 
+	    // except for multiples of 400 which *are* leap years.
+	    return (Year-1969)/4 - (Year-2001)/100
+	}
+    }
+
+  public
+    Time create(UnivInteger Year, MonthEnum Month,
+      UnivInteger DayOfMonth,
+      TimeInterval TimeOfDay = 0.0,
+      TimeInterval TimeZone = 0.0) {
+	// Determine number of nanos since Jan 1, 1970
+	final Kind = kindOfYear(1970)
+	final Base = MonthBase[Month][Kind]
+
+	return (Since_1970 => 
+	  (Year-1970) * (365*Day) + 
+	  (leapsBefore(Year) + Base + DayOfMonth)*Day +
+	  TimeOfDay - TimeZone)
+    }
+
+    Time zero() {
+	return (Since_1970 => 0.0)
+    }
+
+}
+
+void java.test.testTime(UnivReal X) {
+    var Time.TimeInterval XTI = X
+    final Time.TimeInterval LocalMinute = 60.0
+    println("X = " + XTI)
+    println("X * 2 = " + XTI*2)
+    println("X + X = " + (XTI + XTI))
+    println("X - X = " + (XTI - XTI))
+    println("X / 2 = " + (XTI / 2))
+    println("X / 2.0 = " + (XTI / 2.0))
+    println("X * 3.0 = " + (XTI * 3.0))
+    println("5.0 * X = " + (5.0 * XTI))
+    println("-5.0 * X = " + (-5.0 * XTI))
+    println("-5.0 = " + -5.0)
+    println("LocalMinute = " + LocalMinute)
+    println("-5.0*LocalMinute = " + (-5.0*LocalMinute))
+    println("Time.Minute = " + Time.Minute)
+    println("-5.0*Time.Minute = " + (-5.0*Time.Minute))
+    println("Time.Hour = " + Time.Hour )
+    println("-5.0*Time.Hour = " + (-5.0*Time.Hour))
+
+    var Time T = create(Year => 2011, Month => #Oct, DayOfMonth => 18,
+      TimeOfDay => 10*Time.Hour + 5*Time.Minute,
+      TimeZone => -5.0*Time.Hour)
+
+    println("18-Oct-2011 = " + ( T - zero() ))
+    println("X = " + XTI )
+    println("18-Oct-2011 - X = " + ( (T - XTI) - zero() ) )
+
+}
+     
+synchronized class interface java.lang.Clock<> {
+    // A module that provides access to a wall clock and
+    // to other timers, and an ability to delay the caller
+    // for a given amount of time, or until a specified time
+    // in the future.
+    
+    Clock create()
+	// create a clock, which corresponds to the current wall clock time
+
+    Clock create(Time Now)
+	// create a clock, where now() returns the given time when created
+
+    Time now(locked Clock C)
+	// Return current reading of clock
+
+    Time now()
+	// Return current reading of wall clock
+
+    queued void delay(Clock C, Time Until)
+	// Wait until the given clock reads >= Until
+
+    queued void delay(Time Until)
+	// Wait until the wall clock reads >= Until
+
+    queued void delay(Clock C, Time.TimeInterval For)
+	// Wait until the given clock reads "now(C) + For"
+
+    queued void delay(Time.TimeInterval For)
+	// Wait until the wall clock reads "now() + For"
+
+    void set(locked var Clock C, Time To)
+	// Update clock so it reads the given time
+}
+
+synchronized class java.lang.Clock {
+
+    var Time.TimeInterval TimerDelta
+	// Amount to be subtracted from Current Time
+	// to produce value of timer
+
+    Time currentTime(locked Clock C) 
+      is import(#clock_current_time)
+	// NOTE: Clock parameter is ignored; returns wall clock
+
+    void waitForDelay(queued Clock C, Time Until) is
+      import(#clock_delay)
+	// Wait until the wall clock reads >= Until
+	// NOTE: Clock parameter is ignored
+
+  public
+    Clock create() {
+	// create a clock, which corresponds to the current wall clock time
+	// println("create Clock with Delta 0.0")
+	return (TimerDelta => 0.0)
+    }
+
+    Clock create(Time Now) as Result {
+	// create a clock, where now() returns the given time when created
+	final Delta = currentTime(create()) - Now
+	// println("create Clock with Delta = " + Delta)
+	return (TimerDelta => currentTime(create()) - Now)
+    }
+
+    Time now(locked Clock C) as Result {
+	// Return current reading of clock
+	Result = currentTime(C) - C.TimerDelta
+	// println("Now returning " + Result-zero())
+    }
+
+    Time now() as Result {
+	// Return current reading of wall clock
+        var Clock C = create()
+	Result = currentTime(C)
+	// println("Now returning " + Result-zero())
+    }
+
+    queued void delay(Clock C, Time Until) {
+	// Wait until the given clock reads >= Until
+	waitForDelay(C, Until + C.TimerDelta)
+    }
+
+    queued void delay(Time Until) {
+	// Wait until the wall clock reads >= Until
+        var Clock C = create()
+	waitForDelay(C, Until)
+    }
+
+    queued void delay(Clock C, Time.TimeInterval For) {
+	// Wait until the given clock reads "now(C) + For"
+	// NOTE: TimerDelta is irrelevant for this one
+	// println("Wait for delay of " + For)
+	final TimeNow = currentTime(C)
+	final Until = TimeNow + For
+	// println("TimeNow + " + For + " - TimeNow = " + Until - TimeNow)
+	waitForDelay(C, Until)
+    }
+
+    queued void delay(Time.TimeInterval For) {
+	// Wait until the wall clock reads "now() + For"
+	// NOTE: TimerDelta is irrelevant for this one
+	// println("Wait for delay of " + For)
+        var Clock C = create()
+	final TimeNow = currentTime(C)
+	final Until = TimeNow + For
+	// println("TimeNow + " + For + " - TimeNow = " + Until - TimeNow)
+	waitForDelay(C, Until)
+    }
+
+    void set(locked var Clock C, Time To) {
+	// Update clock so it reads the given time
+	C.TimerDelta = currentTime(C) - To
+    }
+
+}
+
+void java.test.testClock() {
+    var C = Clock.create()
+    final Start = C.now()
+    var Ran = Random.start (roundToInt (secondsSince1970 (Clock.now())))
+    println("First random number = " + next(Ran));
+    println("Second random number = " + next(Ran));
+    println("Third random number = " + next(Ran));
+
+  then
+    println("About to delay 4.0 seconds")
+    C.delay(4.0)
+    println("Done with delay of 4.0")
+  ||
+    println("About to delay 2.0 seconds")
+    C.delay(2.0)
+    println("Done with delay of 2.0")
+||    // check that indent of 0 works
+    for I in 1..7 {
+	println("In loop delaying for 1.0")
+	C.delay(1.0)
+	println("Done with delay " + I + " of 1.0")
+    }
+then  // check that indent of 0 works
+    println("Elapsed time: " + (C.now() - Start))
+}
+
+synchronized class interface java.lang.Atomic<Comparable<> as ContentType> {
+    Atomic create(ContentType InitialVal)
+      // create an atomic object with given initial value
+
+    void setValue(locked var Atomic A, ContentType Val)
+      // Atomically set the new value
+      // TBD: Use atomic hardware instructions eventually
+
+    ContentType value(locked Atomic A)
+      // Return the current value
+      // TBD: Use atomic hardware instructions eventually
+
+    ContentType testAndSet(locked var Atomic A, ContentType NewVal)
+      // Set value(A) to NewVal; Return the prior value.
+
+    ContentType compareAndSwap(locked var Atomic A,
+      ContentType ExpectedVal, ContentType NewVal)
+      // If value(A) == ExpectedVal, then set value(A) to NewVal.
+      // In any case, return the prior value.
+}
+
+synchronized class java.lang.Atomic {
+    var ContentType Value
+  public
+    Atomic create(ContentType InitialVal) {
+      // create an atomic object with given initial value
+	return (Value => InitialVal)
+    }
+
+    void setValue(locked var Atomic A, ContentType Val) {
+      // Atomically set the new value
+      // TBD: Use atomic hardware instructions eventually
+	A.Value = Val
+    }
+
+    ContentType value(locked Atomic A) {
+      // Return the current value
+      // TBD: Use atomic hardware instructions eventually
+	return A.Value
+    }
+
+    ContentType testAndSet(locked var Atomic A, ContentType NewVal) as Result {
+      // Set value(A) to NewVal; Return the prior value.
+	Result = A.Value
+	A.Value = NewVal
+    }
+
+    ContentType compareAndSwap(locked var Atomic A,
+      ContentType ExpectedVal, ContentType NewVal) as Result {
+      // If value(A) == ExpectedVal, then set value(A) to NewVal.
+      // In any case, return the prior value.
+	Result = A.Value
+	if Result == ExpectedVal {
+	    A.Value = NewVal
+	}
+    }
+}
+
+void java.test.testAtomic(UnivInteger X, UnivInteger Y) {
+    type AtomicUniv is Atomic<UnivInteger>
+    var AX = AtomicUniv.create(X)
+
+    println("value(X) = " + value(AX))
+
+    setValue(AX, X+1)
+    println("After setValue(" + X+1 + "), value(X) = " + value(AX))
+
+    final Z = testAndSet(AX, Y)
+    println("testAndSet(X, " + Y + ") = " + Z)
+
+    final CAS = compareAndSwap(AX, ExpectedVal => X-1, NewVal => Y-1)
+    println("compareAndSwap(X, " + (X-1) + ", " + (Y-1) + 
+      ") = " + CAS + ", value(X) = " + value(AX))
+
+    final CAS2 = compareAndSwap(AX, Y, Y-2)
+    println("compareAndSwap(X, " + Y + ", " + (Y-2) + 
+      ") = " + CAS2 + ", value(X) = " + value(AX))
+
+}
+
+class interface java.lang.Modular<UnivInteger Modulus> {
+  // This is an unsigned type whose arithmetic is "modulo" the modulus
+    Modular "from_univ"(UnivInteger Lit) 
+      is import(#integer_from_univ)
+
+    UnivInteger "to_univ"(Modular Val) 
+      is import(#integer_to_univ)
+
+    Modular "+"(Modular Right)
+      is import(#identity)
+
+    Modular "-"(Modular Right)
+
+    Modular "abs"(Modular Right)
+      is import(#identity)
+
+    Modular "magnitude"(Modular) is "abs"
+
+    Modular "+"(Modular Left, Modular Right) as Result
+
+    Modular "-"(Modular Left, Modular Right) as Result
+
+    Modular "*"(Modular Left, Modular Right) as Result
+
+    Modular "/"(Modular Left, Modular Right) as Result
+      is import("/")
+
+    Modular "mod"(Modular Left, Modular Right)
+      is import("mod")
+
+    Modular "rem"(Modular Left, Modular Right)
+      is import("rem")
+
+    Modular "**"(Modular Left, UnivInteger Right) as Result
+
+    void "+="(var Modular Left, Modular Right)
+
+    void "-="(var Modular Left, Modular Right)
+
+    void "*="(var Modular Left, Modular Right)
+
+    void "/="(var Modular Left, Modular Right) 
+      is import("/=")
+
+    void "**="(var Modular Left, UnivInteger Right)
+
+    Ordering "=?"(Modular Left, Modular Right)
+      is import("=?")
+
+    Modular ">>"(Modular, Modular) is import(">>")
+
+    Modular "<<"(Modular, Modular) is import("<<")
+
+    Modular "and"(Modular Left, Modular Right) is import(#bit_and)
+    Modular "or"(Modular Left, Modular Right)
+    Modular "xor"(Modular Left, Modular Right)
+    Modular "not"(Modular M)
+
+    optional Modular min(optional Modular Left, optional Modular Right)
+      is import(#min)
+    optional Modular max(optional Modular Left, optional Modular Right)
+      is import(#max)
+
+    UnivInteger hash(Modular Val)
+      is import(#identity)
+
+    void print(Modular X) is import(#print_int)
+
+    UnivString toString(Modular Val)
+      is import(#to_string_int)
+
+    optional Modular fromString(UnivString Str)
+
+    Modular first()
+
+    Modular last()
+
+    CountableRange<Modular> "[..]"() is in CountableRange<Modular>
+
+    CountableSet<Modular> ".."(Modular Left, Modular Right)
+      is in CountableSet<Modular>
+    CountableSet<Modular> "<.."(Modular Left, Modular Right)
+      is in CountableSet<Modular>
+    CountableSet<Modular> "..<"(Modular Left, Modular Right)
+      is in CountableSet<Modular>
+    CountableSet<Modular> "<..<"(Modular Left, Modular Right)
+      is in CountableSet<Modular>
+    CountableSet<Modular> "|"(Modular Left, Modular Right)
+      is in CountableSet<Modular>
+  implements for Countable
+    // These operations are needed so Modular satifies
+    // requirements of "Countable" interface, but these
+    // operations are not directly callable (if they were callable,
+    // we would have ambiguity when adding a Modular to an int-literal).
+
+    Modular "+"(Modular Left, UnivInteger Right) as Result
+
+    Modular "+"(UnivInteger Left, Modular Right) as Result
+
+    Modular "-"(Modular Left, UnivInteger Right) as Result
+
+    UnivInteger "-"(Modular Left, Modular Right) as Result
+
+}
+
+class java.lang.Modular {
+    final UnivInteger Content;  // So this ends up as a wrapper
+
+    UnivInteger bitOr(UnivInteger Left, UnivInteger Right) 
+      is import(#bit_or)
+
+    UnivInteger bitXor(UnivInteger Left, UnivInteger Right) 
+      is import(#bit_xor)
+  public
+    Modular "-"(Modular Right) {
+	return (Content => Modulus - Right.Content)
+    }
+
+    Modular "+"(Modular Left, Modular Right) as Result {
+	return (Content => (Left.Content + Right.Content) mod Modulus)
+    }
+
+    Modular "-"(Modular Left, Modular Right) as Result {
+	return (Content => (Left.Content - Right.Content) mod Modulus)
+    }
+
+    Modular "*"(Modular Left, Modular Right) as Result {
+	return (Content => (Left.Content * Right.Content) mod Modulus)
+    }
+
+    Modular "**"(Modular Left, UnivInteger Right) as Result {
+	return (Content => (Left.Content ** Right) mod Modulus)
+    }
+
+    void "+="(var Modular Left, Modular Right) {
+	Left = (Content => (Left.Content + Right.Content) mod Modulus)
+    }
+
+    void "-="(var Modular Left, Modular Right) {
+	Left = (Content => (Left.Content - Right.Content) mod Modulus)
+    }
+
+    void "*="(var Modular Left, Modular Right) {
+	Left = (Content => (Left.Content * Right.Content) mod Modulus)
+    }
+
+    void "**="(var Modular Left, UnivInteger Right) {
+	Left = (Content => (Left.Content ** Right) mod Modulus)
+    }
+
+    optional Modular fromString(UnivString Str) {
+	final UnivInteger Val = fromString(Str)
+	if Val is null or else Val in 0..<Modulus {
+	    return (Content => Val)
+	} else {
+	    return null
+	}
+    }
+
+    Modular "or"(Modular Left, Modular Right) {
+	return (Content => bitOr(Left.Content, Right.Content) mod Modulus)
+    }
+
+    Modular "xor"(Modular Left, Modular Right) {
+	return (Content => bitXor(Left.Content, Right.Content) mod Modulus)
+    }
+
+    Modular "not"(Modular M) {
+	return (Content => Modulus - 1 - M.Content)
+    }
+
+    Modular first() {
+	return (Content => 0)
+    }
+
+    Modular last() {
+	return (Content => Modulus-1)
+    }
+
+  // implements
+  // for Countable
+    // These operations are needed so Modular satifies
+    // requirements of "Countable" interface, but these
+    // operations are not directly callable (if they were callable,
+    // we would have ambiguity when adding an Modular to an int-literal).
+
+    Modular "+"(Modular Left, UnivInteger Right) as Result {
+	return (Content => (Left.Content + Right) mod Modulus)
+    }
+
+    Modular "+"(UnivInteger Left, Modular Right) as Result {
+	return (Content => (Left + Right.Content) mod Modulus)
+    }
+
+    Modular "-"(Modular Left, UnivInteger Right) as Result {
+	return (Content => (Left.Content - Right) mod Modulus)
+    }
+
+    UnivInteger "-"(Modular Left, Modular Right) as Result {
+	return (Left.Content - Right.Content) mod Modulus
+    }
+}
+    
+void java.test.testModular() {
+    type Mod16 is Modular<16>
+
+    println("Testing mod 16")
+    println("0xA + 0xA = " + (Mod16)0xA + (Mod16)0xA)
+    println("0xA or 0x1 = " + ((Mod16)0xA or (Mod16)0x1))
+    println("0xA xor 0x2 = " + ((Mod16)0xA xor (Mod16)0x2))
+    println("not 0xA = " + (not (Mod16)0xA))
+}
+
+void testEnum() {
+    java.test.testEnum()
+}
+
+class interface java.util.DiscreteOrderedSet<Comparable<> as ElementType> {
+  // A set over individual but ordered elements
+    DiscreteOrderedSet "[]"()
+
+    DiscreteOrderedSet singleton(ElementType Elem)
+
+    DiscreteOrderedSet "|"(ElementType Left, ElementType Right)
+    DiscreteOrderedSet "|"(DiscreteOrderedSet Left, ElementType Right)
+    DiscreteOrderedSet "|"(ElementType Left, DiscreteOrderedSet Right)
+    DiscreteOrderedSet "|"(DiscreteOrderedSet Left, DiscreteOrderedSet Right)
+
+    void "|="(var DiscreteOrderedSet Left, ElementType Right)
+    void "|="(var DiscreteOrderedSet Left, DiscreteOrderedSet Right)
+
+    void "<|="(var DiscreteOrderedSet Left, var optional ElementType Right)
+        // Move element into set, leaving Right null afterward.
+
+    void "<|="(var DiscreteOrderedSet Left, var DiscreteOrderedSet Right)
+	// Move all elements of Right into Left, leaving Right empty.
+
+    DiscreteOrderedSet "-"(DiscreteOrderedSet Left, DiscreteOrderedSet Right)
+      // Set difference
+    DiscreteOrderedSet "-"(DiscreteOrderedSet Left, ElementType Right)
+      // Remove one element
+    void "-="(var DiscreteOrderedSet S, ElementType Elem)
+      // Remove the given element from the set, if present
+    void "-="(var DiscreteOrderedSet Left, DiscreteOrderedSet Right)
+      // Remove all elements of Right from Left, if present
+
+    DiscreteOrderedSet "or"(DiscreteOrderedSet Left, DiscreteOrderedSet Right) is "|"   // union
+    void "or="(var DiscreteOrderedSet Left, DiscreteOrderedSet Right)
+      is "|="
+
+    DiscreteOrderedSet "+"(DiscreteOrderedSet Left, DiscreteOrderedSet Right) is "|"   // Union
+    void "+="(var DiscreteOrderedSet Left, DiscreteOrderedSet Right)
+      is "|="
+    void "+="(var DiscreteOrderedSet Left, ElementType Right) is "|="
+   
+    DiscreteOrderedSet "and"(DiscreteOrderedSet Left, DiscreteOrderedSet Right)
+	// Intersection
+    void "and="(var DiscreteOrderedSet Left, DiscreteOrderedSet Right)
+
+    DiscreteOrderedSet "xor"(DiscreteOrderedSet Left, DiscreteOrderedSet Right)
+	// Symmetric difference
+    void "xor="(var DiscreteOrderedSet Left, DiscreteOrderedSet Right)
+
+    Boolean "in"(ElementType Left, DiscreteOrderedSet Right)
+
+    Ordering "=?"(DiscreteOrderedSet Left, DiscreteOrderedSet Right)
+	// Return #equal if Left and Right have the same elements
+	// Return #less if Left is a proper subset of Right
+	// Return #greater if Left is a proper superset of Right
+	// Return #unordered otherwise
+
+    UnivInteger count(DiscreteOrderedSet S)
+
+    UnivInteger "magnitude"(DiscreteOrderedSet) is count
+
+    Boolean isEmpty(DiscreteOrderedSet S)
+
+    optional ElementType first(DiscreteOrderedSet S)
+    optional ElementType last(DiscreteOrderedSet S)
+
+    optional ElementType removeFirst(var DiscreteOrderedSet S)
+	// Remove first element of set (lowest value)
+
+    optional ElementType removeLast(var DiscreteOrderedSet S)
+	// Remove last element of set (highest value)
+
+    optional ElementType removeAny(var DiscreteOrderedSet S)
+	// Remove an arbitrary element of set
+
+}
+
+class java.util.DiscreteOrderedSet {
+
+    var optional AATree<ElementType> Items
+
+  public
+    DiscreteOrderedSet "[]"() {
+        return (Items => [])
+    }
+
+    DiscreteOrderedSet singleton(ElementType Elem) as Result {
+	Result = []
+	Result.Items |= Elem
+    }
+
+    DiscreteOrderedSet "|"(ElementType Left, ElementType Right) as Result {
+        Result = [];
+        Result.Items |= Left;
+        Result.Items |= Right;
+    }
+
+    DiscreteOrderedSet "|"(DiscreteOrderedSet Left, ElementType Right) as Result {
+        Result = Left
+        Result.Items |= Right
+    }
+
+    DiscreteOrderedSet "|"(ElementType Left, DiscreteOrderedSet Right) {
+        return Right | Left
+    }
+
+    DiscreteOrderedSet "|"(DiscreteOrderedSet Left, DiscreteOrderedSet Right) as Result {
+        Result = Left
+        Result |= Right
+    }
+
+    void "|="(var DiscreteOrderedSet Left, ElementType Right) {
+        Left.Items |= Right;
+    }
+
+    void "<|="(var DiscreteOrderedSet Left, var optional ElementType Right)
+      {
+        // Move element into set, leaving Right null afterward.
+	Left.Items <|= Right
+    }
+
+    void "<|="(var DiscreteOrderedSet Left, var DiscreteOrderedSet Right)
+      {
+	// Move all elements of Right into Left, leaving Right empty.
+        if count(Left.Items) == 0 {
+            Left.Items <== Right.Items
+        } else {
+            // Iterate through the tree
+	    for {
+		// Extract element from right
+		var Elem for Left = removeAny(Right.Items)
+
+		if Elem is null {
+		    return   // All done
+		}
+
+                Left.Items <|= Elem
+
+            }
+        }
+    }
+
+    void "|="(var DiscreteOrderedSet Left, DiscreteOrderedSet Right) {
+	// Pass the buck to the "<|=" operation
+	var RightCopy for Left = Right
+	Left <|= RightCopy
+    }
+
+    DiscreteOrderedSet "-"(DiscreteOrderedSet Left, DiscreteOrderedSet Right) as Result {
+      // Set difference
+	Result = Left
+	Result -= Right
+    }
+
+    DiscreteOrderedSet "-"(DiscreteOrderedSet Left, ElementType Right) as Result {
+      // Remove one element
+        Result = Left
+        Result -= Right
+    }
+        
+    void "-="(var DiscreteOrderedSet S, ElementType Elem) {
+      // Remove the given element from the set, if present
+	delete(S.Items, Elem);
+    }
+
+    void "-="(var DiscreteOrderedSet Left, DiscreteOrderedSet Right) {
+      // Remove all elements of Right from Left, if present
+	for Elem in Right {
+	    Left -= Elem
+	}
+    }
+
+    DiscreteOrderedSet "and"(DiscreteOrderedSet Left, DiscreteOrderedSet Right) as Result {
+	// Intersection
+	Result = []
+	for Elem in Right {
+	    if Elem in Left {
+		Result += Elem
+	    }
+	}
+    }
+
+    void "and="(var DiscreteOrderedSet Left, DiscreteOrderedSet Right) {
+	// Intersection
+	for Elem in Left {
+	    if Elem not in Right {
+		Left -= Elem
+	    }
+	}
+    }
+
+    DiscreteOrderedSet "xor"(DiscreteOrderedSet Left, DiscreteOrderedSet Right) as Result {
+	// Symmetric difference
+	Result = Left
+	Result xor= Right
+    }
+
+    void "xor="(var DiscreteOrderedSet Left, DiscreteOrderedSet Right) {
+	// Symmetric difference
+	// Want elements that are only in one of the two inputs
+	for Elem in Right {
+	    if Elem in Left {
+		Left -= Elem
+	    } else {
+		Left += Elem
+	    }
+	}
+    }
+
+    Boolean "in"(ElementType Left, DiscreteOrderedSet Right) {
+        return overlapping(Right.Items, Left) not null
+    }
+
+    Ordering "=?"(DiscreteOrderedSet Left, DiscreteOrderedSet Right) {
+	// Return #equal if Left and Right have the same elements
+	// Return #less if Left is a proper subset of Right
+	// Return #greater if Left is a proper superset of Right
+	// Return #unordered otherwise
+        var Overlaps = 0
+        var Missing = 0
+        for Elem in Left {
+            if Elem not in Right {
+                Missing++
+            } else {
+                Overlaps++
+            }
+        }
+
+        if Missing > 0 {
+            // Can't be equal, but Left might be a proper superset
+            if Overlaps < count(Right) {
+                return #unordered
+            } else {
+                // Left is a superset
+                return #greater
+            }
+        } else {
+            // Might be equal or Left might be a proper subset
+            if Overlaps < count(Right) {
+                // Left is a proper subset of Right
+                return #less
+            } else {
+                return #equal
+            }
+        }
+    }
+
+    UnivInteger count(DiscreteOrderedSet S) as Result {
+        // Return count of items in set
+        return count(S.Items);
+    }
+
+    Boolean isEmpty(DiscreteOrderedSet S) {
+	return isEmpty(S.Items)
+    }
+
+    optional ElementType first(DiscreteOrderedSet S) {
+        return first(S.Items);
+    }
+
+    optional ElementType last(DiscreteOrderedSet S) {
+        return last(S.Items);
+    }
+
+    optional ElementType removeFirst(var DiscreteOrderedSet S) as Result {
+        // Return first element of set
+        return removeFirst(S.Items)
+    }
+
+    optional ElementType removeLast(var DiscreteOrderedSet S) as Result {
+        // Remove last element of set
+        return removeLast(S.Items);
+    }
+
+    optional ElementType removeAny(var DiscreteOrderedSet S) {
+        // Remove any element of set
+        return removeAny(S.Items);
+    }
+
+}
+
+class interface java.lang.EnumWithRep
+  <Imageable<> as RepType, Map<UnivEnumeration, RepType> RepMap> {
+  // An enumeration type specified using a map from literal to value
+  // of an underlying representation type.
+    EnumWithRep "from_univ"(UnivEnumeration Univ)
+    optional UnivEnumeration "to_univ"(optional EnumWithRep Val) as Result
+    // {> Result is null or else
+    //    (for some [Lit => Val] of Literals => Lit == Result) <}
+
+    // Functions to convert from/to rep
+    optional EnumWithRep fromRep (optional RepType Rep)
+    optional RepType toRep (optional EnumWithRep Val)
+
+    DiscreteOrderedSet<EnumWithRep> "[..]"()
+
+    Ordering "=?"(EnumWithRep Left, EnumWithRep Right)
+
+    // Functions for Imageable
+    UnivString toString(EnumWithRep Val)
+    optional EnumWithRep fromString(UnivString Str)
+
+    UnivInteger hash(EnumWithRep Val)
+
+    optional EnumWithRep min(optional EnumWithRep Left, optional EnumWithRep Right)
+    optional EnumWithRep max(optional EnumWithRep Left, optional EnumWithRep Right)
+
+}
+
+class java.lang.EnumWithRep {
+    final RepType Rep
+  public
+    EnumWithRep "from_univ"(UnivEnumeration Univ) {
+        return (Rep => RepMap[Univ]);
+    }
+
+    optional UnivEnumeration "to_univ"(optional EnumWithRep Val) as Result {
+	if Val is null {
+	    return null
+	} else {
+            for each [Lit => Rep] of RepMap {
+                if Val.Rep == Rep {
+                    return Lit
+                }
+            }
+	    return null
+	}
+    }
+
+    optional EnumWithRep fromRep (optional RepType Rep) {
+        if Rep is null {
+            return null
+        } else {
+            return (Rep => Rep)
+        }
+    }
+
+    optional RepType toRep (optional EnumWithRep Val) {
+        if Val is null {
+            return null
+        } else {
+            return Val.Rep
+        }
+    }
+
+    // Functions for Imageable
+    UnivString toString(EnumWithRep Val) {
+        final optional UnivEnumeration Enum = [[Val]];
+        if Enum not null {
+            // use enum image
+            return UnivEnumeration.toString(Enum);
+        } else {
+            // use rep-type toString
+            return RepType.toString(Val.Rep)
+        }
+    }
+
+    optional EnumWithRep fromString(UnivString Str) {
+        if Str[1] == '#' {
+            // Presume is an enum
+            return UnivEnumeration.fromString(Str)
+        } else {
+            // Use rep-type fromString
+            return (Rep => RepType.fromString(Str))
+        }
+    }
+
+    DiscreteOrderedSet<EnumWithRep> "[..]"() {
+        return [for each Rep of RepMap => fromRep(Rep)]
+    }
+
+    Ordering "=?"(EnumWithRep Left, EnumWithRep Right) {
+        return Left.Rep =? Right.Rep
+    }
+
+    UnivInteger hash(EnumWithRep Val) {
+        return hash (Val.Rep)
+    }
+
+    optional EnumWithRep min(optional EnumWithRep Left, optional EnumWithRep Right)
+      {
+        if Left is null {
+            return Right
+        } else if Right is null or else Right.Rep > Left.Rep {
+            return Left
+        } else {
+            return Right
+        }
+    }
+
+    optional EnumWithRep max(optional EnumWithRep Left, optional EnumWithRep Right)
+      {
+        if Left is null {
+            return Right
+        } else if Right is null or else Right.Rep < Left.Rep {
+            return Left
+        } else {
+            return Right
+        }
+    }
+
+}
+
+void java.test.testEnumWithRep() {
+    type Color is EnumWithRep<UnivInteger,
+               [#red => 1, #green => 3, #blue => 5]>;
+
+    type DayOfWeek is
+       EnumWithRep<Modular<2**7>,
+          [#Monday => 1<<1, #Tuesday => 1<<2, #Wednesday => 1<<3,
+           #Thursday => 1<<4, #Friday => 1<<5,
+            #Saturday => 1<<6, #Sunday => 1<<7]>
+
+    for C in Color forward {
+        println("Next color = " + C)
+    }
+
+    for C2 in Color reverse {
+        println("Prev color = " + C2)
+    }
+
+    for D3 in DayOfWeek {
+        println("Random day of week = " + D3)
+    }
+
+    {> #Monday in DayOfWeek <}
+
+    for D4 in DayOfWeek reverse {
+        println("Prev day of week = " + D4)
+    }
+
+    for D5 in DayOfWeek forward {
+        println("toRep(" + D5 + ") = " + toRep(D5))
+    }
+
+    for I in 1..10 forward {
+        println("DayOfWeek.fromRep(" + I + ") = " +
+          DayOfWeek.fromRep(I))
+    }
+
+}
+
+synchronized class interface java.lang.IO<> {
+  // Locked versions of the print, println and readln operations
+    IO getIO()  // Get handle on IO subsystem
+
+    void println(locked var IO, UnivString)
+    void print(locked var IO, UnivString)
+    void print(locked var IO, UnivCharacter)
+    void print(locked var IO, UnivInteger)
+    void print(locked var IO, UnivReal)
+    void print(locked var IO, UnivEnumeration) 
+
+    optional UnivString readln(locked var IO)
+}
+
+synchronized class java.lang.IO {
+  public
+    IO getIO() {
+        return ()
+    }
+
+    void println(locked var IO, UnivString) {
+        println (UnivString)
+    }
+
+    void print(locked var IO, UnivString) {
+        print (UnivString)
+    }
+
+    void print(locked var IO, UnivCharacter) {
+        print (UnivCharacter)
+    }
+
+    void print(locked var IO, UnivInteger) {
+        print (UnivInteger)
+    }
+
+    void print(locked var IO, UnivReal) {
+        print (UnivReal)
+    }
+
+    void print(locked var IO, UnivEnumeration) {
+        print (UnivEnumeration)
+    }
+
+    optional UnivString readln(locked var IO) {
+        return readln()
+    }
+
+}
+
+void java.test.testIO (UnivString X, UnivString Y, UnivInteger Z) {
+    var IO = java.lang.IO.getIO()
+    final Pi = 3.141592653589793
+    final True = (Boolean)#true
+
+    IO.print ("Pi = ")
+    IO.print (Pi)
+    IO.print (", True prints as ")
+    IO.print (True)
+    IO.print ('\n')
+    IO.print ("X = \"" + X + '"')
+    IO.print (", Y = \"" + Y + '"')
+    IO.println (", Z = " + Z )
+    IO.print ("Give me somethin: ")
+    var Input = IO.readln()
+    IO.println ("You gave me: \"" + Input + '"')
+
+}
+    
+import java.test.testIO
+
+void testIO (UnivString X, UnivString Y, UnivInteger Z) {
+    java.test.testIO (X, Y, Z)
+}
+
+class interface java.lang.OutputStream<> {
+  // Output stream interface; all operations
+  // expressed in terms of UnivString print and close
+    abstract void print(var OutputStream, UnivString)
+    abstract void close(var optional OutputStream)
+
+    void println(var OutputStream+, UnivString)
+
+    void print(var OutputStream+, UnivCharacter)
+    void print(var OutputStream+, UnivInteger)
+    void print(var OutputStream+, UnivReal)
+    void print(var OutputStream+, UnivEnumeration) 
+}
+
+class java.lang.OutputStream {
+  // Output stream interface; all operations
+  // expressed in terms of UnivString print
+  public
+    void println(var OutputStream+, UnivString) {
+        OutputStream.print(UnivString)
+        OutputStream.print("\n")
+    }
+
+    void print(var OutputStream+, UnivCharacter) {
+        OutputStream.print(toString(UnivCharacter))
+    }
+
+    void print(var OutputStream+, UnivInteger) {
+        OutputStream.print(toString(UnivInteger))
+    }
+
+    void print(var OutputStream+, UnivReal) {
+        OutputStream.print(toString(UnivReal))
+    }
+
+    void print(var OutputStream+, UnivEnumeration) {
+        OutputStream.print(toString(UnivEnumeration))
+    }
+}
+
+interface java.lang.InputStream<> {
+    optional UnivString readln(var InputStream)
+    void close(var optional InputStream)
+}
+
+class interface java.lang.FileOutputStream<> extends java.lang.OutputStream<> {
+    optional FileOutputStream create(var IO, UnivString Name)
+      is import(#create_output_file)
+    optional FileOutputStream append(var IO, UnivString Name)
+      is import(#append_output_file)
+    void close(var optional FileOutputStream)
+      is import(#close_output_file)
+    void print(var FileOutputStream, UnivString)
+      is import(#print_to_file)
+}
+
+class java.lang.FileOutputStream {
+    final UnivString Name
+    final UnivInteger Index
+  public
+}
+
+class interface java.lang.FileInputStream<> extends java.lang.InputStream<> {
+    optional FileInputStream open(var IO, UnivString Name)
+      is import(#open_input_file)
+    void close(var optional FileInputStream)
+      is import(#close_input_file)
+    optional UnivString readln(var FileInputStream)
+      is import(#read_from_file)
+}
+
+class java.lang.FileInputStream {
+    final UnivString Name;
+    final UnivInteger Index
+  public
+}
+
+void java.test.testFile (UnivString Name, UnivString X, UnivString Y, UnivInteger Z) {
+    var IO = java.lang.IO.getIO()
+    var File = FileOutputStream.create(IO, Name);
+    final Pi = 3.14159265389793
+    final True = (Boolean)#true
+
+    IO.println ("Writing to file: " + Name)
+
+    File.print ("Pi = ")
+    OutputStream.print (File, Pi)
+    File.print (", True prints as ")
+    print (File, True)
+    print (File, '\n')
+    File.print ("X = \"" + X + '"')
+    println (File, ", Y = \"" + Y + '"')
+    IO.print ("Give me somethin: ")
+    var Inp = IO.readln()
+    IO.println ("You gave me: \"" + Inp + '"')
+    File.println ("User input = \"" + Inp + '"')
+    File.close();
+
+    var InpFile = FileInputStream.open(IO, Name)
+    IO.println ("Contents of file " + Name)
+    for {
+        final Line = InpFile.readln()
+        if Line is null {
+            break
+        }
+        IO.println(Line)
+    }
+
+    IO.println("All done")
+
+}

@@ -1,0 +1,192 @@
+interface Binary_Node
+  <Key_Type is Comparable<>; Value_Type is Assignable<>> is
+    func Left(ref N : Binary_Node) -> ref optional Binary_Node;
+
+    func Right(ref N : Binary_Node) -> ref optional Binary_Node;
+
+    func Create(Key : Key_Type; Value : Value_Type;
+      Left : optional Binary_Node := null;
+      Right : optional Binary_Node := null) -> Binary_Node;
+
+    func Key(N : Binary_Node) -> Key_Type;
+
+    func Value(ref N : Binary_Node) -> ref Value_Type;
+
+    func Key_Set(N : optional Binary_Node) -> Countable_Set<Key_Type>;
+end interface Binary_Node;
+
+class Binary_Node is
+    const Key : Key_Type;
+    var Value : Value_Type;
+    var Left : optional Binary_Node;
+    var Right : optional Binary_Node;
+  exports
+    func Left(ref N : Binary_Node) -> ref optional Binary_Node is
+        return N.Left;
+    end func Left;
+
+    func Right(ref N : Binary_Node) -> ref optional Binary_Node is
+        return N.Right;
+    end func Right;
+
+    func Create(Key : Key_Type; Value : Value_Type;
+      Left : optional Binary_Node := null;
+      Right : optional Binary_Node := null) -> Binary_Node is
+
+        return (Key => Key, Value => Value, Left => Left, Right => Right);
+    end func Create;
+
+    func Key(N : Binary_Node) -> Key_Type is
+        return N.Key;
+    end func Key;
+
+    func Value(ref N : Binary_Node) -> ref Value_Type is
+        return N.Value;
+    end func Value;
+
+    func Key_Set(N : optional Binary_Node) -> Countable_Set<Key_Type> is
+        if N is null then
+            return [];
+        else
+            return Key_Set(Left(N)) | Key_Set(Right(N)) | Key(N);
+        end if;
+    end func Key_Set;
+end class Binary_Node;
+
+interface Binary_Tree
+  <Key_Type is Comparable<>; Value_Type is Assignable<>> is
+    op "[]"() -> Binary_Tree;
+
+    op "in"(K : Key_Type; T : Binary_Tree) 
+      -> Boolean;
+
+    op "indexing"(ref T : Binary_Tree; K : Key_Type) 
+      -> ref Value_Type;
+
+    op "var_indexing"(ref var T : Binary_Tree; K : Key_Type) 
+      -> ref var optional Value_Type;
+
+    op "index_set"(T : Binary_Tree) 
+      -> Result : Countable_Set<Key_Type>;
+end interface Binary_Tree;
+
+class Binary_Tree is
+    type Node_Type is Binary_Node<Key_Type, Value_Type>;
+
+    var Root : optional Node_Type;
+
+    func Root(ref T : Binary_Tree) -> ref optional Node_Type is
+	return T.Root;
+    end func Root;
+
+    op "<|="(var T : Binary_Tree; var New : optional Node_Type) is
+	for N => Root(T) loop
+	    if N is null then
+		// Found where to put the new node
+		N <== New;
+	        return;
+	    end if;
+
+	    case Key(New) =? Key(N) of
+	      [#less] => 
+		continue loop with Left(N);
+	      [#greater] => 
+		continue loop with Right(N);  
+	      [#equal] => 
+		// Already there; replace value
+		Value(N) <== Value(New);
+		return;
+	    end case;
+	end loop;
+    end op "<|=";
+
+  exports
+
+    op "[]"() -> Binary_Tree is
+	return (Root => null);
+    end op "[]";
+
+    op "in"(K : Key_Type; T : Binary_Tree) 
+      -> Boolean is
+	for N => Root(T) while N not null loop
+	    case K =? Key(N) of
+	      [#less] => 
+		continue loop with Left(N);
+	      [#greater] => 
+		continue loop with Right(N);  
+	      [#equal] => 
+		return #true;
+	    end case;
+	end loop;
+	return #false;
+    end op "in";
+
+    op "indexing"(ref T : Binary_Tree; K : Key_Type) 
+      -> ref Value_Type is
+	for N => Root(T) while N not null loop
+	    case K =? Key(N) of
+	      [#less] => 
+		continue loop with Left(N);
+	      [#greater] => 
+		continue loop with Right(N);  
+	      [#equal] => 
+		return Value(N);
+	    end case;
+	end loop;
+	{#false} // Key not found
+    end op "indexing";
+
+    op "var_indexing"(ref var T : Binary_Tree; K : Key_Type) 
+      -> ref var optional Value_Type is
+	for N => Root(T) loop
+	    if N is null then
+		N := Create(K, null);
+		return Value(N);
+	    end if;
+	    case K =? Key(N) of
+	      [#less] => 
+		continue loop with Left(N);
+	      [#greater] => 
+		continue loop with Right(N);  
+	      [#equal] => 
+		return Value(N);
+	    end case;
+	end loop;
+    end op "var_indexing";
+
+    op "index_set"(T : Binary_Tree) 
+      -> Result : Countable_Set<Key_Type> is
+	return Key_Set(Root(T));
+    end op "index_set";
+end class Binary_Tree;
+
+func Test_Binary_Tree() is
+    type Univ_Tree is Binary_Tree<Univ_Integer, Univ_Enumeration>;
+    var T : Univ_Tree := [];
+    Println("3 in T = " | [[3 in T]]);
+
+    T[3] := #three;
+    T[1] := #one;
+    T[2] := #two;
+    T[4] := #four;
+    
+    var T2 : Univ_Tree := 
+      [15 => #fifteen, 5 => #five, 9 => #nine, 11 => #eleven];
+
+    Println("T = ");
+    for each [Key => Value] of T forward loop
+	Println(Key | " => " | Value);
+	Println(Key | " in T = " | [[Key in T]]);
+    end loop;
+
+    T2[19] := #nineteen;
+
+    Println("T2 = ");
+    for each [Key => Value] of T2 reverse loop
+	Println(Key | " => " | Value);
+    end loop;
+end func Test_Binary_Tree;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Test_Binary_Tree ();
+end func main;

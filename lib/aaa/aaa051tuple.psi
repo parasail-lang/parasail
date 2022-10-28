@@ -1,0 +1,21 @@
+//  Tuple types
+
+interface PSL::Containers::Pair<T1 is Assignable<>; T2 is Assignable<>> is
+   const First  : T1;
+   const Second : T2;
+end interface PSL::Containers::Pair;
+
+interface PSL::Containers::Triple<T1 is Assignable<>; T2 is Assignable<>;
+                                  T3 is Assignable<>> is
+   const First  : T1;
+   const Second : T2;
+   const Third  : T3;
+end interface PSL::Containers::Triple;
+
+interface PSL::Containers::Quad<T1 is Assignable<>; T2 is Assignable<>;
+                                T3 is Assignable<>; T4 is Assignable<>> is
+   const First  : T1;
+   const Second : T2;
+   const Third  : T3;
+   const Fourth : T4;
+end interface PSL::Containers::Quad;

@@ -1,0 +1,8 @@
+Hello, World!
+#This_Is_An_Enum
+Const_Params<3>::Twice = 6
+Const_Params<3>::Square = 9
+Const_Params<5>::Twice = 10
+Const_Params<5>::Square = 25
+#This #Is #Fun 
+

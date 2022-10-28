@@ -1,0 +1,9 @@
+interface Cairo<> is
+end interface Cairo
+
+interface Cairo::Context<> is
+end interface Cairo::Context
+
+func main(Args : Basic_Array<Univ_String>) is
+  null;
+end func main;

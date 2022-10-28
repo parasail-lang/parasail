@@ -1,0 +1,239 @@
+We have begun building an LLVM generator, which converts PSVM routines into
+LLVM functions.  One challenge is how to combine these LLVM functions into
+an executable program, while still making the LLVM functions accessible to
+other code, including interpreted code.  Currently the ParaSail compiler
+reads in all code at one time, and does some amount of global processing.
+Once some of the modules have been converted to compiled code, it is not
+clear how this will all still work.  We would of course like the compiled
+code to be callable from code not seen before.  
+
+If we presume that the
+unit of compilation is the module (and the top-level "func"), then we need
+to make all references module-relative, with some kind of link-time resolution
+of module references.  If we presume that ParaSail Module names are
+globally unique, then the module's ParaSail name can be used as part of the
+link-time ID.
+
+When the compiler is provided only a module interface, without the class that
+implements it, that implies that the class has already been compiled, or will
+be compiled later, and so references to the code for the operations should use
+link-time IDs that can be resolved at link time.
+
+It would be nice if the generated code for module classes could be dynamically
+loaded by the interpreter, rather than having to have an ever growing
+interpreter executable.  In other words, we would like to generate "DLLs"
+for each module.  The question is whether LLVM supports this directly.
+
+The GNAT Ada compiler supports "stand-alone" libraries, which seem to have
+some of the desired characteristics.  I have posted a query about how to load
+and call into a DLL.
+
+--
+
+As a first step we might want to change the interpreter and the PSVM so that
+it uses module-relative unique IDs, rather than global ones.  This can be
+seen as roughly equivalent to eliminating zero_base and const_area addresses.
+For constants it would be nice to share constants across modules, but that
+is probably not worth the hassle.
+
+So what would a module-relative global ID look like?
+The module name as a symbol could be used plus a module-relative offset.
+String literals and symbols can presumably be shared and unioned, and to
+some extent symbols need to be.
+
+---
+
+We chose a different approach, leaving things global in the interpreter, but
+using local indices in the LLVM, which are translated back to global indices
+at start-up time.
+
+Now we are at the stage where we need to call operations "through" a type
+descriptor, that is, the locator for the target of a [parallel] call is
+relative to a type area.  That requires out of line work for now, and we
+might as well go out-of-line to both compute the code address and static link,
+and actually make the call.  This allows the various necessary fixups to also
+occur.  We will need to pass the context/params/static link as usual, then
+also the locator for the operation (should always be type-relative or
+param-relative).  Oops, it is the static link that is param-relative currently,
+with the operation still being param-relative.  We could add a flag which is
+by default zero, but is like the locked param index, indicating the
+polymorphic param index, negative if is by-reference.  Would need to subtract
+one to get the param-relative offset.
+
+We also need to fill in the type descriptor operation tables.  This means
+calling some operation with each module operation to have it installed in
+the routine table.  This might also be a way to retrieve the routine info.
+We can use unique names for routines here rather than routine indices.
+
+When reconstructing type descriptors we read in the Routine_Info records, which
+have Index and associated type descriptor (effectively the desired static link
+on calls).  The index is not very helpful, and should probably be replaced
+with the full name of the routine.  Then we need a hash on this name.
+Alternatively, we put the routine names in a separate table, and use local
+indices in the stream representation.  Or put the routine names elsewhere
+along with their original index, and then, and then while reconstructing
+type descriptors we would also use a map from original index to new index,
+and would have the address (which we could check that it matches if routine
+is already in the table).
+
+The Per-File routine table, at compile-time, needs the string name and
+original index of the routine.  In the run-time table we want
+the address of routine (using the string name to specify an LLVM external),
+the original index (as it appears in the LLVM) and the name itself
+(to find/create the routine in the interpreter).
+
+Can we use the "simple name" and overloading index of the routine?
+We will need some way to identify the module uniquely -- its name as a local
+string index.  Need to provide the local string table, add to it when streaming
+out the type descriptor operation table so can get local index of
+module and simple name, and then use it when reconstructing the type
+descriptor operation table, to do a lookup by module/simple name.
+Clearly need an operation that finds routine given module/simple name.
+
+Need per-file table of local routines with module/simple-name as local indices
+with address.  This per-file table is used to fill in information in the global
+routine table.
+
+---
+
+The challenge we have is that we need to make the per-file string table
+available (for update) while generating the stream representation of
+type descriptors.  The Stream operation would need to take a ref to the
+per-file string table.  Another problem is that the per-file table is a
+ParaSail object, and we would be doing this work in Ada.
+One alternative might be to make the per-file string table a table in
+Ada land, with a ParaSail interface as well.  The per-file table could
+then be "copied" into the info-stream object, and be available for
+update.  Or we could have an operation to store and retrieve the
+per-file string table.  Simplest would be to have it as a "var"
+parameter of the Stream operation.  We would then do some work
+before returning the Info_Stream object, which would generate the
+stream and update the PFS table.
+
+----------
+
+We no longer reuse space for type descriptor stream representations.
+Would it be possible to go back to "linkonce," but notice whether the
+one referenced by the associated address was actually created for
+this file (e.g. by including the address of some non-linkonce
+local object of the file)?  If it wasn't, then we would perhaps create
+the type-descriptor but not fill it in, if this was the first one.
+At a minimum we would need the unique name of the type descriptor.
+
+---------
+
+We would like to mix compiled and interpreted code, and in particular
+start compiling pieces of the run-time and the compiler while having
+other parts still interpreted.  This means that we need the front end
+linked together with compiled code, and we need some interfacing such
+that calls from compiled code will have "landing pads" for interpreted
+code.  The interfacing could be a simple set of external definitions
+which call the interpreter with appropriate unique routine names.
+The compiler could generate this for every file that is found that is
+*not* being compiled to "hard" code, perhaps with a name blah.ps?.stubs.ll/s.
+
+We should keep a set of files seen and a set of files processed and then
+subtract the files processed from those seen.  When done processing files,
+we would iterate over the files seen, and compile those into x.ps?.stubs.ll.
+Every routine that would have generated code needs to have a stub.
+The stub would call the interpreter with the given routine; this could be
+a new built-in.  For efficiency it would be nice to do the lookups once
+and then remember the routine name for reference within the stub.  We could
+do the whole to-do list thing for these as well.  
+
+These stubs have to match, name-wise, what the calls will expect, with
+the overloading index included.
+
+------------
+
+We are running into problems when we combine interpreted code with compiled
+code because the type descriptor tables and routine tables are already
+partly filled out.  The index for a type descriptor was being assigned
+based on the number of installed type descriptors, and the expectation
+was tha the table of type-sem info would also be of similar size.
+We can arrange to install either the compiled code
+or the interpreted code first.  Presumably we would like the compiled code
+to supersede the interpreted code.  So we need some kind of "merge."  The
+routines cannot easily be merged because they are of a discriminated type.
+But the routine table provides a level of indirection, so that isn't
+really a problem, as we can replace the elemnt of the table.
+Ideally we could handle either compiled code or interpreted code coming
+first or second.
+
+For type descriptors, only the interpreted version has a meaningful type-sem
+(which should probably be set to null in the reconstructed version, either
+before write, or after read).
+------------
+
+Should perhaps give an extra command to the compiler to recognize
+any stand-alone procedure with Basic_Array<Univ_String> as the
+param type as a candidate "main" procedure and emit a separate file
+which defines "parasail_main_routine" and then just calls the
+stand-alone procedure.
+
+---------------
+
+We need to have a new solution for exit-with-skip.  We could keep track
+of the various skip counts associated with a given wait-for-parallel,
+and return some indication of which one was used.  Might be better to
+do this in the front end.
+
+--------------- 8/1/2014 -------------
+
+We are now dealing with compiled code and locking/queuing.
+We have decided to provide a separate address for the dequeue condition,
+aka the "internal precondition."  One problem is associated with up-level
+references from that internal precondition function.  We need to pass it
+a static link pointing at a local area which points to the enclosing type,
+as well as the parameter list.  Who creates and initializes this local area?
+How big is it?  At a minimum it needs to be three words long.
+We have decided to create a "bogus" linked-list of two local areas inside
+Dequeue_Condition_Satisfied for use by the compiled internal precondition.
+
+------------ 12/10/2014 ------------
+
+We have problems with work stealing for compiled code that uses queuing,
+such as drinking_phils.psl.  We are not preserving the Uses_Queuing flag
+in compiled code for blocks and operations.  Where could we put this flag?
+
+------------- 2/18/2014 ------------
+
+The LLVM optimizer is not smart enough to eliminate redundant stores into the
+local area, so I think we may want to represent the local area specially, and
+only store into it when we really need to, and only fetch from it when it might
+have been modified.  In general we would store into it when making calls on
+nested blocks/operations that make up-level references.  To pass parameters
+we should probably alloc an appropriate-sized array to hold the inputs
+and outputs and use it only for that one call.  And of course for builtins,
+we don't need to store them at all.  All other uses should probably
+become uses of single-word temporaries, or even better, pseudo-registers.
+
+---
+
+Should we try to integrate ParaScope and the LLVM generator at this stage?
+Would that give us any advantages?  Could we do LLVM generation after
+various passes of ParaScope?  Does value numbering help?  Does value set
+propagation help?  Once we have value numbers, can we generate LLVM code
+directly?  We need to be sure that value number definitions dominate all
+uses, which is not necessarily the case.  Presumably LLVM will do some of this.
+If we know the block in which a value is computed, we can make sure that it
+dominates the current block, and if not, compute it again.  We can keep track
+of all of the computations, and look for the most recent one that dominates
+the current block.
+
+Do we know anything about up-level references in ParaScope?  Does it even
+handle them?  Yes, but it would probably be better if we handled them
+earlier, since we want them at call points.  We could keep track of what
+up-level references are made in the Code_Gen pass, and include them in
+the routine/nested-block header.  Actually, ParaScope handles nested operations
+before it does the enclosing operation, so we could build up a list of
+up-level references to enclosing local/param areas.  Nested blocks are
+handled as they are encountered, and in general nested blocks come after
+the enclosing blocks, but we could keep track of usage on an earlier pass.
+However, at the moment, we don't look at most instructions until we get
+to the value numbering phase.  But we probably want to have value-set
+information during code generation, as that determines what checks we
+actually need to generate (though that could be recorded by itself).
+Is value set information useful for anything else?  Conceivably if the
+value set is a singleton, we don't need to do the operation, but that
+would probably deserve a warning, so shouldn't be very common.

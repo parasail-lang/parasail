@@ -1,0 +1,21 @@
+proc Para_Block() is
+    var XYZ : Univ_Integer := 0;
+
+    block
+        var My_Clock := Clock.Create();
+        
+      then
+        Delay(My_Clock, 5.0);
+        Println("delay of 5.0 expired");
+        exit block with XYZ => 5;
+      ||
+        Delay(My_Clock, 2.0);
+        Println("delay of 2.0 expired");
+        exit block with XYZ => 2;
+      then
+        Println("Should not get here because of exits");
+    end block;
+
+    Println("XYZ now = " | XYZ);
+
+end proc Para_Block;

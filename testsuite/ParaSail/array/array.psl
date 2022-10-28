@@ -1,0 +1,54 @@
+interface Basic_Array<Element_Type is Assignable<>> is
+    func Create(Length : Univ_Integer<>; Val : Element_Type) -> Basic_Array 
+      is import(#basic_array_create);
+    op "indexing"(ref V : Basic_Array; Index : Univ_Integer<>) -> 
+      ref Element_Type is import(#basic_array_indexing);
+    func Length(V : Basic_Array) -> Univ_Integer<>
+      is import(#basic_array_length);
+    op "|"(Left, Right : Basic_Array) -> Basic_Array;
+end interface Basic_Array;
+
+class Basic_Array is
+  exports
+    op "|"(Left, Right : Basic_Array) -> Result : Basic_Array is
+	if Length(Left) == 0 then
+	    Result := Right;
+	else
+	    Result := Create(Length(Left) + Length(Right), Left[1]);
+	end if;
+	var I : Univ_Integer := 1;
+	while I <= Length(Left) loop
+	    Result[I] := Left[I];
+	    I += 1;
+	end loop;
+	var J : Univ_Integer := 1;
+	while I <= Length(Result) loop
+	    Result[I] := Right[J];
+	    I += 1;
+	    J += 1;
+	end loop;
+    end op "|";
+	    
+end class Basic_Array;
+
+func Test_Array() is
+    var A : Basic_Array<Univ_Integer<>> := Create(3, 7);
+    A[1] := 42;
+    A[2] += 6;
+    A[3] += A[2];
+    Print("The answer is: " | A[1] + A[2] + A[3] | "\n");
+    Print("Length(A) = " | Length(A) | "\n");
+
+    var B := A | A;
+    Print("Length(B) = " | Length(B) | ", B[5] = " | B[5] | "\n");
+    var I : Univ_Integer := 1;
+    while I <= Length(B) loop
+	Print("B[" | I | "] = " | B[I] | ", ");
+	I += 1;
+    end loop;
+    Print("\n");
+end func Test_Array;
+
+func main(Args : PSL::Containers::Basic_Array<Univ_String>) is
+   Test_Array ();
+end func main;

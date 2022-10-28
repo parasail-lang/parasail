@@ -1,0 +1,155 @@
+// Example ParaSail program -- ParaSail source code HTML-izer
+
+// Usage:
+//   pslc aaa.psi htmlize.psl -command Htmlize < blah.psl > blah.psl.html
+
+// Copyright (C) 2011-2014, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+func Html_Escape(C : Univ_Character) -> Univ_String is
+    // Do single-character escapes
+    case C of
+      ['<'] =>
+        return "&lt;";
+      ['>'] =>
+        return "&gt;";
+      ['&'] =>
+        return "&amp;";
+      ['\\'] =>
+        return "\\";    // Prevent "Print" from expanding control chars
+      [..] =>
+        return "" | C;  // Convert character into a string
+    end case;
+end func Html_Escape;
+
+func Htmlize_Line(Orig : Univ_String; Cols_Per_Tab : Univ_Integer) is
+    // Bold lower case words that are not in comments or
+    // characters, strings, or enum literals.
+    // Italicize comments.
+    // Escape HTML special characters (<, >, &).
+    // Expand tabs into spaces (if Cols_Per_Tab > 1).
+
+    var Result := "";
+    var I := 1;
+    var Tab_Adjust := 0;  // I + Tab_Adjust = column
+    const L := Length(Orig);
+    var State : Univ_Enumeration := #other;
+    while I <= L loop
+        var C := Orig[I];
+        case C of
+          ['\\'] =>
+            if State == #string_literal or else State == #char_literal then
+                // skip next character no matter what it is
+                if I < L then
+                    Result |= Html_Escape(C);
+                    I += 1;
+                    C := Orig[I];
+                end if;
+            end if;
+          ['/'] =>
+            if I < L and then Orig[I+1] == '/' then
+                // comment, italicize it
+                Result |= "<i>" | Html_Escape(C);
+                while I < L loop
+                    I += 1;
+                    Result |= Html_Escape(Orig[I]);
+                end loop;
+                Result |= "</i>";
+                C := null;
+            end if;
+          ['a' .. 'z'] =>
+            if State == #other then
+                // Presume this is a reserved word, so bold it
+                Result |= "<b>" | C;
+                while I < L and then Orig[I+1] in 'a' .. 'z' loop
+                    I += 1;
+                    Result |= Orig[I];
+                end loop;
+                Result |= "</b>";
+                C := null;
+            end if;
+            
+          ['#' | '0'..'9' | 'A' .. 'Z' | '_'] =>
+            // Presume this is not a reserved word, pass through as is
+            if State == #other then
+                State := #unreserved;
+            end if;
+
+          ['"'] =>
+            if State == #string_literal then
+                // End of string literal
+                State := #other;
+            elsif State != #char_literal then
+                State := #string_literal;
+            end if;
+
+          ['\''] =>
+            if State == #char_literal then
+                // End of char literal
+                State := #other;
+            elsif State != #string_literal and then
+              I+2 <= L and then 
+              (Orig[I+2] == '\'' or else Orig[I+1] == '\\') then
+                // Start of a new char literal
+                State := #char_literal;
+            end if;
+
+          ['{'] =>
+            // Italicize annotations not inside a literal
+            if State != #string_literal and then State != #char_literal then
+                State := #other;
+                Result |= "<i>";
+            end if;
+	    
+          ['}'] =>
+            // End italicized annotation
+            if State != #string_literal and then State != #char_literal then
+                State := #other;
+                Result |= "}</i>";
+                C := null;
+            end if;
+	    
+          [..] =>
+            if State != #string_literal and then State != #char_literal then
+                State := #other;
+            end if;
+
+	    if C == '\t' and then Cols_Per_Tab > 1 then 
+		// Expand tabs to avoid portability issues
+		// NOTE: We are passing through tabs occurring in comments
+		const Pos := (I + Tab_Adjust - 1) mod Cols_Per_Tab;
+		for T in 1..(Cols_Per_Tab - Pos) loop
+		    Result |= ' ';
+		end loop;
+		// Keep track of adjustment to column.
+		Tab_Adjust += (Cols_Per_Tab - Pos - 1);
+		C := null;
+	    end if;
+        end case;
+
+        if C not null then
+            Result |= Html_Escape(C);
+        end if;
+        I += 1;
+    end loop;
+
+    Println(Result);
+end func Htmlize_Line;
+
+func Htmlize() is
+    const Cols_Per_Tab := 8;
+    Println("<pre>");
+    loop
+        const Line : Univ_String := Readln();
+        if Line is null then
+            exit loop;
+        end if;
+        Htmlize_Line(Line, Cols_Per_Tab);
+    end loop;
+    Println("</pre>");
+end func Htmlize;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Htmlize ();
+end func main;

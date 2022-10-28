@@ -1,0 +1,8 @@
+type RGB is Packed_Word<Fields, [#red => 8, #green => 7, #blue => 9]>
+ Bit_Field_Sizes: [#red => 8, #green => 7, #blue => 9]
+ Bit_Field_Ranges: [#red => 0..255, #green => 0..127, #blue => 0..511]
+ Bit_Field_Defaults: [#red => 0, #green => 0, #blue => 0]
+ Bit_Field_Offsets: [#red => 0, #green => 8, #blue => 15]
+Red: [#red => 255, #green => 0, #blue => 0]
+Purple: [#red => 255, #green => 0, #blue => 255]
+Purple with a touch of green: [#red => 255, #green => 3, #blue => 255]

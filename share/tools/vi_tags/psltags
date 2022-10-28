@@ -1,0 +1,64 @@
+#!/bin/csh -f
+set args = ()
+foreach a ($*)
+  switch ($a)
+    case "-a":
+      set appflg
+      breaksw
+    case "-x":
+      set indexflg
+      breaksw
+    case "-u":
+      set updateflg
+      breaksw
+    case "-r":  # reverse sort on file name
+      set revflg
+      breaksw
+    case "-*":
+      echo "$a : Unrecognized switch"
+      set args = ()
+      break
+    default:
+      set args = ($args $a)
+      breaksw
+  endsw
+end
+
+set mypath = $0
+set myname = $mypath:t
+set mydir = $mypath:h
+if ($mydir == $mypath) set mydir = "."
+
+if ($#args == 0) then
+    echo "Usage: $myname [ -a -x -u -r ] file ..."
+    exit -1
+endif
+
+set sortflags = ""
+if ($?revflg) then
+    # reverse sort on filename field
+    set sortflags = "--key=1 --key=2r"
+endif
+
+if ($?indexflg) then
+    awk -f $mydir/psltags.inx $args | sort
+    exit 0
+endif
+
+if ($?updateflg) then
+    echo >> tags
+    set sedargs = ""
+    foreach a ($args)
+      set sedargs = ($sedargs:q -e "/ $a ?/d")
+    end
+    sed $sedargs:q tags > tags.$$
+    mv tags.$$ tags
+    set appflg
+endif
+
+if ($?appflg) then
+    awk -f $mydir/psltags.awk $args | sort $sortflags tags - > tags.$$
+    mv tags.$$ tags
+else
+    awk -f $mydir/psltags.awk $args | sort $sortflags > tags
+endif

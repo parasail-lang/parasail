@@ -1,0 +1,158 @@
+# -------------------------------------------------------------------
+# Group 1: tests without dependencies
+#   All these tests are compiled by the script with the command:
+#     $ pslc aaa.psi <testfile>
+# -------------------------------------------------------------------
+# aa_tree.psl                8 semantic errors found
+# aggr.psl                   1 semantic errors found
+ agg_with_iterator.psl
+ annotation.psl
+ apply_op.psl
+ array.psl
+# array3.psl                 NYI: Type_Conversion not yet supported
+# assign.psl                 1 semantic errors found
+# binary_search.psl          2 semantic errors found
+ bin_tree.psl
+ bmap.psl
+ bottles_on_wall.psl
+ box.psl
+# cached_fib.psl             2 semantic errors found
+ cairo_stub.psl
+ case_expr.psl
+ case_stmt.psl
+ char_vec2.psl
+# clock.psl                  2 codegen errors found
+# compiler.psl               1 semantic errors found
+ cond_exprs.psl
+ contin.psl
+ deque.psl
+ dgraph.psl
+ div_con.psl
+ double_gen.psl
+# doubly_linked_list.psl     17 semantic errors found
+ dp2.psl
+ dp_with_colons.psl
+ drinking_phils.psl
+# enum.psl                   1 semantic errors found
+ expr_tree.psl
+ extend2_tree.psl
+ extend3_tree.psl
+ extend_tree.psl
+# fancy_int_vector.psl       1 semantic errors found
+# fancy_vector.psl           1 semantic errors found
+ fib.psl
+ fifo_queue.psl
+ fixed.psl
+ float.psl
+# float_with_units.psl       25 semantic errors found
+ for_loop1.psl
+ for_loop.psl
+ func_result.psl
+# graph.psl                  3 total syntax errors found
+ gtk_cairo.psl
+hello_button.psl
+# hier_module.psl            4 semantic errors found
+# hippo_game.psl             62 semantic errors found
+ htmlize.psl
+# imat_vec.psl               208 codegen errors found
+ implements.psl
+ interval.psl
+# int_vector.psl             1 codegen errors found
+ locked_box2.psl
+ locked_box.psl
+ locked_exit.psl
+# map2.psl                   8 semantic errors found
+# map3.psl                   134 semantic errors found
+# map4.psl                   1 total syntax errors found
+# map.psl                    2 total syntax errors found
+ map_reduce_expr.psl
+# map_reduce_func.psl        1 semantic errors found
+# map_reduce.psl             26 semantic errors found
+# mapset.psl                 4 semantic errors found
+ math.psl
+# mat_vec.psl                5 semantic errors found
+ measurement.psl
+ membership.psl
+ memoizing.psl
+ module_add_on.psl
+ move.psl
+# multi_assign.psl           1 semantic errors found (NYI)
+ multi_continue.psl
+# multi_outputs.psl          1 semantic errors found (NYI)
+# named_call.psl             2 semantic errors found
+ new_new_types.psl
+ new_type.psl
+# nonrec_qsort.psl           4 total syntax errors found
+# n_queens2.psl              2 semantic errors found
+ n_queens3.psl
+ n_queens4.psl
+ n_queens.psl
+# nullness.psl               3 semantic errors found
+ one_dim_array.psl
+# ordered_list_fancy.psl     4 semantic errors found
+ ordered_list.psl
+ ordered_set.psl
+# pair.psl                   21 semantic errors found
+ para_block.psl
+ para_hello.psl
+# parallel_search.psl         22 semantic errors found
+ parallel_stmt.psl
+# parse_tree.psl              31 semantic errors found
+ poly_tree.psl
+ poly_type.psl
+ prime_cycles.psl
+# psvm_mapper.psl            4 total syntax errors found
+# psvm.psl                   5 total syntax errors found
+# qsort2.psl                 64 semantic errors found
+# qsort3.psl                 1 semantic errors found
+# qsort4.psl                 2 semantic errors found
+ qsort5.psl
+ qsort6.psl
+ qsort7.psl
+ qsort.psl
+ queued_box.psl
+# reduce_op.psl              1 total syntax errors found
+# set.psl                    2 codegen errors found
+# shortest_path.psl          64 semantic errors found
+ simp_fib3.psl
+ simple_apply.psl
+# simple_fib.psl             1 semantic errors found
+ simple_hello_world.psl
+# simpler_fib.psl            21 semantic errors found
+ simp_loop.psl
+# slice.psl                  2 semantic errors found
+# stable_marriage_int.psl    4 semantic errors found
+# stable_marriage.psl        1 semantic errors found
+# stack_no_annotations.psl   1 semantic errors found
+ stack.psl
+ stack_simp2.psl
+# stack_simpler.psl          1 semantic errors found
+ string_case.psl
+ table.psl
+ test_ops.psl
+# test_param.psl             4 semantic errors found
+# tic_tac_toe_gtk.psl        2 semantic errors found
+ tictactoe.psl
+ tokenizer2.psl
+# tokenizer.psl              38 semantic errors found
+ ttt_tyler_edited.psl
+# type_conv.psl              8 semantic errors found
+# units2.psl                 3 semantic errors found
+ units.psl
+# unitsx.psl                 8 semantic errors found
+ vector.psl
+ wgraph.psl
+ word_count.psl
+#
+# -------------------------------------------------------------------
+# Group 2: tests with dependencies (unsupported yet by the script)
+# -------------------------------------------------------------------
+#
+# cairo.psl
+# dining_phils.psl
+# drinking_phils_orig.psl
+# gtk.psl
+# hello_gtk.psl
+# hello_world.psl
+# nqueens_gtk.psl
+# rubiks_gtk.psl

@@ -1,0 +1,42 @@
+interface SI< > is
+    type Quantity_Enum is Enum < [#Time, #Length, #Mass,
+#Electric_Charge, #Thermodynamic_Temperature, #Luminous_Intensity,
+#Amount,
+      #Plane_Angle, #Solid_Angle, #Electric_Current, #Area, #Volume,
+#Velocity, #Acceleration] >;
+    type Prefix_Enum is Enum <
+[#yotta,#zetta,#exa,#peta,#tera,#giga,#mega,#kilo,#hecto,#none,#deci,#centi,#milli,#micro,#nano,#pico,#femto,#atto,#zepto,#yocto]
+>;
+    func Prefix_Exponent ( Prefix : SI::Prefix_Enum) -> Univ_Integer;
+end interface SI;
+
+class SI is
+exports
+  func Prefix_Exponent ( Prefix : SI::Prefix_Enum) -> Univ_Integer is
+    const exp : Vector<Univ_Integer> :=
+[24,21,18,15,12,9,6,3,2,1,0,-1,-2,-3,-6,-9,-12,-15,-18,-21,-24];
+    return (exp[Hash(Prefix)]);
+  end func Prefix_Exponent;
+end class SI;
+
+interface Measurement< aUnit_Enum is Enum<>; asystem_Enum is Enum<>;
+aThisQuantity : asystem_Enum > is
+    func Quantity (M : Measurement) ->  asystem_Enum;
+end interface Measurement;
+
+class Measurement is
+exports
+  func Quantity (M : Measurement) -> asystem_Enum is
+    return (aThisQuantity);
+  end func Quantity;
+end class Measurement;
+
+interface MQ <> is
+   type Length is Measurement < 
+      aUnit_Enum => Enum<[#meter,#feet,#inch,#yard]>,
+      asystem_Enum => SI::Quantity_Enum, aThisQuantity => #Length >;
+end interface MQ; 
+
+func main(Args : Basic_Array<Univ_String>) is
+   null;
+end func main;

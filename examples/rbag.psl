@@ -1,0 +1,132 @@
+interface PSL::Containers::RBag<Element_Type is Any<>> is
+  //  This is a bag of references.
+  //  It cannot be updated, but it can be constructed using "|".
+
+    type Index is Univ_Integer;
+
+    op "[]"() -> RBag;
+    op "|"(Left, Right : RBag) -> RBag;
+    op "|"(Left : Element_Type; Right : RBag) -> RBag;
+    op "|"(Left : RBag; Right : Element_Type) -> RBag;
+    op "|"(Left, Right : Element_Type) -> RBag;
+
+    func Count(RBag) -> Univ_Integer;
+    op "magnitude"(RBag) -> Univ_Integer is Count;
+
+    op "index_set"(RBag) -> Countable_Set<Index>;
+    op "indexing"(ref RBag; Index) -> ref Element_Type;
+end interface PSL::Containers::RBag;
+
+class PSL::Containers::RBag is
+    ref Element : Element_Type;
+    ref Left : optional RBag;
+    ref Right : optional RBag;
+    var Count : Univ_Integer := 1;
+  exports
+
+    op "[]"() -> RBag is (null);
+    
+    op "|"(Left, Right : RBag) -> RBag is
+        if Left is null then
+            return Right
+        elsif Right is null then
+            return Left
+        elsif |Left| < |Right| then
+            //  TBD: Balance the tree
+            return (Element => Right.Element,
+                    Left => Left,
+                    Right => (Right.Left | Right.Right),
+                    Count => |Left| + |Right|)
+        else
+            //  TBD: Balance the tree
+            return (Element => Left.Element,
+                    Left => (Left.Left | Left.Right),
+                    Right => Right,
+                    Count => |Left| + |Right|)
+        end if
+    end op "|"
+
+    op "|"(Left : Element_Type; Right : RBag) -> RBag is
+        return (Element => Left, Left => null, Right => null) | Right
+    end op "|"
+
+    op "|"(Left : RBag; Right : Element_Type) -> RBag is
+        return Left | (Element => Right, Left => null, Right => null)
+    end op "|"
+
+    op "|"(Left, Right : Element_Type) -> RBag is
+        return (Element => Left, Left => null, Right => null) |
+               (Element => Right, Left => null, Right => null)
+    end op "|"
+
+    func Count(RBag) -> Univ_Integer is
+        if RBag is null then
+            return 0;
+        else
+            return RBag.Count;
+        end if
+    end func Count
+
+    op "index_set"(RBag) -> Countable_Set<Index> is
+        return 1 .. Count(RBag)
+    end op "index_set"
+
+    op "indexing"(ref RBag; Index) -> ref Element_Type is
+        {Index in 1 .. Count(RBag)}
+        //  Find how Index compares to count of left hand subtree
+        const Middle := Count(RBag.Left)+1
+        case Index =? Middle of
+          [#less] =>
+            //  Return appropriate element of left-hand subtree
+            return RBag.Left[Index]
+          [#equal] =>
+            //  We have the index of the middle element
+            return RBag.Element
+          [#greater] =>
+            //  Return appropriate element of right-hand subtree
+            return RBag.Right[Index - Middle]
+        end case
+    end op "indexing"
+end class PSL::Containers::RBag;
+
+interface PSL::Test::Trans<Account is Assignable<>> is
+  // Example of a non-assignable type
+    ref Data : Account;
+    func Create(ref A : Account) -> ref Trans is (Data => A)
+end interface PSL::Test::Trans
+
+func PSL::Test::Test_RBag() is
+  //  Test the bag-of-references type
+    type Trans_Bag is RBag<Trans<Univ_Integer>>
+
+    var I1 := 23
+    var I2 := 35
+    Println ("Initially, I1 = " | I1 | ", I2 = " | I2)
+
+    ref var Tr1 : Trans<Univ_Integer> => Create(I1)
+    ref var Tr2 : Trans<Univ_Integer> => Create(I2)
+
+    //  Test the ability to update using the ref
+    Tr1.Data := 24
+    Tr2.Data := 36
+
+    Println ("After first update, I1 = " | I1 | ", I2 = " | I2)
+
+    ref var TB : Trans_Bag => "|"(Tr1, Tr2)
+    Println ("Count of bag of transactions is " | Count(TB));
+    if Count(TB) != 2 then
+        Println (" --> Should be 2")
+    end if
+    const Ind_Set := "index_set"(TB)
+    Println ("Index set of TB = 1 .. " | Ind_Set.Last())
+
+    //  Now test whether we can iterate over bag of references and update
+    //  Underlying objects.
+    for each T of TB loop
+        Print ("Adding 1 to " | T.Data)
+        T.Data += 1
+        Println (" to produce " | T.Data)
+    end loop
+
+    Println("After iteration, I1 = " | I1 | ", I2 = " | I2);
+end func PSL::Test::Test_RBag

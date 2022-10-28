@@ -1,0 +1,243 @@
+-- generic
+package N_Queens is
+    -- Place N queens on an NxN checkerboard so that none of them can
+    -- "take" each other.
+    Max_N : constant Univ_Integer := 20;
+
+    type Chess_Unit is new Integer< -Max_N*2 .. Max_N*2 >;
+        -- An integer big enough to represent values -Max_N*2 .. +Max_N*2
+
+    subtype Row is Chess_Unit; -- A subrange in 1..Max_N
+    subtype Column is Chess_Unit; -- A subrange
+    type Solution is new Array<Column, Indexed_By => Row>;  
+      -- A "solution" is an array of Column's, indexed by "Row."
+      -- It indicates in which Column a queen of the given Row is located
+      -- An example solution would be:  2 8 6 1 3 5 7 4
+      --   meaning that the queen in row 1 is at column 2,
+      --   the queen in row 2 is at column 8, the queen in
+      --   row 3 is at column 6, and so on.
+
+    type Solution_Vec is new Array<Solution, Indexed_By => Univ_Integer>
+
+    package Prot is
+       type Prot_Solution_Vec is synchronized private;
+
+       function Create return Prot_Solution_Vec;
+
+       procedure Append_Solution
+         (Sols : in out Prot_Solution_Vec; Filled_Board : Solution);
+
+       function Solutions (Sols : Prot_Solution_Vec) return Solution_Vec;
+    end Prot;
+
+    function Solution_Is_OK (Sol : Solution; Index : Univ_Integer)
+      return Boolean;
+    --  Verify that all columns of solution is filled in
+
+    function Place_Queens(N : Row := Max_N) return Solution_Vec
+      with Post =>
+        (for all S in 1 .. Place_Queens'Result'Last =>
+           Solution_Is_OK (Place_Queens'Result(S), S));
+        -- Produce a vector of solutions, with the requirement
+        -- that for each solution, there are non-null column numbers
+        -- specified for each row of the checkerboard.
+end N_Queens;
+
+package body N_Queens is
+    subtype Sum_Range is Chess_Unit; -- {Sum_Range in 2..2*Max_N};
+        -- Sum_Range is used for diagonals where the row+column is the
+        -- same throughout the diagonal.
+    subtype Diff_Range is Chess_Unit; -- {Diff_Range in (1-Max_N) .. (Max_N-1)};
+        -- Diff_Range is used for diagonals where row-column is the
+        -- same throughout the diagonal.
+    type Sum is new Array<Boolean, Indexed_By => Sum_Range>;
+        -- This type of set keeps track of which Sum_Range diagonals
+        -- have a queen on them already.
+    type Diff is new Array<Boolean, Indexed_By => Diff_Range>;
+        -- This type of set keeps track of which Diff_Range diagonals
+        -- have a queen on them already.
+
+    type Solution_State is record
+        C : Column;    -- Current column
+        Trial : Solution;  -- Trial solution, some col#s still null
+        Diag_Sum : Sum;   -- Set of "sum" diagonals in use
+        Diag_Diff : Diff; -- Set of "diff" diagnoals in use
+    end record;
+
+    -- We build up a solution state progressively as we move
+    -- across the checkerboard, one column at a time.
+    function Initial_State(N : Row) return Solution_State is
+    begin
+        return (C => 1, Trial => Create (1..N, null),
+          Diag_Sum => Create (2 .. 2 * N, #False),
+          Diag_Diff => Create(1-N .. N-1, #False));
+    end Initial_State;
+
+    function Is_Acceptable(S : Solution_State; R : Row) return Boolean is
+      -- Is_Acceptable returns True if the next queen could be
+      -- place in row R.
+    begin
+        return S.Trial(R) is null and then
+          not S.Diag_Sum(R+S.C) and then
+          not S.Diag_Diff(R-S.C);
+    end Is_Acceptable;
+    
+    function Current_Column(S : Solution_State) return Column is
+      -- Current_Column indicates which column we are working on.
+    begin
+        return S.C;
+    end Current_Column;
+
+    function Next_State(S : Solution_State; R : Row) return Solution_State is
+      -- Next_State returns a Solution_State produced by
+      -- adding a queen at (Current_Column(S), R).
+    begin
+        return (C => S.C+1, 
+          Trial     => S.Trial | [R => S.C],
+          Diag_Sum  => S.Diag_Sum | [R+S.C => #True],
+          Diag_Diff => S.Diag_Diff | [R-S.C => #True]);
+    end Next_State;
+
+    function Final_Result(S : Solution_State; R : Row) return Solution is
+      -- Final_Result returns a result produced by adding a queen
+      -- at (Columns.Last, R) to a solution with all other columns
+      -- placed.
+    begin
+        return S.Trial | [R => S.C];
+    end Final_Result;
+
+    function Partial_Solution(S : Solution_State) return Solution is
+      -- Return partial solution thus far
+    begin
+        return S.Trial;
+    end Partial_Solution;
+
+ -- exports
+
+    function Place_Queens(N : Row := Max_N) return Solution_Vec
+        -- Produce a vector of solutions, with the requirement
+        -- that for each solution, there are non-null column numbers
+        -- specified for each row of the checkerboard.
+    is
+      Rows : constant Countable_Range<Chess_Unit> := 1..N;
+      Prot_Solutions : Prot.Prot_Solution_Vec := Create();
+      
+      procedure Append_Solution (Filled_Board : Solution) is
+         Append_Solution (Prot_Solutions, Filled_Board);
+      end Append_Solution;
+
+      procedure Fill_Rest_Of_Board (State : Solution_State) is
+          -- Iterate over the columns
+        
+          Inner_Loop:
+          parallel
+          for R in Rows loop
+              -- Iterate over the rows
+              if Is_Acceptable(State, R)
+              then
+                  -- Found a Row/Column combination that is not on any diagonal
+                  -- already occupied.
+                  if Current_Column(State) < N then
+                      -- Continue recursing since haven't reached Nth column.
+                      Fill_Rest_Of_Board (Next_State(State, R));
+                  else
+                      -- All done, remember trial result with last queen placed
+                      Append_Solution (Final_Result (State, R));
+                  end if;
+              end if;
+          end loop Inner_Loop;
+      end Fill_Rest_Of_Board
+    begin
+
+      --  Start the search for solutions
+      Fill_Rest_Of_Board (Initial_State(N));
+
+      --  Return sequence of solutions
+      return Solutions(Prot_Solutions);
+      
+    end Place_Queens;
+
+    package body Prot is
+       type Prot_Solution_Vec is synchronized record
+           Num_Solutions : Integer := 0;
+           Solutions : Solution_Vec := Create(1 .. 20, null);
+       end record Prot_Solution_Vec;
+
+       function Create return Prot_Solution_Vec is
+       begin
+          return ();
+       end Create;
+
+       procedure Append_Solution
+         (Sols : in out Prot_Solution_Vec; Filled_Board : Solution) is
+           Sols.Num_Solutions := Sols.Num_Solutions + 1;
+       begin
+           if Sols.Num_Solutions > Sols.Solutions'Last then
+              declare
+                 New_Sols : Solution_Vec :=
+                   Create (1 .. Sols.Solutions'Last * 2, null)
+              begin
+                 Put_Line ("Doubling size of solutions vector from " &
+                   Sols.Solutions'Last'Image);
+                 for I in 1 .. Sols.Solutions'Last loop
+                    New_Sols(I) := Sols.Solutions(I);
+                 end loop;
+                 Sols.Solutions := New_Sols;
+                 Put_Line (" to " & Sols.Solutions'Last'Image);
+              end;
+           end if;
+           Sols.Solutions(Sols.Num_Solutions) := Filled_Board;
+       end Append_Solution;
+
+       function Solutions (Sols : Prot_Solution_Vec) return Solution_Vec is
+       begin
+          return Sols.Solutions(1 .. [[Sols.Num_Solutions]]);
+       end Solutions;
+    end Prot;
+
+    function Solution_Is_OK (Sol : Solution; Index : Univ_Integer)
+      return Boolean is
+       Result : Boolean := True;
+    begin
+       if Sol is null then
+          Put_Line ("Solution #" & Index'Image & " is null");
+          Result := False;
+       else
+          for C of Sol'First .. Sol'Last loop
+             if Sol(C) is null then
+                Put_Line (" Column #" & C'Image & " of Solution #" &
+                  Index'Image & " is null");
+                Result := False;
+             end if;
+          end loop;
+       end if;
+       return Result;
+    end Solution_Is_OK;
+    --  Verify that all columns of solution is filled in
+end N_Queens;
+
+procedure Test_N_Queens(N : Univ_Integer) is
+
+    -- package Max_12_Queens is new N_Queens(Max_N => 12);
+    subtype Max_12_Queens is N_Queens;
+
+    Results : N_Queens.Solution_Vec := Max_12_Queens.Place_Queens(N);
+    I : Integer := 1;
+begin
+
+    Put_Line("Number of results with " & N'Image & " queens = " &
+     Results'Length'Image);
+
+    for Result of Results loop
+
+        Put("Result #" & I'Image);
+
+        for Col of Result loop
+            Put(" " & Col'Image);
+        end loop;
+        Put_Line("");
+        I := I + 1;
+    end loop;
+
+end Test_N_Queens;
+
