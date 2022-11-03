@@ -155,7 +155,9 @@ func Test_Fifo(X, Y, Z : Univ_Integer) is
       ||
         Clock::Delay(For => 0.01);
         const Val := Q.Take();
-        Println("Got " | Val);
+        if Val not in 1 .. 10 then
+           Println("Unexpected value: Got " | Val);
+        end if
     end loop;
 end func Test_Fifo;
 

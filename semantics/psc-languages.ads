@@ -39,6 +39,7 @@ package PSC.Languages is
       Convention_External_Default,  --  No convention specified, and is import
       Convention_Locking_Default,   --  No convention specified, locking
       Convention_Queuing_Default,   --  No convention specified, queuing
+      Convention_Nested_Block,      --  Convention for nested blocks
       Convention_ParaSail,          --  #parasail convention specified
       Convention_Sparkel,           --  #sparkel convention specified
       Convention_Parython,          --  #parython convention specified

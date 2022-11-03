@@ -74,8 +74,8 @@ package body PSC.Trees.Semantics.Translator is
       ("PSL::Containers::Basic_Array" &
           "<PSC::Reflection::Instruction::Code_Offset>");
 
-   Univ_Int_Array_Name : constant Strings.U_String := Strings.String_Lookup
-      ("PSL::Containers::Basic_Array<optional PSL::Core::Univ_Integer>");
+   Unsigned_64_Array_Name : constant Strings.U_String := Strings.String_Lookup
+      ("PSL::Containers::Basic_Array<PSL::Core::Unsigned_64>");
 
    function Object_Locator_Type_Desc (Instr_Type_Desc : Non_Op_Map_Type_Ptr)
      return Non_Op_Map_Type_Ptr is
@@ -1761,7 +1761,7 @@ package body PSC.Trees.Semantics.Translator is
      (Context : Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
-      --  func Const_Is_Large_Null (Value : optional Univ_Integer)
+      --  func Const_Is_Large_Null (Value : Unsigned_64)
       --    -> Boolean
       --    is import (#is_large_null)
       Const_Value : constant Word_Type := Fetch_Word (Params, 1);
@@ -1913,7 +1913,7 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Init_Stream(Val : Streamable_Value; var Per_File_String_Table)
-      --    -> Basic_Array<optional Univ_Integer>
+      --    -> Basic_Array<Unsigned_64>
       --  //  Initialize a byte-stream representation of the value
       --  //  Update the Per-File string table as appropriate
       --    is import(#const_value_init_stream)
@@ -1930,14 +1930,14 @@ package body PSC.Trees.Semantics.Translator is
           (Fetch_Word_Ptr (Params, 2))));
 
       --  Get type descriptor for result
-      Univ_Int_Array_Type : constant Type_Descriptor_Ptr :=
-        Type_Descriptor_Ops.Get_Type_Desc_By_Name (Univ_Int_Array_Name);
+      Unsigned_64_Array_Type : constant Type_Descriptor_Ptr :=
+        Type_Descriptor_Ops.Get_Type_Desc_By_Name (Unsigned_64_Array_Name);
    begin
       --  Generate the stream representation, updating the per-file string tab
 
       Store_Word (Params, 0,
         Interpreter.Generate_Value_Stream_Rep
-          (Info, Univ_Int_Array_Type, Target, Context.Server_Index, PFST));
+          (Info, Unsigned_64_Array_Type, Target, Context.Server_Index, PFST));
    end Const_Value_Init_Stream;
 
    procedure Global_Const_Value
@@ -4367,7 +4367,7 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Init_Stream(Desc : Type_Descriptor; var Per_File_String_Table)
-      --    -> Basic_Array<optional Univ_Integer>
+      --    -> Basic_Array<Unsigned_64>
       --  //  Initialize a byte-stream representation of the type descriptor
       --  //  Update the Per-File string table as appropriate
       --    is import (#type_desc_init_stream)
@@ -4384,14 +4384,14 @@ package body PSC.Trees.Semantics.Translator is
           (Fetch_Word_Ptr (Params, 2))));
 
       --  Get type descriptor for result
-      Univ_Int_Array_Type : constant Type_Descriptor_Ptr :=
-        Type_Descriptor_Ops.Get_Type_Desc_By_Name (Univ_Int_Array_Name);
+      Unsigned_64_Array_Type : constant Type_Descriptor_Ptr :=
+        Type_Descriptor_Ops.Get_Type_Desc_By_Name (Unsigned_64_Array_Name);
    begin
       --  Generate the stream representation, updating the per-file string tab
 
       Store_Word (Params, 0,
         Interpreter.Type_Descriptor_Ops.Generate_Stream_Rep
-          (Type_Desc, Univ_Int_Array_Type, Target,
+          (Type_Desc, Unsigned_64_Array_Type, Target,
            Context.Server_Index, PFST));
    end Type_Desc_Init_Stream;
 
@@ -4473,7 +4473,7 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Null_Value_For_Type(Desc : Type_Descriptor)
-      --    -> optional Univ_Integer
+      --    -> Unsigned_64
       --    is import(#type_desc_null_value)
       Type_Desc : constant Non_Op_Map_Type_Ptr :=
         To_Type_Descriptor_Ptr (Fetch_Word (Params, 1));

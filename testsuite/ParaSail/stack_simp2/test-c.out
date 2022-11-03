@@ -1,0 +1,11 @@
+Pushing 1..5
+Pop = 5
+Pop = 4
+Pushing 6
+Pop = 6
+Pop = 3
+Pop = 2
+Pop = 1
+stack_simp2.psl:50:38: Error: Assertion failed:  {> Count(S) > 0 <}
+stack_simp2.psl:52:11: Error: Assertion failed:  {> *Stack_Underflow_Check* Count(S) > 0 <}
+stack_simp2.psl:32:14: Error: Assertion failed:  {> Count in 0 .. Max_Stack_Size(S) <}

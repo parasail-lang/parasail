@@ -49,7 +49,7 @@ interface PSC::Info_Stream<Entity_Type is Any<>>
     //  Stream associated with an Entity, where a Stream
     //  is an array of Stream_Elems, indexed by Univ_Integers
 
-    var Cache : optional Basic_Array<optional Univ_Integer> := null
+    var Cache : optional Basic_Array<Unsigned_64> := null
     //  This caches the content of the stream
 
     //  String vector representation matching LLVM array literal
@@ -758,35 +758,35 @@ interface PSC::Reflection<> is
         //  Common info between Param_Info and Const_Info
         const Type_Desc : Type_Descriptor
         const Addr      : Univ_Integer
-        const Value     : Univ_Integer
+        const Value     : Unsigned_64
 
         func Large_Const_Component_Values(Info : Element_Info)
-          -> Info_Array<optional Univ_Integer, Element_Info,
+          -> Info_Array<Unsigned_64, Element_Info,
                Indexed_By => Univ_Integer>
           is (Info, #large_const_component_values)
     end interface Element_Info
 
-    func Interpret_As_String(optional Univ_Integer) -> optional Univ_String
+    func Interpret_As_String(Unsigned_64) -> optional Univ_String
       is import(#identity);
     //  Just reinterpret the univ-integer as a univ-string.
     //  Note that the region is *not* adjusted.
 
-    func Interpret_As_Univ_Enum(optional Univ_Integer)
+    func Interpret_As_Univ_Enum(Unsigned_64)
       -> optional Univ_Enumeration
       is import(#identity);
     //  Just reinterpret the univ-integer as a univ-enumeration
 
-    func Interpret_As_Univ_Real(optional Univ_Integer)
+    func Interpret_As_Univ_Real(Unsigned_64)
       -> optional Univ_Real
       is import(#identity);
     //  Just reinterpret the univ-integer as a univ-real
  
-    func Interpret_As_Univ_Char(optional Univ_Integer)
+    func Interpret_As_Univ_Char(Unsigned_64)
       -> optional Univ_Character
       is import(#identity);
     //  Just reinterpret the univ-integer as a univ-char
 
-    func Const_Is_Large_Null(optional Univ_Integer)
+    func Const_Is_Large_Null(Unsigned_64)
       -> Boolean
       is import(#const_is_large_null);
     //  See whether value corresponds to the representation of a large null
@@ -870,7 +870,7 @@ interface PSC::Reflection<> is
         func Is_Wrapper(Desc : Type_Descriptor) -> Boolean
           is import(#type_desc_is_wrapper)
         func Null_Value_For_Type(Desc : Type_Descriptor)
-          -> optional Univ_Integer
+          -> Unsigned_64
           is import(#type_desc_null_value)
         func Parent_Type(Desc : Type_Descriptor) -> optional Type_Descriptor
           is import(#type_desc_parent_type)
@@ -1016,13 +1016,13 @@ interface PSC::Reflection<> is
         //  Information about a stack frame for the current running thread
         const Code : optional Routine;
         const Enclosing_Type : optional Type_Descriptor;
-        const Params : optional Univ_Integer;
-        const Local_Area : optional Univ_Integer;
+        const Params : Unsigned_64;
+        const Local_Area : Unsigned_64;
         const Pc : optional Instruction::Code_Offset;
         const Start_Pc : optional Instruction::Code_Offset;
         const Src_Pos : optional Source_Position;
-        const Master_Id : Univ_Integer;
-        const Thread_Id : Univ_Integer;
+        const Master_Id : Unsigned_64;
+        const Thread_Id : Unsigned_64;
 
         type Single_Step_Indicator is Integer<-3 .. 100>;
           //  Indicator returned from invocation of debugger console
@@ -1109,7 +1109,7 @@ interface PSC::Reflection<> is
           //  Returns 0 if breakpoint has already been cleared.
 
         func Peek_At_Address
-          (Base : optional Univ_Integer; Offset : Offset_Within_Area)
+          (Base : Unsigned_64; Offset : Offset_Within_Area)
           -> (Result_Type is Assignable<>)
           is import(#peek_at_address);
           //  Return word at given base + offset location

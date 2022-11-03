@@ -7379,7 +7379,7 @@ interface PSL::Core::Float<Digits : Univ_Integer := 15> is
 
  implements for Summable
 
-    func From_Int (Int : Univ_Integer) -> Float is (Int_To_Float(Int))
+    func From_Int (Int : Univ_Integer) -> Float
 
 end interface PSL::Core::Float
 
@@ -7390,6 +7390,11 @@ class PSL::Core::Float is
         // Hand off to built-in real*int op
         return Right * Left
     end op "*"
+
+ implements for Summable
+    func From_Int (Int : Univ_Integer) -> Float is
+       return Int_To_Float(Int)
+    end func From_Int
 end class PSL::Core::Float
     
 func PSL::Test::Test_Float() is
@@ -8297,7 +8302,8 @@ func PSL::Test::Test_Clock() is
 then  // check that indent of 0 works
     Println("Elapsed time: " | (C.Now() - Start))
 end func PSL::Test::Test_Clock
-concurrent interface PSL::Core::Atomic<Content_Type is Comparable<>> is
+
+concurrent interface PSL::Core::Atomic<Content_Type is Countable<>> is
     func Create(Initial_Val : Content_Type) -> Atomic
       // Create an atomic object with given initial value
 
@@ -8317,6 +8323,14 @@ concurrent interface PSL::Core::Atomic<Content_Type is Comparable<>> is
       Expected_Val, New_Val : Content_Type) -> Content_Type
       // If Value(A) == Expected_Val, then set Value(A) to New_Val.
       // In any case, return the prior value.
+
+    func Fetch_And_Add(locked var A : Atomic; Amount : Univ_Integer) ->
+      Content_Type
+      //  Set Value(A) to Value(A) + Amount; Return the prior value
+
+    func Add_And_Fetch(locked var A : Atomic; Amount : Univ_Integer) ->
+      Content_Type
+      //  Set Value(A) to Value(A) + Amount; Return the new value
 end interface PSL::Core::Atomic
 
 concurrent class PSL::Core::Atomic is
@@ -8355,6 +8369,20 @@ concurrent class PSL::Core::Atomic is
             A.Value := New_Val
         end if
     end func Compare_And_Swap
+
+    func Fetch_And_Add(locked var A : Atomic; Amount : Univ_Integer) ->
+      Result : Content_Type is
+      //  Set Value(A) to Value(A) + Amount; Return the prior value
+       Result := A.Value
+       A.Value += Amount
+    end func Fetch_And_Add
+
+    func Add_And_Fetch(locked var A : Atomic; Amount : Univ_Integer) ->
+      Content_Type is
+      //  Set Value(A) to Value(A) + Amount; Return the new value
+       A.Value += Amount
+       return A.Value
+    end func Add_And_Fetch
 end class PSL::Core::Atomic
 
 func PSL::Test::Test_Atomic(X, Y : Univ_Integer) is

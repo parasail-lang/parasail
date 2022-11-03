@@ -835,11 +835,6 @@ package body PSC.Interpreter is
      (Local_Area_Stg_Rgn_Ptr_Offset < Local_Area_Local_Data_Offset);
    --  Local data must start after region pointer
 
-   Mismatched_Compare_Conv_Desc : Convention_Descriptor := Null_Conv_Desc;
-      --  Will be initialized with convention descriptor appropriate for
-      --  the no-op used in case of a mismatched dispatching "=?" which
-      --  is defined to return #unordered.
-
    --------------- Local Subprograms ------------------
 
    function Addr_To_Large_Obj_Ptr is
@@ -1223,6 +1218,79 @@ package body PSC.Interpreter is
 
    procedure Wait_For_Open_Master (Context : in out Exec_Context);
    --  Wait for the Open_Master, then set Open_Master to null.
+
+   ----------------
+   -- Convention --
+   ----------------
+
+   Num_Inp_Width : constant := 8;
+      --  Number of bits for count of input params within Conv Desc
+
+   Num_Out_Width : constant := 8;
+      --  Number of bits for count of output params within Conv Desc
+
+   pragma Assert (Conv_Width + Num_Inp_Width + Num_Out_Width + 2 <
+                    Convention_Descriptor'Size);
+      --  Make sure the three fields + two Booleans fit within Conv Desc
+
+   function Convention (Conv_Desc : Convention_Descriptor)
+     return Languages.Convention_Enum is
+      --  Extract Convention from Convention_Descriptor
+   begin
+      return Languages.Convention_Enum'Val (Conv_Desc mod 2 ** Conv_Width);
+   end Convention;
+
+   -------------------
+   -- New_Conv_Desc --
+   -------------------
+
+   function New_Conv_Desc
+     (Convention : Languages.Convention_Enum;
+      Num_Inputs : Natural; Num_Outputs : Natural;
+      Output_Needs_Init : Boolean;
+      Uses_Queuing : Boolean)
+     return Convention_Descriptor is
+      --  Create convention descriptor given convention,
+      --  number of inputs, outputs, whether output needs init,
+      --  and whether routine uses queuing.
+   begin
+      return (((Boolean'Pos (Output_Needs_Init) * 2 +
+                Boolean'Pos (Uses_Queuing)) * 2 ** Num_Out_Width +
+               Convention_Descriptor (Num_Outputs)) * 2 ** Num_Inp_Width +
+              Convention_Descriptor (Num_Inputs)) * 2 ** Conv_Width +
+             Languages.Convention_Enum'Pos (Convention);
+   end New_Conv_Desc;
+
+   --  Convention used for imported subprograms without a specified convention
+   External_Default_Conv_Desc : constant Convention_Descriptor :=
+     New_Conv_Desc
+        (Convention => Languages.Convention_External_Default,
+         Num_Inputs => 1, --  TBD: Not known
+         Num_Outputs => 1, --  TBD: Not known
+         Output_Needs_Init => False,  --  TBD: Not known
+         Uses_Queuing => False);  --  TBD: Not known
+
+   --  We use a special convention for nested blocks
+   --  which means there are no incoming parameters,
+   --  and the output represents the "outcome" of the nested
+   --  block.
+   Nested_Block_Conv_Desc : constant Convention_Descriptor :=
+     New_Conv_Desc
+        (Convention => Languages.Convention_Nested_Block,
+         Num_Inputs => 0,
+         Num_Outputs => 1,
+         Output_Needs_Init => False,
+         Uses_Queuing => False);
+
+   --  Convention descriptor appropriate for the no-op used in
+   --  case of a mismatched dispatching "=?" which
+   --  is defined to return #unordered.
+   Mismatched_Compare_Conv_Desc : constant Convention_Descriptor :=
+     New_Conv_Desc
+        (Convention => Languages.Convention_External_Default,
+         Num_Inputs => 2, Num_Outputs => 1,
+         Output_Needs_Init => False,
+         Uses_Queuing => False);
 
    --------------------------
    -- Delay_Queue_Handling --
@@ -2954,6 +3022,35 @@ package body PSC.Interpreter is
       when Convention_Queuing_Default =>
          --  No convention specified, queuing
             Code_Addr (Context, Params, Static_Link);
+
+      when Convention_Nested_Block =>
+         --  Compiled nested blocks return an indication of outcome
+         --  (multi-level exit or return).
+         declare
+            function Import_NBO is new Ada.Unchecked_Conversion
+                  (Nested_Block_Outcome_As_Int, Nested_Block_Outcome);
+            Nested_Block : constant Nested_Blk_Address :=
+              To_Nested_Blk_Address (Code_Addr);
+            Block_Outcome : constant Nested_Block_Outcome :=
+              Import_NBO (Nested_Block.all
+                 (Context, Params, Static_Link));
+         begin
+            if Block_Outcome.Level <=
+               Nested_Block_Return_Outcome_Level
+            then
+               --  A "return"
+               Set_Enclosing_Master_Outcome (Context,
+                 Outcome         => Return_From_Operation_Outcome);
+            elsif Block_Outcome.Level > 0
+              or else Block_Outcome.Skip > 0
+            then
+               --  A multi-level "exit", or a non-zero "skip" count
+               Set_Enclosing_Master_Outcome (Context,
+                 Outcome         => Exit_Outcome,
+                 Exit_Level_Diff => Natural (Block_Outcome.Level + 1),
+                 Exit_Skip_Count => Block_Outcome.Skip);
+            end if;
+         end;
 
       when Convention_Ada
          --  #ada convention specified
@@ -9742,13 +9839,13 @@ package body PSC.Interpreter is
 
          elsif Is_Compiled then
             if Debug_Threading then
-               Put_Line (" about to use Call_Compiled_Routine to invoke tcb " &
+               Put_Line (" about to use call compiled code to invoke tcb " &
                  Hex_Image (New_Tcb) & ", server index" &
                  Thread_Server_Index'Image (Server_Index));
             end if;
 
-            begin
-               --  No result returned
+            begin  --  exception handler
+               --  do a convention-specific call on compiled code
                Call_Compiled_Routine
                  (Context     => New_Context,
                   Params      => New_Context.Params,
@@ -9822,43 +9919,16 @@ package body PSC.Interpreter is
          Static_Link : constant Word_Ptr := Tcb_Static_Link (New_Tcb);
          Params      : constant Word_Ptr :=
                             Add (New_Tcb, Tcb_Param_List_Offset);
+
       begin
+
          Context.Control_Area := New_Tcb;
-         if Tcb_For_Nested_Block (New_Tcb) then
-            --  Compiled nested block returns exit outcome as a return value
-            declare
-               function Import_NBO is new Ada.Unchecked_Conversion
-                     (Nested_Block_Outcome_As_Int, Nested_Block_Outcome);
-               Nested_Block : constant Nested_Blk_Address :=
-                 To_Nested_Blk_Address (Tcb_Code_Addr (New_Tcb));
-               Block_Outcome : constant Nested_Block_Outcome :=
-                 Import_NBO (Nested_Block.all
-                    (Context, Params,
-                     To_Type_Desc_Or_Op_Map (Static_Link)));
-            begin
-               if Block_Outcome.Level <=
-                  Nested_Block_Return_Outcome_Level
-               then
-                  --  A "return"
-                  Set_Enclosing_Master_Outcome (Context,
-                    Outcome         => Return_From_Operation_Outcome);
-               elsif Block_Outcome.Level > 0
-                 or else Block_Outcome.Skip > 0
-               then
-                  --  A multi-level "exit", or a non-zero "skip" count
-                  Set_Enclosing_Master_Outcome (Context,
-                    Outcome         => Exit_Outcome,
-                    Exit_Level_Diff => Natural (Block_Outcome.Level + 1),
-                    Exit_Skip_Count => Block_Outcome.Skip);
-               end if;
-            end;
-         else
-            --  No result returned
-            Call_Compiled_Routine
-              (Context, Params,
-               To_Non_Op_Map_Type_Desc (Static_Link),
-               Tcb_Code_Addr (New_Tcb), Tcb_Conv_Desc (New_Tcb));
-         end if;
+
+         --  Call compiled code using appropriate calling convention
+         Call_Compiled_Routine
+           (Context, Params,
+            To_Non_Op_Map_Type_Desc (Static_Link),
+            Tcb_Code_Addr (New_Tcb), Tcb_Conv_Desc (New_Tcb));
 
          --  Restore Control_Area
          Context.Control_Area := Old_Tcb;
@@ -16016,27 +16086,6 @@ package body PSC.Interpreter is
       end if;
    end Content_Of_Virtual_Address;
 
-   ----------------
-   -- Convention --
-   ----------------
-
-   Num_Inp_Width : constant := 8;
-      --  Number of bits for count of input params within Conv Desc
-
-   Num_Out_Width : constant := 8;
-      --  Number of bits for count of output params within Conv Desc
-
-   pragma Assert (Conv_Width + Num_Inp_Width + Num_Out_Width + 2 <
-                    Convention_Descriptor'Size);
-      --  Make sure the three fields + two Booleans fit within Conv Desc
-
-   function Convention (Conv_Desc : Convention_Descriptor)
-     return Languages.Convention_Enum is
-      --  Extract Convention from Convention_Descriptor
-   begin
-      return Languages.Convention_Enum'Val (Conv_Desc mod 2 ** Conv_Width);
-   end Convention;
-
    --------------------
    -- Copy_Large_Obj --
    --------------------
@@ -17358,51 +17407,10 @@ package body PSC.Interpreter is
          --  Call it and return.
          Cur_State.Src_Pos := Source_Positions.Null_Source_Position;
 
-         if Context.Control_Area /= null and then
-           Tcb_For_Nested_Block (Context.Control_Area)
-         then
-            --  Compiled nested block returns exit outcome as a return value
-            declare
-
-               function Import_NBO is new Ada.Unchecked_Conversion
-                     (Nested_Block_Outcome_As_Int, Nested_Block_Outcome);
-               Nested_Block : constant Nested_Blk_Address :=
-                 To_Nested_Blk_Address (Instructions.Routine_Addr);
-               Block_Outcome : constant Nested_Block_Outcome :=
-                 Import_NBO (Nested_Block.all
-                    (Context, Context.Params,
-                     To_Type_Desc_Or_Op_Map (Static_Link)));
-            begin
-               if Block_Outcome.Level <=
-                  Nested_Block_Return_Outcome_Level
-               then
-                  --  A "return"
-                  Set_Enclosing_Master_Outcome (Context,
-                    Outcome         => Return_From_Operation_Outcome);
-               elsif Block_Outcome.Level > 0
-                 or else Block_Outcome.Skip > 0
-               then
-                  --  A multi-level "exit", or a non-zero "skip" count
-                  Set_Enclosing_Master_Outcome (Context,
-                    Outcome         => Exit_Outcome,
-                    Exit_Level_Diff => Natural (Block_Outcome.Level + 1),
-                    Exit_Skip_Count => Block_Outcome.Skip);
-               elsif Tcb_Exit_Requested (Context.Control_Area) then
-                  --  Nothing more to do, except to restore state
-                  Cur_State := Prev_State;
-                  return;   --- All done ---
-               else
-                  --  Nothing special to do
-                  null;
-               end if;
-            end;
-         else
-            --  No result returned
-            Call_Compiled_Routine
-              (Context, Context.Params,
-               To_Non_Op_Map_Type_Desc (Static_Link),
-               Instructions.Routine_Addr, Instructions.Conv_Desc);
-         end if;
+         Call_Compiled_Routine
+           (Context, Context.Params,
+            To_Non_Op_Map_Type_Desc (Static_Link),
+            Instructions.Routine_Addr, Instructions.Conv_Desc);
 
          if Debug_Calls then
             Put
@@ -18591,16 +18599,7 @@ package body PSC.Interpreter is
       Execute_Compiled_Parallel_Call_Op_With_Conv
         (Context, Master_Address, New_Tcb, Code_Address, Static_Link,
          Internal_Precond_Address, Tcb_Is_Local, Is_Start_Op, Info_As_Byte,
-         Conv_Desc =>
-           New_Conv_Desc
-             (Convention => Languages.Convention_Queuing_Default,
-              Num_Inputs => 1,
-              Num_Outputs => 1,
-              Output_Needs_Init => True,
-              Uses_Queuing => True));
-               --  The only thing that matters is the Queuing_Default
-               --  which means no re-structuring of the parameter list
-               --  is required.
+         Conv_Desc => Nested_Block_Conv_Desc);
    end Execute_Compiled_Parallel_Call_Op;
 
    -------------------------------------------------
@@ -18715,6 +18714,8 @@ package body PSC.Interpreter is
       Compiled_Routine.Is_Compiled_Routine := True;
       Compiled_Routine.Is_Nested_Block := True;
       Compiled_Routine.Uses_Queuing := Uses_Queuing;
+
+      Compiled_Routine.Conv_Desc := Nested_Block_Conv_Desc;
 
       Spawn_Parallel_Thread (Context,
         Master_Addr  => Master_Address,
@@ -19518,12 +19519,7 @@ package body PSC.Interpreter is
                end if;
 
                New_Routine.Convention := Languages.Convention_External_Default;
-               New_Routine.Conv_Desc := New_Conv_Desc
-                 (Convention => Languages.Convention_External_Default,
-                  Num_Inputs => 1, --  TBD: Not known
-                  Num_Outputs => 1, --  TBD: Not known
-                  Output_Needs_Init => False,  --  TBD: Not known
-                  Uses_Queuing => False);  --  TBD: Not known
+               New_Routine.Conv_Desc := External_Default_Conv_Desc;
             else
                --  This is not a built-in, so must be compiled.
                New_Routine.Is_Compiled_Routine := True;
@@ -20415,27 +20411,6 @@ package body PSC.Interpreter is
       return Stg_Rgn_Index
       renames Large_Obj_Header_Ops.Large_Obj_Stg_Rgn_Index;
    --  Return region index associated with (possibly null) large object
-
-   -------------------
-   -- New_Conv_Desc --
-   -------------------
-
-   function New_Conv_Desc
-     (Convention : Languages.Convention_Enum;
-      Num_Inputs : Natural; Num_Outputs : Natural;
-      Output_Needs_Init : Boolean;
-      Uses_Queuing : Boolean)
-     return Convention_Descriptor is
-      --  Create convention descriptor given convention,
-      --  number of inputs, outputs, whether output needs init,
-      --  and whether routine uses queuing.
-   begin
-      return (((Boolean'Pos (Output_Needs_Init) * 2 +
-                Boolean'Pos (Uses_Queuing)) * 2 ** Num_Out_Width +
-               Convention_Descriptor (Num_Outputs)) * 2 ** Num_Inp_Width +
-              Convention_Descriptor (Num_Inputs)) * 2 ** Conv_Width +
-             Languages.Convention_Enum'Pos (Convention);
-   end New_Conv_Desc;
 
    -------------------------
    -- New_Object_Exported --
@@ -23152,13 +23127,6 @@ begin
       --  Should not be changed.
       pragma Assert (Null_Routine = Null_Routine_Copy);
    end;
-
-   --  Initialize convention for dispatching mismatched "=?"
-   Mismatched_Compare_Conv_Desc := New_Conv_Desc
-     (Convention => Languages.Convention_External_Default,
-      Num_Inputs => 2, Num_Outputs => 1,
-      Output_Needs_Init => False,
-      Uses_Queuing => False);
 
    --  Register the builtin routines defined directly in the Interpreter
    Register_Builtin
