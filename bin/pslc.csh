@@ -288,7 +288,8 @@ foreach i ($*)
       endif
    else
       if ("$i" =~ "-*") then
-         echo "switch not understood: ${i}"
+         echo ""
+         echo "error: Switch needs to precede any file names: ${i}"
          set exit_stat = -1
          goto print_help
       endif
@@ -438,7 +439,10 @@ endif
 exit
 
 print_help:
-echo "valid flags are"
+echo ""
+echo "% pslc.csh <switches> file1.ps? file2.ps? ..."
+echo ""
+echo "valid switches are"
 echo "  -o <file_name> Set executable output file name"
 echo "  -On            Optimization level, where n is in 0 .. 3."
 echo "  -a             Include assertions even when optimizing."
@@ -452,7 +456,7 @@ echo "                 func main() or func main(Basic_Array<Univ_String>)"
 echo "  -m <name>      Specify the name of the main routine which must"
 echo "                 be declared func <name>(Basic_Array<Univ_String>)"
 echo "                 or simply func <name>()"
-echo "  -g             Generate ParaSail debug information."
+echo "  -g             [beta] Generate ParaSail debug information."
 echo "                 If -g is not supplied,"
 echo "                 assembly debug information is generated"
 echo "  -i             Use the interpreter to execute the compiler,"
