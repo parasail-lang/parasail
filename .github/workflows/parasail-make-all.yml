@@ -1,6 +1,6 @@
-# This workflow will build the ParaSail compiler
+# This workflow will build all ParaSail projects
 
-name: ParaSail compiler
+name: ParaSail make all
 
 on:
 
