@@ -1,5 +1,13 @@
 # Object file
 *.o
+*.ll
+*.s
+*.lst
+*.diffs
+*.nm
+errors.err
+*.old
+*.exe
 
 # Ada Library Information
 *.ali
@@ -7,3 +15,21 @@
 *.pdf
 *.log
 *.toc
+tags
+build/bin/**
+build/obj/**
+build/slow_obj/**
+parser/gen/**
+ada202x_parser/gen/**
+install/**
+parser/build/bin/**
+testsuite/tmp/**
+interpreter/psc-interpreter-locks.ad?
+semantics/psc-link_names.ads
+ada202x_parser/build/bin/**
+examples/_*/**
+testsuite/ParaSail/runtests*
+examples/*__main.psl
+*parser/*.verbose
+*parser/build/*.verbose
+*parser/build/bin
