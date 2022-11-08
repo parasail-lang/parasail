@@ -3,6 +3,10 @@
 name: ParaSail compiler
 
 on:
+
+  #schedule:
+  #  - cron: "* */23 * * *"
+
   push:
     branches: [ main ]
 
@@ -30,6 +34,9 @@ jobs:
 
     - name: Install csh
       run: sudo apt-get install -y csh
+
+    - name: Install tcsh
+      run: sudo apt-get install -y tcsh
 
     - name: Build ParaSail
       run: make
