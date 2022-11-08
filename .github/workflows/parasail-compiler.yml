@@ -28,6 +28,9 @@ jobs:
     - name: Install gprbuild
       run: sudo apt-get install -y gprbuild
 
+    - name: Install csh
+      run: sudo apt-get install -y csh
+
     - name: Build ParaSail
       run: make
 
