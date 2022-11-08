@@ -4,7 +4,7 @@ name: ParaSail compiler
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   build-parasail:
