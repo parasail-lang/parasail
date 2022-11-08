@@ -1,0 +1,27 @@
+# This workflow will build the ParaSail compiler
+
+name: ParaSail compiler
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build-parasail:
+
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install LLVM and Clang
+      uses: KyleMayes/install-llvm-action@v1
+      with:
+        version: "12.0.1"
+
+    - name: Set up JDK 1.8
+      uses: actions/setup-java@v1
+      with:
+        java-version: 1.8
+
+   
