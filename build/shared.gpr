@@ -11,7 +11,7 @@ abstract project Shared is
    end Compiler;
 
    package Linker is
-      for Default_Switches ("ada") use ("-g", "-L/usr/lib", "-L.", "-ltermcap",
+      for Default_Switches ("ada") use ("-g", "-L/usr/lib/", "-L/usr/lib/x86_64-linux-gnu/", "-lreadline", "-L.", "-ltermcap",
 	"-latomic");
    end Linker;
 
