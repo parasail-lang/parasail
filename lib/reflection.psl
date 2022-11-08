@@ -269,7 +269,7 @@ class PSC::Reflection is
         const TD : Univ_Integer
 
         func Init_Stream(Desc : Type_Descriptor; var Per_File_String_Table)
-          -> Basic_Array<optional Univ_Integer>
+          -> Basic_Array<Unsigned_64>
         //  Produce a byte-stream representation of the type descriptor
         //  Update the Per-File string table as appropriate
           is import (#type_desc_init_stream)
@@ -350,7 +350,7 @@ class PSC::Reflection is
     class Streamable_Value is
         var Const_Val : Univ_Integer
         func Init_Stream(Val : Streamable_Value; var Per_File_String_Table)
-          -> Basic_Array<optional Univ_Integer>
+          -> Basic_Array<Unsigned_64>
           is import(#const_value_init_stream)
         //  Initialize the byte-stream representation of the value
         //  Update the Per-File string table as appropriate

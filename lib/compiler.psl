@@ -3670,6 +3670,8 @@ class PSC::Translate is
                      Assign_Binary_Op("mul nsw");
                   ["#uns_assign_multiply"] =>
                      Assign_Binary_Op("mul");
+                  ["#univ_assign_multiply"] =>
+                     Assign_Builtin_Op("@_psc_univ_multiply_op");
                   ["\"/=\""] =>
                      Assign_Binary_Op("sdiv");
                   ["#uns_assign_divide"] =>
@@ -3706,6 +3708,8 @@ class PSC::Translate is
                      Assign_Builtin_Op("@_psc_word_type_exp_op");
                   ["#uns_assign_exp"] => 
                      Assign_Builtin_Op("@_psc_uns_exp_op");
+                  ["#univ_assign_exp"] =>
+                     Assign_Builtin_Op("@_psc_univ_exp_op");
                   ["#real_assign_add"] =>
                      Assign_Binary_Op("fadd", "double");
                   ["#real_assign_subtract"] =>

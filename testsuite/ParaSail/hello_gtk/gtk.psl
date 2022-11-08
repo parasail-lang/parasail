@@ -68,7 +68,7 @@ interface GTK::Controller<> is
       -> Boolean
       is (#false)
 
-    func On_Delete_Event (var Controller; var Window+; Event) -> Boolean
+    func On_Delete_Event (var Controller; var Window+; Event+) -> Boolean
 
     func On_Destroy (var Controller; var Window+)
 
@@ -88,7 +88,7 @@ class GTK::Controller is
         return Controller.GTK.Get_Widget(Widget_Id)
     end func Get_Widget
 
-    func On_Delete_Event (var Controller; var Window+; Event) -> Boolean is
+    func On_Delete_Event (var Controller; var Window+; Event+) -> Boolean is
         // Default is to destroy the window
         Window.Destroy()
         return #false

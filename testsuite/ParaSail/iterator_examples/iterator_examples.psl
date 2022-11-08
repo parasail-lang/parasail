@@ -36,11 +36,13 @@ func Iterators() is
 //   end loop
 //   Println ("]")
 
-   const Sum_Sqrs : Univ_Integer :=
-     (for P => Sample then P.Left || P.Right while P not null =>
-       <0> + P.Count ** 2)
+   var Sum_Sqrs : Atomic<Univ_Integer> := Create(0)
 
-   Println ("Sum of squares = " | Sum_Sqrs)
+   for P => Sample then P.Left || P.Right while P not null loop
+      const Intermed_Result := Sum_Sqrs.Fetch_And_Add(P.Count ** 2)
+   end loop
+
+   Println ("Sum of squares = " | Value(Sum_Sqrs))
 
 end func Iterators
 
