@@ -273,8 +273,9 @@ func PSC::Debugging::Console(Reason : Stack_Frame_Info::Debugger_Reason)
    end func Find_Op_Of_Type;
 
    func Display_One_Obj
-     (Base : optional Univ_Integer;
-      Offset : Offset_Within_Area;
+     (Orig_Base : Unsigned_64;
+      Orig_Offset : Offset_Within_Area;
+      By_Ref : Boolean;
       Type : optional Type_Descriptor;
       Indent : Univ_Integer := 0;
       Orig_Type_Name : optional Univ_String := null;
@@ -291,7 +292,17 @@ func PSC::Debugging::Console(Reason : Stack_Frame_Info::Debugger_Reason)
 
       if Debug then
          Println
-           ("Display_One_Obj(`(Base), `(Offset), Prefix => \"`(Prefix)\")");
+           ("Display_One_Obj(`(Orig_Base), `(Orig_Offset)" |
+              (By_Ref? ", By_Ref":"") | ", Prefix => \"`(Prefix)\")");
+      end if;
+
+      var Base : Unsigned_64 := Orig_Base;
+      var Offset : Offset_Within_Area := Orig_Offset;
+
+      if By_Ref then
+         //  Level of indirection
+         Base := Stack_Frame_Info::Peek_At_Address (Orig_Base, Orig_Offset);
+         Offset := 0;
       end if;
 
       const Type_Name :=
@@ -324,6 +335,7 @@ func PSC::Debugging::Console(Reason : Stack_Frame_Info::Debugger_Reason)
                --  Is a wrapper, recurse with only component
                Display_One_Obj
                  (Base, Offset,
+                  Components[1].Is_By_Ref,
                   Components[1].Type_Desc, Indent,
                   Orig_Type_Name => Type_Name,
                   Prefix => Prefix,
@@ -393,6 +405,7 @@ func PSC::Debugging::Console(Reason : Stack_Frame_Info::Debugger_Reason)
             const Type_With_Params := (if |Type.Parameters()| > 0 then Type
                                        else Type.Enclosing_Type());
             const Comp_Type := Type_With_Params.Parameters()[1].Data.Type_Desc;
+            const Comp_By_Ref : Boolean := #false;
             const Obj_Base : optional Univ_Integer :=
               Stack_Frame_Info::Peek_At_Address(Base, Offset);
             const Max_Array_Len := 10;  //  Max # of array components to show
@@ -409,7 +422,7 @@ func PSC::Debugging::Console(Reason : Stack_Frame_Info::Debugger_Reason)
                Println(Indent * " " | Prefix | Type_Name | "::[");
                Line_Count += 1;
                for I in 1 .. Len forward loop
-                  Display_One_Obj (Obj_Base, I + 1, Comp_Type,
+                  Display_One_Obj (Obj_Base, I + 1, Comp_By_Ref, Comp_Type,
                     Indent => Indent + 2,
                     Line_Count => Line_Count,
                     Line_Limit => Line_Limit,
@@ -453,18 +466,24 @@ func PSC::Debugging::Console(Reason : Stack_Frame_Info::Debugger_Reason)
                const Poly_Header : optional Univ_Integer :=
                  Stack_Frame_Info::Peek_At_Address(Obj_Base, 0);
                const Type_Index := Poly_Header mod 2**48 / 2**32;
-               const Poly_Type : Type_Descriptor :=
+               const Poly_Type : optional Type_Descriptor :=
                  Type_Desc_At_Index(Type_Index);
                
                Println(Indent * " " | Prefix | Type_Name | "::(");
                Line_Count += 1;
-               Display_One_Obj
-                 (Obj_Base, 1, Poly_Type.Components()[1].Type_Desc,
-                   Indent => Indent + 2,
-                   Prefix => "",
-                   Line_Count => Line_Count,
-                   Line_Limit => Line_Limit,
-                   Indent_Limit => Indent_Limit);
+               if Poly_Type is null then
+                  Println(Indent * " " |
+                    "  Poly Type Index #`(Type_Index) invalid");
+               else
+                  Display_One_Obj
+                    (Obj_Base, 1, Poly_Type.Components()[1].Is_By_Ref,
+                      Poly_Type.Components()[1].Type_Desc,
+                      Indent => Indent + 2,
+                      Prefix => "",
+                      Line_Count => Line_Count,
+                      Line_Limit => Line_Limit,
+                      Indent_Limit => Indent_Limit);
+               end if;
                Println("");
                Line_Count += 1;
                Print(Indent * " " | ")");
@@ -525,7 +544,7 @@ func PSC::Debugging::Console(Reason : Stack_Frame_Info::Debugger_Reason)
                   end if;
 
                   Display_One_Obj
-                    (Obj_Base, Comp_Offs, C.Type_Desc,
+                    (Obj_Base, Comp_Offs, C.Is_By_Ref, C.Type_Desc,
                       Indent => Indent + 2,
                       Prefix => Comp_Prefix,
                       Line_Count => Line_Count,
@@ -737,14 +756,9 @@ func PSC::Debugging::Console(Reason : Stack_Frame_Info::Debugger_Reason)
          var Offset : Offset_Within_Area := Param_Index - 1;
          var Line_Count := 0;
 
-         if P.Is_Passed_By_Ref then
-            //  Level of indirection
-            Base := Stack_Frame_Info::Peek_At_Address (Base, Offset);
-            Offset := 0;
-         end if;
-
          Display_One_Obj
            (Base, Offset,
+            P.Is_Passed_By_Ref,  // Level of indirection
             Stack_Frame_Info::Nth_Frame_Type_At_Locator
               (Adjusted_Frame_Num + 1, P.Type_Info),
                 //  Need to bump Adjusted_Frame_Num again since we are now in
@@ -866,15 +880,9 @@ func PSC::Debugging::Console(Reason : Stack_Frame_Info::Debugger_Reason)
                return;  --  Don't know how to display
             end if;
 
-            if Instr.Decl_Obj_Is_By_Ref() then
-               //  Level of indirection
-               Base_Addr :=
-                 Stack_Frame_Info::Peek_At_Address (Base_Addr, Offset);
-               Offset := 0;
-            end if;
-
             Display_One_Obj
               (Base_Addr, Offset,
+               Instr.Decl_Obj_Is_By_Ref(),  //  Level of indirection
                Stack_Frame_Info::Nth_Frame_Type_At_Locator
                  (Adjusted_Frame_Num + 1, Instr.Declare_Type_Info()),
                    //  Need to bump Adjusted_Frame_Num again since

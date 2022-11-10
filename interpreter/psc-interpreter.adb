@@ -12636,8 +12636,11 @@ package body PSC.Interpreter is
       function To_Type_Desc_Or_Op_Map
         (Type_Id : Type_Index) return Type_Descriptor_Ptr is
       begin
-         if Type_Id = 0 then
-            --  Must be a "null"
+         if Type_Id = 0
+           or else
+            Type_Elem_Index (Type_Id) > Num_Elements (Type_Table)
+         then
+            --  Null or invalid type descriptor index.
             return null;
          else
             return Nth_Element (Type_Table, Type_Elem_Index (Type_Id));
@@ -20296,7 +20299,8 @@ package body PSC.Interpreter is
    --  NOTE: We reserve a special chunk number for all large nulls.
    --        We also require it to be odd.
    begin
-      return (To_Unsigned_Word (Value) and (Chunk_Mask + 1)) =
+      return Value = Null_Value  --  NOTE: Also check for Integer Null_Value
+        or else (To_Unsigned_Word (Value) and (Chunk_Mask + 1)) =
                  Large_Null_Base_Value;
    end Is_Large_Null;
 

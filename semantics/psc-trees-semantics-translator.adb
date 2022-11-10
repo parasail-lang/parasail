@@ -4232,7 +4232,7 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --   func Type_Desc_At_Locator(Locator : Object_Locator)
-      --     -> Type_Descriptor
+      --     -> optional Type_Descriptor
       --     is import(#type_desc_at_locator)
       Locator_Int : constant Word_Type :=
         Fetch_Word (Params, 1);
@@ -4256,18 +4256,27 @@ package body PSC.Trees.Semantics.Translator is
             --  is relative to the called routine's type area,
             --  which is given by the static link.
 
-            pragma Assert (False);  --  TBD
-            null;
+            Store_Word (Params, 0, Null_Value);  --  TBD
+
+            return;
 
          when others =>
             --  Address of operation descriptor
-            pragma Assert (False);  --  TBD
-            null;
+            Store_Word (Params, 0, Null_Value);  --  TBD
+            
+            return;
       end case;
 
-      Store_Word
-        (Params, 0,
-         To_Word_Type (To_Type_Desc_Or_Op_Map (Index)));
+      declare
+         Result : constant Type_Descriptor_Ptr :=
+                    To_Type_Desc_Or_Op_Map (Index);
+      begin
+         if Result /= null then
+            Store_Word (Params, 0, To_Word_Type (Result));
+         else
+            Store_Word (Params, 0, Null_Value);  --  TBD -- use Large null?
+         end if;
+      end;
    end Type_Desc_At_Locator;
 
    procedure Type_Desc_At_Index
@@ -4275,14 +4284,18 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Type_Desc_At_Index(Index : Type_Index)
-      --    -> Type_Descriptor
+      --    -> optional Type_Descriptor
       --    is import(#type_desc_at_index)
       Index : constant Type_Index :=
         Type_Index (Fetch_Word (Params, 1));
+      Result : constant Type_Descriptor_Ptr :=
+        To_Type_Desc_Or_Op_Map (Index);
    begin
-      Store_Word
-        (Params, 0,
-         To_Word_Type (To_Type_Desc_Or_Op_Map (Index)));
+      if Result /= null then
+         Store_Word (Params, 0, To_Word_Type (Result));
+      else
+         Store_Word (Params, 0, Null_Value);  --  TBD -- use Large null?
+      end if;
    end Type_Desc_At_Index;
 
    procedure Type_Desc_Has_Op_Map

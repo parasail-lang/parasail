@@ -838,11 +838,11 @@ interface PSC::Reflection<> is
         type Type_Index is new Integer<0..2**16-1>
 
         func Type_Desc_At_Locator(Locator : Object_Locator)
-          -> Type_Descriptor
+          -> optional Type_Descriptor
           is import(#type_desc_at_locator)
 
         func Type_Desc_At_Index(Index : Type_Index)
-          -> Type_Descriptor
+          -> optional Type_Descriptor
           is import(#type_desc_at_index)
 
         func Has_Op_Map(Desc : Type_Descriptor) -> Boolean
