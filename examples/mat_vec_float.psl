@@ -31,7 +31,7 @@ interface Matrix<Rows : Univ_Integer; Cols : Univ_Integer> is
 
 	op "[..]"() -> Countable_Range<Row_Col> is in Countable_Range<Row_Col>;
 
-	func Hash(Val : Row_Col) -> Univ_Integer;
+	func Hash(Val : Row_Col) -> Unsigned_64;
 
 	op ".."(Left, Right : Row_Col) -> Countable_Set<Row_Col>
 	  is in Countable_Set<Row_Col>;
@@ -99,7 +99,7 @@ interface Matrix<Rows : Univ_Integer; Cols : Univ_Integer> is
 
     // Imageable operations
     op "=?"(Left, Right : Matrix) -> Ordering;
-    func Hash(M : Matrix) -> Univ_Integer;
+    func Hash(M : Matrix) -> Unsigned_64;
     func To_String(M : Matrix) -> Univ_String;
     func From_String(Str : Univ_String) -> Matrix;
     
@@ -293,7 +293,7 @@ class Matrix is
 	    end case;
 	end op "-";
 
-	func Hash(Val : Row_Col) -> Univ_Integer is
+	func Hash(Val : Row_Col) -> Unsigned_64 is
 	    return [[Val.R-1]] * Cols + [[Val.C]];
 	end func Hash;
 
@@ -439,7 +439,7 @@ class Matrix is
         return #equal;
     end op "=?"
 
-    func Hash(M : Matrix) -> Univ_Integer is
+    func Hash(M : Matrix) -> Unsigned_64 is
         return Hash(M[1,1]) + Hash(M[Rows, Cols]);
     end func Hash;
 

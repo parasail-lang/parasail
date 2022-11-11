@@ -314,7 +314,7 @@ interface PSC::Reflection<> is
         func To_String(Object_Locator) -> Univ_String
         func From_String(Univ_String) -> optional Object_Locator
         op "=?"(Left, Right : Object_Locator) -> Ordering
-        func Hash(Val : Object_Locator) -> Univ_Integer
+        func Hash(Val : Object_Locator) -> Unsigned_64
     end interface Object_Locator
 
     interface Decl<> is
@@ -381,7 +381,7 @@ interface PSC::Reflection<> is
           is import(#global_const_value)
 
         //  Operations needed to be Hashable
-        func Hash(Val : Decl) -> Univ_Integer is import(#identity)
+        func Hash(Val : Decl) -> Unsigned_64 is import(#identity)
         op "=?"(Left, Right : Decl) -> Ordering is
           (Hash(Left) == Hash(Right)? #equal : #unordered)
     end interface Decl
@@ -400,7 +400,7 @@ interface PSC::Reflection<> is
         func From_String(Str : Univ_String) -> optional Source_Position
         op "=?"(Left, Right : Source_Position) -> Ordering
           is import("=?")
-        func Hash(Source_Position) -> Univ_Integer
+        func Hash(Source_Position) -> Unsigned_64
           is import(#identity)
     end interface Source_Position
 
@@ -473,7 +473,7 @@ interface PSC::Reflection<> is
              is (null)
            op "=?"(Left, Right : Code_Block_Descriptor) -> Ordering
              is (Left.Pc_Offset =? Right.Pc_Offset)
-           func Hash(Val : Code_Block_Descriptor) -> Univ_Integer
+           func Hash(Val : Code_Block_Descriptor) -> Unsigned_64
              is (Hash (Val.Pc_Offset))
         end interface Code_Block_Descriptor
 
@@ -694,7 +694,7 @@ interface PSC::Reflection<> is
              is (null)
            op "=?"(Left, Right : Convention_Descriptor) -> Ordering
              is import("=?")
-           func Hash(Val : Convention_Descriptor) -> Univ_Integer
+           func Hash(Val : Convention_Descriptor) -> Unsigned_64
              is import(#identity)
         end interface Convention_Descriptor
 

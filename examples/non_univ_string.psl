@@ -39,7 +39,7 @@ interface PSL::Core::Non_Univ_String<> is
 
     op "magnitude"(Non_Univ_String) -> Univ_Integer is Length
 
-    func Hash(Val : Non_Univ_String) -> Univ_Integer
+    func Hash(Val : Non_Univ_String) -> Unsigned_64
 
     // Operations to convert to/from a Vector of Univ_Character's
     func To_Vector(Str : Non_Univ_String) -> Vector<Univ_Character>
@@ -123,7 +123,7 @@ class PSL::Core::Non_Univ_String is
 
     const Char_First := Univ_Character::First()
 
-    func Hash_Vec(Vec : Vector<Univ_Character>) -> Univ_Integer is
+    func Hash_Vec(Vec : Vector<Univ_Character>) -> Integer_64 is
        return (for I in 1 .. |Vec| reverse =>
          (<0> * 127 + (Vec[I] - Char_First)) mod Hash_Modulus)
     end func Hash_Vec
@@ -228,8 +228,8 @@ class PSL::Core::Non_Univ_String is
 
     func Length(Str : Non_Univ_String) -> Univ_Integer is (Str.Info[#Length])
 
-    func Hash(Val : Non_Univ_String) -> Univ_Integer
-      is (Val.Info[#Hash])
+    func Hash(Val : Non_Univ_String) -> Unsigned_64
+      is ([[ Val.Info[#Hash] ]])
 
     op "|="(var Left : Non_Univ_String; Right : Right_Type is Imageable<>) is
         var Right_Str : Non_Univ_String for Left := To_String(Right)

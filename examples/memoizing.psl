@@ -12,7 +12,7 @@ abstract interface Memoizable<Output_Type is Assignable<>>
 
     // TBD: The following should not be necessary; should be
     //      implicit in "implements Hashable<>".
-    func Hash(Key : Memoizable) -> Univ_Integer;
+    func Hash(Key : Memoizable) -> Unsigned_64;
     op "=?"(Left, Right : Memoizable) -> Ordering;
 end interface Memoizable;
 
@@ -175,12 +175,12 @@ class Trig is
         abstract func Operation_Id(Input : Trig_Op) -> Univ_Enumeration;
           // This identifies the particular trig function being computed
 
-        func Hash_Pair(Op : Trig_Op+) -> Univ_Integer;
+        func Hash_Pair(Op : Trig_Op+) -> Unsigned_64;
     end interface Trig_Op;
 
     class Trig_Op is
       exports
-        func Hash_Pair(Op : Trig_Op+) -> Univ_Integer is
+        func Hash_Pair(Op : Trig_Op+) -> Unsigned_64 is
             if Debug then
                Println(" Hash: using float = " | Op.U_Float | 
                  ", operation_id = " |
@@ -199,14 +199,14 @@ class Trig is
       // Create an extension of Trig_Op that computes the "sin" function
         func Compute(Input : Sin_Op) -> Float_Type;
         func Operation_Id(X : Sin_Op) -> Univ_Enumeration;
-        func Hash(Op : Sin_Op) -> Univ_Integer is (Hash_Pair(Op));
+        func Hash(Op : Sin_Op) -> Unsigned_64 is (Hash_Pair(Op));
     end interface Sin_Op;
 
     interface Cos_Op extends Trig_Op is
       // Create an extension of Trig_Op that computes the "cos" function
         func Compute(Input : Cos_Op) -> Float_Type;
         func Operation_Id(X : Cos_Op) -> Univ_Enumeration;
-        func Hash(Op : Cos_Op) -> Univ_Integer is (Hash_Pair(Op));
+        func Hash(Op : Cos_Op) -> Unsigned_64 is (Hash_Pair(Op));
     end interface Cos_Op;
 
     class Sin_Op is

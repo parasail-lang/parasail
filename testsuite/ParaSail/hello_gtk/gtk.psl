@@ -281,7 +281,7 @@ interface GTK::Widget<> is
       is import("null") --(#gtk_widget_get_toplevel)
 
     op "=?" (Left, Right : Widget) -> Ordering
-    func Hash (Widget) -> Univ_Integer
+    func Hash (Widget) -> Unsigned_64
 end interface GTK::Widget
 
 class GTK::Widget is
@@ -304,7 +304,7 @@ class GTK::Widget is
         end if
     end op "=?"
 
-    func Hash (Widget) -> Univ_Integer is
+    func Hash (Widget) -> Unsigned_64 is
         return Widget.Id
     end func Hash
 

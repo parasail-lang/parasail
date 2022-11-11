@@ -8,7 +8,7 @@ interface Linked_List<> is
    func Extract(var Source, Target : Linked_List; Key : Integer)
 
    func To_String(Linked_List) -> Univ_String
-   func Hash(Linked_List) -> Univ_Integer
+   func Hash(Linked_List) -> Unsigned_64
    func From_String(Univ_String) -> optional Linked_List is (null)
    op "=?"(Left, Right : Linked_List) -> Ordering
 end interface Linked_List
@@ -35,7 +35,7 @@ class Linked_List is
                 <"["> | Sep | L.Key | " => " | L.Value ) | "]"
    end func To_String
 
-   func Hash(Linked_List) -> Univ_Integer is
+   func Hash(Linked_List) -> Unsigned_64 is
       return (for L => Linked_List then L.Next while L not null =>
                 <0> * 3 + L.Key)
    end func Hash

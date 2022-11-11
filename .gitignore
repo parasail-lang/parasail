@@ -29,6 +29,7 @@ semantics/psc-link_names.ads
 ada202x_parser/build/bin/**
 examples/_*/**
 testsuite/ParaSail/runtests*
+testsuite/ParaSail/tmp/**
 examples/*__main.psl
 *parser/*.verbose
 *parser/build/*.verbose

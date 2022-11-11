@@ -209,7 +209,7 @@ class PSC::Reflection is
             end if
         end op "=?"
 
-        func Hash(Val : Object_Locator) -> Univ_Integer is
+        func Hash(Val : Object_Locator) -> Unsigned_64 is
             return Hash(Base(Val)) + Hash(Offset(Val))
         end func Hash
     end class Object_Locator

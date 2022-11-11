@@ -124,7 +124,7 @@ class Matrix is
            Left := Left - Right;
         end op "-=";
 
-	func Hash(Val : Row_Col) -> Univ_Integer is
+	func Hash(Val : Row_Col) -> Unsigned_64 is
 	    return [[Val.R-1]] * Cols + [[Val.C]];
 	end func Hash;
 
@@ -270,7 +270,7 @@ class Matrix is
         return #equal;
     end op "=?"
 
-    func Hash(M : Matrix) -> Univ_Integer is
+    func Hash(M : Matrix) -> Unsigned_64 is
         return Hash(M[1,1]) + Hash(M[Rows, Cols]);
     end func Hash;
 

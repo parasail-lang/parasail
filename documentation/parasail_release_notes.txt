@@ -719,6 +719,12 @@ specified revision:
               also now supports assignments of the form "X := Y'Move" which
               is equivalent to the ParaSail "X <== Y", meaning it
               moves the contents of Y into X and leaves Y equal to null.
+  * [rev 22.11] Revisions are now numbered by YY.MM.
+              Unsigned_64 is now used more systematically for things like
+              packed words and arrays.  Also, all Hash func's now return
+              Unsigned_64.  NOTE WELL: If you have implemented anything
+              that is intended to implement Hashable or Imageable, you
+              must change it to return an Unsigned_64.
               
 We are very interested in your feedback.  Please use the ParaSail Google 
 Group (see link above) to provide whatever comments or suggestions you

@@ -91,7 +91,7 @@ interface Basic_Units<Dimension : Dimensions> is
     op "+"(Right : Basic_Units) -> Basic_Units;
     op "-"(Right : Basic_Units) -> Basic_Units;
     op "abs"(Right : Basic_Units) -> Basic_Units;
-    func Hash(Val : Basic_Units) -> Univ_Integer;
+    func Hash(Val : Basic_Units) -> Unsigned_64;
     op "=?"(Left, Right : Basic_Units) -> Ordering;
     func To_String(Val : Basic_Units) -> Univ_String;
     func From_String(Str : Univ_String) -> Basic_Units;
@@ -166,7 +166,7 @@ class Basic_Units is
         return Left.Value =? Right.Value;
     end op "=?";
 
-    func Hash(Val : Basic_Units) -> Univ_Integer is
+    func Hash(Val : Basic_Units) -> Unsigned_64 is
         return Hash(Val.Value);
     end func Hash;
 
