@@ -142,4 +142,3 @@ described here:
     of test.opt. It just provides the following minimum functionality: if
     the file test.opt is found in the test, then the test is SKIPPED.
 
-Small change.
