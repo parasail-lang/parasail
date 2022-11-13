@@ -7,9 +7,7 @@ func Green_Yellow() is
 
    //  Unicode for grey, yellow, and green boxes
    const Colored_Box : Array<Char, Indexed_By => Color> :=
-     [#grey => Char::First() + 0x2B1C,
-      #yellow => Char::First() + 0x1F7E8,
-      #green => Char::First() + 0x1F7E9]
+     [#grey => '\#2B_1C#', #yellow => '\#1_F7_E8#', #green => '\#1_F7_E9#']
 
    const Num_Secrets := 4  //  count of secret numbers
 
@@ -64,6 +62,7 @@ func Green_Yellow() is
    const Secrets : Vector<Guess> :=
      [for I in 1 .. Num_Secrets => Next(Ran) mod 10]
 
+   Println ("Welcome to the Green (\#1_F7E9#) Yellow (\#1_F7E8#) game!");
   *Outer*
    loop
       //  Now play the game

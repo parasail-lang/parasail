@@ -11524,16 +11524,19 @@ package body PSC.Trees.Semantics.Dynamic is
                (Strings.Index (Strings.String_Lookup (Lit)));
 
          when '"' => --  String literal
-            return Interpreter.Word_Type (Strings.Index (Strings.String_Lookup
-               (Strings.To_UTF_8 (Lit (Lit'First + 1 .. Lit'Last - 1)))));
+            return Interpreter.Word_Type
+              (Strings.Index (Strings.Wide_Wide_String_Lookup
+                (Strings.Decode_Source_Rep
+                  (Lit (Lit'First + 1 .. Lit'Last - 1)))));
 
          when ''' => --  Character literal
             declare
-               Str : constant Wide_String :=
-                 Strings.To_UTF_16 (Lit (Lit'First + 1 .. Lit'Last - 1));
+               Str : constant Wide_Wide_String :=
+                 Strings.Decode_Source_Rep
+                   (Lit (Lit'First + 1 .. Lit'Last - 1));
             --  Expand escaped characters
             begin
-               return Wide_Character'Pos (Str (Str'First));
+               return Wide_Wide_Character'Pos (Str (Str'First));
             end;
 
          when others =>

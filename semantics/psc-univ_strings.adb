@@ -1082,8 +1082,8 @@ package body PSC.Univ_Strings is
             Elem_Size : constant Natural := Elem_Sizes (Array_Kind);
 
             Elems_Per_Word : constant Natural := Word_Type'Size / Elem_Size;
-            pragma Assert (Word_Type'Size rem Elem_Size = 0);
-               --  Should be no remainder
+            --  tbd:stt pragma Assert (Word_Type'Size rem Elem_Size = 0);
+               --  tbd:stt  Should be no remainder
 
             Word_Len : constant Natural :=
               (Len + Elems_Per_Word - 1) / Elems_Per_Word;

@@ -243,6 +243,85 @@ package body PSC.Strings is
       return Result;
    end Any_String_Lookup;
 
+   function Escaped_Char (Str : String; Index : in out Positive)
+     return Wide_Wide_Character;
+   --  Return meaning of characters starting at Str (Index).
+   --  Advance Index past the escape sequence.
+   --  Does not complain about syntax errors.
+
+   function Escaped_Char (Str : String; Index : in out Positive)
+     return Wide_Wide_Character is
+
+      Result_Char : Character;
+
+   begin
+
+      case Str (Index) is
+         when '0' =>
+            Result_Char := ASCII.NUL;
+         when 'n' =>
+            Result_Char := ASCII.LF;
+         when 'r' =>
+            Result_Char := ASCII.CR;
+         when 'f' =>
+            Result_Char := ASCII.FF;
+         when 't' =>
+            Result_Char := ASCII.HT;
+         when '#' =>
+            --  Unicode value, in Hex
+            declare
+               Uni_Val : Long_Integer := 0;
+               Digit : Long_Integer := 0;
+            begin
+               loop
+                  Index := Index + 1;
+
+                  exit when Index > Str'Last;
+
+                  case Str (Index) is
+                     when '#' =>
+                        --  All done; skip over '#'
+                        Index := Index + 1;
+                        return Wide_Wide_Character'Val (Uni_Val);
+                     when '0' .. '9' =>
+                        Digit := Character'Pos (Str (Index)) -
+                                   Character'Pos ('0');
+                     when 'a' .. 'f' =>
+                        Digit := Character'Pos (Str (Index)) -
+                                   Character'Pos ('a') + 10;
+                     when 'A' .. 'F' =>
+                        Digit := Character'Pos (Str (Index)) -
+                                   Character'Pos ('A') + 10;
+                     when '_' =>
+                        --  Underscore is treated as a separator
+                        Digit := -1;
+
+                     when others =>
+                        --  NOTE: This is a syntax error
+                        --  Do not advance Index
+                        return Wide_Wide_Character'Val (Uni_Val);
+                  end case;
+
+                  if Digit >= 0 then
+                     Uni_Val := Uni_Val * 16 + Digit;
+                  end if;
+
+               end loop;
+               --  Ran out of characters
+               --  NOTE: This is a syntax error
+               return Wide_Wide_Character'Val (Uni_Val);
+            end;
+
+         when others =>
+            --  Character is just itself
+            Result_Char := Str (Index);
+      end case;
+
+      --  Skip past escaped character
+      Index := Index + 1;
+      return Wide_Wide_Character'Val (Character'Pos (Result_Char));
+   end Escaped_Char;
+
    ---------- externally visible subprograms --------
 
    function String_Lookup
@@ -383,66 +462,42 @@ package body PSC.Strings is
                     and then To_Lower (Left.Str) = To_Lower (Right.Str));
    end Case_Insensitive_Equal;
 
-   function Escaped_Char (Char : Character) return Character is
-   --  Return meaning of Char when preceded by a back slash.
-   begin
-      case Char is
-         when '0' =>
-            return ASCII.NUL;
-         when 'n' =>
-            return ASCII.LF;
-         when 'r' =>
-            return ASCII.CR;
-         when 'f' =>
-            return ASCII.FF;
-         when 't' =>
-            return ASCII.HT;
-         when others =>
-            --  Character is just itself
-            return Char;
-      end case;
-   end Escaped_Char;
-
-   function To_UTF_8 (S : String) return String is
-      --  Convert any escaped characters and produce a UTF-8 string.
-      Result : String (1 .. S'Length);
+   function Decode_Source_Rep (S : String) return Wide_Wide_String is
+      --  Expects the characters between the double quotes of a string
+      --  literal or the single quotes of a character literal.
+      --  Converts any escaped characters and produces a wide-wide string.
+      --  Does not complain about syntax errors.
+      Result : Wide_Wide_String (1 .. S'Length);
       I : Positive := S'First;
       J : Positive := Result'First;
    begin
       while I <= S'Last loop
          declare
             Chr : Character := S (I);
+            WW_Chr : Wide_Wide_Character :=
+              Wide_Wide_Character'Val (Character'Pos (Chr));
          begin
             if I = S'Last then
                --  Can't be an escape character
-               null;
+               I := I + 1;
             elsif Chr = '\' then
                --  We have an escaped character
                I := I + 1;
-               Chr := Escaped_Char (S (I));  --  TBD: Not really UTF-8
+               WW_Chr := Escaped_Char (S, Index => I);
             elsif Chr = '"' and then S (I + 1) = '"' then
                --  Doubled "" => '"'
+               I := I + 2;
+            else
+               --  Skip over character
                I := I + 1;
             end if;
-            Result (J) := Chr;
-            I := I + 1;
+            Result (J) := WW_Chr;
             J := J + 1;
          end;
       end loop;
 
       return Result (1 .. J - 1);
-   end To_UTF_8;
-
-   function To_UTF_16 (S : String) return Wide_String is
-      --  Convert any escaped characters and produce a UTF-16 string
-      Conv : constant String := To_UTF_8 (S);
-      Result : Wide_String (Conv'Range);
-   begin
-      for I in Conv'Range loop
-         Result (I) := Wide_Character'Val (Character'Pos (Conv (I))); --  TBD
-      end loop;
-      return Result;
-   end To_UTF_16;
+   end Decode_Source_Rep;
 
    function Tokenize (S : String; Seps : String := ' ' & ASCII.HT)
      return U_String_Array is

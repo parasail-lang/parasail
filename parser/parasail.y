@@ -2137,15 +2137,17 @@ operation_input :
              Operand => $2.Tree),
 	  Param_Default => $3.Tree))));
     }
-  | '<' value_formal '>' {
-	$$ := $2;
-	-- Set Is_Implicit_Module_Param on each parameter
+  | '<' opt_input_mode value_formal '>' {
+	$$ := $3;
+	-- Set Is_Implicit_Module_Param and input-mode info on each parameter
 	for I in 1..Lists.Length($$.List) loop
 	  declare
 	    Param_Decl_Tree : Param_Decl.Tree renames
 	      Param_Decl.Tree(Tree_Ptr_Of(Lists.Nth_Element($$.List, I)).all);
 	  begin
 	    Param_Decl_Tree.Is_Implicit_Module_Param := True;
+	    Param_Decl_Tree.Kind := $2.Param_Kind;
+	    Param_Decl_Tree.Locking := $2.Param_Locking;
 	  end;
 	end loop;
     }

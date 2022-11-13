@@ -40,7 +40,7 @@ UNQUOTE (`)
 
 STRING_LITERAL  (\"([^\\\"\n`]|\\.)*(\"|\n|{UNQUOTE}))
 
-CHAR_LITERAL    (\'([^\\\']|\\.)\')
+CHAR_LITERAL    (\'([^\\\']|\\[^#]|\\#[0-9a-fA-F_]*#)\')
 
   -- The following is used to match all valid ParaSail identifiers
   -- except reserved words. Note that leading digits and underscores
