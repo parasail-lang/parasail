@@ -61,6 +61,7 @@ package Parasail_Tokens is
               Is_Abstract : Boolean := False;
               Is_Private : Boolean := False;
               Is_Concurrent : Boolean := False;
+              Is_Limited : Boolean := False;
               Is_Optional : Boolean := False;
               Is_While : Boolean := False;
               Is_Until : Boolean := False;
@@ -123,15 +124,15 @@ package Parasail_Tokens is
          Func_Kw, Global_Kw, If_Kw,
          Implements_Kw, Import_Kw, In_Kw,
          Interface_Kw, Is_Kw, Lambda_Kw,
-         Locked_Kw, Loop_Kw, Mod_Kw,
-         New_Kw, Not_Kw, Null_Kw,
-         Of_Kw, Op_Kw, Opt_Kw,
-         Optional_Kw, Or_Kw, Private_Kw,
-         Queued_Kw, Ref_Kw, Rem_Kw,
-         Return_Kw, Reverse_Kw, Some_Kw,
-         Then_Kw, Type_Kw, Until_Kw,
-         Var_Kw, While_Kw, With_Kw,
-         Xor_Kw );
+         Limited_Kw, Locked_Kw, Loop_Kw,
+         Mod_Kw, New_Kw, Not_Kw,
+         Null_Kw, Of_Kw, Op_Kw,
+         Opt_Kw, Optional_Kw, Or_Kw,
+         Private_Kw, Queued_Kw, Ref_Kw,
+         Rem_Kw, Return_Kw, Reverse_Kw,
+         Some_Kw, Then_Kw, Type_Kw,
+         Until_Kw, Var_Kw, While_Kw,
+         With_Kw, Xor_Kw );
 
     Syntax_Error : exception;
 

@@ -133,6 +133,7 @@
 %token INTERFACE_kw
 %token IS_kw
 %token LAMBDA_kw
+%token LIMITED_kw
 %token LOCKED_kw
 %token LOOP_kw
 %token MOD_kw
@@ -222,6 +223,7 @@
               Is_Abstract : Boolean := False;
               Is_Private : Boolean := False;
               Is_Concurrent : Boolean := False;
+              Is_Limited : Boolean := False;
               Is_Optional : Boolean := False;
               Is_While : Boolean := False;
               Is_Until : Boolean := False;
@@ -357,7 +359,7 @@ interface_declaration_with_term :
 	  Is_Abstract => $1.Is_Abstract,
 	  Is_Private => $1.Is_Private,
 	  Is_Concurrent => $1.Is_Concurrent,
-	  Is_Limited => False,
+	  Is_Limited => $1.Is_Limited,
 	  Has_Formals => $4.Has_Module_Formals,
 	  Module_Formals => $4.Module_Formals,
 	  Extends_Interface => $4.Extends,
@@ -388,7 +390,7 @@ interface_declaration_with_term :
 	  Is_Abstract => $1.Is_Abstract,
 	  Is_Private => $1.Is_Private,
 	  Is_Concurrent => $1.Is_Concurrent,
-	  Is_Limited => False,
+	  Is_Limited => $1.Is_Limited,
 	  Has_Formals => $4.Has_Module_Formals,
 	  Module_Formals => $4.Module_Formals,
 	  Extends_Interface => $4.Extends,
@@ -415,7 +417,7 @@ interface_declaration_with_term :
 	  Is_Abstract => $1.Is_Abstract,
 	  Is_Private => $1.Is_Private,
 	  Is_Concurrent => $1.Is_Concurrent,
-	  Is_Limited => False,
+	  Is_Limited => $1.Is_Limited,
 	  Has_Formals => $4.Has_Module_Formals,
 	  Module_Formals => $4.Module_Formals,
 	  Extends_Interface => $4.Extends,
@@ -497,6 +499,7 @@ interface_qualifier :
           Source_Pos => $1.Source_Pos,
 	  Is_Abstract => True, 
 	  Is_Concurrent => $2.Is_Concurrent,
+          Is_Limited => $2.Is_Limited,
 	  others => False);
     }
   | PRIVATE_kw opt_class_qualifier {
@@ -504,6 +507,7 @@ interface_qualifier :
           Source_Pos => $1.Source_Pos,
 	  Is_Private => True, 
 	  Is_Concurrent => $2.Is_Concurrent,
+          Is_Limited => $2.Is_Limited,
 	  others => False);
     }
   ;
@@ -517,11 +521,18 @@ opt_class_qualifier :
     }
   ;
 
-class_qualifier : CONCURRENT_kw {
+class_qualifier :
+      CONCURRENT_kw {
 	$$ := (Construct_Qualifier, 
                Source_Pos => $1.Source_Pos,
 	       Is_Concurrent => True, others => False);
-    };
+      }
+    | LIMITED_kw {
+	$$ := (Construct_Qualifier, 
+               Source_Pos => $1.Source_Pos,
+	       Is_Limited => True, others => False);
+      }
+    ;
 
 standalone_operation_definition_with_term : 
     func_definition_with_term {
@@ -1432,7 +1443,7 @@ class_definition_with_term :
 	  Is_Abstract => $1.Is_Abstract,
 	  Is_Private => $1.Is_Private,
 	  Is_Concurrent => $1.Is_Concurrent,
-	  Is_Limited => False,
+	  Is_Limited => $1.Is_Limited,
 	  Has_Formals => $4.Has_Module_Formals,
 	  Module_Formals => $4.Module_Formals,
 	  Extends_Interface => $4.Extends,
@@ -1466,7 +1477,7 @@ class_definition_with_term :
 	  Is_Abstract => $1.Is_Abstract,
 	  Is_Private => $1.Is_Private,
 	  Is_Concurrent => $1.Is_Concurrent,
-	  Is_Limited => False,
+	  Is_Limited => $1.Is_Limited,
 	  Has_Formals => $4.Has_Module_Formals,
 	  Module_Formals => $4.Module_Formals,
 	  Extends_Interface => $4.Extends,

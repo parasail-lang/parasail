@@ -12,6 +12,7 @@ errors.err
 # Ada Library Information
 *.ali
 
+.DS_Store
 *.pdf
 *.log
 *.toc
@@ -24,6 +25,7 @@ ada202x_parser/gen/**
 install/**
 parser/build/bin/**
 testsuite/tmp/**
+testsuite/tmp/ParaSail/aaa.psi
 interpreter/psc-interpreter-locks.ad?
 semantics/psc-link_names.ads
 ada202x_parser/build/bin/**

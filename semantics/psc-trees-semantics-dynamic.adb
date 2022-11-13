@@ -4334,6 +4334,7 @@ package body PSC.Trees.Semantics.Dynamic is
                         (Opnd_Sem.Resolved_Type,
                          Referring_Module => Enc_Module,
                          Formal_Type => Opnd_Sem.Target_Polymorphic_Type,
+                         Source_Pos => Find_Source_Pos (T),
                          Is_Polymorphic_Type_Id => True)));
             end if;
 

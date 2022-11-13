@@ -210,7 +210,7 @@ EXPONENT          [Ee][-+]?{DIGIT_SEQUENCE}
         ENTER(CHARLIT);
 }
 
-^("abstract"|"class"|"concurrent"|"end"|"func"|"def"|"import"|"interface"|"op"|[ \r\t\f]+)   {
+^("abstract"|"class"|"concurrent"|"end"|"func"|"def"|"import"|"interface"|"limited"|"op"|[ \r\t\f]+)   {
     declare
         -- ignore spaces,Carriage returns,tabs,form feeds
         -- 
@@ -350,6 +350,12 @@ EXPONENT          [Ee][-+]?{DIGIT_SEQUENCE}
 	ECHO_L; ENTER(CHARLIT); 
 	yylval := Create_Token;
 	return (INTERFACE_kw);
+}
+
+<RESCANNING>^"limited"	{
+	ECHO_L; ENTER(CHARLIT); 
+	yylval := Create_Token;
+	return (LIMITED_kw);
 }
 
 <RESCANNING>^"op"	{
@@ -570,6 +576,11 @@ EXPONENT          [Ee][-+]?{DIGIT_SEQUENCE}
 	ECHO_L; ENTER(CHARLIT); 
 	yylval := Create_Token;
 	return (LAMBDA_kw);
+}
+"limited"	{
+	ECHO_L; ENTER(CHARLIT); 
+	yylval := Create_Token;
+	return (LIMITED_kw);
 }
 "locked"	{
 	ECHO_L; ENTER(CHARLIT); 
