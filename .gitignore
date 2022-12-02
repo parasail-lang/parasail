@@ -7,3 +7,15 @@
 *.pdf
 *.log
 *.toc
+*.ll
+*.lst
+*.err
+*.verbose
+*.aux
+
+tags
+bin
+obj
+install
+slow_obj
+gen
