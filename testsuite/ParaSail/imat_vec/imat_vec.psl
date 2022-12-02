@@ -32,7 +32,7 @@ interface IMatrix<Rows : Univ_Integer; Cols : Univ_Integer> is
 
 	op "[..]"() -> Countable_Range<Row_Col> is in Countable_Range<Row_Col>;
 
-	func Hash(Val : Row_Col) -> Univ_Integer;
+	func Hash(Val : Row_Col) -> Unsigned_64;
 
         func Min(Left, Right : optional Row_Col) -> optional Row_Col;
         func Max(Left, Right : optional Row_Col) -> optional Row_Col;
@@ -103,7 +103,7 @@ interface IMatrix<Rows : Univ_Integer; Cols : Univ_Integer> is
 
     // Imageable operations
     op "=?"(Left, Right : IMatrix) -> Ordering;
-    func Hash(M : IMatrix) -> Univ_Integer;
+    func Hash(M : IMatrix) -> Unsigned_64;
     func To_String(M : IMatrix) -> Univ_String;
     func From_String(Str : Univ_String) -> IMatrix;
     
@@ -298,7 +298,7 @@ class IMatrix is
            Left := Left - Right;
         end op "-=";
 
-	func Hash(Val : Row_Col) -> Univ_Integer is
+	func Hash(Val : Row_Col) -> Unsigned_64 is
 	    return [[Val.R-1]] * Cols + [[Val.C]];
 	end func Hash;
 
@@ -444,8 +444,8 @@ class IMatrix is
         return #equal;
     end op "=?"
 
-    func Hash(M : IMatrix) -> Univ_Integer is
-        return Hash(M[1,1]) + Hash(M[Rows, Cols]);
+    func Hash(M : IMatrix) -> Unsigned_64 is
+        return Unsigned_64::(M[1,1]) + Unsigned_64::(M[Rows, Cols]);
     end func Hash;
 
     func To_String(M : IMatrix) -> Univ_String is

@@ -12,7 +12,7 @@ abstract interface Memoizable<Output_Type is Assignable<>>
 
     // TBD: The following should not be necessary; should be
     //      implicit in "implements Hashable<>".
-    func Hash(Key : Memoizable) -> Univ_Integer;
+    func Hash(Key : Memoizable) -> Unsigned_64;
     op "=?"(Left, Right : Memoizable) -> Ordering;
 end interface Memoizable;
 
@@ -241,7 +241,7 @@ class Trig is
       // where a "Trig_Op"-implementing type is needed
         const Data : Trig_Op+;
         func Compute(Input : Trig_Op_Poly) -> Float_Type;
-        func Hash(TOP : Trig_Op_Poly) -> Univ_Integer;
+        func Hash(TOP : Trig_Op_Poly) -> Unsigned_64;
         op "=?"(Left, Right : Trig_Op_Poly) -> Ordering;
     end interface Trig_Op_Poly;
 
@@ -256,7 +256,7 @@ class Trig is
             return Compute(Input.Data);
         end func Compute;
 
-        func Hash(TOP : Trig_Op_Poly) -> Univ_Integer is
+        func Hash(TOP : Trig_Op_Poly) -> Unsigned_64 is
             if Debug then
                Println(" Hash: using float = " | TOP.Data.U_Float | 
                  ", operation_id = " |

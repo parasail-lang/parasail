@@ -42,7 +42,7 @@ interface PSL::Core::Boolean<> is
     op "or="(var Left : Boolean; Right : Boolean)
     op "xor="(var Left : Boolean; Right : Boolean)
 
-    func Hash(Val : Boolean) -> Univ_Integer
+    func Hash(Val : Boolean) -> Unsigned_64
       is import(#identity)
 
     // For Imageable
@@ -253,7 +253,7 @@ interface PSL::Core::Univ_Enumeration<> is
     func Println(Val : Univ_Enumeration) 
       is (Println(To_String(Val)))
 
-    func Hash(Val : Univ_Enumeration) -> Univ_Integer
+    func Hash(Val : Univ_Enumeration) -> Unsigned_64
       is import(#hash_enum)
 
     op "in"(Left : Univ_Enumeration; Right : Set<Univ_Enumeration>) 
@@ -280,7 +280,7 @@ interface PSL::Core::Ordering<> is
 
     op "=?"(Left, Right : Ordering) -> Ordering is import("=?")
 
-    func Hash(Val : Ordering) -> Univ_Integer
+    func Hash(Val : Ordering) -> Unsigned_64
       is import(#identity)
 
     // For Imageable
@@ -405,7 +405,7 @@ abstract interface PSL::Core::Hashable<> implements Comparable<> is
     // hashable, which makes it possible to create an efficient
     // set or map using them as the index type.
     op "=?"(Left, Right : Hashable) -> Ordering
-    func Hash(Val : Hashable) -> Univ_Integer
+    func Hash(Val : Hashable) -> Unsigned_64
 end interface PSL::Core::Hashable
 
 abstract interface Summable<> implements Hashable<> is
@@ -431,7 +431,7 @@ abstract interface Summable<> implements Hashable<> is
     op "=?"(Left, Right : Summable) -> Ordering
     func Min(Left, Right : optional Summable) -> optional Summable
     func Max(Left, Right : optional Summable) -> optional Summable
-    func Hash(Val : Summable) -> Univ_Integer
+    func Hash(Val : Summable) -> Unsigned_64
     func From_Int(Int : Univ_Integer) -> optional Summable
     func Trunc_To_Int(Val : Summable) -> Univ_Integer
     func Floor_To_Int(Val : Summable) -> Univ_Integer
@@ -562,7 +562,7 @@ abstract interface PSL::Core::Countable<> implements Ordered<> is
     func Min(Left, Right : optional Countable) -> optional Countable
     func Max(Left, Right : optional Countable) -> optional Countable
 
-    func Hash(Val : Countable) -> Univ_Integer
+    func Hash(Val : Countable) -> Unsigned_64
 
     op ".."(Left, Right : Countable) -> Countable_Set<Countable>
       is in Countable_Set<Countable>
@@ -643,8 +643,8 @@ interface PSL::Core::Univ_Integer<> is
     func Max(Left, Right : optional Univ_Integer) -> optional Univ_Integer
       is import(#univ_max)
 
-    func Hash(Val : Univ_Integer) -> Univ_Integer
-      is import(#identity)
+    func Hash(Val : Univ_Integer) -> Unsigned_64
+      is (Val mod 2**32)
 
     func To_String(Val : optional Univ_Integer) -> Univ_String
       is import(#to_string_univ_int)
@@ -910,7 +910,7 @@ interface PSL::Core::Univ_Character<> is
     func Print(C : Univ_Character) is import(#print_char)
     func Println(C : Univ_Character) is (Println(To_String(C)))
 
-    func Hash(Val : Univ_Character) -> Univ_Integer
+    func Hash(Val : Univ_Character) -> Unsigned_64
       is import(#identity)
 
     func First() -> Univ_Character
@@ -966,7 +966,7 @@ abstract interface PSL::Core::Imageable<> is
     //       so we might as well requires these operations too.
 
     op "=?"(Left, Right : Imageable) -> Ordering
-    func Hash(Val : Imageable) -> Univ_Integer
+    func Hash(Val : Imageable) -> Unsigned_64
 end interface PSL::Core::Imageable
 interface PSL::Containers::Packed_Word
   <Key_Type is Enum<>;
@@ -1714,7 +1714,7 @@ interface PSL::Core::Univ_String<> is
     op "magnitude"(Univ_String) -> Univ_Integer
       is import(#string_length)
 
-    func Hash(Val : Univ_String) -> Univ_Integer
+    func Hash(Val : Univ_String) -> Unsigned_64
       is import(#hash_string)
 
     op "|"(Left : optional Univ_String;
@@ -1822,7 +1822,7 @@ class PSL::Core::Univ_String is
 
     const Char_First := Univ_Character::First()
 
-    func Hash_Vec(Vec : Vector<Univ_Character>) -> Univ_Integer is
+    func Hash_Vec(Vec : Vector<Univ_Character>) -> Unsigned_64 is
        return (for I in 1 .. |Vec| reverse =>
          (<0> * 127 + (Vec[I] - Char_First)) mod Hash_Modulus)
     end func Hash_Vec
@@ -2186,7 +2186,7 @@ interface PSL::Core::Integer_64 <> is
     func Max(Left, Right : optional Integer_64) -> optional Integer_64
       is import(#max)
 
-    func Hash(Val : Integer_64) -> Univ_Integer
+    func Hash(Val : Integer_64) -> Unsigned_64
       is import(#identity)
 
     func To_String(Val : optional Integer_64) -> Univ_String
@@ -2320,7 +2320,7 @@ interface PSL::Core::Integer
     func Max(Left, Right : optional Integer) -> optional Integer
       is import(#max)
 
-    func Hash(Val : Integer) -> Univ_Integer
+    func Hash(Val : Integer) -> Unsigned_64
       is import(#identity)
 
     func To_String(Val : optional Integer) -> Univ_String
@@ -5735,7 +5735,7 @@ interface PSL::Core::Univ_Real<> is
     func Sqrt(Val : Univ_Real {Val >= 0.0}) -> Univ_Real
       is import(#real_sqrt)
 
-    func Hash(Val : Univ_Real) -> Univ_Integer
+    func Hash(Val : Univ_Real) -> Unsigned_64
       is import(#identity)
 
     func To_String(Val : optional Univ_Real) -> Univ_String
@@ -6501,7 +6501,7 @@ interface PSL::Core::ZString<> is
 
     op "magnitude"(ZString) -> Univ_Integer is Length
 
-    func Hash(Val : ZString) -> Univ_Integer
+    func Hash(Val : ZString) -> Unsigned_64
       is import(#hash_string)
 
     op "|"(Left : optional ZString; Right : optional Right_Type is Imageable<>) 
@@ -6821,7 +6821,7 @@ interface PSL::Core::Enum<Literals : Vector<Univ_Enumeration>> is
 
     op "[..]"() -> Countable_Range<Enum> is in Countable_Range<Enum>
 
-    func Hash(Val : Enum) -> Univ_Integer
+    func Hash(Val : Enum) -> Unsigned_64
       is import(#identity)
 
     op ".."(Left, Right : Enum) -> Countable_Set<Enum>
@@ -7349,7 +7349,7 @@ interface PSL::Core::Float<Digits : Univ_Integer := 15> is
       is import(#real_sqrt)
       // is (Univ_Real::Sqrt([[Val]]))     
 
-    func Hash(Val : Float) -> Univ_Integer
+    func Hash(Val : Float) -> Unsigned_64
       is import(#identity)
 
     func Round_To_Int(Val : Float) -> Univ_Integer
@@ -7485,7 +7485,7 @@ interface PSL::Core::Fixed<Delta : Univ_Real> is
     func Max(Left, Right : optional Fixed) -> optional Fixed
       is import(#max)
 
-    func Hash(Val : Fixed) -> Univ_Integer
+    func Hash(Val : Fixed) -> Unsigned_64
       is import(#identity)
 
     func Round_To_Int(Val : Fixed) -> Univ_Integer
@@ -8475,7 +8475,7 @@ interface PSL::Core::Unsigned_64<> is
     func Max(Left, Right : Unsigned_64) -> Unsigned_64
       is import(#uns_max)
 
-    func Hash(Val : Unsigned_64) -> Univ_Integer
+    func Hash(Val : Unsigned_64) -> Unsigned_64
       is (Val >> 1)
 
     op "from_univ"(Lit : Univ_Integer) -> Unsigned_64 
@@ -8642,7 +8642,7 @@ interface PSL::Core::Modular<Modulus : Unsigned_64> is
     func Max(Left, Right : optional Modular) -> optional Modular
       is import(#uns_max)
 
-    func Hash(Val : Modular) -> Univ_Integer
+    func Hash(Val : Modular) -> Unsigned_64
       is import(#identity)
 
     func To_String(Val : optional Modular) -> Univ_String
@@ -9268,7 +9268,7 @@ interface PSL::Core::Enum_With_Rep
     func To_String(Val : optional Enum_With_Rep) -> Univ_String
     func From_String(Str : Univ_String) -> optional Enum_With_Rep
 
-    func Hash(Val : Enum_With_Rep) -> Univ_Integer
+    func Hash(Val : Enum_With_Rep) -> Unsigned_64
 
     func Min(Left, Right : optional Enum_With_Rep) -> optional Enum_With_Rep
     func Max(Left, Right : optional Enum_With_Rep) -> optional Enum_With_Rep
@@ -9339,7 +9339,7 @@ class PSL::Core::Enum_With_Rep is
         return Left.Rep =? Right.Rep
     end op "=?"
 
-    func Hash(Val : Enum_With_Rep) -> Univ_Integer is
+    func Hash(Val : Enum_With_Rep) -> Unsigned_64 is
         return Hash (Val.Rep)
     end func Hash
 
@@ -9485,7 +9485,7 @@ interface PSL::Containers::Imageable_Vector<Element_Type is Imageable<>>
       is (null)  // TBD
 
     op "=?"(Left, Right : Imageable_Vector) -> Ordering
-    func Hash(Val : Imageable_Vector) -> Univ_Integer
+    func Hash(Val : Imageable_Vector) -> Unsigned_64
 
     func Print(Val : Imageable_Vector) is (Print(To_String(Val)))
     func Println(Val : Imageable_Vector) is (Println(To_String(Val)))
@@ -9513,7 +9513,7 @@ class PSL::Containers::Imageable_Vector is
         return |Left| =? |Right|
     end op "=?"
 
-    func Hash(Val : Imageable_Vector) -> Univ_Integer is
+    func Hash(Val : Imageable_Vector) -> Unsigned_64 is
         if |Val| == 0 then
             return 0
         else
@@ -9772,7 +9772,7 @@ class PSL::Containers::Indexed_Set is
    interface With_Hash<> is
       //  Save a copy of the Hash value to avoid repeatedly re-invoking Hash
       var Elem : Element_Type
-      var Saved_Hash : Univ_Integer
+      var Saved_Hash : Unsigned_64
    end interface With_Hash
 
    const Initial_Size := 4  //  Length of initial hash-table backbone

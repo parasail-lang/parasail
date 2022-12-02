@@ -37,6 +37,8 @@ with Ada.Streams.Stream_IO;
 with Ada.Command_Line;
 with Ada.Strings.UTF_Encoding.Wide_Wide_Strings;
 
+with System.Storage_Elements;
+
 pragma Elaborate (PSC.Interpreter.Builtins);
 pragma Elaborate (PSC.Strings);
 pragma Elaborate (Ada.Text_IO);
@@ -157,6 +159,24 @@ package body PSC.Interpreter.IO is
    --  Read a line from a file as a string
    --  Readln(var Input_Stream) -> optional Univ_String
    pragma Export (Ada, Read_From_File, "_psc_read_from_file");
+
+   procedure Read_Bytes_From_File
+     (Context : Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   --  Read an array of bytes from file stream.
+   --  Read(var Input_Stream; var Stream_Element_Array)
+   --   -> Bytes_Read : Stream_Count;
+   pragma Export (Ada, Read_Bytes_From_File, "_psc_read_bytes_from_file");
+
+   procedure Write_Bytes_To_File
+     (Context : Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   --  Write an array of bytes to file stream.
+   --  Write(var Output_Stream; Stream_Element_Array)
+   --   -> Bytes_Written : Stream_Count;
+   pragma Export (Ada, Write_Bytes_To_File, "_psc_write_bytes_to_file");
 
    procedure Set_Exit_Status
      (Context : Exec_Context;
@@ -688,6 +708,123 @@ package body PSC.Interpreter.IO is
          end if;
    end Read_From_File;
 
+   --------------------------
+   -- Read_Bytes_From_File --
+   --------------------------
+
+   procedure Read_Bytes_From_File
+     (Context : Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+   --  Read an array of bytes from file stream.
+   --  Read(var Input_Stream; var Stream_Element_Array)
+   --   -> Bytes_Read : Stream_Count;
+      use Ada.Streams.Stream_IO;
+
+      File_Obj_Ref : constant Word_Ptr :=
+                       Fetch_Word_Ptr (Params, 1);
+      File_Obj     : constant Word_Type :=
+                       Fetch_Nonnull_Word (File_Obj_Ref, 0);
+
+      File_Index   : constant Stream_File_Index :=
+                       Stream_File_Index
+                         (Fetch_Word
+                           (File_Obj + (Large_Obj_Header_Size + 1)));
+      Info_Ptr     : constant Stream_File_Ptr :=
+                       Nth_Element (Stream_File_Table, File_Index);
+
+      Arr_Obj_Ref  : constant Word_Ptr :=
+                       Fetch_Word_Ptr (Params, 2);
+      Arr_Obj      : constant Word_Ptr :=
+                       Fetch_Word_Ptr (Arr_Obj_Ref, 0);
+
+      Arr_Bounds   : constant Word_Ptr :=
+                       Fetch_Word_Ptr
+                         (Arr_Obj, Large_Obj_Header_Size + 0);
+
+      use Ada.Streams;
+
+      Arr_First    : constant Stream_Element_Count := Stream_Element_Count
+                       (Fetch_Word (Arr_Bounds, Large_Obj_Header_Size + 0));
+      Arr_Last     : constant Stream_Element_Offset := Stream_Element_Offset
+                       (Fetch_Word (Arr_Bounds, Large_Obj_Header_Size + 1));
+      Arr_Basic    : constant Word_Type :=
+                       Fetch_Nonnull_Word (Arr_Obj, Large_Obj_Header_Size + 1);
+
+      use System.Storage_Elements;
+
+      Arr_Start    : constant System.Address := To_Address (Integer_Address
+                       (Word_Type'(Arr_Basic + (Large_Obj_Header_Size + 1))));
+
+      Stream_Elem_Arr : Stream_Element_Array (Arr_First .. Arr_Last)
+        with Address => Arr_Start;
+
+      Last : Stream_Element_Offset := 0;
+   begin
+      --  Read in the bytes
+      Stream (Info_Ptr.File).Read (Stream_Elem_Arr, Last);
+
+      --  Store the count of bytes read from the file
+      Store_Word (Params, 0, Word_Type (Last - Arr_First + 1));
+   end Read_Bytes_From_File;
+
+   -------------------------
+   -- Write_Bytes_To_File --
+   -------------------------
+
+   procedure Write_Bytes_To_File
+     (Context : Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+   --  Write an array of bytes to file stream.
+   --  Write(var Output_Stream; Stream_Element_Array)
+   --   -> Bytes_Written : Stream_Count;
+      use Ada.Streams.Stream_IO;
+
+      File_Obj_Ref : constant Word_Ptr :=
+                       Fetch_Word_Ptr (Params, 1);
+      File_Obj     : constant Word_Ptr :=
+                       Fetch_Word_Ptr (File_Obj_Ref, 0);
+
+      File_Index   : constant Stream_File_Index :=
+                       Stream_File_Index
+                         (Fetch_Word
+                           (File_Obj, Large_Obj_Header_Size + 1));
+      Info_Ptr     : constant Stream_File_Ptr :=
+                       Nth_Element (Stream_File_Table, File_Index);
+
+      Arr_Obj      : constant Word_Ptr :=
+                       Fetch_Word_Ptr (Params, 2);
+
+      Arr_Bounds   : constant Word_Ptr :=
+                       Fetch_Word_Ptr (Arr_Obj, Large_Obj_Header_Size + 0);
+
+      use Ada.Streams;
+
+      Arr_First    : constant Stream_Element_Count := Stream_Element_Count
+                       (Fetch_Word (Arr_Bounds, Large_Obj_Header_Size + 0));
+      Arr_Last     : constant Stream_Element_Offset := Stream_Element_Offset
+                       (Fetch_Word (Arr_Bounds, Large_Obj_Header_Size + 1));
+      Arr_Basic    : constant Word_Type :=
+                       Fetch_Nonnull_Word (Arr_Obj, Large_Obj_Header_Size + 1);
+
+      use System.Storage_Elements;
+
+      Arr_Start    : constant System.Address := To_Address (Integer_Address
+                       (Word_Type'(Arr_Basic + (Large_Obj_Header_Size + 1))));
+
+      Stream_Elem_Arr : Stream_Element_Array (Arr_First .. Arr_Last)
+        with Address => Arr_Start;
+
+      Last : Stream_Element_Offset := 0;
+   begin
+      --  Write out the bytes
+      Stream (Info_Ptr.File).Write (Stream_Elem_Arr);
+
+      --  Store the count of bytes written (all of them)
+      Store_Word (Params, 0, Word_Type (Arr_Last - Arr_First + 1));
+   end Write_Bytes_To_File;
+
    procedure Set_Exit_Status
      (Context : Exec_Context;
       Params : Word_Ptr;
@@ -733,6 +870,10 @@ begin
       Print_To_File'Access);
 
    Register_Builtin
+     (String_Lookup ("#write_bytes_to_file"),
+      Write_Bytes_To_File'Access);
+
+   Register_Builtin
      (String_Lookup ("#open_input_file"),
       Open_Input_File'Access);
 
@@ -743,6 +884,10 @@ begin
    Register_Builtin
      (String_Lookup ("#read_from_file"),
       Read_From_File'Access);
+
+   Register_Builtin
+     (String_Lookup ("#read_bytes_from_file"),
+      Read_Bytes_From_File'Access);
 
    Register_Builtin
      (String_Lookup ("#set_exit_status"),

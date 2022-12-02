@@ -544,14 +544,30 @@ package body PSC.Trees.Semantics.Dynamic is
          declare
             Opnd_Sem : constant Root_Sem_Ptr := Sem_Info (Resolved_Tree (T));
          begin
-            if Opnd_Sem /= null
-              and then Opnd_Sem.all in Computation_Semantic_Info'Class
+            if Opnd_Sem = null then
+               --  No semantic info, so no temps
+               return 0;
+            elsif Opnd_Sem.all in Computation_Semantic_Info'Class then
+               --  Computation, retrieve num-finalizable-temps from there,
+               --  plus include temp potentially needed for conv to poly type.
+               declare
+                  Comp_Sem : Computation_Semantic_Info renames
+                     Computation_Semantic_Info (Opnd_Sem.all);
+               begin
+                  return Comp_Sem.Num_Finalizable_Temps +
+                      Boolean'Pos (Comp_Sem.Target_Polymorphic_Type /= null);
+               end;
+            elsif Opnd_Sem.all in Operand_Semantic_Info'Class
+              and then
+                  Operand_Semantic_Info
+                    (Opnd_Sem.all).Target_Polymorphic_Type /= null
             then
-               --  Computation, retrieve num-finalizable-temps from there
-               return Computation_Semantic_Info
-                 (Opnd_Sem.all).Num_Finalizable_Temps;
+               --  A conversion to a polymorphic type might require a
+               --  finalizable temp.
+               return 1;
             else
-               --  No computation info, so presume no finalizable temps.
+               --  No computation or conversion info,
+               --  so presume no finalizable temps.
                return 0;
             end if;
          end;
@@ -4157,6 +4173,12 @@ package body PSC.Trees.Semantics.Dynamic is
       end if;
    end Assign_VM_Obj_Id;
 
+   procedure Initialize_Lvalue_Location_From_Temp
+     (Visitor : in out Code_Gen_Visitor;
+      Opnd_Sem : Operand_Sem_Ptr;
+      Current_Loc : Interpreter.Object_Locator);
+      --  Set loc of result of computation that is to be passed by ref
+
    procedure Emit_Code_For_Resolved_Tree
      (T : Optional_Tree;
       Visitor : in out Code_Gen_Visitor) is
@@ -4214,8 +4236,7 @@ package body PSC.Trees.Semantics.Dynamic is
                   Source_Pos => Find_Source_Pos (T_Copy));
             end if;
          end;
-      elsif not Visitor.Is_Lvalue_Context
-        and then not Visitor.Gen_Parallel_Invocations_Only
+      elsif not Visitor.Gen_Parallel_Invocations_Only
         and then Operand_Sem_Ptr (Tree_Sem).Target_Polymorphic_Type /= null
       then
          --  We have a target polymorphic type, so we need
@@ -4230,6 +4251,8 @@ package body PSC.Trees.Semantics.Dynamic is
               Visitor.Target_Local_Offset;
             Orig_Target_Object : constant Object_Locator :=
               Visitor.Target_Object;
+            Orig_Lvalue_Context : constant Boolean :=
+              Visitor.Is_Lvalue_Context;
             Target_Offset_For_Initial_Value : Offset_Within_Area :=
               Orig_Target_Offset;
             Opnd_Sem : constant Operand_Sem_Ptr := Operand_Sem_Ptr (Tree_Sem);
@@ -4239,6 +4262,7 @@ package body PSC.Trees.Semantics.Dynamic is
             Orig_Target_VM_Info : constant VM_Obj_Id_Type :=
               Visitor.Target_VM_Info;
             Poly_Target_VM_Info : VM_Obj_Id_Type := Orig_Target_VM_Info;
+            Poly_Obj_Location   : Object_Locator;
             Poly_Target_Needs_Decl : Boolean := False;
          begin
             if Static.Known_To_Be_Small (Opnd_Sem.Resolved_Type)
@@ -4262,15 +4286,17 @@ package body PSC.Trees.Semantics.Dynamic is
                Poly_Target_Needs_Decl := True;
             end if;
 
+            Poly_Obj_Location :=
+               (Local_Area, Target_Offset_For_Initial_Value,
+                Poly_Target_VM_Info);
+
             if Poly_Target_Needs_Decl then
                --  Need to declare the poly target
                Emit
                  (Visitor,
                   (Declare_Obj_Op,
                    Source_Pos => Find_Source_Pos (T_Copy),
-                   Destination =>
-                     (Local_Area, Target_Offset_For_Initial_Value,
-                      Poly_Target_VM_Info),
+                   Destination => Poly_Obj_Location,
                    Dest_Name => Strings.Null_U_String_Index,
                    Is_By_Ref => False,
                    Is_Var => False,
@@ -4284,7 +4310,11 @@ package body PSC.Trees.Semantics.Dynamic is
             Visitor.Create_Polymorphic_Obj := True;
 
             Visitor.Target_VM_Info := Poly_Target_VM_Info;
+            Visitor.Is_Lvalue_Context := False;
+
             Visit (T_Copy, Visitor);  --  Actually generate the code
+
+            Visitor.Is_Lvalue_Context := Orig_Lvalue_Context;
 
             if Visitor.Create_Polymorphic_Obj then
                --  Flag still set, so we should go ahead and create
@@ -4295,9 +4325,7 @@ package body PSC.Trees.Semantics.Dynamic is
                  (Visitor,
                   (Op => Create_Polymorphic_Obj_Op,
                    Source_Pos => Find_Source_Pos (T_Copy),
-                   Destination =>
-                     (Local_Area, Target_Offset_For_Initial_Value,
-                      Poly_Target_VM_Info),
+                   Destination => Poly_Obj_Location,
                    Dest_Name => Visitor.Dest_Name,
                    Source => Orig_Target_Object,
                    Might_Be_Null => True,  --  TBD
@@ -4306,10 +4334,17 @@ package body PSC.Trees.Semantics.Dynamic is
                         (Opnd_Sem.Resolved_Type,
                          Referring_Module => Enc_Module,
                          Formal_Type => Opnd_Sem.Target_Polymorphic_Type,
+                         Source_Pos => Find_Source_Pos (T),
                          Is_Polymorphic_Type_Id => True)));
             end if;
 
-            if Orig_Target_Offset /= Target_Offset_For_Initial_Value
+            if Visitor.Is_Lvalue_Context then
+               --  We need to copy into a preallocated (finalizable) temp
+               --  and set Visitor.Lvalue_Location from there.
+               Initialize_Lvalue_Location_From_Temp
+                 (Visitor, Opnd_Sem, Poly_Obj_Location);
+
+            elsif Orig_Target_Offset /= Target_Offset_For_Initial_Value
               or else Orig_Target_VM_Info /= Poly_Target_VM_Info
             then
                --  Need to move (polymorphic) result to original target offset
@@ -4320,8 +4355,7 @@ package body PSC.Trees.Semantics.Dynamic is
                    Destination => (Local_Area, Orig_Target_Offset,
                                    Orig_Target_VM_Info),
                    Dest_Name => Visitor.Dest_Name,
-                   Source => (Local_Area, Target_Offset_For_Initial_Value,
-                              Poly_Target_VM_Info),
+                   Source => Poly_Obj_Location,
                    Might_Be_Null => True));
 
                if Orig_Target_Offset /= Target_Offset_For_Initial_Value then
@@ -7861,7 +7895,7 @@ package body PSC.Trees.Semantics.Dynamic is
 
    procedure Initialize_Lvalue_Location_From_Temp
      (Visitor : in out Code_Gen_Visitor;
-      Comp_Sem : Computation_Sem_Ptr;
+      Opnd_Sem : Operand_Sem_Ptr;
       Current_Loc : Interpreter.Object_Locator) is
       --  Set loc of result of computation that is to be passed by ref
       --  TBD: This currently can happen after substitution
@@ -7879,30 +7913,30 @@ package body PSC.Trees.Semantics.Dynamic is
          if Current_Loc.Base = Local_Area
            and then Current_Loc.Offset = Visitor.Target_Local_Offset - 1
          then
-            Sem_Error (Comp_Sem.Definition,
+            Sem_Error (Opnd_Sem.Definition,
               "Internal: No space allocated for finalizable temp for " &
-              Subtree_Image (Comp_Sem.Definition));
+              Subtree_Image (Opnd_Sem.Definition));
          elsif True or else Debug_Code_Gen then
             Put_Line ("No space allocated for finalizable temps for " &
-              Subtree_Image (Comp_Sem.Definition) & ", current_loc = " &
+              Subtree_Image (Opnd_Sem.Definition) & ", current_loc = " &
               Obj_Locator_Image (Current_Loc) & ", target_local_offset = " &
               Offset_Within_Area'Image (Visitor.Target_Local_Offset));
          end if;
       else
-         --  Copy aggregate into finalizable temp so we can point
+         --  Copy result into finalizable temp so we can point
          --  to it from Target_Local_Offset.
          if Debug_Code_Gen then
             Put_Line ("Allocate finalizable temp at " &
               Obj_Locator_Image
                 ((Local_Area, Visitor.Finalizable_Temp_Offset,
                   Finalizable_Temp_VM_Info)) &
-              " for " & Subtree_Image (Comp_Sem.Definition));
+              " for " & Subtree_Image (Opnd_Sem.Definition));
          end if;
 
          Emit
            (Visitor,
             (Declare_Obj_Op,
-             Source_Pos => Find_Source_Pos (Comp_Sem.Definition),
+             Source_Pos => Find_Source_Pos (Opnd_Sem.Definition),
              Destination =>
                Adjust_For_Level_And_Prefix
                  (Visitor.Current_Level,
@@ -7914,14 +7948,14 @@ package body PSC.Trees.Semantics.Dynamic is
              Is_By_Ref => False,
              Is_Var => False,
              Declare_Type_Info => Run_Time_Type_Info
-                                 (Comp_Sem.Resolved_Type,
+                                 (Opnd_Sem.Resolved_Type,
                                   Referring_Module => Enc_Module)));
 
-         --  Copy aggregate into finalizable temp
+         --  Copy result into finalizable temp
          Emit
            (Visitor,
             (Copy_Word_Op,
-             Source_Pos => Find_Source_Pos (Comp_Sem.Definition),
+             Source_Pos => Find_Source_Pos (Opnd_Sem.Definition),
              Destination =>
                Adjust_For_Level_And_Prefix
                  (Visitor.Current_Level,
@@ -7940,7 +7974,7 @@ package body PSC.Trees.Semantics.Dynamic is
             (Local_Area, Visitor.Finalizable_Temp_Offset,
              Finalizable_Temp_VM_Info),
             Visitor.Finalizable_Temp_Level,
-            Src_Pos => Find_Source_Pos (Comp_Sem.Definition));
+            Src_Pos => Find_Source_Pos (Opnd_Sem.Definition));
 
          --  Skip over this finalizable temp
          Visitor.Finalizable_Temp_Offset :=
@@ -8770,6 +8804,18 @@ package body PSC.Trees.Semantics.Dynamic is
                        (Formal_Sem,
                         Formal_Param.Kind,
                         Formal_Param.Locking);
+
+                  if Visitor.Is_Lvalue_Context
+                    and then Actual_Sem.Target_Polymorphic_Type /= null
+                  then
+                     --  We can't easily create a polymorphic wrapper for
+                     --  a by-ref parameter so give up now.
+                     --  TBD: Support this someday by implicitly allocating
+                     --       temp in pre-codegen phase.
+                     Sem_Error
+                       (Actual_Operand,
+                        "Must be of polymorphic type because passed by ref");
+                  end if;
 
                   --  Indicate whether parameter is locked
                   if Formal_Is_Unlocked_Concurrent then
@@ -11441,7 +11487,7 @@ package body PSC.Trees.Semantics.Dynamic is
          --       that iterates over the parameter.  Eventually these
          --       should be replaced with a reference to a normal object.
          Initialize_Lvalue_Location_From_Temp
-           (Visitor, Computation_Sem_Ptr (Agg_Sem),
+           (Visitor, Operand_Sem_Ptr (Agg_Sem),
             Agg_Sem.Info.Obj_Location);
       else
          --  Move aggregate to original VM target
@@ -11479,16 +11525,19 @@ package body PSC.Trees.Semantics.Dynamic is
                (Strings.Index (Strings.String_Lookup (Lit)));
 
          when '"' => --  String literal
-            return Interpreter.Word_Type (Strings.Index (Strings.String_Lookup
-               (Strings.To_UTF_8 (Lit (Lit'First + 1 .. Lit'Last - 1)))));
+            return Interpreter.Word_Type
+              (Strings.Index (Strings.Wide_Wide_String_Lookup
+                (Strings.Decode_Source_Rep
+                  (Lit (Lit'First + 1 .. Lit'Last - 1)))));
 
          when ''' => --  Character literal
             declare
-               Str : constant Wide_String :=
-                 Strings.To_UTF_16 (Lit (Lit'First + 1 .. Lit'Last - 1));
+               Str : constant Wide_Wide_String :=
+                 Strings.Decode_Source_Rep
+                   (Lit (Lit'First + 1 .. Lit'Last - 1));
             --  Expand escaped characters
             begin
-               return Wide_Character'Pos (Str (Str'First));
+               return Wide_Wide_Character'Pos (Str (Str'First));
             end;
 
          when others =>

@@ -444,17 +444,17 @@ package body PSC.Languages is
    begin
       case Current_Language is
          when ParaSail => return
-           "PSL::Containers::Basic_Array<optional PSL::Core::Unsigned_64>";
+           "PSL::Containers::Basic_Array<PSL::Core::Unsigned_64>";
          when Sparkel  => return
            "SSL.Containers.Basic_Array" &
-             "<optional SSL.Core.Unsigned_64.Unsigned_64>.Basic_Array";
+             "<SSL.Core.Unsigned_64.Unsigned_64>.Basic_Array";
          when Ada202x  => return
            "A2X.Containers.Basic_Array" &
-             "<optional SSL.Core.Unsigned_64.Unsigned_64>.Basic_Array";
+             "<SSL.Core.Unsigned_64.Unsigned_64>.Basic_Array";
          when Parython => return
-           "PSL.Containers.Basic_Array<optional PSL.Core.Unsigned_64>";
+           "PSL.Containers.Basic_Array<PSL.Core.Unsigned_64>";
          when Javallel => return
-           "java.util.BasicArray<optional java.lang.Unsigned64>";
+           "java.util.BasicArray<java.lang.Unsigned64>";
       end case;
    end Optional_Unsigned_64_Basic_Array_Type_Name;
 

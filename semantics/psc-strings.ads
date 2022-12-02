@@ -116,15 +116,11 @@ package PSC.Strings is
    function Case_Insensitive_Equal (Left, Right : U_String) return Boolean;
    --  Return True if Left and Right are equal ignoring case.
 
-   function Escaped_Char (Char : Character) return Character;
-   --  Return meaning of Char when preceded by a back slash.
-   --  NOTE: This does not handle the \#xx_xx# syntax.
-
-   function To_UTF_8 (S : String) return String;
-   --  Convert any escaped characters and produce a UTF-8 string.
-
-   function To_UTF_16 (S : String) return Wide_String;
-   --  Convert any escaped characters and produce a UTF-16 string
+   function Decode_Source_Rep (S : String) return Wide_Wide_String;
+   --  Expects the characters between the double quotes of a string
+   --  literal or the single quotes of a character literal.
+   --  Converts any escaped characters and produces a wide-wide string.
+   --  Does not complain about syntax errors.
 
    type U_String_Array is array (Positive range <>) of Strings.U_String;
 

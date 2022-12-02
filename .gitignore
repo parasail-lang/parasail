@@ -1,21 +1,38 @@
 # Object file
 *.o
+*.ll
+*.s
+*.lst
+*.diffs
+*.nm
+errors.err
+*.old
+*.exe
 
 # Ada Library Information
 *.ali
 
+.DS_Store
 *.pdf
 *.log
 *.toc
-*.ll
-*.lst
-*.err
-*.verbose
-*.aux
-
 tags
-bin
-obj
-install
-slow_obj
-gen
+build/bin/**
+build/obj/**
+build/slow_obj/**
+parser/gen/**
+ada202x_parser/gen/**
+install/**
+parser/build/bin/**
+testsuite/tmp/**
+testsuite/tmp/ParaSail/aaa.psi
+interpreter/psc-interpreter-locks.ad?
+semantics/psc-link_names.ads
+ada202x_parser/build/bin/**
+examples/_*/**
+testsuite/ParaSail/runtests*
+testsuite/ParaSail/tmp/**
+examples/*__main.psl
+*parser/*.verbose
+*parser/build/*.verbose
+*parser/build/bin

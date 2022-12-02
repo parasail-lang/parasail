@@ -290,7 +290,7 @@ interface GTK::Widget<> is
       is import("null") --(#gtk_widget_get_toplevel)
 
     op "=?" (Left, Right : Widget) -> Ordering
-    func Hash (Widget) -> Univ_Integer
+    func Hash (Widget) -> Unsigned_64
 
     func On_Draw (var Widget; var Cairo::Context) -> Boolean
       //  This is called by default from On_Draw routine of controller
@@ -313,7 +313,7 @@ class GTK::Widget is
         end if
     end op "=?"
 
-    func Hash (Widget) -> Univ_Integer is
+    func Hash (Widget) -> Unsigned_64 is
         return Widget.Id
     end func Hash
 

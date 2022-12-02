@@ -21,7 +21,7 @@ interface Integer_Range<Range : Countable_Range<Univ_Integer> :=
     op "=?"(Left, Right : Integer_Range) -> Ordering
       is import("=?");
     op "[..]"() -> Countable_Range<Integer_Range>;
-    func Hash(Val : Integer_Range) -> Univ_Integer
+    func Hash(Val : Integer_Range) -> Unsigned_64
       is import(#identity);
   implements
   for Countable

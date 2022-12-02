@@ -181,12 +181,12 @@ package body PSC.Trees.Module is
       if T.Is_Concurrent then
          Put (On, "concurrent ");
       end if;
+      if T.Is_Limited then
+         Put (On, "limited ");
+      end if;
       if T.Treat_As_Type then
          --  Finish display as a type
 
-         if T.Is_Limited then
-            Put (On, "limited ");
-         end if;
          if Not_Null (T.Extends_Interface) then
             Put (On, "new ");
             Display_Subtree (T.Extends_Interface, On);

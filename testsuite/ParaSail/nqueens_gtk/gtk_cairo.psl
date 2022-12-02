@@ -290,7 +290,7 @@ interface GTK::Widget<> is
       is import("null") --(#gtk_widget_get_toplevel)
 
     op "=?" (Left, Right : Widget) -> Ordering
-    func Hash (Widget) -> Univ_Integer
+    func Hash (Widget) -> Unsigned_64
 
     func On_Draw (var Widget; var Cairo::Context) -> Boolean
       //  This is called by default from On_Draw routine of controller
@@ -313,7 +313,7 @@ class GTK::Widget is
         end if
     end op "=?"
 
-    func Hash (Widget) -> Univ_Integer is
+    func Hash (Widget) -> Unsigned_64 is
         return Widget.Id
     end func Hash
 
@@ -862,7 +862,7 @@ interface GDK::RGBA <> is
     func Get_Green(RGBA) -> Float
     func Get_Blue(RGBA) -> Float
     func Get_Alpha(RGBA) -> Float
-    func Hash(RGBA) -> Univ_Integer
+    func Hash(RGBA) -> Unsigned_64
 end interface GDK::RGBA
 
 class GDK::RGBA is
@@ -880,7 +880,7 @@ class GDK::RGBA is
     func Get_Blue(RGBA) -> Float is (RGBA.Blue)
     func Get_Alpha(RGBA) -> Float is (RGBA.Alpha)
 
-    func Hash(RGBA) -> Univ_Integer is
+    func Hash(RGBA) -> Unsigned_64 is
         return Hash(RGBA.Red) + Hash(RGBA.Green) + Hash(RGBA.Blue) +
           Hash(RGBA.Alpha)
     end func Hash
