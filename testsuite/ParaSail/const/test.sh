@@ -1,3 +1,3 @@
 RUN="psli ../aaa.psi"
 
-echo | $RUN const.psl | grep "Error:"
+$RUN const.psl -command main
