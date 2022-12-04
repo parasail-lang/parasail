@@ -57,7 +57,7 @@ package PSC.Interpreter.Builtins is
       with procedure Invoke_After_Call is Do_Nothing;
    package Unary_Builtin is
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
    private
@@ -78,7 +78,7 @@ package PSC.Interpreter.Builtins is
       with procedure Invoke_After_Call is Do_Nothing;
    package Binary_Builtin is
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
    private
@@ -102,7 +102,7 @@ package PSC.Interpreter.Builtins is
       with procedure Invoke_After_Call is Do_Nothing;
    package Ternary_Builtin is
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
    private
@@ -129,7 +129,7 @@ package PSC.Interpreter.Builtins is
       with procedure Invoke_After_Call is Do_Nothing;
    package Quarternary_Builtin is
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
    private
@@ -146,7 +146,7 @@ package PSC.Interpreter.Builtins is
       with procedure Invoke_After_Call is Do_Nothing;
    package One_Input_Builtin is
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
    private
@@ -166,7 +166,7 @@ package PSC.Interpreter.Builtins is
       with procedure Invoke_After_Call is Do_Nothing;
    package Two_Input_Builtin is
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
    private
@@ -188,7 +188,7 @@ package PSC.Interpreter.Builtins is
       with procedure Invoke_After_Call is Do_Nothing;
    package Three_Input_Builtin is
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
    private
@@ -212,7 +212,7 @@ package PSC.Interpreter.Builtins is
       with procedure Invoke_After_Call is Do_Nothing;
    package Four_Input_Builtin is
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
    private
@@ -238,7 +238,7 @@ package PSC.Interpreter.Builtins is
       with procedure Invoke_After_Call is Do_Nothing;
    package Five_Input_Builtin is
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
    private
@@ -266,7 +266,7 @@ package PSC.Interpreter.Builtins is
       with procedure Invoke_After_Call is Do_Nothing;
    package Six_Input_Builtin is
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
    private
@@ -287,7 +287,7 @@ package PSC.Interpreter.Builtins is
       with procedure Invoke_After_Call is Do_Nothing;
    package Assign_Op_Builtin is
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
    private

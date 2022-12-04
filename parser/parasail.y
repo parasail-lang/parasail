@@ -133,7 +133,6 @@
 %token INTERFACE_kw
 %token IS_kw
 %token LAMBDA_kw
-%token LIMITED_kw
 %token LOCKED_kw
 %token LOOP_kw
 %token MOD_kw
@@ -527,7 +526,7 @@ class_qualifier :
                Source_Pos => $1.Source_Pos,
 	       Is_Concurrent => True, others => False);
       }
-    | LIMITED_kw {
+    | REF_kw {
 	$$ := (Construct_Qualifier, 
                Source_Pos => $1.Source_Pos,
 	       Is_Limited => True, others => False);
@@ -2148,17 +2147,15 @@ operation_input :
              Operand => $2.Tree),
 	  Param_Default => $3.Tree))));
     }
-  | '<' opt_input_mode value_formal '>' {
-	$$ := $3;
-	-- Set Is_Implicit_Module_Param and input-mode info on each parameter
+  | '<' value_formal '>' {
+	$$ := $2;
+	-- Set Is_Implicit_Module_Param on each parameter
 	for I in 1..Lists.Length($$.List) loop
 	  declare
 	    Param_Decl_Tree : Param_Decl.Tree renames
 	      Param_Decl.Tree(Tree_Ptr_Of(Lists.Nth_Element($$.List, I)).all);
 	  begin
 	    Param_Decl_Tree.Is_Implicit_Module_Param := True;
-	    Param_Decl_Tree.Kind := $2.Param_Kind;
-	    Param_Decl_Tree.Locking := $2.Param_Locking;
 	  end;
 	end loop;
     }

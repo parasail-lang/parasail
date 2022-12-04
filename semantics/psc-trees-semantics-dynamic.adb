@@ -5563,6 +5563,9 @@ package body PSC.Trees.Semantics.Dynamic is
          end loop;
       end if;  --  Has at least one component
 
+      --  TBD: Fill in Interface_Op_Maps array with op-maps
+      --       for each (explicitly) implemented interface.
+
       if Type_Desc.Is_Small then
          --  If floating point, set Null_Value to Null_Float_Value;
          --  If wrapper, use underlying type Null value.
@@ -6570,7 +6573,9 @@ package body PSC.Trees.Semantics.Dynamic is
                Nested_Types => Ancestors,
                Num_Nested_Objs => 0,
                Nested_Objs => null,
-               Operations => null); --  TBD
+               Operations => null,  --  TBD
+               Num_Interface_Op_Maps => 0,
+               Interface_Op_Maps => null);
 
             Poly_Type_Desc_Index : Type_Sem_Vectors.Elem_Index;
             use type Type_Sem_Vectors.Elem_Index;

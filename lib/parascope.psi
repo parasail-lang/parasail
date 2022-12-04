@@ -399,7 +399,7 @@ abstract interface PSC::Analysis::Value_Set<> is
      // This means Is_Empty should return #true if Might_Be_Null is #false.
    func Is_Empty(Value_Set) -> Boolean
    op "=?"(Left, Right : Value_Set) -> Ordering
-   func Hash(Value_Set) -> Univ_Integer
+   func Hash(Value_Set) -> Unsigned_64
    func To_String(Value_Set) -> Univ_String
    optional func From_String(Univ_String) -> optional Value_Set
 end interface PSC::Analysis::Value_Set
@@ -407,7 +407,7 @@ end interface PSC::Analysis::Value_Set
 abstract interface PSC::Analysis::Value_Number<> is
    //  Value numbers are all extensions of this root interface
    //  TBD: Add a "type" field to all value numbers?
-   func Hash(Value_Number) -> Univ_Integer
+   func Hash(Value_Number) -> Unsigned_64
    op "=?"(Left, Right : Value_Number) -> Ordering
 
    optional func Child_Vec(Value_Number) -> optional Vector<VN_Id>
@@ -660,7 +660,7 @@ interface PSC::Analysis::Boolean_Value_Set<> extends Value_Set is
            and then Left.Might_Be_Null >= Right.Might_Be_Null? #greater :
          #unordered)
 
-   func Hash(Vals : Boolean_Value_Set) -> Univ_Integer
+   func Hash(Vals : Boolean_Value_Set) -> Unsigned_64
      is ((Vals.Might_Be_True - Boolean::First())*2 +
          (Vals.Might_Be_False - Boolean::First()))
 
@@ -687,7 +687,7 @@ interface PSC::Analysis::Countable_Value_Set<> extends Value_Set is
    func Is_Empty(Vals : Countable_Value_Set) -> Boolean
      is (not Vals.Might_Be_Null and then Is_Empty(Vals.Possible_Values))
 
-   func Hash(Vals : Countable_Value_Set) -> Univ_Integer
+   func Hash(Vals : Countable_Value_Set) -> Unsigned_64
      is ((Vals.Might_Be_Null - Boolean::First())*100 + |Vals.Possible_Values|)
 
    op "=?"(Left, Right : Countable_Value_Set) -> Ordering
@@ -741,7 +741,7 @@ interface PSC::Analysis::Object_Value_Set<> extends Value_Set is
            and then Left.Might_Be_Null >= Right.Might_Be_Null? #greater :
          #unordered)
 
-   func Hash(Vals : Object_Value_Set) -> Univ_Integer
+   func Hash(Vals : Object_Value_Set) -> Unsigned_64
      is ((Vals.Might_Be_Non_Null - Boolean::First())*2 +
          (Vals.Might_Be_Null - Boolean::First()))
 
@@ -757,7 +757,7 @@ abstract interface PSC::Analysis::Literal_VN<>
    type Literal_Kind is Enum<[#Null, #Univ_String, #Univ_Enumeration,
             #Univ_Integer, #Univ_Real, #Univ_Character, #Boolean]>;
    func Kind(L : Literal_VN) -> Literal_Kind;
-   func Hash(L : Literal_VN) -> Univ_Integer;
+   func Hash(L : Literal_VN) -> Unsigned_64;
    op "=?"(Left, Right : Literal_VN) -> Ordering;
 
    optional func Compute_Value_Set
@@ -775,7 +775,7 @@ interface PSC::Analysis::Null_Literal_VN<>
                             //  Make the null unique so its value is not lost
                             //  when used as an LLVM value number.
    func Kind(L : Null_Literal_VN) -> Literal_Kind is (#Null);
-   func Hash(L : Null_Literal_VN) -> Univ_Integer is
+   func Hash(L : Null_Literal_VN) -> Unsigned_64 is
      (L.Origin is null? 0 : Hash(L.Origin));
    op "=?"(Left, Right : Null_Literal_VN) -> Ordering is
       (Left.Origin is null or else Right.Origin is null?
@@ -794,7 +794,7 @@ interface PSC::Analysis::String_Literal_VN<>
    extends PSC::Analysis::Literal_VN is
    const Value : Univ_String;
    func Kind(L : String_Literal_VN) -> Literal_Kind is (#Univ_String);
-   func Hash(L : String_Literal_VN) -> Univ_Integer is (Hash(L.Value));
+   func Hash(L : String_Literal_VN) -> Unsigned_64 is (Hash(L.Value));
    op "=?"(Left, Right : String_Literal_VN) -> Ordering is
       (Left.Value =? Right.Value);
    func To_String(L : String_Literal_VN) -> Univ_String
@@ -805,7 +805,7 @@ interface PSC::Analysis::Enum_Literal_VN
    extends PSC::Analysis::Literal_VN is
    const Value : Univ_Enumeration;
    func Kind(L : Enum_Literal_VN) -> Literal_Kind is (#Univ_Enumeration);
-   func Hash(L : Enum_Literal_VN) -> Univ_Integer is (Hash(L.Value));
+   func Hash(L : Enum_Literal_VN) -> Unsigned_64 is (Hash(L.Value));
    op "=?"(Left, Right : Enum_Literal_VN) -> Ordering is
       ((Left.Value =? Right.Value));
    func To_String(L : Enum_Literal_VN) -> Univ_String
@@ -816,7 +816,7 @@ interface PSC::Analysis::Int_Literal_VN<>
    extends PSC::Analysis::Literal_VN is
    const Value : Univ_Integer;
    func Kind(L : Int_Literal_VN) -> Literal_Kind is (#Univ_Integer);
-   func Hash(L : Int_Literal_VN) -> Univ_Integer is (L.Value);
+   func Hash(L : Int_Literal_VN) -> Unsigned_64 is (L.Value);
    op "=?"(Left, Right : Int_Literal_VN) -> Ordering is
       (Left.Value =? Right.Value);
    
@@ -837,7 +837,7 @@ interface PSC::Analysis::Real_Literal_VN<>
    extends PSC::Analysis::Literal_VN is
    const Value : Univ_Real;
    func Kind(L : Real_Literal_VN) -> Literal_Kind is (#Univ_Real);
-   func Hash(L : Real_Literal_VN) -> Univ_Integer is (Hash(L.Value));
+   func Hash(L : Real_Literal_VN) -> Unsigned_64 is (Hash(L.Value));
    op "=?"(Left, Right : Real_Literal_VN) -> Ordering is
       (Left.Value =? Right.Value);
    func To_String(L : Real_Literal_VN) -> Univ_String
@@ -848,7 +848,7 @@ interface PSC::Analysis::Char_Literal_VN<>
    extends PSC::Analysis::Literal_VN is
    const Value : Univ_Character;
    func Kind(L : Char_Literal_VN) -> Literal_Kind is (#Univ_Character);
-   func Hash(L : Char_Literal_VN) -> Univ_Integer is (Hash(L.Value));
+   func Hash(L : Char_Literal_VN) -> Unsigned_64 is (Hash(L.Value));
    op "=?"(Left, Right : Char_Literal_VN) -> Ordering is
       (Left.Value =? Right.Value);
    func To_String(L : Char_Literal_VN) -> Univ_String
@@ -859,7 +859,7 @@ interface PSC::Analysis::Bool_Literal_VN<>
    extends PSC::Analysis::Literal_VN is
    const Value : Boolean
    func Kind(L : Bool_Literal_VN) -> Literal_Kind is (#Boolean);
-   func Hash(L : Bool_Literal_VN) -> Univ_Integer is (Hash(L.Value));
+   func Hash(L : Bool_Literal_VN) -> Unsigned_64 is (Hash(L.Value));
    op "=?"(Left, Right : Bool_Literal_VN) -> Ordering is
       (Left.Value =? Right.Value);
    func To_String(L : Bool_Literal_VN) -> Univ_String
@@ -890,7 +890,7 @@ interface PSC::Analysis::Named_Selector_VN<>
 
    func Kind(Named_Selector_VN) -> Selector_Kind is (#named)
 
-   func Hash(S : Named_Selector_VN) -> Univ_Integer is ([[S.Offset]])
+   func Hash(S : Named_Selector_VN) -> Unsigned_64 is ([[S.Offset]])
    op "=?"(Left, Right : Named_Selector_VN) -> Ordering is
       (Left.Offset =? Right.Offset);
    func To_String(S : Named_Selector_VN) -> Univ_String
@@ -912,7 +912,7 @@ interface PSC::Analysis::Indexed_Selector_VN<>
      is (not S.Is_Indexing_Op? #referenced_part:
          S.Is_Static_Indexing? #static_index: #dynamic_index)
 
-   func Hash(S : Indexed_Selector_VN) -> Univ_Integer
+   func Hash(S : Indexed_Selector_VN) -> Unsigned_64
      is ((for each [I => V] of S.Indexing_Operands => <0> + I * [[V]]))
 
    op "=?"(Left, Right : Indexed_Selector_VN) -> Ordering is
@@ -946,7 +946,7 @@ interface PSC::Analysis::Local_Addr_VN<>
    const BB_Id : CFG::Node_Id  //  Zero for up-level reference
    const Offset : Reflection::Offset_Within_Area
 
-   func Hash(Local_Addr_VN) -> Univ_Integer is (Local_Addr_VN.Offset)
+   func Hash(Local_Addr_VN) -> Unsigned_64 is (Local_Addr_VN.Offset)
 
    op "=?"(Left, Right : Local_Addr_VN) -> Ordering
      is (Left.Level != Right.Level? Left.Level =? Right.Level:
@@ -964,7 +964,7 @@ interface PSC::Analysis::Param_Addr_VN<>
    const BB_Id : CFG::Node_Id  //  Zero for up-level reference
    const Offset : Reflection::Offset_Within_Area
 
-   func Hash(Param_Addr_VN) -> Univ_Integer is (Param_Addr_VN.Offset)
+   func Hash(Param_Addr_VN) -> Unsigned_64 is (Param_Addr_VN.Offset)
 
    op "=?"(Left, Right : Param_Addr_VN) -> Ordering
      is (Left.Level != Right.Level? Left.Level =? Right.Level:
@@ -981,7 +981,7 @@ interface PSC::Analysis::Type_Addr_VN<>
    const Uplevel : Code_Nesting_Level
    const Offset : Reflection::Offset_Within_Area
 
-   func Hash(Type_Addr_VN) -> Univ_Integer is (Type_Addr_VN.Offset)
+   func Hash(Type_Addr_VN) -> Unsigned_64 is (Type_Addr_VN.Offset)
 
    op "=?"(Left, Right : Type_Addr_VN) -> Ordering
      is (Left.Uplevel != Right.Uplevel? Left.Uplevel =? Right.Uplevel:
@@ -996,7 +996,7 @@ interface PSC::Analysis::Const_Area_VN<>
    //  Address of a variable in the Const_Area
    const Offset : Reflection::Offset_Within_Area
 
-   func Hash(Const_Area_VN) -> Univ_Integer is (Const_Area_VN.Offset)
+   func Hash(Const_Area_VN) -> Unsigned_64 is (Const_Area_VN.Offset)
 
    op "=?"(Left, Right : Const_Area_VN) -> Ordering
      is (Left.Offset =? Right.Offset)
@@ -1014,7 +1014,7 @@ interface PSC::Analysis::Component_Addr_VN<>
    const Comp_Type : optional Object_Locator
    const Comp_Might_Be_Null : Boolean
 
-   func Hash(Component_Addr_VN) -> Univ_Integer
+   func Hash(Component_Addr_VN) -> Unsigned_64
      is ([[Component_Addr_VN.Base_Obj]] + [[Component_Addr_VN.Selector]])
 
    op "=?"(Left, Right : Component_Addr_VN) -> Ordering
@@ -1056,7 +1056,7 @@ interface PSC::Analysis::Call_VN<> extends PSC::Analysis::Typed_VN is
 
    //  Use the hashes of all the operands
    //  Multiply by index so that order matters
-   func Hash(C : Call_VN) -> Univ_Integer is
+   func Hash(C : Call_VN) -> Unsigned_64 is
       ([[C.Routine_Id]] +
         (for each [I => Val_Num] of C.Operands => <0> + I * [[Val_Num]]));
 
@@ -1092,7 +1092,7 @@ interface PSC::Analysis::Input_VN<> extends PSC::Analysis::Typed_VN is
    //  Represents the initial value of an input to the operation.
    const Input_Addr : Addr_VN_Id;
 
-   func Hash(I : Input_VN) -> Univ_Integer is ([[I.Input_Addr]]);
+   func Hash(I : Input_VN) -> Unsigned_64 is ([[I.Input_Addr]]);
 
    op "=?"(Left, Right : Input_VN) -> Ordering
      is (Left.Input_Addr =? Right.Input_Addr);
@@ -1116,7 +1116,7 @@ interface PSC::Analysis::Not_Null_VN<> extends PSC::Analysis::Value_Number is
    //  Represents the boolean test "Tested_Val not null"
    const Tested_Val : VN_Id;
 
-   func Hash(N : Not_Null_VN) -> Univ_Integer is ([[N.Tested_Val]]);
+   func Hash(N : Not_Null_VN) -> Unsigned_64 is ([[N.Tested_Val]]);
 
    op "=?"(Left, Right : Not_Null_VN) -> Ordering
      is (Left.Tested_Val =? Right.Tested_Val)
@@ -1152,7 +1152,7 @@ interface PSC::Analysis::Countable_Membership_VN<>
    const Tested_Val : VN_Id;
    const Tested_Set : Countable_Value_Set;
 
-   func Hash(N : Countable_Membership_VN) -> Univ_Integer is ([[N.Tested_Val]]);
+   func Hash(N : Countable_Membership_VN) -> Unsigned_64 is ([[N.Tested_Val]]);
 
    op "=?"(Left, Right : Countable_Membership_VN) -> Ordering
      is (Left.Tested_Val == Right.Tested_Val and then
@@ -1189,7 +1189,7 @@ interface PSC::Analysis::Logical_Not_VN<> extends PSC::Analysis::Value_Number
   is
    const Tested_Val : VN_Id;
 
-   func Hash(N : Logical_Not_VN) -> Univ_Integer is ([[N.Tested_Val]]);
+   func Hash(N : Logical_Not_VN) -> Unsigned_64 is ([[N.Tested_Val]]);
 
    op "=?"(Left, Right : Logical_Not_VN) -> Ordering
      is (Left.Tested_Val =? Right.Tested_Val)
@@ -1225,7 +1225,7 @@ interface PSC::Analysis::Logical_And_VN<> extends PSC::Analysis::Value_Number
    const Left : VN_Id;
    const Right : VN_Id;
 
-   func Hash(N : Logical_And_VN) -> Univ_Integer is ([[N.Left]] + [[N.Right]]);
+   func Hash(N : Logical_And_VN) -> Unsigned_64 is ([[N.Left]] + [[N.Right]]);
 
    op "=?"(Left, Right : Logical_And_VN) -> Ordering
      is (Left.Left != Right.Left?
@@ -1260,7 +1260,7 @@ interface PSC::Analysis::Logical_Or_VN<> extends PSC::Analysis::Value_Number
    const Left : VN_Id;
    const Right : VN_Id;
 
-   func Hash(N : Logical_Or_VN) -> Univ_Integer is ([[N.Left]] + [[N.Right]]);
+   func Hash(N : Logical_Or_VN) -> Unsigned_64 is ([[N.Left]] + [[N.Right]]);
 
    op "=?"(Left, Right : Logical_Or_VN) -> Ordering
      is (Left.Left != Right.Left?
@@ -1294,7 +1294,7 @@ interface PSC::Analysis::Negate_VN<> extends PSC::Analysis::Value_Number
   is
    const Operand : VN_Id;
 
-   func Hash(N : Negate_VN) -> Univ_Integer is ([[N.Operand]]);
+   func Hash(N : Negate_VN) -> Unsigned_64 is ([[N.Operand]]);
 
    op "=?"(Left, Right : Negate_VN) -> Ordering
      is (Left.Operand =? Right.Operand)
@@ -1330,7 +1330,7 @@ interface PSC::Analysis::Addition_VN<> extends PSC::Analysis::Value_Number
    const Left : VN_Id;
    const Right : VN_Id;
 
-   func Hash(N : Addition_VN) -> Univ_Integer is ([[N.Left]] + [[N.Right]]);
+   func Hash(N : Addition_VN) -> Unsigned_64 is ([[N.Left]] + [[N.Right]]);
 
    op "=?"(Left, Right : Addition_VN) -> Ordering
      is (Left.Left != Right.Left?
@@ -1365,7 +1365,7 @@ interface PSC::Analysis::Subtraction_VN<> extends PSC::Analysis::Value_Number
    const Left : VN_Id;
    const Right : VN_Id;
 
-   func Hash(N : Subtraction_VN) -> Univ_Integer is ([[N.Left]] + [[N.Right]]);
+   func Hash(N : Subtraction_VN) -> Unsigned_64 is ([[N.Left]] + [[N.Right]]);
 
    op "=?"(Left, Right : Subtraction_VN) -> Ordering
      is (Left.Left != Right.Left?
@@ -1400,7 +1400,7 @@ interface PSC::Analysis::Condition_Mask_VN<>
    const Tested_Val : VN_Id;
    const Mask : Reflection::Instruction::Condition_Bit_Mask;
 
-   func Hash(N : Condition_Mask_VN) -> Univ_Integer
+   func Hash(N : Condition_Mask_VN) -> Unsigned_64
      is ([[N.Tested_Val]] + N.Mask.To_Rep());
 
    op "=?"(Left, Right : Condition_Mask_VN) -> Ordering
@@ -1438,7 +1438,7 @@ interface PSC::Analysis::Cond_VN<> extends PSC::Analysis::Typed_VN is
    const Then : VN_Id;
    const Else : VN_Id;
 
-   func Hash(C : Cond_VN) -> Univ_Integer is
+   func Hash(C : Cond_VN) -> Unsigned_64 is
       ([[C.Cond]] + 2 * [[C.Then]] + 3 * [[C.Else]]);
 
    op "=?"(Left, Right : Cond_VN) -> Ordering;
@@ -1462,7 +1462,7 @@ interface PSC::Analysis::Phi_VN<> extends PSC::Analysis::Typed_VN is
    const Phi_Addr  : optional Addr_VN_Id      //  Addr if known
 
    //  Use the hashes of Phi_Block and Phi_OID
-   func Hash(P : Phi_VN) -> Univ_Integer is
+   func Hash(P : Phi_VN) -> Unsigned_64 is
       ([[P.Phi_Block]] + 2 * [[P.Phi_OID]]);
 
    op "=?"(Left, Right : Phi_VN) -> Ordering is
@@ -1495,7 +1495,7 @@ interface PSC::Analysis::Aggregate_VN<> extends PSC::Analysis::Typed_VN is
 
    //  Use the hashes of all the components
    //  Multiply by selector so that selector matters
-   func Hash(A : Aggregate_VN) -> Univ_Integer is
+   func Hash(A : Aggregate_VN) -> Unsigned_64 is
       ((for each [Sel => Val] of A.Components => <0> +
          [[Sel]] * [[Val]]));
 
@@ -1540,7 +1540,7 @@ interface PSC::Analysis::Component_Value_VN<>
    const Base_Val : VN_Id;
    const Selector : Component_Selector_VN::Component_Selector_VN_Id
 
-   func Hash(C : Component_Value_VN) -> Univ_Integer is
+   func Hash(C : Component_Value_VN) -> Unsigned_64 is
       ([[C.Base_Val]] + 2 * [[C.Selector]]);
 
    op "=?"(Left, Right : Component_Value_VN) -> Ordering is
@@ -1564,7 +1564,7 @@ interface PSC::Analysis::Copied_VN<> extends PSC::Analysis::Typed_VN is
    const New_OID  : OID;
    const Orig_Val : VN_Id;
 
-   func Hash(C : Copied_VN) -> Univ_Integer
+   func Hash(C : Copied_VN) -> Unsigned_64
       is ([[C.New_OID]])
 
    op "=?"(Left, Right : Copied_VN) -> Ordering is
@@ -1600,7 +1600,7 @@ interface PSC::Analysis::Unknown_VN<> extends PSC::Analysis::Typed_VN is
    //  Just a wrapper around one value
    const Unknown : VN_Id;
 
-   func Hash(U : Unknown_VN) -> Univ_Integer is ([[U.Unknown]]);
+   func Hash(U : Unknown_VN) -> Unsigned_64 is ([[U.Unknown]]);
 
    op "=?"(Left, Right : Unknown_VN) -> Ordering is
       (Left.Unknown =? Right.Unknown);
@@ -1618,7 +1618,7 @@ abstract interface PSC::Analysis::Origin_Info<> is
   // Value numbering maintains two mappings:
   //   Address => Origin
   //   Origin => Value
-   func Hash(Origin_Info) -> Univ_Integer
+   func Hash(Origin_Info) -> Unsigned_64
    op "=?"(Left, Right : Origin_Info) -> Ordering
    func To_String(Origin_Info) -> Univ_String
    optional func From_String(Univ_String) -> optional Origin_Info
@@ -1630,7 +1630,7 @@ interface PSC::Analysis::Code_Origin<>
   //  Object that originates from an instruction
    const Instr : Code_Index
    const Which_Output : Output_Index
-   func Hash(CO : Code_Origin) -> Univ_Integer
+   func Hash(CO : Code_Origin) -> Unsigned_64
      is (Hash(CO.Instr) + Hash(CO.Which_Output))
    op "=?"(Left, Right : Code_Origin) -> Ordering
      is (Left.Instr == Right.Instr? Left.Which_Output =? Right.Which_Output:
@@ -1646,7 +1646,7 @@ interface PSC::Analysis::Phi_Origin<>
   //  Object that originates as a phi-node of a join point in the CFG
    const Phi_Block : CFG::Node_Id
    const Phi_Addr : Addr_VN_Id  // Address of "var"
-   func Hash(PO : Phi_Origin) -> Univ_Integer
+   func Hash(PO : Phi_Origin) -> Unsigned_64
      is (Hash(PO.Phi_Block) + Hash(PO.Phi_Addr))
    op "=?"(Left, Right : Phi_Origin) -> Ordering
      is (Left.Phi_Block == Right.Phi_Block? Left.Phi_Addr =? Right.Phi_Addr:
@@ -1660,7 +1660,7 @@ interface PSC::Analysis::Input_Origin<>
   //  Object that comes from an input parameter, directly or indirectly
    const Input_Addr : Addr_VN_Id  // Param_Addr_VN or Input_VN
 
-   func Hash(IO : Input_Origin) -> Univ_Integer is (Hash(IO.Input_Addr))
+   func Hash(IO : Input_Origin) -> Unsigned_64 is (Hash(IO.Input_Addr))
    op "=?"(Left, Right : Input_Origin) -> Ordering
      is (Left.Input_Addr =? Right.Input_Addr)
    func To_String(IO : Input_Origin) -> Univ_String
@@ -1680,7 +1680,7 @@ interface PSC::Analysis::Updated_Value<> is
 
    //  Imageable operations on Updated_Value
    op "=?"(Left, Right : Updated_Value) -> Ordering
-   func Hash(Updated_Value) -> Univ_Integer
+   func Hash(Updated_Value) -> Unsigned_64
    func To_String(Updated_Value) -> Univ_String
    optional func From_String(Univ_String) -> optional Updated_Value is (null)
 

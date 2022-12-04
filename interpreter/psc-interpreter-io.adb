@@ -81,7 +81,7 @@ package body PSC.Interpreter.IO is
    ----------  Builtin Subprograms  -------------
 
    procedure Append_Output_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Create an Output_Stream which appends to a File
@@ -89,7 +89,7 @@ package body PSC.Interpreter.IO is
    pragma Export (Ada, Append_Output_File, "_psc_append_output_file");
 
    procedure Close_Output_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Close the Output_Stream
@@ -97,7 +97,7 @@ package body PSC.Interpreter.IO is
    pragma Export (Ada, Close_Output_File, "_psc_close_file");
 
    procedure Delete_Output_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Close and Delete the File associated with the Output_Stream
@@ -105,7 +105,7 @@ package body PSC.Interpreter.IO is
    pragma Export (Ada, Delete_Output_File, "_psc_delete_output");
 
    procedure Flush_Output_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Flush the Output_Stream
@@ -113,7 +113,7 @@ package body PSC.Interpreter.IO is
    pragma Export (Ada, Flush_Output_File, "_psc_flush_output_file");
 
    procedure Create_Output_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Create an Output_Stream connected to a File
@@ -121,7 +121,7 @@ package body PSC.Interpreter.IO is
    pragma Export (Ada, Create_Output_File, "_psc_create_output_file");
 
    procedure Open_Input_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Open an Input_Stream connected to a File
@@ -129,7 +129,7 @@ package body PSC.Interpreter.IO is
    pragma Export (Ada, Open_Input_File, "_psc_open_input_file");
 
    procedure Print_To_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Print string to file
@@ -137,7 +137,7 @@ package body PSC.Interpreter.IO is
    pragma Export (Ada, Print_To_File, "_psc_print_to_file");
 
    procedure Print_To_Standard_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Print string to standard output/error file
@@ -145,7 +145,7 @@ package body PSC.Interpreter.IO is
    pragma Export (Ada, Print_To_Standard_File, "_psc_print_to_standard_file");
 
    procedure Flush_Standard_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Flush the Standard_Output_Stream
@@ -153,7 +153,7 @@ package body PSC.Interpreter.IO is
    pragma Export (Ada, Flush_Standard_File, "_psc_flush_standard_file");
 
    procedure Read_From_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Read a line from a file as a string
@@ -161,7 +161,7 @@ package body PSC.Interpreter.IO is
    pragma Export (Ada, Read_From_File, "_psc_read_from_file");
 
    procedure Read_Bytes_From_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Read an array of bytes from file stream.
@@ -170,7 +170,7 @@ package body PSC.Interpreter.IO is
    pragma Export (Ada, Read_Bytes_From_File, "_psc_read_bytes_from_file");
 
    procedure Write_Bytes_To_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Write an array of bytes to file stream.
@@ -178,8 +178,66 @@ package body PSC.Interpreter.IO is
    --   -> Bytes_Written : Stream_Count;
    pragma Export (Ada, Write_Bytes_To_File, "_psc_write_bytes_to_file");
 
+   procedure Write_Obj
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   --  Write_Obj (var Output_Object_Stream; Obj : Obj_Type is Any<>)
+   pragma Export (Ada, Write_Obj, "_psc_write_obj");
+   procedure Write_Optional_Obj
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   --  Write_Optional_Obj
+   --    (var Output_Object_Stream; Obj : optional Obj_Type is Any<>)
+   pragma Export (Ada, Write_Optional_Obj, "_psc_write_optional_obj");
+
+   procedure Write_Default
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   --  Write_Default
+   --    (var Output_Object_Stream; Obj : Obj_Type is Any<>)
+   pragma Export (Ada, Write_Default, "_psc_write_default");
+   procedure Write_Optional_Default
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   --  Write_Optional_Default
+   --    (var Output_Object_Stream; Obj : optional Obj_Type is Any<>)
+   pragma Export (Ada, Write_Optional_Default, "_psc_write_optional_default");
+
+   procedure Read_Obj
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   --  Read_Obj (var Input_Object_Stream; var Obj : Obj_Type is Any<>)
+   pragma Export (Ada, Read_Obj, "_psc_read_obj");
+   procedure Read_Optional_Obj
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   --  Read_Optional_Obj
+   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Any<>)
+   pragma Export (Ada, Read_Optional_Obj, "_psc_read_optional_obj");
+
+   procedure Read_Default
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   --  Read_Default
+   --    (var Input_Object_Stream; var Obj : Obj_Type is Any<>)
+   pragma Export (Ada, Read_Default, "_psc_read_default");
+   procedure Read_Optional_Default
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   --  Read_Optional_Default
+   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Any<>)
+   pragma Export (Ada, Read_Optional_Default, "_psc_read_optional_default");
+
    procedure Set_Exit_Status
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Set_Exit_Status, "_psc_set_exit_status");
@@ -223,7 +281,7 @@ package body PSC.Interpreter.IO is
    ------------------------
 
    procedure Append_Output_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -290,7 +348,7 @@ package body PSC.Interpreter.IO is
    -----------------------
 
    procedure Close_Output_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -327,7 +385,7 @@ package body PSC.Interpreter.IO is
    ------------------------
 
    procedure Delete_Output_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -364,7 +422,7 @@ package body PSC.Interpreter.IO is
    -----------------------
 
    procedure Flush_Output_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -398,7 +456,7 @@ package body PSC.Interpreter.IO is
    -------------------------
 
    procedure Flush_Standard_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -426,7 +484,7 @@ package body PSC.Interpreter.IO is
    ------------------------
 
    procedure Create_Output_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -499,7 +557,7 @@ package body PSC.Interpreter.IO is
    ---------------------
 
    procedure Open_Input_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -556,7 +614,7 @@ package body PSC.Interpreter.IO is
    -------------------
 
    procedure Print_To_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -593,7 +651,7 @@ package body PSC.Interpreter.IO is
    ----------------------------
 
    procedure Print_To_Standard_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Print string to standard output/error file
@@ -632,7 +690,7 @@ package body PSC.Interpreter.IO is
    --------------------
 
    procedure Read_From_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -713,7 +771,7 @@ package body PSC.Interpreter.IO is
    --------------------------
 
    procedure Read_Bytes_From_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Read an array of bytes from file stream.
@@ -773,7 +831,7 @@ package body PSC.Interpreter.IO is
    -------------------------
 
    procedure Write_Bytes_To_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Write an array of bytes to file stream.
@@ -825,8 +883,816 @@ package body PSC.Interpreter.IO is
       Store_Word (Params, 0, Word_Type (Arr_Last - Arr_First + 1));
    end Write_Bytes_To_File;
 
+   -----------------------------------------
+   -- Write_[Optional_]{Obj,Default} --
+   -----------------------------------------
+
+   NYI : exception;
+
+   procedure Write_Obj_To_Stream
+     (Context : in out Exec_Context;
+      Obj_Stream : Word_Type;
+      Obj : Word_Type;
+      Obj_Type : Type_Descriptor_Ptr;
+      Is_Optional, Use_Default : Boolean);
+   --  Write Obj of type Obj_Type to Obj_Stream.
+   --  If Is_Optional is True, then Obj is allowed to be null.
+   --  Is Use_Default is True, then any definition of the "write"
+   --  operation for Obj_Type should be ignored, and the default
+   --  implementation should be used.
+
+   procedure Write_Obj_To_Stream
+     (Context : in out Exec_Context;
+      Obj_Stream : Word_Type;
+      Obj : Word_Type;
+      Obj_Type : Type_Descriptor_Ptr;
+      Is_Optional, Use_Default : Boolean) is
+
+      use Type_Descriptor_Ops;
+
+      Non_Map_Type_Desc : constant Non_Op_Map_Type_Ptr :=
+                           Skip_Over_Op_Map (Obj_Type);
+
+      Debug : constant Boolean := True;
+      use Ada.Text_IO;
+
+   begin  --  Write_Obj_To_Stream
+
+      if not Use_Default then
+         --  TBD: Check if type implements "write" of Custom_Streaming
+         --       interface
+         null;
+      end if;
+
+      if Non_Map_Type_Desc.Is_Wrapper then
+         --  Is a wrapper, recurse with only component
+         Write_Obj_To_Stream
+           (Context,
+            Obj_Stream,
+            Obj,
+            Non_Map_Type_Desc.Components (1).Type_Desc,
+            Is_Optional, Use_Default);
+         return;  --  All done  --
+      end if;
+
+      declare
+         --  (Polymorhic) Value stream is only component of Obj_Stream
+         Val_Stream_Poly_Obj : constant Word_Type :=
+           Fetch_Word (Obj_Stream, Large_Obj_Header_Size);
+
+         --  Get poly type from val stream obj
+         Val_Stream_Poly_Type : constant Type_Descriptor_Ptr :=
+           Large_Obj_Type_Desc (Val_Stream_Poly_Obj);
+         pragma Assert (Val_Stream_Poly_Type.Is_Polymorphic);
+
+         --  Get non-poly type for val stream (might be op-map)
+         Val_Stream_Type : constant Type_Descriptor_Ptr :=
+           Val_Stream_Poly_Type.Components (1).Type_Desc;
+         pragma Assert (not Val_Stream_Type.Is_Polymorphic);
+
+         --  Get underlying non-poly stream obj
+         Val_Stream_Obj : constant Word_Type :=
+           Fetch_Word (Val_Stream_Poly_Obj, Large_Obj_Header_Size);
+
+         --  TBD: We could use non-optional ops if Is_Optional => False.
+
+         Write_Int_Op_Index : constant Operation_Index := 4;
+            --  func Write_Optional_Int
+            --   (var Output_Value_Stream;
+            --    Val : optional Univ_Integer;
+            --    Low, High : Univ_Integer);
+
+         Write_Float_Op_Index : constant Operation_Index := 6;
+            --  func Write_Optional_Float
+            --   (var Output_Value_Stream; Val : optional Univ_Float;
+            --   Digits : Univ_Integer);
+
+         Write_Str_Op_Index : constant Operation_Index := 8;
+            --  func Write_Optional_String
+            --   (var Output_Value_Stream; Val : optional Univ_String;
+            --    Max_Char : Univ_Character;
+            --    Min_Len, Max_Len : Univ_Integer);
+
+         Begin_Seq_Op_Index : constant Operation_Index := 10;
+         --  func Write_Begin_Optional_Seq
+         --        (var Output_Value_Stream;
+         --         Min_Len, Max_Len : Univ_Integer;
+         --         Actual_Len : optional Univ_Integer);
+
+         End_Seq_Op_Index : constant Operation_Index := 11;
+         --  func Write_End_Seq (var Output_Value_Stream;
+         --       Min_Len, Max_Len, Actual_Len : Univ_Integer);
+
+         Begin_Obj_Op_Index : constant Operation_Index := 18;
+         --  func Write_Begin_Optional_Obj
+         --         (var Output_Value_Stream;
+         --          Is_Null : Boolean);
+         End_Obj_Op_Index : constant Operation_Index := 19;
+         --  func Write_End_Obj (var Output_Value_Stream);
+
+         Param_Arr : array (0 .. 4) of aliased Word_Type;
+
+         Op_Index : Operation_Index := 0;
+
+      begin
+
+         --  Initialize val-stream parameter
+         Param_Arr (0) := Val_Stream_Obj;
+
+         if Obj_Type.Type_Kind = Univ_String_Kind then
+            --  write a Univ_String
+            if Debug then
+               Put_Line ('"' &
+                 Univ_Strings.To_String (Univ_Strings.From_Word_Type (Obj))
+                 & '"');
+            end if;
+
+            --  Init rest of params for Write_Optional_String
+            Param_Arr (1) := Obj;
+            Param_Arr (2) := 2**23 - 1;  --  Max_Char TBD
+            Param_Arr (3) := 0;
+            Param_Arr (4) := 2**16 - 1;  --  Max_Len TBD
+            Op_Index := Write_Str_Op_Index;
+
+         elsif Is_Small (Non_Map_Type_Desc) then
+            if Is_Null_Value (Obj, Non_Map_Type_Desc) then
+               if Debug then
+                  Put_Line ("null");
+               end if;
+            else
+               if Debug then
+                  Put_Line (Hex_Image (Obj));
+               end if;
+            end if;
+
+            --  Init "obj" parameter
+            Param_Arr (1) := Obj;
+
+            --  Do type-kind-specific processing
+            case Obj_Type.Type_Kind is
+            when Normal_Kind
+               | Basic_Array_Kind
+               | Univ_String_Kind
+               | Aliased_Object_Kind =>
+               --  These are "large" types
+               raise Program_Error;
+
+            when Univ_Integer_Kind
+               | Univ_Char_Kind  --  TBD
+               | Unsigned_64_Kind  --  TBD
+               | Integer_64_Kind =>  -- TBD
+               --  These are all "integerish" types
+               --  TBD -- need to convert to a real Univ_Integer
+
+               --  Init rest of params for Write_Optional_Integer
+               --  TBD: Low and High could be much larger!
+               Param_Arr (2) := Word_Type'First + Word_Type'(1);
+               Param_Arr (3) := Word_Type'Last;
+               Op_Index := Write_Int_Op_Index;
+
+            when Univ_Real_Kind =>
+               --  Init rest of params for Write_Optional_Float
+               Param_Arr (2) := 15;  --  Digits
+               Op_Index := Write_Float_Op_Index;
+
+            when Univ_Enum_Kind =>
+               raise NYI;
+
+            end case;
+
+         elsif Is_Large_Null (Obj) then
+
+            pragma Assert (Is_Optional);  --  TBD: check earlier as well
+
+            if Non_Map_Type_Desc.Type_Kind = Basic_Array_Kind then
+               Param_Arr (1) := 0;  --  Min_Len
+               Param_Arr (2) := 2**31 - 1;  --  Max_Len
+               Param_Arr (3) := Null_Value;  --  Actual_Len
+               Op_Index := Begin_Seq_Op_Index;
+            else
+               Param_Arr (1) := 1;  -- Is_Null => #true
+               Op_Index := Begin_Obj_Op_Index;
+            end if;
+
+         else
+            --  Non-null large object
+            --  Write each component
+            declare
+               Lock_Obj : constant Lock_Obj_Index :=
+                            Large_Obj_Lock_Obj (Obj);
+            begin
+               if Debug then
+                  Put_Line
+                    ("Large obj at " &
+                     Hex_Image (Obj) &
+                     ", size = " &
+                     Hex_Image (Word_Type (Large_Obj_Size (Obj))));
+                  Put_Line
+                    (" region =" &
+                     Stg_Rgn_Index'Image (Large_Obj_Stg_Rgn_Index (Obj)));
+                  Put_Line
+                    (" type = " &
+                     Strings.To_String (Non_Map_Type_Desc.Name));
+
+                  if Lock_Obj /= 0 then
+                     Put_Line
+                       (" lock =" & Lock_Obj_Index'Image (Lock_Obj));
+                  end if;
+               end if;
+
+               if Non_Map_Type_Desc.Type_Kind = Basic_Array_Kind then
+                  --  write "Basic_Array" components
+                  declare
+                     Comp_Type : constant Type_Descriptor_Ptr :=
+                       Basic_Array_Comp_Type (Non_Map_Type_Desc);
+                     Len : constant Word_Type :=
+                       Content_Of_Virtual_Address
+                          (Obj + Large_Obj_Header_Size);
+
+                  begin
+                     Param_Arr (1) := 0;  --  Min_Len
+                     Param_Arr (2) := 2**16 - 1;  --  Max_Len
+                     Param_Arr (3) := Len;  --  Actual_Len
+                     Execute_Compiled_Nth_Op_Of_Type
+                       (Context => Context,
+                        Params => Param_Arr (0)'Unchecked_Access,
+                        Static_Link => Val_Stream_Type,
+                        Target_Base => Type_Area,
+                        Op_Index => Begin_Seq_Op_Index);
+
+                     for I in 1 .. Offset_Within_Area (Len) loop
+                        declare
+                           Offset : constant Offset_Within_Area :=
+                             Large_Obj_Header_Size + I;
+                           Comp_Value : constant Word_Type :=
+                             Content_Of_Virtual_Address (Obj + Offset);
+                        begin
+                           --  Write each component
+                           Write_Obj_To_Stream
+                             (Context,
+                              Obj_Stream,
+                              Comp_Value,
+                              Comp_Type,
+                              Is_Optional => True,  --  TBD
+                              Use_Default => False);
+                        end;
+                     end loop;
+
+                     Op_Index := End_Seq_Op_Index;
+
+                  end;
+               else
+                  --  Not a "Basic_Array" so each component of a different type
+                  Param_Arr (1) := 0;  --  Is_Null => #false
+                  Execute_Compiled_Nth_Op_Of_Type
+                    (Context => Context,
+                     Params => Param_Arr (0)'Unchecked_Access,
+                     Static_Link => Val_Stream_Type,
+                     Target_Base => Type_Area,
+                     Op_Index => Begin_Obj_Op_Index);
+
+                  for I in 1 .. Non_Map_Type_Desc.Num_Components loop
+                     declare
+                        Comp_Type : constant Non_Op_Map_Type_Ptr :=
+                          Skip_Over_Op_Map
+                             (Non_Map_Type_Desc.Components (I).Type_Desc);
+                        Comp_Value : constant Word_Type :=
+                          Content_Of_Virtual_Address
+                             (Obj +
+                              Large_Obj_Header_Size +
+                              Offset_Within_Area (I - 1));
+                     begin
+                        if Non_Map_Type_Desc.Components (I).Is_By_Ref then
+                           --  TBD -- by-ref component
+                           Put_Line
+                             ("  Ref: " & Hex_Image (Comp_Value));
+                        else
+                           Write_Obj_To_Stream
+                             (Context,
+                              Obj_Stream,
+                              Comp_Value,
+                              Comp_Type,
+                              Is_Optional => True,  --  TBD
+                              Use_Default => False);
+                        end if;
+                     end;
+                  end loop;
+
+                  Op_Index := End_Obj_Op_Index;
+
+               end if;  --  Whether is Basic_Array
+            end;
+         end if;  --  Whether is string, small, or large non-string
+
+         --  Emit the (final) call to the appropriate Value_Stream operation
+         Execute_Compiled_Nth_Op_Of_Type
+           (Context => Context,
+            Params => Param_Arr (0)'Unchecked_Access,
+            Static_Link => Val_Stream_Type,
+            Target_Base => Type_Area,
+            Op_Index => Op_Index);
+
+      end;
+   end Write_Obj_To_Stream;
+
+   procedure Write_Obj
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+   --  Write_Obj (var Output_Object_Stream; Obj : Obj_Type is Any<>)
+      Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
+         --  Implicit module instance with one formal param
+
+      Obj_Type : constant Type_Descriptor_Ptr :=
+        Enclosing_Type.Parameters (1).Data.Type_Desc;
+         --  Type of object
+
+      Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
+      Obj : constant Word_Type := Fetch_Word (Params, 1);
+
+   begin  --  Write_Obj
+      --  Pass the buck to recursive version
+      Write_Obj_To_Stream (Context, Obj_Stream, Obj, Obj_Type,
+        Is_Optional => False, Use_Default => False);
+   end Write_Obj;
+
+   procedure Write_Optional_Obj
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+   --  Write_Optional_Obj
+   --    (var Output_Object_Stream; Obj : optional Obj_Type is Any<>)
+
+      Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
+         --  Implicit module instance with one formal param
+
+      Obj_Type : constant Type_Descriptor_Ptr :=
+        Enclosing_Type.Parameters (1).Data.Type_Desc;
+         --  Type of object
+
+      Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
+      Obj : constant Word_Type := Fetch_Word (Params, 1);
+
+   begin  --  Write_Optional_Obj
+      --  Pass the buck to recursive version
+      Write_Obj_To_Stream (Context, Obj_Stream, Obj, Obj_Type,
+        Is_Optional => True, Use_Default => False);
+   end Write_Optional_Obj;
+
+   procedure Write_Default
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+   --  Write_Default
+   --    (var Output_Object_Stream; Obj : Obj_Type is Any<>)
+      Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
+         --  Implicit module instance with one formal param
+
+      Obj_Type : constant Type_Descriptor_Ptr :=
+        Enclosing_Type.Parameters (1).Data.Type_Desc;
+         --  Type of object
+
+      Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
+      Obj : constant Word_Type := Fetch_Word (Params, 1);
+
+   begin  --  Write_Default
+      --  Pass the buck to recursive version
+      Write_Obj_To_Stream (Context, Obj_Stream, Obj, Obj_Type,
+        Is_Optional => False, Use_Default => True);
+   end Write_Default;
+
+   procedure Write_Optional_Default
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+   --  Write_Optional_Default
+   --    (var Output_Object_Stream; Obj : optional Obj_Type is Any<>)
+      Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
+         --  Implicit module instance with one formal param
+
+      Obj_Type : constant Type_Descriptor_Ptr :=
+        Enclosing_Type.Parameters (1).Data.Type_Desc;
+         --  Type of object
+
+      Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
+      Obj : constant Word_Type := Fetch_Word (Params, 1);
+
+   begin  --  Write_Optional_Default
+      --  Pass the buck to recursive version
+      Write_Obj_To_Stream (Context, Obj_Stream, Obj, Obj_Type,
+        Is_Optional => True, Use_Default => True);
+   end Write_Optional_Default;
+
+   ----------------------------------------
+   -- Read_[Optional_]{Obj,Default} --
+   ----------------------------------------
+
+   procedure Read_Obj_From_Stream
+     (Context : in out Exec_Context;
+      Obj_Stream : Word_Type;
+      Obj_Ptr : Word_Ptr;
+      Obj_Type : Type_Descriptor_Ptr;
+      Is_Optional, Use_Default : Boolean);
+   --  Read Obj of type Obj_Type from Obj_Stream.
+   --  If Is_Optional is True, then Obj is allowed to be null.
+   --  Is Use_Default is True, then any definition of the "read"
+   --  operation for Obj_Type should be ignored, and the default
+   --  implementation should be used.
+
+   procedure Read_Obj_From_Stream
+     (Context : in out Exec_Context;
+      Obj_Stream : Word_Type;
+      Obj_Ptr : Word_Ptr;
+      Obj_Type : Type_Descriptor_Ptr;
+      Is_Optional, Use_Default : Boolean) is
+
+      use Type_Descriptor_Ops;
+
+      Non_Map_Type_Desc : constant Non_Op_Map_Type_Ptr :=
+                           Skip_Over_Op_Map (Obj_Type);
+
+      Debug : constant Boolean := True;
+      use Ada.Text_IO;
+
+   begin  --  Read_Obj_From_Stream
+
+      if not Use_Default then
+         --  TBD: Check if type implements "read" of Custom_Streaming
+         --       interface
+         null;
+      end if;
+
+      if Non_Map_Type_Desc.Is_Wrapper then
+         --  Is a wrapper, recurse with only component
+         Read_Obj_From_Stream
+           (Context,
+            Obj_Stream,
+            Obj_Ptr,
+            Non_Map_Type_Desc.Components (1).Type_Desc,
+            Is_Optional, Use_Default);
+         return;  --  All done  --
+      end if;
+
+      declare
+         --  (Polymorhic) Value stream is only component of Obj_Stream
+         Val_Stream_Poly_Obj : constant Word_Type :=
+           Fetch_Word (Obj_Stream, Large_Obj_Header_Size);
+
+         --  Get poly type from val stream obj
+         Val_Stream_Poly_Type : constant Type_Descriptor_Ptr :=
+           Large_Obj_Type_Desc (Val_Stream_Poly_Obj);
+         pragma Assert (Val_Stream_Poly_Type.Is_Polymorphic);
+
+         --  Get non-poly type for val stream (might be op-map)
+         Val_Stream_Type : constant Type_Descriptor_Ptr :=
+           Val_Stream_Poly_Type.Components (1).Type_Desc;
+         pragma Assert (not Val_Stream_Type.Is_Polymorphic);
+
+         --  Get underlying non-poly stream obj
+         Val_Stream_Obj : constant Word_Type :=
+           Fetch_Word (Val_Stream_Poly_Obj, Large_Obj_Header_Size);
+
+         Null_For_Obj : constant Word_Type :=
+           Null_Of_Same_Stg_Rgn (Obj_Type, Obj_Ptr.all);
+            --  Null to use for output slot
+
+         Result : Word_Type := Null_For_Obj;
+
+         Read_Int_Op_Index : constant Operation_Index := 4;
+            --  func Read_Optional_Int
+            --   (var Input_Value_Stream;
+            --    Low, High : Univ_Integer) -> optional Univ_Integer;
+
+         Read_Float_Op_Index : constant Operation_Index := 6;
+            --  func Read_Optional_Float
+            --   (var Input_Value_Stream;
+            --   Digits : Univ_Integer) -> optional Univ_Real;
+
+         Read_Str_Op_Index : constant Operation_Index := 8;
+            --  func Read_Optional_String
+            --   (var Input_Value_Stream;
+            --    Max_Char : Univ_Character;
+            --    Min_Len, Max_Len : Univ_Integer) -> optional Univ_String;
+
+         Begin_Seq_Op_Index : constant Operation_Index := 10;
+         --  func Read_Begin_Optional_Seq
+         --        (var Input_Value_Stream;
+         --         Min_Len, Max_Len : Univ_Integer)
+         --         -> Actual_Len : optional Univ_Integer;
+
+         End_Seq_Op_Index : constant Operation_Index := 12;
+         --  func Read_End_Seq (var Input_Value_Stream;
+         --       Min_Len, Max_Len) -> Actual_Len : Univ_Integer;
+
+         Begin_Obj_Op_Index : constant Operation_Index := 21;
+         --  func Read_Begin_Optional_Obj
+         --         (var Input_Value_Stream) -> Boolean;
+         End_Obj_Op_Index : constant Operation_Index := 22;
+         --  func Read_End_Obj (var Input_Value_Stream);
+
+         Param_Arr : array (0 .. 4) of aliased Word_Type;
+
+         Op_Index : Operation_Index := 0;
+
+      begin
+
+         --  Initialize output slot and val-stream parameter
+         Param_Arr (0) := Null_For_Obj;
+         Param_Arr (1) := Val_Stream_Obj;
+
+         if Obj_Type.Type_Kind = Univ_String_Kind then
+            --  read a Univ_String
+            --  Init rest of params for Read_Optional_String
+            Param_Arr (2) := 2**23 - 1;  --  Max_Char TBD
+            Param_Arr (3) := 0;
+            Param_Arr (4) := 2**16 - 1;  --  Max_Len TBD
+            Op_Index := Read_Str_Op_Index;
+
+         elsif Is_Small (Non_Map_Type_Desc) then
+            --  Init output slot
+            case Obj_Type.Type_Kind is
+            when Normal_Kind
+               | Basic_Array_Kind
+               | Univ_String_Kind
+               | Aliased_Object_Kind =>
+               --  These are "large" types
+               raise Program_Error;
+
+            when Univ_Integer_Kind
+               | Univ_Char_Kind  --  TBD
+               | Unsigned_64_Kind  --  TBD
+               | Integer_64_Kind =>  -- TBD
+               --  These are all "integerish" types
+               --  TBD -- need to convert to a real Univ_Integer
+
+               --  Init rest of params for Read_Optional_Integer
+               --  TBD: Low and High could be much larger!
+               Param_Arr (2) := Word_Type'First + Word_Type'(1);
+               Param_Arr (3) := Word_Type'Last;
+               Op_Index := Read_Int_Op_Index;
+
+            when Univ_Real_Kind =>
+               --  Init rest of params for Read_Optional_Float
+               Param_Arr (2) := 15;  --  Digits
+               Op_Index := Read_Float_Op_Index;
+
+            when Univ_Enum_Kind =>
+               raise NYI;
+
+            end case;
+
+            Execute_Compiled_Nth_Op_Of_Type
+              (Context => Context,
+               Params => Param_Arr (0)'Unchecked_Access,
+               Static_Link => Val_Stream_Type,
+               Target_Base => Type_Area,
+               Op_Index => Op_Index);
+
+            --  Get result from output slot.
+            Result := Param_Arr (0);
+
+         else
+            --  Read large object
+            --  Read each component
+            declare
+               Existing_Lock_Obj : constant Lock_Obj_Index :=
+                            (if Is_Large_Null (Obj_Ptr.all)
+                             then 0 else Large_Obj_Lock_Obj (Obj_Ptr.all));
+            begin
+               if Debug then
+                  Put_Line
+                    ("Read Large obj, target = " &
+                     Hex_Image (Obj_Ptr.all));
+                  Put_Line
+                    (" region =" &
+                     Stg_Rgn_Index'Image
+                       (Large_Obj_Stg_Rgn_Index (Obj_Ptr.all)));
+                  Put_Line
+                    (" type = " &
+                     Strings.To_String (Non_Map_Type_Desc.Name));
+
+                  if Existing_Lock_Obj /= 0 then
+                     Put_Line
+                       (" lock =" & Lock_Obj_Index'Image (Existing_Lock_Obj));
+                  end if;
+               end if;
+
+               if Non_Map_Type_Desc.Type_Kind = Basic_Array_Kind then
+                  --  read Length and then "Basic_Array" components
+                  declare
+                     Comp_Type : constant Type_Descriptor_Ptr :=
+                       Basic_Array_Comp_Type (Non_Map_Type_Desc);
+                     Len : Word_Type := 0;
+                  begin
+                     Param_Arr (0) := 0;  --  Output slot
+                     Param_Arr (2) := 0;  --  Min_Len
+                     Param_Arr (3) := 2**16 - 1;  --  Max_Len
+                     Execute_Compiled_Nth_Op_Of_Type
+                       (Context => Context,
+                        Params => Param_Arr (0)'Unchecked_Access,
+                        Static_Link => Val_Stream_Type,
+                        Target_Base => Type_Area,
+                        Op_Index => Begin_Seq_Op_Index);
+
+                     Len := Param_Arr (0);  --  Get Actual_Len
+
+                     if Len = Null_Value then
+                        --  Result is null
+                        Result := Null_For_Obj;
+                        return;  --  All done  --
+                     end if;
+
+                     Result := Create_Basic_Array_Obj
+                       (Array_Type_Desc => Non_Map_Type_Desc,
+                        Array_Len => Integer (Len),
+                        Stg_Rgn => Stg_Rgn_Of_Large_Obj (Obj_Ptr.all),
+                        Server_Index => Context.Server_Index);
+
+                     --  Now read in the elements
+                     for I in 1 .. Offset_Within_Area (Len) loop
+                        declare
+                           Offset : constant Offset_Within_Area :=
+                             Large_Obj_Header_Size + I;
+                           Comp_Value_Ptr : constant Word_Ptr :=
+                             Word_To_Word_Ptr (Result + Offset);
+                        begin
+                           --  Read each component
+                           Read_Obj_From_Stream
+                             (Context,
+                              Obj_Stream,
+                              Comp_Value_Ptr,
+                              Comp_Type,
+                              Is_Optional => True,  --  TBD
+                              Use_Default => False);
+                        end;
+                     end loop;
+
+                     Op_Index := End_Seq_Op_Index;
+
+                  end;
+               else
+                  --  Not a "Basic_Array" so each component of a different type
+                  Param_Arr (0) := 0;  --  output slot tells if null
+                  Execute_Compiled_Nth_Op_Of_Type
+                    (Context => Context,
+                     Params => Param_Arr (0)'Unchecked_Access,
+                     Static_Link => Val_Stream_Type,
+                     Target_Base => Type_Area,
+                     Op_Index => Begin_Obj_Op_Index);
+
+                  if Param_Arr (0) = 1 then
+                     --  Is_Null == #true
+                     Result := Null_For_Obj;
+                     return;  --  All done  --
+                  end if;
+
+                  --  Create the object
+                  Result := Create_Large_Obj
+                    (Type_Desc => Obj_Type,
+                     Stg_Rgn => Stg_Rgn_Of_Large_Obj (Obj_Ptr.all),
+                     Server_Index => Context.Server_Index);
+
+                  for I in 1 .. Non_Map_Type_Desc.Num_Components loop
+                     declare
+                        Comp_Type : constant Non_Op_Map_Type_Ptr :=
+                          Skip_Over_Op_Map
+                             (Non_Map_Type_Desc.Components (I).Type_Desc);
+                        Comp_Value_Ptr : constant Word_Ptr :=
+                          Word_To_Word_Ptr
+                            (Result + Large_Obj_Header_Size +
+                                   Offset_Within_Area (I - 1));
+                     begin
+                        if Non_Map_Type_Desc.Components (I).Is_By_Ref then
+                           --  TBD -- by-ref component
+                           Put_Line
+                             ("  Ref: " & Hex_Image (Comp_Value_Ptr.all));
+                        else
+                           Read_Obj_From_Stream
+                             (Context,
+                              Obj_Stream,
+                              Comp_Value_Ptr,
+                              Comp_Type,
+                              Is_Optional => True,  --  TBD
+                              Use_Default => False);
+                        end if;
+                     end;
+                  end loop;
+
+                  Op_Index := End_Obj_Op_Index;
+
+               end if;  --  Whether is Basic_Array
+
+               --  Emit the (final) call to the appropriate
+               --  "End" Value_Stream operation
+               Execute_Compiled_Nth_Op_Of_Type
+                 (Context => Context,
+                  Params => Param_Arr (0)'Unchecked_Access,
+                  Static_Link => Val_Stream_Type,
+                  Target_Base => Type_Area,
+                  Op_Index => Op_Index);
+
+            end;
+         end if;  --  Whether is string, small, or large non-string
+
+         Obj_Ptr.all := Result;
+
+      end;
+
+   end Read_Obj_From_Stream;
+
+   procedure Read_Obj
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+   --  Read_Obj (var Input_Object_Stream; var Obj : Obj_Type is Any<>)
+      Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
+         --  Implicit module instance with one formal param
+
+      Obj_Type : constant Type_Descriptor_Ptr :=
+        Enclosing_Type.Parameters (1).Data.Type_Desc;
+         --  Type of object
+
+      Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
+      Obj_Ptr : constant Word_Ptr := Fetch_Word_Ptr (Params, 1);
+
+   begin  --  Read_Obj
+      --  Pass the buck to recursive version
+      Read_Obj_From_Stream (Context, Obj_Stream, Obj_Ptr, Obj_Type,
+        Is_Optional => False, Use_Default => False);
+   end Read_Obj;
+
+   procedure Read_Optional_Obj
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+   --  Read_Optional_Obj
+   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Any<>)
+      Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
+         --  Implicit module instance with one formal param
+
+      Obj_Type : constant Type_Descriptor_Ptr :=
+        Enclosing_Type.Parameters (1).Data.Type_Desc;
+         --  Type of object
+
+      Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
+      Obj_Ptr : constant Word_Ptr := Fetch_Word_Ptr (Params, 1);
+
+   begin  --  Read_Optional_Obj
+      --  Pass the buck to recursive version
+      Read_Obj_From_Stream (Context, Obj_Stream, Obj_Ptr, Obj_Type,
+        Is_Optional => True, Use_Default => False);
+   end Read_Optional_Obj;
+
+   procedure Read_Default
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+   --  Read_Default
+   --    (var Input_Object_Stream; var Obj : Obj_Type is Any<>)
+      Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
+         --  Implicit module instance with one formal param
+
+      Obj_Type : constant Type_Descriptor_Ptr :=
+        Enclosing_Type.Parameters (1).Data.Type_Desc;
+         --  Type of object
+
+      Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
+      Obj_Ptr : constant Word_Ptr := Fetch_Word_Ptr (Params, 1);
+
+   begin  --  Read_Default
+      --  Pass the buck to recursive version
+      Read_Obj_From_Stream (Context, Obj_Stream, Obj_Ptr, Obj_Type,
+        Is_Optional => False, Use_Default => True);
+   end Read_Default;
+
+   procedure Read_Optional_Default
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+   --  Read_Optional_Default
+   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Any<>)
+      Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
+         --  Implicit module instance with one formal param
+
+      Obj_Type : constant Type_Descriptor_Ptr :=
+        Enclosing_Type.Parameters (1).Data.Type_Desc;
+         --  Type of object
+
+      Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
+      Obj_Ptr : constant Word_Ptr := Fetch_Word_Ptr (Params, 1);
+
+   begin  --  Read_Default
+      --  Pass the buck to recursive version
+      Read_Obj_From_Stream (Context, Obj_Stream, Obj_Ptr, Obj_Type,
+        Is_Optional => True, Use_Default => True);
+   end Read_Optional_Default;
+
+   ----------------------
+   --  Set_Exit_Status --
+   ----------------------
+
    procedure Set_Exit_Status
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       Exit_Code : constant Word_Type := Fetch_Word (Params, 1);
@@ -888,6 +1754,38 @@ begin
    Register_Builtin
      (String_Lookup ("#read_bytes_from_file"),
       Read_Bytes_From_File'Access);
+
+   Register_Builtin
+     (String_Lookup ("#write_obj"),
+      Write_Obj'Access);
+
+   Register_Builtin
+     (String_Lookup ("#write_optional_obj"),
+      Write_Optional_Obj'Access);
+
+   Register_Builtin
+     (String_Lookup ("#write_default"),
+      Write_Default'Access);
+
+   Register_Builtin
+     (String_Lookup ("#write_optional_default"),
+      Write_Optional_Default'Access);
+
+   Register_Builtin
+     (String_Lookup ("#read_obj"),
+      Read_Obj'Access);
+
+   Register_Builtin
+     (String_Lookup ("#read_optional_obj"),
+      Read_Optional_Obj'Access);
+
+   Register_Builtin
+     (String_Lookup ("#read_default"),
+      Read_Default'Access);
+
+   Register_Builtin
+     (String_Lookup ("#read_optional_default"),
+      Read_Optional_Default'Access);
 
    Register_Builtin
      (String_Lookup ("#set_exit_status"),

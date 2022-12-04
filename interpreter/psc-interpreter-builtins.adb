@@ -56,7 +56,7 @@ package body PSC.Interpreter.Builtins is
    --------------------------- Local Subprograms  ----------------------------
 
    procedure Assert_True
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  func Assert(Boolean, Univ_String).
@@ -64,21 +64,21 @@ package body PSC.Interpreter.Builtins is
    pragma Export (Ada, Assert_True, "_psc_assert_true");
 
    procedure Assign_Concat_Char
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Concatenate univ-char onto "universal" string
    pragma Export (Ada, Assign_Concat_Char, "_psc_assign_concat_char");
 
    procedure Assign_Concat_String
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Concatenate one "universal" string on to end of another
    pragma Export (Ada, Assign_Concat_String, "_psc_assign_concat_string");
 
    procedure Basic_Array_Create
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Create an array of given length and initial element value
@@ -87,7 +87,7 @@ package body PSC.Interpreter.Builtins is
    pragma Export (Ada, Basic_Array_Create, "_psc_basic_array_create");
 
    procedure Basic_Array_Indexing
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Index into a basic array, return ref.
@@ -96,7 +96,7 @@ package body PSC.Interpreter.Builtins is
    pragma Export (Ada, Basic_Array_Indexing, "_psc_basic_array_indexing");
 
    procedure Basic_Array_Length
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Return length of basic array
@@ -104,7 +104,7 @@ package body PSC.Interpreter.Builtins is
    pragma Export (Ada, Basic_Array_Length, "_psc_basic_array_length");
 
    procedure Bit_Not
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Bit-wise not
@@ -120,39 +120,39 @@ package body PSC.Interpreter.Builtins is
    pragma Export (Ada, Unsigned_Exponentiate_Op, "_psc_uns_exp_op");
 
    procedure To_String_Unsigned
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, To_String_Unsigned, "_psc_to_string_uns");
 
    procedure From_String_Unsigned
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, From_String_Unsigned, "_psc_from_string_uns");
 
    procedure Bool_From_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  "from_univ"(Univ_Enumeration) -> Boolean
    pragma Export (Ada, Bool_From_Univ, "_psc_bool_from_univ");
 
    procedure Bool_Not
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Boolean not
 
    procedure Bool_To_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  "to_univ"(Boolean) -> Univ_Enumeration
    pragma Export (Ada, Bool_To_Univ, "_psc_bool_to_univ");
 
    procedure Clock_Current_Time
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  func Current_Time(C : Clock) -> Time
@@ -160,7 +160,7 @@ package body PSC.Interpreter.Builtins is
    pragma Export (Ada, Clock_Current_Time, "_psc_clock_current_time");
 
    procedure Clock_Delay
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  func Wait_For_Delay(queued C : Clock; Until : Time)
@@ -169,180 +169,180 @@ package body PSC.Interpreter.Builtins is
    pragma Export (Ada, Clock_Delay, "_psc_clock_delay");
 
    procedure Concat_Char
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Concatenate "universal" string with univ-char
    pragma Export (Ada, Concat_Char, "_psc_concat_char");
 
    procedure Concat_Char_Str
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Concatenate univ-char with "universal" string
    pragma Export (Ada, Concat_Char_Str, "_psc_concat_char_str");
 
    procedure Concat_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Concatenate "universal" string with string image of int
    pragma Export (Ada, Concat_Int, "_psc_concat_int");
 
    procedure Concat_Int_Str
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Concatenate string image of int with "universal" string
    pragma Export (Ada, Concat_Int_Str, "_psc_concat_int_str");
 
    procedure Concat_Real
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Concatenate "universal" string with string image of real
    pragma Export (Ada, Concat_Real, "_psc_concat_real");
 
    procedure Concat_Real_Str
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Concatenate string image of real with "universal" string
    pragma Export (Ada, Concat_Real_Str, "_psc_concat_real_str");
 
    procedure Concat_String
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Concatenate two "universal" strings
    pragma Export (Ada, Concat_String, "_psc_concat_string");
 
    procedure Direction_From_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  "from_univ"(Univ_Enumeration) -> Direction
    pragma Export (Ada,  Direction_From_Univ, "_psc_direction_from_univ");
 
    procedure Direction_To_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  "to_univ"(Direction) -> Univ_Enumeration
    pragma Export (Ada, Direction_To_Univ, "_psc_direction_to_univ");
 
    procedure Fixed_Real_Div
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  op "/"(Left : Fixed; Right : Univ_Real) -> Fixed
    pragma Export (Ada, Fixed_Real_Div, "_psc_fixed_real_div");
 
    procedure Fixed_Real_Mul
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  op "*"(Left : Fixed; Right : Univ_Real) -> Fixed
    pragma Export (Ada, Fixed_Real_Mul, "_psc_fixed_real_mul");
 
    procedure From_String_Char
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Convert univ string to univ char
    pragma Export (Ada, From_String_Char, "_psc_from_string_char");
 
    procedure From_String_Real
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Convert univ string to univ real
    pragma Export (Ada, From_String_Real, "_psc_from_string_real");
 
    procedure Identity
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Identity function
 
    procedure Int_To_Real
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  func Int_To_Real(Int : Univ_Integer) -> Univ_Real
 
    procedure From_String_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Convert univ string to univ int
    pragma Export (Ada, From_String_Int, "_psc_from_string_int");
 
    procedure No_Op
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Do nothing; this presumes any outputs are initialized to an appropriate
    --  sort of "null."
 
    procedure Ordering_From_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  "from_univ"(Univ_Enumeration) -> Ordering
    pragma Export (Ada, Ordering_From_Univ, "_psc_ordering_from_univ");
 
    procedure Ordering_To_Bool
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  "to_bool"(Ordering, Cond_Mask) -> Boolean
    pragma Export (Ada, Ordering_To_Bool, "_psc_ordering_to_bool");
 
    procedure Ordering_To_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  "to_univ"(Ordering) -> Univ_Enumeration
    pragma Export (Ada, Ordering_To_Univ, "_psc_ordering_to_univ");
 
    procedure Print_Char
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Print char value of Param 0 as a string
    pragma Export (Ada, Print_Char, "_psc_print_char");
 
    procedure Print_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Print int value of Param 0 as a string
    pragma Export (Ada, Print_Int, "_psc_print_int");
 
    procedure Print_String
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Print value of Param 0 presuming it is a Univ_String using large rep
    pragma Export (Ada, Print_String, "_psc_print_string");
 
    procedure Print_Real
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Print real value of Param 0 as a string
    pragma Export (Ada, Print_Real, "_psc_print_real");
 
    procedure Print_Univ_Enum
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Print univ-enum value of Param 0 as a string
    pragma Export (Ada, Print_Univ_Enum, "_psc_print_univ_enum");
 
    procedure Println_String
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Print value of Param 0 presuming it is a Univ_String, followed by a
@@ -350,34 +350,34 @@ package body PSC.Interpreter.Builtins is
    pragma Export (Ada, Println_String, "_psc_println_string");
 
    procedure Read_String
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Read string from standard input; return null at EOF; assume large rep.
    pragma Export (Ada, Read_String, "_psc_read_string");
 
    procedure Hash_Enum
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Hash_Enum, "_psc_hash_enum");
 
    procedure To_String_Enum
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, To_String_Enum, "_psc_to_string_enum");
    --  Convert Univ_Enumeration into Univ_String
 
    procedure From_String_Enum
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, From_String_Enum, "_psc_from_string_enum");
    --  Convert Univ_String into Univ_Enumeration
 
    procedure Hash_String
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Hash_String, "_psc_hash_string");
@@ -392,7 +392,7 @@ package body PSC.Interpreter.Builtins is
    --  Use Word_Type as exponent for univ-real "**" operator
 
    procedure Real_Fixed_Mul
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  op "*"(Left : Univ_Real; Right : Fixed) -> Fixed
@@ -407,32 +407,32 @@ package body PSC.Interpreter.Builtins is
    --  Provide univ-real * int operation
 
    procedure Round_To_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  func Round_To_Int(Real : Univ_Real) -> Univ_Integer
 
    procedure Trunc_To_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  func Trunc_To_Int(Real : Univ_Real) -> Univ_Integer
 
    procedure Floor_To_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  func Floor_To_Int(Real : Univ_Real) -> Univ_Integer
 
    procedure String_Compare
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  String "=?" operator
    pragma Export (Ada, String_Compare, "_psc_string_compare");
 
    procedure String_Indexing
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  String "indexing" operator (Univ_String, Univ_Integer) -> Univ_Char
@@ -440,7 +440,7 @@ package body PSC.Interpreter.Builtins is
    pragma Export (Ada, String_Indexing, "_psc_string_indexing");
 
    procedure String_Length
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  String Length func (Univ_String) -> Univ_Integer
@@ -448,7 +448,7 @@ package body PSC.Interpreter.Builtins is
    pragma Export (Ada, String_Length, "_psc_string_length");
 
    procedure String_Slicing
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  String "slicing" operator (Univ_String, Univ_Integer) -> Univ_Char
@@ -456,14 +456,14 @@ package body PSC.Interpreter.Builtins is
    pragma Export (Ada, String_Slicing, "_psc_string_slicing");
 
    procedure Time_Int_From_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  op "from_univ"(Univ : Univ_Real) -> Time_Interval
    pragma Export (Ada, Time_Int_From_Univ, "_psc_time_int_from_univ");
 
    procedure Time_Int_To_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  op "to_univ"(Val : Time_Interval) -> Univ_Real
@@ -476,21 +476,21 @@ package body PSC.Interpreter.Builtins is
    --  Return a count of nanos from start of epoch
 
    procedure To_String_Char
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Convert univ-char to univ-string
    pragma Export (Ada, To_String_Char, "_psc_to_string_char");
 
    procedure To_String_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Convert univ int to univ string
    pragma Export (Ada, To_String_Int, "_psc_to_string_int");
 
    procedure To_String_Real
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Convert univ-real to univ-string
@@ -509,7 +509,7 @@ package body PSC.Interpreter.Builtins is
    pragma Export (Ada, Univ_Real_Min, "_psc_univ_real_min_op");
 
    procedure Unordered_Compare
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Unordered "=?" operator (returns #equal or #unordered)
@@ -565,7 +565,7 @@ package body PSC.Interpreter.Builtins is
    package body Unary_Builtin is
       --  Body of generic package to introduce a unary builtin routine
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       begin
@@ -582,7 +582,7 @@ package body PSC.Interpreter.Builtins is
    package body Binary_Builtin is
       --  Body of generic package to introduce a binary builtin routine
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       begin
@@ -601,7 +601,7 @@ package body PSC.Interpreter.Builtins is
       --  Body of generic package to introduce a
       --  three-input, one-output builtin routine
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       begin
@@ -622,7 +622,7 @@ package body PSC.Interpreter.Builtins is
       --  Body of generic package to introduce a
       --  three-input, one-output builtin routine
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       begin
@@ -643,7 +643,7 @@ package body PSC.Interpreter.Builtins is
    package body One_Input_Builtin is
       --  Body of generic package to introduce a builtin routine with one input
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       begin
@@ -659,7 +659,7 @@ package body PSC.Interpreter.Builtins is
    package body Two_Input_Builtin is
       --  Body of generic package to define a builtin routine with two inputs
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       begin
@@ -676,7 +676,7 @@ package body PSC.Interpreter.Builtins is
    package body Three_Input_Builtin is
       --  Body of generic package to define a builtin routine with three inputs
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       begin
@@ -694,7 +694,7 @@ package body PSC.Interpreter.Builtins is
    package body Four_Input_Builtin is
       --  Body of generic package to define a builtin routine with four inputs
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       begin
@@ -713,7 +713,7 @@ package body PSC.Interpreter.Builtins is
    package body Five_Input_Builtin is
       --  Body of generic package to define a builtin routine with five inputs
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       begin
@@ -733,7 +733,7 @@ package body PSC.Interpreter.Builtins is
    package body Six_Input_Builtin is
       --  Body of generic package to define a builtin routine with six inputs
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       begin
@@ -755,7 +755,7 @@ package body PSC.Interpreter.Builtins is
       --  Body of generic package to define a builtin "assign-op" routine
       --  which updates the Left operand with result of "Left op Right"
       procedure Builtin_Routine
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
          --  Builtin "op=" operator
@@ -803,7 +803,7 @@ package body PSC.Interpreter.Builtins is
    ---------------
 
    procedure Print_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -817,7 +817,7 @@ package body PSC.Interpreter.Builtins is
    ----------------
 
    procedure Print_Real
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -831,7 +831,7 @@ package body PSC.Interpreter.Builtins is
    ------------------
 
    procedure Print_String
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -855,7 +855,7 @@ package body PSC.Interpreter.Builtins is
    --------------------
 
    procedure Println_String
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -868,7 +868,7 @@ package body PSC.Interpreter.Builtins is
    ----------------
 
    procedure Print_Char
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -891,7 +891,7 @@ package body PSC.Interpreter.Builtins is
    ---------------------
 
    procedure Print_Univ_Enum
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Print univ-enum value of Param 0 as a string
@@ -910,7 +910,7 @@ package body PSC.Interpreter.Builtins is
    -----------------
 
    procedure Read_String
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -936,7 +936,7 @@ package body PSC.Interpreter.Builtins is
    -----------------
 
    procedure Hash_Enum
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       Index : constant Word_Type := Fetch_Word (Params, 1);
@@ -949,7 +949,7 @@ package body PSC.Interpreter.Builtins is
    --------------------
 
    procedure To_String_Enum
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Convert Univ_Enumeration into Univ_String, convert null into "null"
@@ -971,7 +971,7 @@ package body PSC.Interpreter.Builtins is
    ----------------------
 
    procedure From_String_Enum
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Convert Univ_String into Univ_Enumeration
@@ -986,7 +986,7 @@ package body PSC.Interpreter.Builtins is
    -------------------
 
    procedure Hash_String
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       Str : constant Word_Type := Fetch_Word (Params, 1);
@@ -1000,7 +1000,7 @@ package body PSC.Interpreter.Builtins is
    -----------------
 
    procedure Assert_True
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -1124,13 +1124,13 @@ package body PSC.Interpreter.Builtins is
      ("""**""", Word_Type_Exponentiate);
 
    procedure Int_Exponentiate_Exported
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Int_Exponentiate_Exported, "_psc_int_exponentiate");
 
    procedure Int_Exponentiate_Exported
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -1158,14 +1158,14 @@ package body PSC.Interpreter.Builtins is
      ("""**=""", Word_Type_Exponentiate);
 
    procedure Int_Assign_Exponentiate_Exported
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Int_Assign_Exponentiate_Exported,
                   "_psc_int_assign_exponentiate");
 
    procedure Int_Assign_Exponentiate_Exported
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -1337,14 +1337,14 @@ package body PSC.Interpreter.Builtins is
         new Binary_Univ_Int_Assign_Op ("#univ_assign_divide", "/");
 
       procedure Print_Univ_Int
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
       --  Print int value of Param 0 as a string
       pragma Export (Ada, Print_Univ_Int, "_psc_print_univ_int");
 
       procedure Univ_Integer_First
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
       --  func First() -> Univ_Integer
@@ -1353,7 +1353,7 @@ package body PSC.Interpreter.Builtins is
       pragma Export (Ada, Univ_Integer_First, "_psc_univ_integer_first");
 
       procedure Univ_Integer_Last
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
       --  func Last() -> Univ_Integer
@@ -1362,13 +1362,13 @@ package body PSC.Interpreter.Builtins is
       pragma Export (Ada, Univ_Integer_Last, "_psc_univ_integer_last");
 
       procedure From_String_Univ_Int
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
       pragma Export (Ada, From_String_Univ_Int, "_psc_from_string_univ_int");
 
       procedure To_String_Univ_Int
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
       pragma Export (Ada, To_String_Univ_Int, "_psc_to_string_univ_int");
@@ -1415,13 +1415,13 @@ package body PSC.Interpreter.Builtins is
         "_psc_uns_subtract_returns_univ_op");
 
       procedure Unsigned_From_Univ
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
       pragma Export (Ada, Unsigned_From_Univ, "_psc_uns_from_univ");
 
       procedure Unsigned_To_Univ
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr);
       pragma Export (Ada, Unsigned_To_Univ, "_psc_uns_to_univ");
@@ -1534,7 +1534,7 @@ package body PSC.Interpreter.Builtins is
       ------------------------
 
       procedure Univ_Integer_First
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       --  TBD: Actually could be even bigger
@@ -1547,7 +1547,7 @@ package body PSC.Interpreter.Builtins is
       -----------------------
 
       procedure Univ_Integer_Last
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Last() -> Univ_Integer
@@ -1668,7 +1668,7 @@ package body PSC.Interpreter.Builtins is
       -----------------------
 
       procedure Integer_From_Univ
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       begin
@@ -1682,7 +1682,7 @@ package body PSC.Interpreter.Builtins is
       ---------------------
 
       procedure Integer_To_Univ
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
          use Univ_Strings;
@@ -1697,7 +1697,7 @@ package body PSC.Interpreter.Builtins is
       ------------------------
 
       procedure Unsigned_From_Univ
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
       begin
@@ -1711,7 +1711,7 @@ package body PSC.Interpreter.Builtins is
       ----------------------
 
       procedure Unsigned_To_Univ
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
          use Univ_Strings;
@@ -1726,7 +1726,7 @@ package body PSC.Interpreter.Builtins is
       ------------------------
 
       procedure To_String_Univ_Int
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
          Target : constant Word_Type := Fetch_Word (Params, 0);
@@ -1746,7 +1746,7 @@ package body PSC.Interpreter.Builtins is
       --------------------------
 
       procedure From_String_Univ_Int
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr) is
          use Univ_Strings;
@@ -1757,7 +1757,7 @@ package body PSC.Interpreter.Builtins is
       end From_String_Univ_Int;
 
       procedure Print_Univ_Int
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Params : Word_Ptr;
          Static_Link : Non_Op_Map_Type_Ptr)
       is
@@ -1801,13 +1801,13 @@ package body PSC.Interpreter.Builtins is
       with function Bit_Op
              (Left, Right : Unsigned_Word_Type) return Unsigned_Word_Type;
    procedure Binary_Bit_Op
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Generic to represent simple binary operation on a word of bits
 
    procedure Binary_Bit_Op
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -1830,7 +1830,7 @@ package body PSC.Interpreter.Builtins is
    -------------
 
    procedure Bit_Not
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -1967,7 +1967,7 @@ package body PSC.Interpreter.Builtins is
    ------------------------
 
    procedure To_String_Unsigned
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       Target : constant Word_Type := Fetch_Word (Params, 0);
@@ -1987,7 +1987,7 @@ package body PSC.Interpreter.Builtins is
    --------------------------
 
    procedure From_String_Unsigned
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       use Univ_Strings;
@@ -2003,13 +2003,13 @@ package body PSC.Interpreter.Builtins is
    generic
       with function Bool_Op (Left, Right : Boolean) return Boolean;
    procedure Binary_Bool_Op
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Generic to represent simple boolean binary operation on words
 
    procedure Binary_Bool_Op
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -2032,7 +2032,7 @@ package body PSC.Interpreter.Builtins is
    --------------
 
    procedure Bool_Not
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -2052,7 +2052,7 @@ package body PSC.Interpreter.Builtins is
    --------------------
 
    procedure Bool_From_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2084,7 +2084,7 @@ package body PSC.Interpreter.Builtins is
    ------------------
 
    procedure Bool_To_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2130,7 +2130,7 @@ package body PSC.Interpreter.Builtins is
    ------------------------
 
    procedure Ordering_From_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2169,7 +2169,7 @@ package body PSC.Interpreter.Builtins is
    ----------------------
 
    procedure Ordering_To_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2192,7 +2192,7 @@ package body PSC.Interpreter.Builtins is
    ----------------------
 
    procedure Ordering_To_Bool
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2213,7 +2213,7 @@ package body PSC.Interpreter.Builtins is
    -------------------------
 
    procedure Direction_From_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2250,7 +2250,7 @@ package body PSC.Interpreter.Builtins is
    -----------------------
 
    procedure Direction_To_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2272,7 +2272,7 @@ package body PSC.Interpreter.Builtins is
    -----------------------
 
    procedure Unordered_Compare
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2294,7 +2294,7 @@ package body PSC.Interpreter.Builtins is
    --------------
 
    procedure Identity
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -2308,7 +2308,7 @@ package body PSC.Interpreter.Builtins is
    -----------
 
    procedure No_Op
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -2320,7 +2320,7 @@ package body PSC.Interpreter.Builtins is
    -------------------
 
    procedure Concat_String
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       use Univ_Strings;
@@ -2341,7 +2341,7 @@ package body PSC.Interpreter.Builtins is
    --------------------------
 
    procedure Assign_Concat_String
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       use Univ_Strings;
@@ -2358,7 +2358,7 @@ package body PSC.Interpreter.Builtins is
    ----------------
 
    procedure Concat_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       use Univ_Strings;
@@ -2380,7 +2380,7 @@ package body PSC.Interpreter.Builtins is
    --------------------
 
    procedure Concat_Int_Str
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       use Univ_Strings;
@@ -2402,7 +2402,7 @@ package body PSC.Interpreter.Builtins is
    -------------------
 
    procedure To_String_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       Target : constant Word_Type := Fetch_Word (Params, 0);
@@ -2421,7 +2421,7 @@ package body PSC.Interpreter.Builtins is
    ---------------------
 
    procedure From_String_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       use Univ_Strings;
@@ -2436,7 +2436,7 @@ package body PSC.Interpreter.Builtins is
    -----------------
 
    procedure Concat_Real
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       use Univ_Strings;
@@ -2458,7 +2458,7 @@ package body PSC.Interpreter.Builtins is
    ---------------------
 
    procedure Concat_Real_Str
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       use Univ_Strings;
@@ -2480,7 +2480,7 @@ package body PSC.Interpreter.Builtins is
    --------------------
 
    procedure To_String_Real
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       Target : constant Word_Type := Fetch_Word (Params, 0);
@@ -2499,7 +2499,7 @@ package body PSC.Interpreter.Builtins is
    ----------------------
 
    procedure From_String_Real
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       use Univ_Strings;
@@ -2516,7 +2516,7 @@ package body PSC.Interpreter.Builtins is
    -----------------
 
    procedure Concat_Char
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       Target : constant Word_Type := Fetch_Word (Params, 0);
@@ -2536,7 +2536,7 @@ package body PSC.Interpreter.Builtins is
    ------------------------
 
    procedure Assign_Concat_Char
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       Target_Ptr : constant Word_Ptr := Fetch_Word_Ptr (Params, 0);
@@ -2556,7 +2556,7 @@ package body PSC.Interpreter.Builtins is
    ---------------------
 
    procedure Concat_Char_Str
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       Target : constant Word_Type := Fetch_Word (Params, 0);
@@ -2577,7 +2577,7 @@ package body PSC.Interpreter.Builtins is
    --------------------
 
    procedure To_String_Char
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       Target : constant Word_Type := Fetch_Word (Params, 0);
@@ -2606,7 +2606,7 @@ package body PSC.Interpreter.Builtins is
    ----------------------
 
    procedure From_String_Char
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2633,7 +2633,7 @@ package body PSC.Interpreter.Builtins is
    ---------------------
 
    procedure String_Indexing
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2651,7 +2651,7 @@ package body PSC.Interpreter.Builtins is
    --------------------
 
    procedure String_Slicing
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2685,7 +2685,7 @@ package body PSC.Interpreter.Builtins is
    -------------------
 
    procedure String_Length
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2699,7 +2699,7 @@ package body PSC.Interpreter.Builtins is
    --------------------
 
    procedure String_Compare
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2715,7 +2715,7 @@ package body PSC.Interpreter.Builtins is
    ------------------------
 
    procedure Basic_Array_Create
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2786,7 +2786,7 @@ package body PSC.Interpreter.Builtins is
    --------------------------
 
    procedure Basic_Array_Indexing
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -2853,7 +2853,7 @@ package body PSC.Interpreter.Builtins is
    ------------------------
 
    procedure Basic_Array_Length
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -3056,7 +3056,7 @@ package body PSC.Interpreter.Builtins is
    ------------------------
 
    procedure Time_Int_From_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -3072,7 +3072,7 @@ package body PSC.Interpreter.Builtins is
    ----------------------
 
    procedure Time_Int_To_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -3094,7 +3094,7 @@ package body PSC.Interpreter.Builtins is
    ------------------
 
    procedure Round_To_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -3110,7 +3110,7 @@ package body PSC.Interpreter.Builtins is
    ------------------
 
    procedure Trunc_To_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -3126,7 +3126,7 @@ package body PSC.Interpreter.Builtins is
    ------------------
 
    procedure Floor_To_Int
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -3142,7 +3142,7 @@ package body PSC.Interpreter.Builtins is
    -----------------
 
    procedure Int_To_Real
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -3165,7 +3165,7 @@ package body PSC.Interpreter.Builtins is
    --------------------
 
    procedure Fixed_Real_Mul
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -3180,7 +3180,7 @@ package body PSC.Interpreter.Builtins is
    --------------------
 
    procedure Real_Fixed_Mul
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -3195,7 +3195,7 @@ package body PSC.Interpreter.Builtins is
    --------------------
 
    procedure Fixed_Real_Div
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -3293,7 +3293,7 @@ package body PSC.Interpreter.Builtins is
    ------------------------
 
    procedure Clock_Current_Time
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -3305,7 +3305,7 @@ package body PSC.Interpreter.Builtins is
    -----------------
 
    procedure Clock_Delay
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is

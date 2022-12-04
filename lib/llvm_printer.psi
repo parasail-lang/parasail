@@ -155,7 +155,7 @@ interface PSC::LLVM_Func_Key<> is
       Left.Block_Region != Right.Block_Region?
         Left.Block_Region =? Right.Block_Region :
         Left.Start_Src_Pos =? Right.Start_Src_Pos);
-   func Hash(LLVM_Func_Key) -> Univ_Integer is
+   func Hash(LLVM_Func_Key) -> Unsigned_64 is
      (Hash(LLVM_Func_Key.PSVM_Routine) +
        Hash(LLVM_Func_Key.Block_Region) +
        Hash(LLVM_Func_Key.Start_Src_Pos))

@@ -35,7 +35,7 @@ package body PSC.Interpreter.Sparkel_Builtins is
      Strings.Index (Strings.String_Lookup ("#False"));
 
    procedure Bool_From_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  "from_univ"(Univ_Enumeration) -> Boolean
@@ -63,7 +63,7 @@ package body PSC.Interpreter.Sparkel_Builtins is
    end Bool_From_Univ;
 
    procedure Bool_To_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  "to_univ"(Boolean) -> Univ_Enumeration

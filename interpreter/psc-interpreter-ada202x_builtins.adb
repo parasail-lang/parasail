@@ -43,14 +43,14 @@ package body PSC.Interpreter.Ada202x_Builtins is
    Debug_Access_Types : constant Boolean := True;
 
    procedure Bool_From_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
       --  "from_univ"(Univ_Enumeration) -> Boolean
    pragma Export (Ada, Bool_From_Univ, "_psc_ada202x_bool_from_univ");
 
    procedure Bool_To_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
       --  "to_univ"(Boolean) -> Univ_Enumeration
@@ -59,7 +59,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    --------
 
    procedure Raise_Exception_Occurrence
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Raise_Exception_Occurrence,
@@ -67,7 +67,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
       --  func Raise_Exception_Occurrence(Exception_Type'Class)
 
    procedure Exception_Name
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Exception_Name,
@@ -77,7 +77,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    --------
 
    procedure Allocate_From_Pool
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
       --  func Allocate
@@ -87,14 +87,14 @@ package body PSC.Interpreter.Ada202x_Builtins is
    pragma Export (Ada, Allocate_From_Pool, "_psc_allocate_from_pool");
 
    procedure Tick_Access
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
       --  func Tick_Access (Ali : in out Aliased_Obj) return Acc
    pragma Export (Ada, Tick_Access, "_psc_tick_access");
 
    procedure Deref_Var
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
       --  func Deref (Acc)
@@ -102,7 +102,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    pragma Export (Ada, Deref_Var, "_psc_deref_var");
 
    procedure Deref_Const
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
       --  func Deref_Const (Acc)
@@ -112,33 +112,33 @@ package body PSC.Interpreter.Ada202x_Builtins is
    ------------------------
 
    procedure Atomic_Set_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Atomic_Set_Value, "_psc_atomic_set_value");
 
    procedure Atomic_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Atomic_Value, "_psc_atomic_value");
 
    procedure Atomic_Exchange
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Atomic_Exchange,
      "_psc_atomic_exchange");
 
    procedure Atomic_Compare_And_Exchange
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Atomic_Compare_And_Exchange,
      "_psc_atomic_compare_and_exchange");
 
    procedure Atomic_Fetch_And_Add
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Atomic_Fetch_And_Add, "_psc_atomic_fetch_and_add");
@@ -152,7 +152,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
      Strings.Index (Strings.String_Lookup ("#False"));
 
    procedure Bool_From_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  "from_univ"(Univ_Enumeration) -> Boolean
@@ -180,7 +180,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    end Bool_From_Univ;
 
    procedure Bool_To_Univ
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  "to_univ"(Boolean) -> Univ_Enumeration
@@ -200,7 +200,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    ------------------------
 
    procedure Raise_Exception_Occurrence
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Raise_Exception_Occurrence(Exception_Type'Class)
@@ -216,7 +216,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    end Raise_Exception_Occurrence;
 
    procedure Exception_Name
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Exception_Name(Exception_Type'Class) return String
@@ -444,13 +444,13 @@ package body PSC.Interpreter.Ada202x_Builtins is
    end Do_Stg_Rgn_Action;
 
    function Get_Available_Proxy_Id
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Aliased_Obj_Stg_Rgn : Stg_Rgn_Ptr)
      return Word_Type;
    --  Get an available proxy index for specified region.
 
    function Get_Available_Proxy_Id
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Aliased_Obj_Stg_Rgn : Stg_Rgn_Ptr)
      return Word_Type is
    begin
@@ -568,7 +568,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    end Do_Stg_Rgn_Action;
 
    function Get_New_Aliased_Obj
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Pool_Stg_Rgn : Stg_Rgn_Ptr;
       Aliased_Obj_Type : Type_Descriptor_Ptr)
      return Word_Type;
@@ -578,7 +578,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    --    Self field to the proxy index.
 
    function Get_New_Aliased_Obj
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Pool_Stg_Rgn : Stg_Rgn_Ptr;
       Aliased_Obj_Type : Type_Descriptor_Ptr)
      return Word_Type is
@@ -621,7 +621,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    end Get_New_Aliased_Obj;
 
    function Get_Aliased_Obj_Ref
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Acc_Val : Word_Type)
      return Word_Ptr;
    --    If access value is zero or Null_Value
@@ -632,7 +632,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    --    If everything checks out, return a "ref" to the aliased object.
 
    function Get_Aliased_Obj_Ref
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Acc_Val : Word_Type)
      return Word_Ptr is
    begin
@@ -662,7 +662,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    ------------------------
 
    procedure Allocate_From_Pool
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -713,7 +713,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    end Allocate_From_Pool;
 
    procedure Tick_Access
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Tick_Access (Ali : in out Aliased_Obj) return Acc
@@ -781,7 +781,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    end Tick_Access;
 
    procedure Deref_Var
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -803,7 +803,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    end Deref_Var;
 
    procedure Deref_Const
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -899,7 +899,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    end Builtin_Atomic_Compare_Exchange;
 
    procedure Atomic_Set_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -915,7 +915,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    end Atomic_Set_Value;
 
    procedure Atomic_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -929,7 +929,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    end Atomic_Value;
 
    procedure Atomic_Exchange
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -950,7 +950,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    end Atomic_Exchange;
 
    procedure Atomic_Compare_And_Exchange
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
@@ -978,7 +978,7 @@ package body PSC.Interpreter.Ada202x_Builtins is
    end Atomic_Compare_And_Exchange;
 
    procedure Atomic_Fetch_And_Add
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is

@@ -53,7 +53,10 @@ pragma Elaborate (PSC.Vectors);
 
 package PSC.Interpreter is
 
-   Virt_Is_Phys : Boolean := True;
+   --  Whether run-time checks are to be performed
+   Doing_Run_Time_Checks : Boolean := True;
+
+   Virt_Is_Phys : constant Boolean := True;
    --  Set to True to make virtual addrs = physical addrs
 
    type Opcode_Enum is (
@@ -711,6 +714,7 @@ package PSC.Interpreter is
    type Type_Descriptor_Ptr is access all Type_Descriptor;
 
    subtype Non_Op_Map_Type_Ptr is Type_Descriptor_Ptr (Has_Op_Map => False);
+   subtype Op_Map_Type_Ptr is Type_Descriptor_Ptr (Has_Op_Map => True);
 
    procedure Type_Desc_Ptr_Write
      (Stream : access Ada.Streams.Root_Stream_Type'Class;
@@ -1731,7 +1735,7 @@ package PSC.Interpreter is
    --  the number supported by Call_Compiled_Routine (currently 5 inputs)
 
    type Routine_Code_Address is access procedure
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  These are used to point to a built-in or compiled operation
@@ -1743,7 +1747,7 @@ package PSC.Interpreter is
    --  return from non-nested block routine.
 
    type Nested_Blk_Address is access function
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Type_Descriptor_Ptr) return Nested_Block_Outcome_As_Int;
    --  These are used to point to a compiled nested block
@@ -2251,6 +2255,25 @@ package PSC.Interpreter is
    for Operation_Index_Array_Ptr'Write use Operation_Index_Array_Ptr_Write;
    --  Write out the contents of the operation-index array
 
+   type Op_Map_Count is range 0 .. 2**15 - 1;
+
+   type Op_Map_Type_Array is
+     array (Op_Map_Count range <>) of Op_Map_Type_Ptr;
+   type Op_Map_Type_Array_Ptr is access all Op_Map_Type_Array;
+   --  Type used for op-maps for (explicitly) implemented interfaces
+
+   procedure Op_Map_Type_Array_Ptr_Read
+     (Stream : access Ada.Streams.Root_Stream_Type'Class;
+      Item : out Op_Map_Type_Array_Ptr);
+   for Op_Map_Type_Array_Ptr'Read use Op_Map_Type_Array_Ptr_Read;
+   --  Read in the contents of the op-map array
+
+   procedure Op_Map_Type_Array_Ptr_Write
+     (Stream : access Ada.Streams.Root_Stream_Type'Class;
+      Item : Op_Map_Type_Array_Ptr);
+   for Op_Map_Type_Array_Ptr'Write use Op_Map_Type_Array_Ptr_Write;
+   --  Write out the contents of the op-map array
+
    ------------ Type Area Offsets -------------
 
    type Type_Desc_Ref_Kind is (
@@ -2327,6 +2350,7 @@ package PSC.Interpreter is
      Univ_Char_Kind,
      Univ_Enum_Kind,
      Unsigned_64_Kind,
+     Integer_64_Kind,
      Aliased_Object_Kind);
 
    type Type_Descriptor (Has_Op_Map : Boolean) is record
@@ -2420,6 +2444,9 @@ package PSC.Interpreter is
             Nested_Objs            : Const_Info_Array_Ptr;
 
             Operations             : Routine_Info_Array_Ptr;
+
+            Num_Interface_Op_Maps  : Op_Map_Count := 0;
+            Interface_Op_Maps      : Op_Map_Type_Array_Ptr;
 
          when True =>
             Op_Map          : Operation_Index_Array_Ptr;
@@ -2658,7 +2685,7 @@ package PSC.Interpreter is
    --  Initialize allocated space with region/size/null-type.
 
    procedure Assign_Word
-     (Context     : Exec_Context;
+     (Context     : in out Exec_Context;
       Type_Desc   : Type_Descriptor_Ptr;
       Destination : Word_Ptr;
       New_Value   : Word_Type);
@@ -2678,7 +2705,7 @@ package PSC.Interpreter is
    --        subcomponents come from the same region.
 
    function Copy_Object
-     (Context    : Exec_Context;
+     (Context    : in out Exec_Context;
       Type_Desc  : Type_Descriptor_Ptr;
       Object     : Word_Type;
       Stg_Rgn_Of : Word_Type) return Word_Type;
@@ -2723,7 +2750,7 @@ package PSC.Interpreter is
      (Dest_Obj : Object_Virtual_Address; Server_Index : Thread_Server_Index);
    --  Create a lock for object if it doesn't already have one.
 
-   procedure Create_Lock_For_Obj_Exported (Context : Exec_Context;
+   procedure Create_Lock_For_Obj_Exported (Context : in out Exec_Context;
       Dest_Obj : Object_Virtual_Address);
    pragma Export (Ada, Create_Lock_For_Obj_Exported,
       "_psc_create_lock_for_obj");
@@ -2812,7 +2839,7 @@ package PSC.Interpreter is
    --  Return True if given non-null large obj is residing on stack
 
    procedure Make_Copy_In_Stg_Rgn_Exported
-     (Context                 : Exec_Context;
+     (Context                 : in out Exec_Context;
       Type_Info               : Type_Descriptor_Ptr;
       Destination             : Word_Ptr;
       Source                  : Word_Ptr;
@@ -2821,7 +2848,7 @@ package PSC.Interpreter is
       "_psc_make_copy_in_stg_rgn");
 
    procedure Move_Object
-     (Context   : Exec_Context;
+     (Context   : in out Exec_Context;
       Type_Info : Type_Descriptor_Ptr;
       LHS_Ptr   : Word_Ptr;
       RHS_Ptr   : Word_Ptr);
@@ -2841,7 +2868,7 @@ package PSC.Interpreter is
    --  TBD: Farm this out to a separate thread.
 
    procedure Swap_Object_Exported
-     (Context   : Exec_Context;
+     (Context   : in out Exec_Context;
       Type_Info : Type_Descriptor_Ptr;
       LHS_Ptr   : Word_Ptr;
       RHS_Ptr   : Word_Ptr);
@@ -2851,7 +2878,7 @@ package PSC.Interpreter is
    pragma Export (Ada, Swap_Object_Exported, "_psc_swap_object");
 
    procedure Create_Object_Exported
-     (Context      : Exec_Context;
+     (Context      : in out Exec_Context;
       Type_Info    : Type_Descriptor_Ptr;
       Destination  : Word_Ptr;
       Existing_Obj : Word_Ptr);
@@ -2859,14 +2886,14 @@ package PSC.Interpreter is
    pragma Export (Ada, Create_Object_Exported, "_psc_create_object");
 
    function New_Object_Exported
-     (Context      : Exec_Context;
+     (Context      : in out Exec_Context;
       Type_Info    : Type_Descriptor_Ptr;
       Existing_Obj : Word_Type) return Word_Type;
    pragma Export (Ada, New_Object_Exported, "_psc_new_object");
    --  Create new object in region based on Existing_Obj, unless is 0.
 
    procedure Init_Large_Obj_Exported
-     (Context      : Exec_Context;
+     (Context      : in out Exec_Context;
       Type_Info    : Type_Descriptor_Ptr;
       New_Obj      : Word_Type);
    pragma Export (Ada, Init_Large_Obj_Exported, "_psc_init_large_obj");
@@ -2882,7 +2909,7 @@ package PSC.Interpreter is
       "_psc_store_null_of_same_stg_rgn");
 
    procedure Create_Tcb (
-      Context          : Exec_Context;
+      Context          : in out Exec_Context;
       Parallel_Master  : Word_Ptr;
       Parallel_Control : Word_Ptr;
       Num_Params : Integer);
@@ -2895,7 +2922,7 @@ package PSC.Interpreter is
    --   Num_Params : Natural;
 
    function New_Tcb (
-      Context : Exec_Context;
+      Context : in out Exec_Context;
       Parallel_Master : Word_Ptr;
       Num_Params : Integer) return Word_Ptr;
    pragma Export (Ada, New_Tcb, "_psc_new_tcb");
@@ -3015,13 +3042,14 @@ package PSC.Interpreter is
       --  Convert object_locator to two-slot ParaSail representation
       --  given obj-locator type, target object, and server index.
 
-   type Large_Obj (Size : Offset_Within_Area) is private;
-   --  Type used for returning a large object from an "imported" function.
-   --  Intended to match, at least approximately, the representation used
-   --  for large objects in storage regions.
-
-   type Large_Obj_Ptr is access all Large_Obj;
-
+--    type Large_Obj (Size : Offset_Within_Area) is private;
+--    --  Type used for returning a large object from an "imported" function.
+--    --  Intended to match, at least approximately, the representation used
+--    --  for large objects in storage regions.
+--
+--    type Large_Obj_Ptr is access all Large_Obj;
+--    pragma No_Strict_Aliasing (Large_Obj_Ptr);
+--
    type Name_For_Object_Locator_Type is access function
      (Locator : Object_Locator;
       Enclosing_Type : Object_Locator := Null_Object_Locator)
@@ -3044,7 +3072,7 @@ package PSC.Interpreter is
    --  is needed to determine the context.
 
    procedure Call_Through_Operation_Desc_Exported
-     (Context        : Exec_Context;
+     (Context        : in out Exec_Context;
       Operation_Desc : Word_Type;
       Params         : Word_Ptr);
    --  Call a ParaSail routine given the execution context,
@@ -3058,7 +3086,7 @@ package PSC.Interpreter is
 
    function Current_Server_Context
      (Server_Index : Thread_Server_Index := Current_Server_Index)
-     return Exec_Context_Ptr;
+     return Exec_Context_RW_Ptr;
    --  Return pointer to current exec-context for given server
 
    procedure Execute
@@ -3169,7 +3197,7 @@ package PSC.Interpreter is
      "_psc_execute_compiled_parallel_call_op_conv");
 
    procedure Execute_Compiled_Indirect_Parallel_Call_Op (
-      Context : in out Exec_Context;
+      Context            : in out Exec_Context;
       Master_Address     : Word_Ptr;
       New_Tcb            : Word_Ptr;       -- Parallel_Control
       Target_Base        : Area_Base_Indicator;
@@ -3203,7 +3231,7 @@ package PSC.Interpreter is
      "_psc_execute_wait_for_parallel_op");
 
    function Execute_Prepare_To_Exit_Parallel_Op
-     (Context        : Exec_Context;
+     (Context        : in out Exec_Context;
       Master_Address : Word_Ptr) return Boolean;
    --  Execute the Prepare_To_Exit_Parallel_Op instructions
    --  Return True if it succeeds; return False if some other
@@ -3215,7 +3243,7 @@ package PSC.Interpreter is
       "_psc_execute_prepare_to_exit_parallel_op");
 
    procedure Raise_Exception_Occurrence
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Excep_Obj : in out Word_Type);
       --  Raise exception given the exception object
       --  The exception object is moved to the handler's stg-rgn.
@@ -3231,14 +3259,14 @@ package PSC.Interpreter is
    pragma Export
       (Ada, Unwrapped_Polymorphic_Obj, "_psc_unwrapped_polymorphic_obj");
 
-   procedure Create_Polymorphic_Obj (Context : Exec_Context;
+   procedure Create_Polymorphic_Obj (Context : in out Exec_Context;
       Stg_Rgn_For_Creation : Stg_Rgn_Ptr;
       Dest_Addr : Word_Ptr;
       Poly_Type_Desc : Non_Op_Map_Type_Ptr);
    --  Create a polymorphic object
    pragma Export (Ada, Create_Polymorphic_Obj, "_psc_create_polymorphic_obj");
 
-   procedure Create_Poly_Obj_Exported (Context : Exec_Context;
+   procedure Create_Poly_Obj_Exported (Context : in out Exec_Context;
       Existing_Obj : Word_Type;
       Dest_Addr : Word_Ptr;
       Poly_Type_Desc : Non_Op_Map_Type_Ptr);
@@ -3364,7 +3392,7 @@ private
    --  given shared-stg-rgn manager.
 
    procedure Null_Routine_Body
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  This routine does nothing
@@ -3394,24 +3422,56 @@ private
       Is_Nested_Block     => False,
       Internal_Precond_Addr => null);
 
-   type Large_Obj (Size : Offset_Within_Area) is record
-      Stg_Rgn   : Stg_Rgn_Index := 0;    --  16 bit unique region index
-      Type_Info : Type_Index := 0;       --  16 bit unique type index
-      Lock_Obj  : Lock_Obj_Index := 0;   --  15 bit unique lock index
-      On_Stack  : Boolean := False;      --   1 bit is-on-stack flag
+   -------- Header of large objects --------
 
-      Data      : Word_Array (2 .. Size) := (others => 0);
-      --  Rest of large object
+   type Large_Obj_Header is record
+      Size      : Offset_Within_Area := 0; --  64K size limit (in 64-bit words)
+      Stg_Rgn   : Stg_Rgn_Index      := 0; --  16 bit unique region index
+      Type_Info : Type_Index         := 0; --  16 bit unique type index
+      Lock_Obj  : Lock_Obj_Index     := 0; --  15 bit unique lock index
+      On_Stack  : Boolean            := False;  --  1 bit on-stack flag
    end record;
 
-   for Large_Obj use record
-      --  Representation intended to match that used in the Large_Obj header
+   for Large_Obj_Header use record
+      --  NOTE: We are trying to match a pragma Pack
+      --        but with a specified a layout.
       Size      at 0 range  0 .. 15;
       Stg_Rgn   at 0 range 16 .. 31;
       Type_Info at 0 range 32 .. 47;
       Lock_Obj  at 0 range 48 .. 62;
       On_Stack  at 0 range 63 .. 63;
    end record;
+
+   for Large_Obj_Header'Size use Word_Size * Large_Obj_Header_Size;
+
+   type Large_Obj_Header_Ptr is access all Large_Obj_Header;
+   for Large_Obj_Header_Ptr'Storage_Size use 0;  --  not for allocators
+   pragma No_Strict_Aliasing (Large_Obj_Header_Ptr);
+
+--    type Large_Obj (Size : Offset_Within_Area) is record
+--       Stg_Rgn   : Stg_Rgn_Index := 0;    --  16 bit unique region index
+--       Type_Info : Type_Index := 0;       --  16 bit unique type index
+--       Lock_Obj  : Lock_Obj_Index := 0;   --  15 bit unique lock index
+--       On_Stack  : Boolean := False;      --   1 bit is-on-stack flag
+--
+--       Data      : Word_Array (2 .. Size) := (others => 0);
+--       --  Rest of large object
+--    end record;
+--
+--    for Large_Obj use record
+--       --  Representation intended to match that used in the Large_Obj header
+--       Size      at 0 range  0 .. 15;
+--       Stg_Rgn   at 0 range 16 .. 31;
+--       Type_Info at 0 range 32 .. 47;
+--       Lock_Obj  at 0 range 48 .. 62;
+--       On_Stack  at 0 range 63 .. 63;
+--    end record;
+--
+   function To_Large_Obj_Ptr is
+     new Ada.Unchecked_Conversion (Word_Ptr, Large_Obj_Header_Ptr);
+
+   function To_Large_Obj_Ptr is
+     new Ada.Unchecked_Conversion (Word_Type, Large_Obj_Header_Ptr);
 
    function To_Size_In_Words
      (Size_In_Bits : Natural) return Offset_Within_Area;
@@ -3421,6 +3481,165 @@ private
      (Large_Obj_Addr : Object_Virtual_Address;
       Size           : Offset_Within_Area);
    --  Set size in words associated with large object
+
+   --------------------------
+   -- Large_Obj_Header_Ops --
+   --------------------------
+
+   package Large_Obj_Header_Ops is
+
+      function Large_Obj_Lock_Obj
+        (Large_Obj_Addr : Object_Address) return Lock_Obj_Index;
+      --  Return lock-obj index associated with given large obj; zero means it
+      --  doesn't have a lock obj.
+
+      function Large_Obj_Lock_Obj
+        (Large_Obj_Addr : Object_Virtual_Address)
+         return Lock_Obj_Index;
+      --  Return lock-obj index associated with given large obj; zero means it
+      --  doesn't have a lock obj.
+
+      function Large_Obj_Lock_Obj
+        (Large_Obj_Addr : Word_Ptr) return Lock_Obj_Index;
+      --  Return lock-obj index associated with given large obj; zero means it
+      --  doesn't have a lock obj.
+
+      function Large_Obj_Next_Block
+        (Large_Obj_Addr : Object_Virtual_Address)
+         return Object_Virtual_Address;
+      --  Return link to next block in free-block chain
+
+      function Large_Obj_On_Stack
+        (Addr : Object_Virtual_Address) return Boolean;
+      --  Return True if given non-null large obj is residing on stack
+
+      function Large_Obj_Size
+        (Large_Obj_Addr : Object_Address)
+         return Offset_Within_Chunk;
+      --  Return size in words associated with large object
+
+      function Large_Obj_Size
+        (Large_Obj_Addr : Object_Virtual_Address)
+         return Offset_Within_Chunk;
+      --  Return size in words associated with large object
+
+      function Large_Obj_Size
+        (Large_Obj_Addr : Word_Ptr) return Offset_Within_Chunk;
+      --  Return size in words associated with large object
+
+      function Large_Obj_Stg_Rgn_Index
+        (Large_Obj_Addr : Object_Virtual_Address)
+         return Stg_Rgn_Index;
+      --  Return region index associated with (possibly null) large object
+
+      function Large_Obj_Stg_Rgn_Index
+        (Large_Obj_Addr : Word_Ptr) return Stg_Rgn_Index;
+      --  Return region associated with large object
+
+      function Large_Obj_Type_Info
+        (Large_Obj_Addr : Object_Address)
+         return Type_Index;
+      --  Return type index associated with given large obj; zero means it is a
+      --  large "null."
+
+      function Large_Obj_Type_Info
+        (Large_Obj_Addr : Object_Virtual_Address)
+         return Type_Index;
+      --  Return type index associated with given large obj;
+
+      function Large_Obj_Type_Info_Is_In_Range
+        (Large_Obj_Addr : Object_Virtual_Address)
+         return Boolean;
+      --  Return True if type info of given large object is in range of
+      --  existing type indices. This is for debugging mostly.
+
+      procedure Set_Large_Obj_Header
+        (Large_Obj_Addr : Object_Address;
+         Size           : Offset_Within_Area;
+         Stg_Rgn_Id     : Stg_Rgn_Index;
+         Type_Id        : Type_Index;
+         Lock_Obj       : Lock_Obj_Index := 0;
+         On_Stack       : Boolean := False);
+      --  Fill in header given large object address, and size/region/type
+      --  information
+
+      procedure Set_Large_Obj_Header
+        (Large_Obj_Addr : Object_Virtual_Address;
+         Size           : Offset_Within_Area;
+         Stg_Rgn_Id     : Stg_Rgn_Index;
+         Type_Id        : Type_Index;
+         Lock_Obj       : Lock_Obj_Index := 0;
+         On_Stack       : Boolean := False);
+      --  Fill in header given large object address, and size/region/type
+      --  information
+
+      procedure Set_Large_Obj_Lock_Obj
+        (Large_Obj_Addr : Object_Address;
+         Lock_Obj       : Lock_Obj_Index);
+      --  Set lock obj associated with large object
+
+      procedure Set_Large_Obj_Lock_Obj
+        (Large_Obj_Addr : Object_Virtual_Address;
+         Lock_Obj       : Lock_Obj_Index);
+      --  Set lock obj associated with large object
+
+      procedure Set_Large_Obj_Lock_Obj
+        (Large_Obj_Addr : Word_Ptr;
+         Lock_Obj       : Lock_Obj_Index);
+      --  Set lock obj associated with large object
+
+      procedure Set_Large_Obj_Next_Block
+        (Large_Obj_Addr : Object_Address;
+         Next_Block     : Object_Virtual_Address);
+      --  Set link to next block in free-block chain
+
+      procedure Set_Large_Obj_Next_Block
+        (Large_Obj_Addr : Object_Virtual_Address;
+         Next_Block     : Object_Virtual_Address);
+      --  Set link to next block in free-block chain
+
+      procedure Set_Large_Obj_On_Stack
+        (Large_Obj_Addr : Object_Virtual_Address;
+         On_Stack       : Boolean);
+      --  Indicate whether given object resides on stack rather than in stg rgn
+
+      procedure Set_Large_Obj_Size
+        (Large_Obj_Addr : Object_Address;
+         Size           : Offset_Within_Area);
+      --  Set size in words associated with large object
+
+      procedure Set_Large_Obj_Size
+        (Large_Obj_Addr : Object_Virtual_Address;
+         Size           : Offset_Within_Area);
+      --  Set size in words associated with large object
+
+      procedure Set_Large_Obj_Stg_Rgn_Index
+        (Large_Obj_Addr : Object_Virtual_Address;
+         Stg_Rgn_Id     : Stg_Rgn_Index);
+      --  Set region associated with large object
+
+      procedure Set_Large_Obj_Type_Info
+        (Large_Obj_Addr : Object_Address;
+         Type_Id        : Type_Index);
+      --  Set type associated with large object
+
+      procedure Set_Large_Obj_Type_Info
+        (Large_Obj_Addr : Object_Virtual_Address;
+         Type_Id        : Type_Index);
+      --  Set type associated with large object
+
+      function To_Large_Obj_Ptr
+        (Large_Obj_Addr : Object_Address)
+         return Large_Obj_Header_Ptr;
+      --  Convert Object_Address of large object to a pointer to header type
+
+   end Large_Obj_Header_Ops;
+   use Large_Obj_Header_Ops;
+
+   procedure Set_Large_Obj_Size
+     (Large_Obj_Addr : Object_Virtual_Address;
+      Size           : Offset_Within_Area)
+     renames Large_Obj_Header_Ops.Set_Large_Obj_Size;
 
    Type_Indicator : constant Word_Type := 16#5AFE_4DAD_5AFE_4DAD#;
       --  This is a special value stored in the first word of every type desc.

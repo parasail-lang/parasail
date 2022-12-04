@@ -833,7 +833,7 @@ interface PSC::Reflection<> is
     interface Type_Descriptor<> implements Streamable_Global<Univ_String> is
         type Type_Kind_Enum is Enum<[#normal, #basic_array, #univ_integer,
           #univ_real, #univ_string, #univ_char, #univ_enum, #unsigned_64,
-          #aliased_object]>
+          #integer_64, #aliased_object]>
 
         type Type_Index is new Integer<0..2**16-1>
 

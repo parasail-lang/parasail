@@ -2081,7 +2081,7 @@ class PSC::Analysis::Updated_Value is
       end if
    end op "=?"
 
-   func Hash(Updated_Value) -> Univ_Integer is
+   func Hash(Updated_Value) -> Unsigned_64 is
       return Hash(Updated_Value.Base_Val) +
         Hash(Updated_Value.Kind_Of_Selectors) +
         |Updated_Value.Component_OIDs|

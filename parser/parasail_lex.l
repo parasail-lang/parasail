@@ -210,7 +210,7 @@ EXPONENT          [Ee][-+]?{DIGIT_SEQUENCE}
         ENTER(CHARLIT);
 }
 
-^("abstract"|"class"|"concurrent"|"end"|"func"|"def"|"import"|"interface"|"limited"|"op"|[ \r\t\f]+)   {
+^("abstract"|"class"|"concurrent"|"end"|"func"|"def"|"import"|"interface"|"ref"|"op"|[ \r\t\f]+)   {
     declare
         -- ignore spaces,Carriage returns,tabs,form feeds
         -- 
@@ -352,16 +352,16 @@ EXPONENT          [Ee][-+]?{DIGIT_SEQUENCE}
 	return (INTERFACE_kw);
 }
 
-<RESCANNING>^"limited"	{
-	ECHO_L; ENTER(CHARLIT); 
-	yylval := Create_Token;
-	return (LIMITED_kw);
-}
-
 <RESCANNING>^"op"	{
 	ECHO_L; ENTER(CHARLIT); 
 	yylval := Create_Token;
 	return (OP_kw);
+}
+
+<RESCANNING>^"ref"	{
+	ECHO_L; ENTER(CHARLIT); 
+	yylval := Create_Token;
+	return (REF_kw);
 }
 
   -- ParaSail reserved words
@@ -576,11 +576,6 @@ EXPONENT          [Ee][-+]?{DIGIT_SEQUENCE}
 	ECHO_L; ENTER(CHARLIT); 
 	yylval := Create_Token;
 	return (LAMBDA_kw);
-}
-"limited"	{
-	ECHO_L; ENTER(CHARLIT); 
-	yylval := Create_Token;
-	return (LIMITED_kw);
 }
 "locked"	{
 	ECHO_L; ENTER(CHARLIT); 

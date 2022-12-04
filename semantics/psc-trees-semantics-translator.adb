@@ -88,1023 +88,1023 @@ package body PSC.Trees.Semantics.Translator is
 
    ------------ Exported operations ------------
    procedure PFS_Create
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, PFS_Create, "_psc_pfs_create");
 
    procedure PFS_Get_Local_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, PFS_Get_Local_Index, "_psc_pfs_get_local_index");
 
    procedure PFS_Num_Elems
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, PFS_Num_Elems, "_psc_pfs_num_elems");
 
    procedure PFS_Nth_Elem
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, PFS_Nth_Elem, "_psc_pfs_nth_elem");
 
    procedure PFS_Reset
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, PFS_Reset, "_psc_pfs_reset");
 
    procedure Num_Library_Items
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Num_Library_Items, "_psc_num_library_items");
 
    procedure Nth_Library_Item
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Nth_Library_Item, "_psc_nth_library_item");
 
    procedure Decl_Id
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Id, "_psc_decl_id");
 
    procedure Decl_Module_Name
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Module_Name, "_psc_decl_module_name");
 
    procedure Decl_Num_Prior_Homonyms
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Num_Prior_Homonyms,
       "_psc_decl_num_prior_homonyms");
 
    procedure Decl_Kind
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Kind, "_psc_decl_kind");
 
    procedure Decl_Is_Spec
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Is_Spec, "_psc_decl_is_spec");
 
    procedure Decl_Spec
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Spec, "_psc_decl_spec");
 
    procedure Decl_Context
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Context, "_psc_decl_context");
 
    procedure Decl_Level
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Level, "_psc_decl_level");
 
    procedure Decl_Location
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Location, "_psc_decl_location");
 
    procedure Decl_Component_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Component_Index, "_psc_decl_component_index");
 
    procedure Decl_Source_Pos
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Source_Pos, "_psc_decl_source_pos");
 
    procedure Operation_Equiv_To
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Operation_Equiv_To, "_psc_operation_equiv_to");
 
    procedure Routine_For_Operation
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_For_Operation, "_psc_routine_for_operation");
 
    procedure Descriptor_For_Type
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Descriptor_For_Type, "_psc_descriptor_for_type");
 
    procedure Const_Is_Large_Null
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Const_Is_Large_Null, "_psc_const_is_large_null");
 
    procedure Const_Info_At_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Const_Info_At_Locator, "_psc_const_info_at_locator");
 
    procedure Const_Value_At_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Const_Value_At_Locator, "_psc_const_value_at_locator");
       --  Return streamable value corresponding to given const-area locator
 
    procedure Const_Value_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Const_Value_Locator, "_psc_const_value_locator");
       --  Return const-area locator associated with streamable value
 
    procedure Const_Info_For_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Const_Info_For_Value, "_psc_const_info_for_value");
 
    procedure Const_Value_Init_Stream
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Const_Value_Init_Stream,
       "_psc_const_value_init_stream");
 
    procedure Global_Const_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Global_Const_Value, "_psc_global_const_value");
 
    procedure Name_For_Object_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export
      (Ada, Name_For_Object_Locator, "_psc_name_for_object_locator");
 
    procedure Region_Kind
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Region_Kind, "_psc_region_kind");
 
    procedure Region_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Region_Index, "_psc_region_index");
 
    procedure Region_Associated_Decl
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Region_Associated_Decl, "_psc_region_associated_decl");
 
    procedure Region_Produces_Nested_Block
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Region_Produces_Nested_Block,
                   "_psc_region_produces_nested_block");
 
    procedure Region_Num_Items
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Region_Num_Items, "_psc_region_num_items");
 
    procedure Region_Nth_Item
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Region_Nth_Item, "_psc_region_nth_item");
 
    procedure Region_Num_Nested_Regions
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Region_Num_Nested_Regions,
       "_psc_region_num_nested_regions");
 
    procedure Region_Nth_Nested_Region
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Region_Nth_Nested_Region,
       "_psc_region_nth_nested_region");
 
    procedure Region_Sibling_Region
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Region_Sibling_Region, "_psc_region_sibling_region");
 
    procedure Decl_Region
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Region, "_psc_decl_region");
 
    procedure Body_Region
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Body_Region, "_psc_body_region");
 
    procedure Source_Position_Create
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Source_Position_Create, "_psc_source_position_create");
 
    procedure Source_Position_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Source_Position_File, "_psc_source_position_file");
 
    procedure Source_Position_Line
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Source_Position_Line, "_psc_source_position_line");
 
    procedure Source_Position_Col
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Source_Position_Col, "_psc_source_position_col");
 
    procedure Instruction_Opcode
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Opcode, "_psc_instruction_opcode");
 
    procedure Instruction_Source_Pos
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Source_Pos, "_psc_instruction_source_pos");
 
    procedure Instruction_Skip_Count
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Skip_Count, "_psc_instruction_Skip_Count");
 
    procedure Instruction_Skip_Counts
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Skip_Counts,
       "_psc_instruction_Skip_Counts");
 
    procedure Instruction_Level_Diff
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Level_Diff, "_psc_instruction_Level_Diff");
 
    procedure Instruction_Params
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Params, "_psc_instruction_Params");
 
    procedure Instruction_Static_Link
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Static_Link,
       "_psc_instruction_Static_Link");
 
    procedure Instruction_Call_Target
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Call_Target,
       "_psc_instruction_Call_Target");
 
    procedure Instruction_Target_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Target_Index,
       "_psc_instruction_Target_Index");
 
    procedure Instruction_Locked_Param_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Locked_Param_Index,
       "_psc_instruction_Locked_Param_Index");
 
    procedure Instruction_Locked_Param_Info
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Locked_Param_Info,
       "_psc_instruction_Locked_Param_Info");
 
    procedure Instruction_Locked_Param_Is_Var
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Locked_Param_Is_Var,
       "_psc_instruction_Locked_Param_Is_Var");
 
    procedure Instruction_Locked_Param_Is_By_Ref
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Locked_Param_Is_By_Ref,
       "_psc_instruction_Locked_Param_Is_By_Ref");
 
    procedure Instruction_Code_Block
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Code_Block, "_psc_instruction_Code_Block");
 
    procedure Instruction_Assertion_Str
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Assertion_Str,
       "_psc_instruction_Assertion_Str");
 
    procedure Instruction_Destination
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Destination,
       "_psc_instruction_Destination");
 
    procedure Instruction_Dest_Name
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Dest_Name, "_psc_instruction_Dest_Name");
 
    procedure Instruction_Decl_Obj_Is_By_Ref
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Decl_Obj_Is_By_Ref,
       "_psc_instruction_Decl_Obj_Is_By_Ref");
 
    procedure Instruction_Decl_Obj_Is_Var
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Decl_Obj_Is_Var,
       "_psc_instruction_Decl_Obj_Is_Var");
 
    procedure Instruction_Declare_Type_Info
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Declare_Type_Info,
       "_psc_instruction_Declare_Type_Info");
 
    procedure Instruction_Null_Type_Info
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Null_Type_Info,
       "_psc_instruction_Null_Type_Info");
 
    procedure Instruction_Local_Addr
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Local_Addr, "_psc_instruction_Local_Addr");
 
    procedure Instruction_Int_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Int_Value, "_psc_instruction_Int_Value");
 
    procedure Instruction_Char_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Char_Value, "_psc_instruction_Char_Value");
 
    procedure Instruction_Real_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Real_Value, "_psc_instruction_Real_Value");
 
    procedure Instruction_Str_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Str_Value, "_psc_instruction_Str_Value");
 
    procedure Instruction_Existing_Str_In_Stg_Rgn
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Existing_Str_In_Stg_Rgn,
      "_psc_instruction_Existing_Str_In_Stg_Rgn");
 
    procedure Instruction_Enum_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Enum_Value, "_psc_instruction_Enum_Value");
 
    procedure Instruction_Operation_Static_Link
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Operation_Static_Link,
       "_psc_instruction_Operation_Static_Link");
 
    procedure Instruction_Operation_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Operation_Locator,
       "_psc_instruction_Operation_Locator");
 
    procedure Instruction_Source
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Source, "_psc_instruction_Source");
 
    procedure Instruction_Might_Be_Null
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Might_Be_Null,
      "_psc_instruction_Might_Be_Null");
 
    procedure Instruction_Type_Info
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Type_Info, "_psc_instruction_Type_Info");
 
    procedure Instruction_Existing_Obj_In_Stg_Rgn
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Existing_Obj_In_Stg_Rgn,
       "_psc_instruction_Existing_Obj_In_Stg_Rgn");
 
    procedure Instruction_Source_Type_Info
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Source_Type_Info,
       "_psc_instruction_Source_Type_Info");
 
    procedure Instruction_Ancestor_Lvalue
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Ancestor_Lvalue,
       "_psc_instruction_Ancestor_Lvalue");
 
    procedure Instruction_Polymorphic_Ancestor_Lvalue
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Polymorphic_Ancestor_Lvalue,
       "_psc_instruction_Polymorphic_Ancestor_Lvalue");
 
    procedure Instruction_If_Source
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_If_Source, "_psc_instruction_If_Source");
 
    procedure Instruction_If_Condition
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_If_Condition,
       "_psc_instruction_If_Condition");
 
    procedure Instruction_Skip_If_False
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Skip_If_False,
       "_psc_instruction_Skip_If_False");
 
    procedure Instruction_Parallel_Master
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Parallel_Master,
       "_psc_instruction_Parallel_Master");
 
    procedure Instruction_Parallel_Control
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Parallel_Control,
       "_psc_instruction_Parallel_Control");
 
    procedure Instruction_Parallel_Static_Link
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Parallel_Static_Link,
       "_psc_instruction_Parallel_Static_Link");
 
    procedure Instruction_Parallel_Code_Block
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Parallel_Code_Block,
       "_psc_instruction_Parallel_Code_Block");
 
    procedure Instruction_Parallel_Call_Target
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Parallel_Call_Target,
       "_psc_instruction_Parallel_Call_Target");
 
    procedure Instruction_Parallel_Target_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Parallel_Target_Index,
       "_psc_instruction_Parallel_Target_Index");
 
    procedure Instruction_Parallel_Locked_Param_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Parallel_Locked_Param_Index,
       "_psc_instruction_Parallel_Locked_Param_Index");
 
    procedure Instruction_Parallel_Locked_Param_Info
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Parallel_Locked_Param_Info,
       "_psc_instruction_Parallel_Locked_Param_Info");
 
    procedure Instruction_Parallel_Locked_Param_Is_Var
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Parallel_Locked_Param_Is_Var,
       "_psc_instruction_Parallel_Locked_Param_Is_Var");
 
    procedure Instruction_Parallel_Locked_Param_Is_By_Ref
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Parallel_Locked_Param_Is_By_Ref,
       "_psc_instruction_Parallel_Locked_Param_Is_By_Ref");
 
    procedure Instruction_Parallel_Is_Queued_Call
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Parallel_Is_Queued_Call,
       "_psc_instruction_Parallel_Is_Queued_Call");
 
    procedure Instruction_Num_In_Params
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export
      (Ada, Instruction_Num_In_Params, "_psc_instruction_Num_In_Params");
 
    procedure Instruction_Num_Out_Params
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export
      (Ada, Instruction_Num_Out_Params, "_psc_instruction_Num_Out_Params");
 
    procedure Instruction_Case_Selector
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Case_Selector,
       "_psc_instruction_Case_Selector");
 
    procedure Instruction_Case_First
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Case_First, "_psc_instruction_Case_First");
 
    procedure Instruction_Case_Last
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Case_Last, "_psc_instruction_Case_Last");
 
    procedure Instruction_Case_Default_Skip
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Case_Default_Skip,
       "_psc_instruction_Case_Default_Skip");
 
    procedure Instruction_Nested_Code_Block
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Nested_Code_Block,
       "_psc_instruction_Nested_Code_Block");
 
    procedure Instruction_Nested_Block_Region
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Nested_Block_Region,
       "_psc_instruction_Nested_Block_Region");
 
    procedure Instruction_Output_Inited_Null
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Output_Inited_Null,
       "_psc_instruction_Output_Inited_Null");
 
    procedure Instruction_Proved
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Instruction_Proved, "_psc_instruction_Proved");
 
    procedure New_Conv_Desc
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, New_Conv_Desc, "_psc_new_conv_desc");
 
    procedure Null_Conv_Desc
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Null_Conv_Desc, "_psc_null_conv_desc");
 
    procedure CD_Convention
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, CD_Convention, "_psc_cd_convention");
 
    procedure CD_Num_Inputs
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, CD_Num_Inputs, "_psc_cd_num_inputs");
 
    procedure CD_Num_Outputs
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, CD_Num_Outputs, "_psc_cd_num_outputs");
 
    procedure CD_Output_Needs_Init
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, CD_Output_Needs_Init, "_psc_cd_output_needs_init");
 
    procedure CD_Uses_Queuing
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, CD_Uses_Queuing, "_psc_cd_uses_queuing");
 
    procedure Routine_Uses_Queuing
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Uses_Queuing, "_psc_routine_uses_queuing");
 
    procedure Routine_Uses_Stg_Rgn
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Uses_Stg_Rgn, "_psc_routine_uses_stg_rgn");
 
    procedure Routine_Num_VM_Regs
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Num_VM_Regs, "_psc_routine_num_vm_regs");
 
    procedure Routine_Num_Instrs
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Num_Instrs, "_psc_routine_num_instrs");
 
    procedure Routine_Nth_Instr
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Nth_Instr, "_psc_routine_nth_instr");
 
    procedure Routine_Start_Callee_Locals
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Start_Callee_Locals,
       "_psc_routine_start_callee_locals");
 
    procedure Routine_Nesting_Level
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Nesting_Level, "_psc_routine_nesting_level");
 
    procedure Routine_Convention
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Convention, "_psc_routine_convention");
 
    procedure Routine_Conv_Desc
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Conv_Desc, "_psc_routine_conv_desc");
 
    procedure Routine_Internal_Precond
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Internal_Precond,
       "_psc_routine_internal_precond");
 
    procedure Routine_Module_Name
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Module_Name, "_psc_routine_module_name");
 
    procedure Routine_Name
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Name, "_psc_routine_name");
 
    procedure Routine_Num_Prior_Homonyms
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Num_Prior_Homonyms,
       "_psc_routine_num_prior_homonyms");
 
    procedure Routine_Name_With_Overloading_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Name_With_Overloading_Index,
       "_psc_routine_name_with_overloading_index");
 
    procedure Routine_Built_In_Desig
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Built_In_Desig, "_psc_routine_built_in_desig");
 
    procedure Routine_Enc_Type_Desc
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_Enc_Type_Desc, "_psc_routine_enc_type_desc");
 
    procedure Routine_At_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_At_Locator, "_psc_routine_at_locator");
 
    procedure Routine_At_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Routine_At_Index, "_psc_routine_at_index");
 
    procedure Set_Breakpoint
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Set_Breakpoint, "_psc_set_breakpoint");
 
    procedure Clear_Breakpoint
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Clear_Breakpoint, "_psc_clear_breakpoint");
 
    procedure Num_Breakpoints
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Num_Breakpoints, "_psc_num_breakpoints");
 
    procedure Nth_Breakpoint_Routine
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Nth_Breakpoint_Routine, "_psc_nth_breakpoint_routine");
 
    procedure Nth_Breakpoint_Line
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Nth_Breakpoint_Line, "_psc_nth_breakpoint_line");
 
    procedure Type_Desc_At_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_At_Locator, "_psc_type_desc_at_locator");
 
    procedure Type_Desc_At_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_At_Index, "_psc_type_desc_at_index");
 
    procedure Type_Desc_Has_Op_Map
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Has_Op_Map, "_psc_type_desc_has_op_map");
 
    procedure Type_Desc_Corresponding_Polymorphic_Type
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Corresponding_Polymorphic_Type,
       "_psc_type_desc_polymorphic_type");
 
    procedure Type_Desc_Name
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Name, "_psc_type_desc_name");
 
    procedure Type_Desc_Type_Decl
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Type_Decl, "_psc_type_desc_type_decl");
 
    procedure Type_Desc_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Index, "_psc_type_desc_index");
 
    procedure Type_Desc_Init_Stream
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Init_Stream, "_psc_type_desc_init_stream");
 
    procedure Type_Desc_Type_Kind
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Type_Kind, "_psc_type_desc_kind");
 
    procedure Type_Desc_All_Parameters_Known
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_All_Parameters_Known,
       "_psc_type_desc_all_parameters_known");
 
    procedure Type_Desc_Is_Small
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Is_Small, "_psc_type_desc_is_small");
 
    procedure Type_Desc_Is_Large
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Is_Large, "_psc_type_desc_is_large");
 
    procedure Type_Desc_Is_Wrapper
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Is_Wrapper, "_psc_type_desc_is_wrapper");
 
    procedure Type_Desc_Null_Value_For_Type
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Null_Value_For_Type,
       "_psc_type_desc_null_value");
 
    procedure Type_Desc_Parent_Type
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Parent_Type, "_psc_type_desc_parent_type");
 
    procedure Type_Desc_Is_Abstract
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Is_Abstract, "_psc_type_desc_is_abstract");
 
    procedure Type_Desc_Is_Concurrent
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Is_Concurrent,
       "_psc_type_desc_is_concurrent");
 
    procedure Type_Desc_Is_Polymorphic
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Is_Polymorphic,
       "_psc_type_desc_is_polymorphic");
 
    procedure Type_Desc_Enclosing_Type
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Enclosing_Type,
       "_psc_type_desc_enclosing_type");
 
    procedure Type_Desc_Root_Type_Desc
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Type_Desc_Root_Type_Desc,
       "_psc_type_desc_root");
 
    procedure Op_Map_Actual_Type
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Op_Map_Actual_Type, "_psc_op_map_actual_type");
 
    procedure Op_Map_Formal_Type_Decl
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Op_Map_Formal_Type_Decl,
    "_psc_op_map_formal_type_decl");
 
    procedure Info_Array_First
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Info_Array_First, "_psc_info_array_first");
 
    procedure Info_Array_Last
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Info_Array_Last, "_psc_info_array_last");
 
    procedure Info_Array_Indexing
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Info_Array_Indexing, "_psc_info_array_indexing");
@@ -1264,7 +1264,7 @@ package body PSC.Trees.Semantics.Translator is
      (PFS.Per_File_String_Table_Ptr, Word_Ptr);
 
    procedure PFS_Create
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Create() -> Per_File_String_Table
@@ -1275,7 +1275,7 @@ package body PSC.Trees.Semantics.Translator is
    end PFS_Create;
 
    procedure PFS_Get_Local_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Get_Local_Index
@@ -1297,7 +1297,7 @@ package body PSC.Trees.Semantics.Translator is
    end PFS_Get_Local_Index;
 
    procedure PFS_Num_Elems
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Num_Elems(Per_File_String_Table) -> Local_Index
@@ -1311,7 +1311,7 @@ package body PSC.Trees.Semantics.Translator is
    end PFS_Num_Elems;
 
    procedure PFS_Nth_Elem
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Nth_Elem(Per_File_String_Table; Local_Index) -> Univ_String
@@ -1329,7 +1329,7 @@ package body PSC.Trees.Semantics.Translator is
    end PFS_Nth_Elem;
 
    procedure PFS_Reset
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Reset (var optional Per_File_String_Table)
@@ -1354,7 +1354,7 @@ package body PSC.Trees.Semantics.Translator is
    --  Create Elem_Info object
 
    procedure Num_Library_Items
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Num_Library_Items(Env : Environment) -> Decl_Index
@@ -1368,7 +1368,7 @@ package body PSC.Trees.Semantics.Translator is
    end Num_Library_Items;
 
    procedure Nth_Library_Item
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Nth_Library_Item(Env : Environment; Decl_Index) -> Decl
@@ -1384,7 +1384,7 @@ package body PSC.Trees.Semantics.Translator is
    end Nth_Library_Item;
 
    procedure Decl_Id
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Id(Decl) -> Univ_String
@@ -1399,7 +1399,7 @@ package body PSC.Trees.Semantics.Translator is
    end Decl_Id;
 
    procedure Decl_Module_Name
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Module_Name(Decl) -> Univ_String  //  full module name
@@ -1431,7 +1431,7 @@ package body PSC.Trees.Semantics.Translator is
    end Decl_Module_Name;
 
    procedure Decl_Num_Prior_Homonyms
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Num_Prior_Homonyms(Decl) -> Overloading_Index
@@ -1445,7 +1445,7 @@ package body PSC.Trees.Semantics.Translator is
    end Decl_Num_Prior_Homonyms;
 
    procedure Decl_Kind
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Kind(Decl) -> Decl_Kind
@@ -1477,7 +1477,7 @@ package body PSC.Trees.Semantics.Translator is
    end Decl_Kind;
 
    procedure Decl_Is_Spec
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Is_Spec(Decl) -> Boolean
@@ -1507,7 +1507,7 @@ package body PSC.Trees.Semantics.Translator is
    end Decl_Is_Spec;
 
    procedure Decl_Spec
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Spec(Decl) -> Decl  // Self if spec, else corresponding spec
@@ -1534,7 +1534,7 @@ package body PSC.Trees.Semantics.Translator is
    end Decl_Spec;
 
    procedure Decl_Context
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Context(Decl) -> Context_Enum
@@ -1565,7 +1565,7 @@ package body PSC.Trees.Semantics.Translator is
    end Decl_Context;
 
    procedure Decl_Level
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Level(Decl) -> Static_Level
@@ -1589,7 +1589,7 @@ package body PSC.Trees.Semantics.Translator is
    end Decl_Level;
 
    procedure Decl_Convention
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Convention(Decl) -> Convention_Enum
@@ -1610,7 +1610,7 @@ package body PSC.Trees.Semantics.Translator is
    end Decl_Convention;
 
    procedure Decl_Location
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Location(Decl) -> Object_Locator
@@ -1657,7 +1657,7 @@ package body PSC.Trees.Semantics.Translator is
    end Decl_Location;
 
    procedure Decl_Component_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Component_Index(Decl) -> optional Offset_Within_Area
@@ -1681,7 +1681,7 @@ package body PSC.Trees.Semantics.Translator is
    end Decl_Component_Index;
 
    procedure Decl_Source_Pos
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Decl_Source_Pos(Decl) -> Source_Position
@@ -1699,7 +1699,7 @@ package body PSC.Trees.Semantics.Translator is
    end Decl_Source_Pos;
 
    procedure Operation_Equiv_To
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Operation_Equiv_To(Decl {Kind(Decl) == #operation})
@@ -1713,7 +1713,7 @@ package body PSC.Trees.Semantics.Translator is
    end Operation_Equiv_To;
 
    procedure Routine_For_Operation
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Routine_For_Operation(Decl {Kind(Decl) == #operation})
@@ -1728,7 +1728,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_For_Operation;
 
    procedure Descriptor_For_Type
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Descriptor_For_Type(Decl)
@@ -1758,7 +1758,7 @@ package body PSC.Trees.Semantics.Translator is
    end Descriptor_For_Type;
 
    procedure Const_Is_Large_Null
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Const_Is_Large_Null (Value : Unsigned_64)
@@ -1770,7 +1770,7 @@ package body PSC.Trees.Semantics.Translator is
    end Const_Is_Large_Null;
 
    procedure Const_Info_At_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Const_Info_At_Locator (Locator : Object_Locator)
@@ -1824,7 +1824,7 @@ package body PSC.Trees.Semantics.Translator is
    end Const_Info_At_Locator;
 
    procedure Const_Value_At_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  Return streamable value corresponding to given const-area locator
@@ -1849,7 +1849,7 @@ package body PSC.Trees.Semantics.Translator is
    end Const_Value_At_Locator;
 
    procedure Const_Value_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  Return const-area locator associated with streamable value
@@ -1871,7 +1871,7 @@ package body PSC.Trees.Semantics.Translator is
    end Const_Value_Locator;
 
    procedure Const_Info_For_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Const_Info_For_Value (Streamable_Value) -> Const_Info
@@ -1909,7 +1909,7 @@ package body PSC.Trees.Semantics.Translator is
    end Const_Info_For_Value;
 
    procedure Const_Value_Init_Stream
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Init_Stream(Val : Streamable_Value; var Per_File_String_Table)
@@ -1941,7 +1941,7 @@ package body PSC.Trees.Semantics.Translator is
    end Const_Value_Init_Stream;
 
    procedure Global_Const_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Value_Of_Global_Const(Decl)
@@ -1968,7 +1968,7 @@ package body PSC.Trees.Semantics.Translator is
    end Global_Const_Value;
 
    procedure Name_For_Object_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Name_For_Object_Locator (Object_Locator) -> Univ_String
@@ -1993,7 +1993,7 @@ package body PSC.Trees.Semantics.Translator is
    end Name_For_Object_Locator;
 
    procedure Region_Kind
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Kind(Region) -> Region_Kind
@@ -2013,7 +2013,7 @@ package body PSC.Trees.Semantics.Translator is
    end Region_Kind;
 
    procedure Region_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Index(Region) -> Region_Index
@@ -2026,7 +2026,7 @@ package body PSC.Trees.Semantics.Translator is
    end Region_Index;
 
    procedure Region_At_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Region_At_Index(Region_Index) -> Region
@@ -2040,7 +2040,7 @@ package body PSC.Trees.Semantics.Translator is
    end Region_At_Index;
 
    procedure Region_Associated_Decl
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Associated_Decl(Region) -> Decl
@@ -2063,7 +2063,7 @@ package body PSC.Trees.Semantics.Translator is
    end Region_Associated_Decl;
 
    procedure Region_Produces_Nested_Block
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Produces_Nested_Block(Region) -> Boolean
@@ -2106,7 +2106,7 @@ package body PSC.Trees.Semantics.Translator is
    end Region_Produces_Nested_Block;
 
    procedure Region_Num_Items
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Num_Items(Region) -> Decl_Index
@@ -2128,7 +2128,7 @@ package body PSC.Trees.Semantics.Translator is
    end Region_Num_Items;
 
    procedure Region_Nth_Item
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Nth_Item(Region, Decl_Index) -> Decl
@@ -2148,7 +2148,7 @@ package body PSC.Trees.Semantics.Translator is
    end Region_Nth_Item;
 
    procedure Region_Num_Nested_Regions
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Num_Nested_Regions(Region) -> Int
@@ -2166,7 +2166,7 @@ package body PSC.Trees.Semantics.Translator is
    end Region_Num_Nested_Regions;
 
    procedure Region_Nth_Nested_Region
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Nth_Nested_Region(Region; Int) -> Region
@@ -2193,7 +2193,7 @@ package body PSC.Trees.Semantics.Translator is
    end Region_Nth_Nested_Region;
 
    procedure Region_Sibling_Region
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Sibling_Region(Region) -> Region
@@ -2206,7 +2206,7 @@ package body PSC.Trees.Semantics.Translator is
    end Region_Sibling_Region;
 
    procedure Decl_Region
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Decl_Region(Decl) -> optional Region
@@ -2233,7 +2233,7 @@ package body PSC.Trees.Semantics.Translator is
    end Decl_Region;
 
    procedure Body_Region
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Body_Region(Decl) -> Region
@@ -2256,7 +2256,7 @@ package body PSC.Trees.Semantics.Translator is
    end Body_Region;
 
    procedure Source_Position_Create
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Create(File : Univ_String;
@@ -2273,7 +2273,7 @@ package body PSC.Trees.Semantics.Translator is
    end Source_Position_Create;
 
    procedure Source_Position_File
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func File(Source_Position) -> Univ_String
@@ -2287,7 +2287,7 @@ package body PSC.Trees.Semantics.Translator is
    end Source_Position_File;
 
    procedure Source_Position_Line
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Line(Source_Position) -> Univ_Integer
@@ -2299,7 +2299,7 @@ package body PSC.Trees.Semantics.Translator is
    end Source_Position_Line;
 
    procedure Source_Position_Col
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Col(Source_Position) -> Univ_Integer
@@ -2311,7 +2311,7 @@ package body PSC.Trees.Semantics.Translator is
    end Source_Position_Col;
 
    procedure Instruction_Opcode
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Opcode(Instruction) -> Opcode_Enum
@@ -2328,7 +2328,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Opcode;
 
    procedure Instruction_Source_Pos
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Source_Pos(Instruction) -> Source_Position
@@ -2355,7 +2355,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Source_Pos;
 
    procedure Instruction_Skip_Count
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Skip_Count(Instruction) -> Code_Offset
@@ -2372,7 +2372,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Skip_Count;
 
    procedure Instruction_Skip_Counts
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Skip_Counts(Instruction) -> Basic_Array<Code_Offset>
@@ -2412,7 +2412,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Skip_Counts;
 
    procedure Instruction_Level_Diff
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Level_Diff(Instruction) -> Natural
@@ -2429,7 +2429,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Level_Diff;
 
    procedure Instruction_Params
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Params(Instruction) -> Object_Locator
@@ -2452,7 +2452,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Params;
 
    procedure Instruction_Static_Link
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Static_Link(Instruction) -> Object_Locator
@@ -2475,7 +2475,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Static_Link;
 
    procedure Instruction_Call_Target
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Call_Target(Instruction) -> Object_Locator
@@ -2498,7 +2498,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Call_Target;
 
    procedure Instruction_Target_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Target_Index(Instruction) -> Routine_Index
@@ -2521,7 +2521,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Target_Index;
 
    procedure Instruction_Locked_Param_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Locked_Param_Index(Instruction) -> Natural
@@ -2538,7 +2538,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Locked_Param_Index;
 
    procedure Instruction_Locked_Param_Info
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Locked_Param_Info(Instruction) -> Locked_Param_Info_As_Byte_Type
@@ -2556,7 +2556,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Locked_Param_Info;
 
    procedure Instruction_Locked_Param_Is_Var
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Locked_Param_Is_Var(Instruction) -> Boolean
@@ -2573,7 +2573,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Locked_Param_Is_Var;
 
    procedure Instruction_Locked_Param_Is_By_Ref
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Locked_Param_Is_By_Ref(Instruction) -> Boolean
@@ -2590,7 +2590,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Locked_Param_Is_By_Ref;
 
    procedure Fill_In_Code_Block_Descriptor
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params  : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr;
       Code    : Code_Block_Descriptor) is
@@ -2636,7 +2636,7 @@ package body PSC.Trees.Semantics.Translator is
    end Fill_In_Code_Block_Descriptor;
 
    procedure Instruction_Code_Block
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Code_Block(Instruction) -> optional Code_Block_Descriptor
@@ -2660,7 +2660,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Code_Block;
 
    procedure Instruction_Assertion_Str
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Assertion_Str(Instruction) -> optional Univ_String
@@ -2679,7 +2679,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Assertion_Str;
 
    procedure Instruction_Destination
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Destination(Instruction) -> Object_Locator
@@ -2702,7 +2702,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Destination;
 
    procedure Instruction_Dest_Name
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Dest_Name(Instruction) -> Univ_String
@@ -2721,7 +2721,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Dest_Name;
 
    procedure Instruction_Decl_Obj_Is_By_Ref
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       Instr_Index : constant Word_Type :=
@@ -2735,7 +2735,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Decl_Obj_Is_By_Ref;
 
    procedure Instruction_Decl_Obj_Is_Var
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       Instr_Index : constant Word_Type :=
@@ -2749,7 +2749,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Decl_Obj_Is_Var;
 
    procedure Instruction_Declare_Type_Info
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Declare_Type_Info(Instruction) -> Object_Locator
@@ -2772,7 +2772,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Declare_Type_Info;
 
    procedure Instruction_Null_Type_Info
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Null_Type_Info(Instruction) -> Object_Locator
@@ -2795,7 +2795,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Null_Type_Info;
 
    procedure Instruction_Local_Addr
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Local_Addr(Instruction) -> Object_Locator
@@ -2818,7 +2818,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Local_Addr;
 
    procedure Instruction_Int_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Int_Value(Instruction) -> Univ_Integer
@@ -2835,7 +2835,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Int_Value;
 
    procedure Instruction_Char_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Char_Value(Instruction) -> Univ_Character
@@ -2852,7 +2852,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Char_Value;
 
    procedure Instruction_Real_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Real_Value(Instruction) -> Univ_Real
@@ -2869,7 +2869,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Real_Value;
 
    procedure Instruction_Str_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Str_Value(Instruction) -> Univ_String
@@ -2888,7 +2888,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Str_Value;
 
    procedure Instruction_Existing_Str_In_Stg_Rgn
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Existing_Str_In_Stg_Rgn(Instruction) -> Object_Locator
@@ -2911,7 +2911,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Existing_Str_In_Stg_Rgn;
 
    procedure Instruction_Enum_Value
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Enum_Value(Instruction) -> Univ_Enumeration
@@ -2928,7 +2928,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Enum_Value;
 
    procedure Instruction_Operation_Static_Link
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Operation_Static_Link(Instruction) -> Object_Locator
@@ -2951,7 +2951,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Operation_Static_Link;
 
    procedure Instruction_Operation_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Operation_Locator(Instruction) -> Object_Locator
@@ -2974,7 +2974,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Operation_Locator;
 
    procedure Instruction_Source
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Source(Instruction) -> Object_Locator
@@ -2997,7 +2997,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Source;
 
    procedure Instruction_Might_Be_Null
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Might_Be_Null(Instruction) -> Boolean
@@ -3014,7 +3014,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Might_Be_Null;
 
    procedure Instruction_Type_Info
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Type_Info(Instruction) -> Object_Locator
@@ -3037,7 +3037,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Type_Info;
 
    procedure Instruction_Existing_Obj_In_Stg_Rgn
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Existing_Obj_In_Stg_Rgn(Instruction) -> Object_Locator
@@ -3060,7 +3060,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Existing_Obj_In_Stg_Rgn;
 
    procedure Instruction_Source_Type_Info
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Source_Type_Info(Instruction) -> Object_Locator
@@ -3083,7 +3083,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Source_Type_Info;
 
    procedure Instruction_Ancestor_Lvalue
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Ancestor_Lvalue(Instruction) -> Boolean
@@ -3110,7 +3110,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Ancestor_Lvalue;
 
    procedure Instruction_Polymorphic_Ancestor_Lvalue
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Polymorphic_Ancestor_Lvalue(Instruction) -> Boolean
@@ -3127,7 +3127,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Polymorphic_Ancestor_Lvalue;
 
    procedure Instruction_If_Source
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func If_Source(Instruction) -> Object_Locator
@@ -3150,7 +3150,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_If_Source;
 
    procedure Instruction_If_Condition
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func If_Condition(Instruction) -> Condition_Bit_Mask
@@ -3167,7 +3167,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_If_Condition;
 
    procedure Instruction_Skip_If_False
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Skip_If_False(Instruction) -> Code_Offset
@@ -3184,7 +3184,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Skip_If_False;
 
    procedure Instruction_Parallel_Master
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Parallel_Master(Instruction) -> Object_Locator
@@ -3207,7 +3207,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Parallel_Master;
 
    procedure Instruction_Parallel_Control
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Parallel_Control(Instruction) -> Object_Locator
@@ -3230,7 +3230,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Parallel_Control;
 
    procedure Instruction_Parallel_Static_Link
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Parallel_Static_Link(Instruction) -> Object_Locator
@@ -3253,7 +3253,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Parallel_Static_Link;
 
    procedure Instruction_Parallel_Code_Block
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Parallel_Code_Block(Instruction)
@@ -3277,7 +3277,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Parallel_Code_Block;
 
    procedure Instruction_Parallel_Call_Target
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Parallel_Call_Target(Instruction) -> Object_Locator
@@ -3300,7 +3300,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Parallel_Call_Target;
 
    procedure Instruction_Parallel_Target_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Parallel_Target_Index(Instruction) -> Routine_Index
@@ -3317,7 +3317,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Parallel_Target_Index;
 
    procedure Instruction_Parallel_Locked_Param_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Parallel_Locked_Param_Index(Instruction) -> Natural
@@ -3334,7 +3334,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Parallel_Locked_Param_Index;
 
    procedure Instruction_Parallel_Locked_Param_Info
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Parallel_Locked_Param_Info(Instruction)
@@ -3353,7 +3353,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Parallel_Locked_Param_Info;
 
    procedure Instruction_Parallel_Locked_Param_Is_Var
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Parallel_Locked_Param_Is_Var(Instruction) -> Boolean
@@ -3370,7 +3370,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Parallel_Locked_Param_Is_Var;
 
    procedure Instruction_Parallel_Locked_Param_Is_By_Ref
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Parallel_Locked_Param_Is_By_Ref(Instruction) -> Boolean
@@ -3387,7 +3387,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Parallel_Locked_Param_Is_By_Ref;
 
    procedure Instruction_Parallel_Is_Queued_Call
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Parallel_Is_Queued_Call(Instruction) -> Boolean
@@ -3404,7 +3404,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Parallel_Is_Queued_Call;
 
    procedure Instruction_Num_In_Params
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Num_In_Params(Instruction) -> Natural
@@ -3427,7 +3427,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Num_In_Params;
 
    procedure Instruction_Num_Out_Params
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Num_Out_Params(Instruction) -> Natural
@@ -3450,7 +3450,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Num_Out_Params;
 
    procedure Instruction_Case_Selector
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Case_Selector(Instruction) -> Object_Locator
@@ -3473,7 +3473,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Case_Selector;
 
    procedure Instruction_Case_First
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  // func Case_First(Instruction) -> Non_Null_Value
@@ -3490,7 +3490,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Case_First;
 
    procedure Instruction_Case_Last
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  // func Case_Last(Instruction) -> Non_Null_Value
@@ -3507,7 +3507,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Case_Last;
 
    procedure Instruction_Case_Default_Skip
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Case_Default_Skip(Instruction) -> Code_Offset
@@ -3524,7 +3524,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Case_Default_Skip;
 
    procedure Instruction_Nested_Code_Block
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Nested_Code_Block(Instruction)
@@ -3548,7 +3548,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Nested_Code_Block;
 
    procedure Instruction_Nested_Block_Region
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Nested_Block_Region(Instruction)
@@ -3567,7 +3567,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Nested_Block_Region;
 
    procedure Instruction_Output_Inited_Null
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Output_Inited_Null(Instruction) -> Boolean
@@ -3591,7 +3591,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Output_Inited_Null;
 
    procedure Instruction_Proved
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Proved(Instruction) -> Boolean is import(#instruction_Proved)
@@ -3620,7 +3620,7 @@ package body PSC.Trees.Semantics.Translator is
    end Instruction_Proved;
 
    procedure New_Conv_Desc
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       Conv : constant Languages.Convention_Enum :=
@@ -3644,7 +3644,7 @@ package body PSC.Trees.Semantics.Translator is
    end New_Conv_Desc;
 
    procedure Null_Conv_Desc
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -3653,7 +3653,7 @@ package body PSC.Trees.Semantics.Translator is
    end Null_Conv_Desc;
 
    procedure CD_Convention
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       CD : constant Convention_Descriptor :=
@@ -3663,7 +3663,7 @@ package body PSC.Trees.Semantics.Translator is
    end CD_Convention;
 
    procedure CD_Num_Inputs
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       CD : constant Convention_Descriptor :=
@@ -3673,7 +3673,7 @@ package body PSC.Trees.Semantics.Translator is
    end CD_Num_Inputs;
 
    procedure CD_Num_Outputs
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       CD : constant Convention_Descriptor :=
@@ -3683,7 +3683,7 @@ package body PSC.Trees.Semantics.Translator is
    end CD_Num_Outputs;
 
    procedure CD_Output_Needs_Init
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       CD : constant Convention_Descriptor :=
@@ -3693,7 +3693,7 @@ package body PSC.Trees.Semantics.Translator is
    end CD_Output_Needs_Init;
 
    procedure CD_Uses_Queuing
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       CD : constant Convention_Descriptor :=
@@ -3703,7 +3703,7 @@ package body PSC.Trees.Semantics.Translator is
    end CD_Uses_Queuing;
 
    procedure Routine_Uses_Queuing
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Routine_Uses_Queuing(Routine) -> Boolean
@@ -3716,7 +3716,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Uses_Queuing;
 
    procedure Routine_Uses_Stg_Rgn
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Routine_Uses_Stg_Rgn(Routine) -> Boolean
@@ -3732,7 +3732,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Uses_Stg_Rgn;
 
    procedure Routine_Num_VM_Regs
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Routine_Num_VM_Regs(Routine) -> VM_Reg_Num
@@ -3749,7 +3749,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Num_VM_Regs;
 
    procedure Routine_Num_Instrs
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Num_Instrs(Routine) -> Code_Length
@@ -3772,7 +3772,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Num_Instrs;
 
    procedure Routine_Nth_Instr
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Nth_Instr(Routine; Code_Index) -> Instruction
@@ -3787,7 +3787,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Nth_Instr;
 
    procedure Routine_Start_Callee_Locals
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Frame_Size(Routine) -> Univ_Integer
@@ -3801,7 +3801,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Start_Callee_Locals;
 
    procedure Routine_Internal_Precond
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Internal_Precond(Routine) -> optional Code_Block_Descriptor
@@ -3819,7 +3819,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Internal_Precond;
 
    procedure Routine_Nesting_Level
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Nesting_Level(Routine) -> Object_Locator::Code_Nesting_Level
@@ -3833,7 +3833,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Nesting_Level;
 
    procedure Routine_Convention
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Convention(Routine) -> Decl::Convention_Enum
@@ -3847,7 +3847,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Convention;
 
    procedure Routine_Conv_Desc
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Conv_Desc(Routine) -> Convention_Descriptor
@@ -3861,7 +3861,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Conv_Desc;
 
    procedure Routine_Module_Name
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Module_Name(Routine) -> Univ_String
@@ -3877,7 +3877,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Module_Name;
 
    procedure Routine_Name
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Name(Routine) -> Univ_String
@@ -3893,7 +3893,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Name;
 
    procedure Routine_Num_Prior_Homonyms
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Num_Prior_Homonyms(Routine) -> Decl::Overloading_Index
@@ -3907,7 +3907,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Num_Prior_Homonyms;
 
    procedure Routine_Name_With_Overloading_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Name_With_Overloading_Index(Routine) -> Univ_String
@@ -3923,7 +3923,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Name_With_Overloading_Index;
 
    procedure Routine_Built_In_Desig
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Built_In_Designator(Routine) -> Univ_String
@@ -3943,7 +3943,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Built_In_Desig;
 
    procedure Routine_Enc_Type_Desc
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Enc_Type_Desc(Routine) -> optional Type_Descriptor
@@ -3962,7 +3962,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_Enc_Type_Desc;
 
    procedure Routine_At_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Routine_At_Locator(Locator : Object_Locator;
@@ -4019,7 +4019,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_At_Locator;
 
    procedure Routine_At_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Routine_At_Index(Index : Routine_Index) -> Routine
@@ -4033,7 +4033,7 @@ package body PSC.Trees.Semantics.Translator is
    end Routine_At_Index;
 
    procedure Set_Breakpoint
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --   func Set_Breakpoint(Op : Routine; Line : Univ_Integer)
@@ -4100,7 +4100,7 @@ package body PSC.Trees.Semantics.Translator is
    end Set_Breakpoint;
 
    procedure Clear_Breakpoint
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --   func Clear_Breakpoint(Index : Breakpoint_Index)
@@ -4157,7 +4157,7 @@ package body PSC.Trees.Semantics.Translator is
    end Clear_Breakpoint;
 
    procedure Num_Breakpoints
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --   func Num_Breakpoints() -> Breakpoint_Index
@@ -4169,7 +4169,7 @@ package body PSC.Trees.Semantics.Translator is
    end Num_Breakpoints;
 
    procedure Nth_Breakpoint_Routine
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --   func Nth_Breakpoint_Routine(Index : Breakpoint_Index) -> Routine
@@ -4198,7 +4198,7 @@ package body PSC.Trees.Semantics.Translator is
    end Nth_Breakpoint_Routine;
 
    procedure Nth_Breakpoint_Line
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --   func Nth_Breakpoint_Line(Index : Breakpoint_Index) -> Univ_Integer
@@ -4228,7 +4228,7 @@ package body PSC.Trees.Semantics.Translator is
    end Nth_Breakpoint_Line;
 
    procedure Type_Desc_At_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --   func Type_Desc_At_Locator(Locator : Object_Locator)
@@ -4280,7 +4280,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_At_Locator;
 
    procedure Type_Desc_At_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Type_Desc_At_Index(Index : Type_Index)
@@ -4299,7 +4299,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_At_Index;
 
    procedure Type_Desc_Has_Op_Map
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Has_Op_Map(Desc : Type_Descriptor) -> Boolean
@@ -4313,7 +4313,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Has_Op_Map;
 
    procedure Type_Desc_Corresponding_Polymorphic_Type
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Corresponding_Polymorphic_Type(Desc : Type_Descriptor)
@@ -4328,7 +4328,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Corresponding_Polymorphic_Type;
 
    procedure Type_Desc_Name
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Name(Desc : Type_Descriptor) -> Univ_String
@@ -4348,7 +4348,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Name;
 
    procedure Type_Desc_Type_Decl
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Type_Decl(Desc : Type_Descriptor) -> Decl
@@ -4362,7 +4362,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Type_Decl;
 
    procedure Type_Desc_Index
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Index(Desc : Type_Descriptor) -> Type_Index
@@ -4376,7 +4376,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Index;
 
    procedure Type_Desc_Init_Stream
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Init_Stream(Desc : Type_Descriptor; var Per_File_String_Table)
@@ -4412,7 +4412,7 @@ package body PSC.Trees.Semantics.Translator is
    --  type descriptor if passed an op map.
 
    procedure Type_Desc_Type_Kind
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Type_Kind(Desc : Type_Descriptor) -> Type_Kind_Enum
@@ -4426,7 +4426,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Type_Kind;
 
    procedure Type_Desc_All_Parameters_Known
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func All_Parameters_Known(Desc : Type_Descriptor) -> Boolean
@@ -4440,7 +4440,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_All_Parameters_Known;
 
    procedure Type_Desc_Is_Small
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Is_Small(Desc : Type_Descriptor) -> Boolean
@@ -4454,7 +4454,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Is_Small;
 
    procedure Type_Desc_Is_Large
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Is_Small(Desc : Type_Descriptor) -> Boolean
@@ -4468,7 +4468,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Is_Large;
 
    procedure Type_Desc_Is_Wrapper
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Is_Wrapper(Desc : Type_Descriptor) -> Boolean
@@ -4482,7 +4482,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Is_Wrapper;
 
    procedure Type_Desc_Null_Value_For_Type
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Null_Value_For_Type(Desc : Type_Descriptor)
@@ -4497,7 +4497,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Null_Value_For_Type;
 
    procedure Type_Desc_Parent_Type
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Parent_Type(Desc : Type_Descriptor) -> optional Type_Descriptor
@@ -4511,7 +4511,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Parent_Type;
 
    procedure Type_Desc_Is_Abstract
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Is_Abstract(Desc : Type_Descriptor) -> Boolean
@@ -4525,7 +4525,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Is_Abstract;
 
    procedure Type_Desc_Is_Concurrent
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Is_Concurrent(Desc : Type_Descriptor) -> Boolean
@@ -4539,7 +4539,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Is_Concurrent;
 
    procedure Type_Desc_Is_Polymorphic
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Is_Polymorphic(Desc : Type_Descriptor) -> Boolean
@@ -4553,7 +4553,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Is_Polymorphic;
 
    procedure Type_Desc_Enclosing_Type
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Enclosing_Type(Desc : Type_Descriptor)
@@ -4568,7 +4568,7 @@ package body PSC.Trees.Semantics.Translator is
    end Type_Desc_Enclosing_Type;
 
    procedure Type_Desc_Root_Type_Desc
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Root_Type_Desc_(Desc : Type_Descriptor)
@@ -4586,7 +4586,7 @@ package body PSC.Trees.Semantics.Translator is
    --  that does not have an "op map"
 
    procedure Op_Map_Actual_Type
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Actual_Type(Desc : Type_Descriptor)
@@ -4607,7 +4607,7 @@ package body PSC.Trees.Semantics.Translator is
    end Op_Map_Actual_Type;
 
    procedure Op_Map_Formal_Type_Decl
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Formal_Type_Decl(Desc : Type_Descriptor) -> optional Decl
@@ -4662,7 +4662,7 @@ package body PSC.Trees.Semantics.Translator is
    end Create_Element_Info;
 
    procedure Info_Array_First
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func First(Arr : Info_Array) -> Indexed_By
@@ -4673,7 +4673,7 @@ package body PSC.Trees.Semantics.Translator is
    end Info_Array_First;
 
    procedure Info_Array_Last
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Last(Arr : Info_Array) -> Indexed_By
@@ -4824,7 +4824,7 @@ package body PSC.Trees.Semantics.Translator is
    end Info_Array_Last;
 
    procedure Info_Array_Indexing
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  op "indexing"(Arr : Info_Array; Index : Indexed_By)

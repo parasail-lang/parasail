@@ -43,7 +43,7 @@ package body PSC.Interpreter.Math is
    ----------  Builtin Subprograms  -------------
 
    procedure Real_Sqrt
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  64-bit Sqrt routine
@@ -58,7 +58,7 @@ package body PSC.Interpreter.Math is
    ---------------
 
    procedure Real_Sqrt
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  64-bit Sqrt routine

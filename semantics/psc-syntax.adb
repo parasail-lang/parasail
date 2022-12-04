@@ -367,17 +367,17 @@ package body PSC.Syntax is
                         Total_Errors := Total_Errors + 1;
                      end if;
                   end;
-               elsif Command_Arg = "-virt"
-                 or else Command_Arg = "-virtual"
-               then
-                  PSC.Interpreter.Virt_Is_Phys := False;
-                  Put_Line ("Objects now using virtual addresses.");
+--             elsif Command_Arg = "-virt"
+--               or else Command_Arg = "-virtual"
+--             then
+--                PSC.Interpreter.Virt_Is_Phys := False;
+--                Put_Line ("Objects now using virtual addresses.");
 
-               elsif Command_Arg = "-phys"
-                 or else Command_Arg = "-physical"
-               then
-                  PSC.Interpreter.Virt_Is_Phys := True;
-                  Put_Line ("Objects now using physical addresses.");
+--             elsif Command_Arg = "-phys"
+--               or else Command_Arg = "-physical"
+--             then
+--                PSC.Interpreter.Virt_Is_Phys := True;
+--                Put_Line ("Objects now using physical addresses.");
 
                elsif Command_Arg = "-lang"
                  or else Command_Arg = "-language"

@@ -408,9 +408,9 @@ abstract interface PSL::Core::Hashable<> implements Comparable<> is
     func Hash(Val : Hashable) -> Unsigned_64
 end interface PSL::Core::Hashable
 
-abstract interface Summable<> implements Hashable<> is
+abstract interface PSL::Core::Summable<> implements Hashable<> is
     //  Types that can be added and subtracted and provide a partial
-    //  mapping from integers
+    //  mapping from integers, as appropriate for histogramming.
     op "+"(Right : Summable) -> Summable
     op "-"(Right : Summable) -> Summable
     op "abs"(Right : Summable) -> Summable
@@ -441,7 +441,7 @@ abstract interface Summable<> implements Hashable<> is
     op "in"(Left : Summable; Right : Range_Set<Summable>) -> Boolean
       is in Range_Set<Summable>
         // "in" defined in Range_Set
-end interface Summable
+end interface PSL::Core::Summable
 
 interface PSL::Containers::Countable_Set<Element_Type is Countable<>> is
     //  A set of values of a "countable" type (e.g. integer or enum),

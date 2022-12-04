@@ -503,7 +503,7 @@ begin
                 case yy.rule_id is
 
 when  3 =>
---#line  262
+--#line  261
 
 	Semantics.Add_Top_Level_Tree(
 yy.value_stack(yy.tos).Tree, Imports => 
@@ -516,7 +516,7 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  4 =>
---#line  269
+--#line  268
 
 	Semantics.Add_Top_Level_Tree(
 yy.value_stack(yy.tos).Tree, Imports => 
@@ -529,7 +529,7 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  5 =>
---#line  276
+--#line  275
 
 	Semantics.Add_Top_Level_Tree(
 yy.value_stack(yy.tos).Tree, Imports => 
@@ -542,13 +542,13 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  6 =>
---#line  283
+--#line  282
 
 	null;
     
 
 when  10 =>
---#line  290
+--#line  289
 
         if not Lists.Is_Empty (
 yy.value_stack(yy.tos).List)
@@ -564,14 +564,14 @@ yyval := (One_List, Last_Import_List);
     
 
 when  11 =>
---#line  302
+--#line  301
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  12 =>
---#line  305
+--#line  304
 
 	
 yyval := 
@@ -583,7 +583,7 @@ yy.value_stack(yy.tos-1).List);
     
 
 when  13 =>
---#line  313
+--#line  312
 
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -591,7 +591,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  14 =>
---#line  316
+--#line  315
 
 	
 yyval := 
@@ -602,7 +602,7 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  15 =>
---#line  323
+--#line  322
 
         
 yyval := (One_Tree, PSC.Trees.Identifier.Make (
@@ -611,7 +611,7 @@ yy.value_stack(yy.tos).Source_Pos));
     
 
 when  16 =>
---#line  326
+--#line  325
 
         
 yyval := 
@@ -619,7 +619,7 @@ yy.value_stack(yy.tos);
     
 
 when  17 =>
---#line  329
+--#line  328
 
 	
 yyval := (One_Tree, Qualified_Name.Make (
@@ -631,7 +631,7 @@ yy.value_stack(yy.tos).Source_Pos)));
     
 
 when  18 =>
---#line  344
+--#line  343
 
       declare
 	Elem_List : Lists.List := 
@@ -690,7 +690,7 @@ yy.value_stack(yy.tos).Label);
    
 
 when  19 =>
---#line  382
+--#line  381
 
 	if 
 yy.value_stack(yy.tos-8).Is_Private and then 
@@ -732,7 +732,7 @@ yy.value_stack(yy.tos-1).Tree);
     
 
 when  20 =>
---#line  407
+--#line  406
 
         --  This is an interface without any declarations
 
@@ -771,32 +771,32 @@ yy.value_stack(yy.tos-1).Implements,
     
 
 when  21 =>
---#line  432
+--#line  431
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  22 =>
---#line  433
+--#line  432
 
         yyerror ("Syntax error before ""is""", At_Token => 
 yy.value_stack(yy.tos-1));
     
 
 when  23 =>
---#line  439
+--#line  438
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  24 =>
---#line  440
+--#line  439
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  25 =>
---#line  441
+--#line  440
 
         yyerror ("Syntax error before ""is""", At_Token => 
 yy.value_stack(yy.tos));
@@ -806,39 +806,39 @@ yy.value_stack(yy.tos);
     
 
 when  28 =>
---#line  450
+--#line  449
 
         yyerror ("Syntax error at end-of-line", At_Token => 
 yy.value_stack(yy.tos));
     
 
 when  29 =>
---#line  453
+--#line  452
 
         yyerror ("Syntax error before ':'", At_Token => 
 yy.value_stack(yy.tos-1));
     
 
 when  30 =>
---#line  459
+--#line  458
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  31 =>
---#line  460
+--#line  459
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  32 =>
---#line  463
+--#line  462
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  33 =>
---#line  466
+--#line  465
 
         
 yyval := (Optional_End_Token, Check_Label => False,
@@ -847,7 +847,7 @@ yyval := (Optional_End_Token, Check_Label => False,
     
 
 when  34 =>
---#line  471
+--#line  470
 
         
 yyval := (Optional_End_Token, Check_Label => True,
@@ -858,19 +858,19 @@ yy.value_stack(yy.tos-1).Tree, others => Null_Optional_Tree);
     
 
 when  37 =>
---#line  481
+--#line  480
 
 	yyerror("Should be ""end interface <id>"" rather than ""end <id>""");
     
 
 when  38 =>
---#line  487
+--#line  486
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  39 =>
---#line  488
+--#line  487
 
 	
 yyval := (Construct_Qualifier,
@@ -879,13 +879,13 @@ yyval := (Construct_Qualifier,
     
 
 when  40 =>
---#line  496
+--#line  495
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  41 =>
---#line  497
+--#line  496
 
 	
 yyval := (Construct_Qualifier, 
@@ -900,7 +900,7 @@ yy.value_stack(yy.tos).Is_Limited,
     
 
 when  42 =>
---#line  505
+--#line  504
 
 	
 yyval := (Construct_Qualifier, 
@@ -915,13 +915,13 @@ yy.value_stack(yy.tos).Is_Limited,
     
 
 when  43 =>
---#line  516
+--#line  515
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  44 =>
---#line  517
+--#line  516
  
 	
 yyval := (Construct_Qualifier,
@@ -930,7 +930,7 @@ yyval := (Construct_Qualifier,
     
 
 when  45 =>
---#line  525
+--#line  524
 
 	
 yyval := (Construct_Qualifier, 
@@ -940,7 +940,7 @@ yy.value_stack(yy.tos).Source_Pos,
       
 
 when  46 =>
---#line  530
+--#line  529
 
 	
 yyval := (Construct_Qualifier, 
@@ -950,7 +950,7 @@ yy.value_stack(yy.tos).Source_Pos,
       
 
 when  47 =>
---#line  538
+--#line  537
 
         --  NOTE: We don't allow stand-alone operator definitions
         
@@ -959,25 +959,25 @@ yy.value_stack(yy.tos);
   
 
 when  48 =>
---#line  542
+--#line  541
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  49 =>
---#line  543
+--#line  542
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  50 =>
---#line  547
+--#line  546
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  51 =>
---#line  548
+--#line  547
 
         --  TBD: Do something with global_access_list
         
@@ -986,12 +986,12 @@ yy.value_stack(yy.tos-3);
     
 
 when  52 =>
---#line  552
+--#line  551
  
 yyval := (One_List, Lists.Empty_List); 
 
 when  53 =>
---#line  553
+--#line  552
 
         --  TBD: Do something with global_access_list
         
@@ -999,7 +999,7 @@ yyval := (One_List, Lists.Empty_List);
     
 
 when  54 =>
---#line  560
+--#line  559
 
 	
 yyval := (Formals_And_Interfaces,
@@ -1013,7 +1013,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  55 =>
---#line  567
+--#line  566
 
         
 yyval := (Formals_And_Interfaces,
@@ -1034,7 +1034,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  56 =>
---#line  580
+--#line  579
 
       declare
 	Extends_Decl : constant Optional_Tree := Param_Decl.Make(
@@ -1060,7 +1060,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  58 =>
---#line  599
+--#line  598
 
         if ParaSail_Lex.Debug_Indent
           and then ParaSail_Lex.Expecting_Indent
@@ -1071,39 +1071,39 @@ when  58 =>
     
 
 when  59 =>
---#line  609
+--#line  608
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  60 =>
---#line  610
+--#line  609
  
 	
 yyval := (Optional, Is_Present => False);
     
 
 when  61 =>
---#line  616
+--#line  615
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  62 =>
---#line  617
+--#line  616
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  63 =>
---#line  622
+--#line  621
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  64 =>
---#line  625
+--#line  624
  
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -1111,7 +1111,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  65 =>
---#line  628
+--#line  627
 
 	
 yyval := 
@@ -1122,31 +1122,31 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  66 =>
---#line  635
+--#line  634
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  67 =>
---#line  636
+--#line  635
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  68 =>
---#line  639
+--#line  638
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  69 =>
---#line  642
+--#line  641
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  70 =>
---#line  643
+--#line  642
  
 	
 yyval := (One_Tree, Invocation.Make(
@@ -1158,7 +1158,7 @@ yy.value_stack(yy.tos).List));
     
 
 when  71 =>
---#line  652
+--#line  651
 
 	
 yyval := 
@@ -1166,13 +1166,13 @@ yy.value_stack(yy.tos-1);
     
 
 when  72 =>
---#line  657
+--#line  656
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  73 =>
---#line  658
+--#line  657
 
 	
 yyval := 
@@ -1183,7 +1183,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  74 =>
---#line  665
+--#line  664
 
 	Annotation.Add_Annotation(
 yy.value_stack(yy.tos-1).Tree, 
@@ -1197,7 +1197,7 @@ yy.value_stack(yy.tos-1).Tree)));
     
 
 when  75 =>
---#line  670
+--#line  669
 
 	
 yyval := 
@@ -1223,33 +1223,33 @@ yy.value_stack(yy.tos).List);
     
 
 when  76 =>
---#line  687
+--#line  686
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  77 =>
---#line  688
+--#line  687
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  78 =>
---#line  694
+--#line  693
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  79 =>
---#line  695
+--#line  694
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  80 =>
---#line  701
+--#line  700
 
 	
 yyval := (One_Tree, Type_Decl.Make(
@@ -1261,7 +1261,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  81 =>
---#line  707
+--#line  706
  
 	
 yyval := (One_Tree, Type_Decl.Make(
@@ -1272,7 +1272,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  82 =>
---#line  715
+--#line  714
 
         if ParaSail_Lex.Debug_Indent
           and then ParaSail_Lex.Expecting_Indent
@@ -1286,18 +1286,18 @@ yy.value_stack(yy.tos);
     
 
 when  83 =>
---#line  726
+--#line  725
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  84 =>
---#line  727
+--#line  726
  
 yyval := (One_Tree, Null_Optional_Tree); 
 
 when  85 =>
---#line  733
+--#line  732
 
 	-- "simple_expression" to avoid use of '>'
 	
@@ -1324,18 +1324,18 @@ yy.value_stack(yy.tos).Tree, I)));
     
 
 when  86 =>
---#line  752
+--#line  751
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  87 =>
---#line  753
+--#line  752
  
 yyval := (One_Tree, Null_Optional_Tree); 
 
 when  88 =>
---#line  757
+--#line  756
 
 	
 yyval := (One_Tree, PSC.Trees.Identifier.Make(
@@ -1344,7 +1344,7 @@ yy.value_stack(yy.tos).Source_Pos));
     
 
 when  89 =>
---#line  766
+--#line  765
 
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -1352,7 +1352,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  90 =>
---#line  769
+--#line  768
 
 	
 yyval := 
@@ -1363,19 +1363,19 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  91 =>
---#line  776
+--#line  775
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  92 =>
---#line  777
+--#line  776
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  93 =>
---#line  780
+--#line  779
 
 	
 yyval := (One_Tree, Qualifier.Qualify(
@@ -1385,7 +1385,7 @@ yy.value_stack(yy.tos-1).Tree));
     
 
 when  94 =>
---#line  787
+--#line  786
  
 	
 yyval := 
@@ -1393,7 +1393,7 @@ yy.value_stack(yy.tos);
     
 
 when  95 =>
---#line  790
+--#line  789
 
 	
 yyval := (One_Tree, Qualified_Name.Make(
@@ -1404,7 +1404,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  96 =>
---#line  795
+--#line  794
 
         --  Using Rust's "TurboFish" notation to provide module params
         
@@ -1417,13 +1417,13 @@ yy.value_stack(yy.tos-1).List));
     
 
 when  97 =>
---#line  805
+--#line  804
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  98 =>
---#line  806
+--#line  805
 
         -- String_Literal can be used as a "name" when it is an operator
 	
@@ -1433,7 +1433,7 @@ yy.value_stack(yy.tos).Source_Pos));
     
 
 when  99 =>
---#line  813
+--#line  812
 
         
 yyval := (Input_And_Global_Lists, Global_Read_List => 
@@ -1442,7 +1442,7 @@ yy.value_stack(yy.tos).List,
     
 
 when  100 =>
---#line  817
+--#line  816
 
         
 yyval := (Input_And_Global_Lists,
@@ -1454,7 +1454,7 @@ yy.value_stack(yy.tos).List,
     
 
 when  101 =>
---#line  823
+--#line  822
 
         
 yyval := (Input_And_Global_Lists, Global_Update_List => 
@@ -1463,7 +1463,7 @@ yy.value_stack(yy.tos).List,
     
 
 when  102 =>
---#line  830
+--#line  829
 
 	
 yyval := 
@@ -1471,7 +1471,7 @@ yy.value_stack(yy.tos);
     
 
 when  103 =>
---#line  836
+--#line  835
 
 	
 yyval := 
@@ -1479,7 +1479,7 @@ yy.value_stack(yy.tos);
     
 
 when  104 =>
---#line  842
+--#line  841
 
 	
 yyval := (One_Tree, Invocation.Make(
@@ -1491,7 +1491,7 @@ yy.value_stack(yy.tos-1).List));
     
 
 when  105 =>
---#line  848
+--#line  847
 
 	-- Include extension label in module name
 	
@@ -1509,33 +1509,33 @@ yy.value_stack(yy.tos-1).List));
     
 
 when  106 =>
---#line  862
+--#line  861
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  107 =>
---#line  863
+--#line  862
  
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  108 =>
---#line  869
+--#line  868
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  109 =>
---#line  870
+--#line  869
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  110 =>
---#line  876
+--#line  875
 
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -1543,7 +1543,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  111 =>
---#line  879
+--#line  878
 
 	
 yyval := 
@@ -1554,13 +1554,13 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  112 =>
---#line  886
+--#line  885
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  113 =>
---#line  887
+--#line  886
 
 	
 yyval := (One_Tree, Reference.Make(
@@ -1571,7 +1571,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  114 =>
---#line  896
+--#line  895
  
 	-- polymorphic type name not allowed here
 	
@@ -1583,7 +1583,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  115 =>
---#line  901
+--#line  900
  
 	
 yyval := 
@@ -1594,7 +1594,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  116 =>
---#line  905
+--#line  904
 
 	-- This is a polymorphic type name, presumably.
 	-- We use adding_expression instead of qualified_name
@@ -1607,37 +1607,37 @@ yy.value_stack(yy.tos-1).Tree));
     
 
 when  117 =>
---#line  913
+--#line  912
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  118 =>
---#line  915
+--#line  914
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  119 =>
---#line  916
+--#line  915
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  120 =>
---#line  917
+--#line  916
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  121 =>
---#line  921
+--#line  920
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  122 =>
---#line  922
+--#line  921
 
 	
 yyval := 
@@ -1648,7 +1648,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  123 =>
---#line  926
+--#line  925
 
         
 yyval := 
@@ -1656,7 +1656,7 @@ yy.value_stack(yy.tos);
     
 
 when  124 =>
---#line  929
+--#line  928
 
         
 yyval := 
@@ -1664,7 +1664,7 @@ yy.value_stack(yy.tos);
     
 
 when  125 =>
---#line  935
+--#line  934
 
         
 yyval := (One_Tree, Invocation.Make
@@ -1677,7 +1677,7 @@ yy.value_stack(yy.tos-2).Source_Pos));
     
 
 when  126 =>
---#line  945
+--#line  944
 
         
 yyval := 
@@ -1685,7 +1685,7 @@ yy.value_stack(yy.tos);
     
 
 when  127 =>
---#line  948
+--#line  947
 
         
 yyval := 
@@ -1696,7 +1696,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  128 =>
---#line  952
+--#line  951
 
 	yyerror("Tuple types must be separated by "";""",
           At_Token => 
@@ -1710,7 +1710,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  129 =>
---#line  961
+--#line  960
 
       declare
 	Id_List : Lists.List := 
@@ -1747,19 +1747,19 @@ yy.value_stack(yy.tos).Tree, I),
     
 
 when  130 =>
---#line  994
+--#line  993
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  131 =>
---#line  995
+--#line  994
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  132 =>
---#line  999
+--#line  998
  
 	
 yyval := 
@@ -1767,7 +1767,7 @@ yy.value_stack(yy.tos);
     
 
 when  133 =>
---#line  1002
+--#line  1001
  
 	
 yyval := 
@@ -1775,7 +1775,7 @@ yy.value_stack(yy.tos);
     
 
 when  134 =>
---#line  1005
+--#line  1004
  
 	
 yyval := (One_Tree, Invocation.Add_Extends(
@@ -1786,7 +1786,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  135 =>
---#line  1013
+--#line  1012
  
 	
 yyval := (One_Tree, Qualifier.Qualify(
@@ -1800,7 +1800,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  136 =>
---#line  1020
+--#line  1019
  
 	
 yyval := (One_Tree, Qualifier.Qualify(
@@ -1814,7 +1814,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  137 =>
---#line  1028
+--#line  1027
  
 	
 yyval := (One_Tree, Qualifier.Qualify(
@@ -1831,7 +1831,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  138 =>
---#line  1040
+--#line  1039
  
 	
 yyval := (Construct_Qualifier,
@@ -1844,7 +1844,7 @@ yy.value_stack(yy.tos).Is_Present,
     
 
 when  139 =>
---#line  1047
+--#line  1046
 
 	
 yyval := (Construct_Qualifier, 
@@ -1854,21 +1854,21 @@ yy.value_stack(yy.tos).Source_Pos,
     
 
 when  140 =>
---#line  1055
+--#line  1054
 
 	
 yyval := (Optional, True);
     
 
 when  141 =>
---#line  1058
+--#line  1057
 
 	
 yyval := (Optional, False);
     
 
 when  142 =>
---#line  1064
+--#line  1063
 
 	
 yyval := (One_Tree, Operation.Make(
@@ -1894,7 +1894,7 @@ yy.value_stack(yy.tos-1)));
     
 
 when  143 =>
---#line  1081
+--#line  1080
 
 	
 yyval := (One_Tree, Operation.Make(
@@ -1921,12 +1921,12 @@ yy.value_stack(yy.tos-3)));
     
 
 when  144 =>
---#line  1100
+--#line  1099
  
 yyval := (One_List, Lists.Empty_List); 
 
 when  145 =>
---#line  1101
+--#line  1100
 
 	if Lists.Is_Empty(
 yy.value_stack(yy.tos-1).List) then
@@ -1953,14 +1953,14 @@ yy.value_stack(yy.tos).List);
     
 
 when  148 =>
---#line  1120
+--#line  1119
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  149 =>
---#line  1123
+--#line  1122
 
 	
 yyval := 
@@ -1979,7 +1979,7 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  150 =>
---#line  1132
+--#line  1131
 
 	
 yyval := 
@@ -1998,7 +1998,7 @@ yy.value_stack(yy.tos-1).Tree);
     
 
 when  151 =>
---#line  1141
+--#line  1140
 
 	
 yyval := 
@@ -2017,7 +2017,7 @@ yy.value_stack(yy.tos-1).Tree);
     
 
 when  152 =>
---#line  1154
+--#line  1153
 
 	
 yyval := 
@@ -2025,50 +2025,50 @@ yy.value_stack(yy.tos-2);
     
 
 when  153 =>
---#line  1160
+--#line  1159
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  154 =>
---#line  1161
+--#line  1160
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  155 =>
---#line  1165
+--#line  1164
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  156 =>
---#line  1166
+--#line  1165
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  157 =>
---#line  1167
+--#line  1166
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  158 =>
---#line  1171
+--#line  1170
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  159 =>
---#line  1172
+--#line  1171
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  160 =>
---#line  1178
+--#line  1177
  
       declare
 	Elem_List : Lists.List := 
@@ -2088,7 +2088,7 @@ yyval := (One_List, Lists.Make((1 => Implements_Element.Make(
     
 
 when  161 =>
---#line  1192
+--#line  1191
 
       declare
 	Elem_List : Lists.List := 
@@ -2109,7 +2109,7 @@ yy.value_stack(yy.tos-2).List, Elements => Elem_List))));
     
 
 when  162 =>
---#line  1206
+--#line  1205
 
       declare
 	Elem_List : Lists.List := 
@@ -2133,32 +2133,32 @@ yy.value_stack(yy.tos-2).List, Elements => Elem_List));
     
 
 when  165 =>
---#line  1224
+--#line  1223
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  166 =>
---#line  1225
+--#line  1224
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  167 =>
---#line  1229
+--#line  1228
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  168 =>
---#line  1230
+--#line  1229
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  169 =>
---#line  1236
+--#line  1235
  
       declare
 	Elem_List : Lists.List := 
@@ -2172,7 +2172,7 @@ yyval := (One_List, Lists.Make((1 => Implements_Element.Make(
     
 
 when  170 =>
---#line  1246
+--#line  1245
  
       declare
 	Elem_List : Lists.List := 
@@ -2187,7 +2187,7 @@ yy.value_stack(yy.tos-1).List,
     
 
 when  171 =>
---#line  1256
+--#line  1255
 
       declare
 	Elem_List : Lists.List := 
@@ -2205,7 +2205,7 @@ yy.value_stack(yy.tos-1).List, Elements => Elem_List));
     
 
 when  172 =>
---#line  1269
+--#line  1268
 
       
 yyval := (One_Tree, Operation.Add_Import_Info(
@@ -2215,7 +2215,7 @@ yy.value_stack(yy.tos).List));
     
 
 when  173 =>
---#line  1273
+--#line  1272
 
       
 yyval := (One_Tree, Operation.Add_Import_Info(
@@ -2225,7 +2225,7 @@ yy.value_stack(yy.tos).List));
     
 
 when  175 =>
---#line  1281
+--#line  1280
 
         --  Pop the indent stack
         if ParaSail_Lex.Debug_Indent then
@@ -2235,7 +2235,7 @@ when  175 =>
     
 
 when  176 =>
---#line  1290
+--#line  1289
 
 	
 yyval := (One_Tree, Operation.Add_Op_Equiv(
@@ -2245,7 +2245,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  177 =>
---#line  1294
+--#line  1293
 
 	
 yyval := (One_Tree, Operation.Add_Op_Equiv(
@@ -2255,7 +2255,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  178 =>
---#line  1298
+--#line  1297
 
 	-- Indicate that operation should be found in given type
 	
@@ -2266,7 +2266,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  179 =>
---#line  1303
+--#line  1302
 
 	-- Indicate that operation should be found in given type
 	
@@ -2277,7 +2277,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  180 =>
---#line  1308
+--#line  1307
 
 	
 yyval := (One_Tree, Operation.Add_Op_Equiv(
@@ -2292,7 +2292,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  181 =>
---#line  1314
+--#line  1313
 
 	
 yyval := (One_Tree, Operation.Add_Op_Equiv(
@@ -2307,7 +2307,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  182 =>
---#line  1320
+--#line  1319
 
         declare
 	    Op_Decl : Operation.Tree := 
@@ -2332,7 +2332,7 @@ yy.value_stack(yy.tos).Source_Pos);
     
 
 when  183 =>
---#line  1336
+--#line  1335
 
         declare
 	    Op_Decl : Operation.Tree := 
@@ -2357,7 +2357,7 @@ yy.value_stack(yy.tos).Source_Pos);
     
 
 when  184 =>
---#line  1352
+--#line  1351
 
 	
 yyval := (One_Tree, Operation.Add_Op_Equiv(
@@ -2371,7 +2371,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  185 =>
---#line  1360
+--#line  1359
 
 	
 yyval := (One_Tree, Operation.Add_Op_Equiv(
@@ -2385,7 +2385,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  186 =>
---#line  1368
+--#line  1367
 
 	
 yyval := (One_Tree, Operation.Add_Op_Equiv(
@@ -2404,7 +2404,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  187 =>
---#line  1378
+--#line  1377
 
 	
 yyval := (One_Tree, Operation.Add_Op_Equiv(
@@ -2423,7 +2423,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  188 =>
---#line  1388
+--#line  1387
 
         declare
 	    Op_Decl : Operation.Tree := 
@@ -2452,7 +2452,7 @@ yy.value_stack(yy.tos).Source_Pos);
     
 
 when  189 =>
---#line  1408
+--#line  1407
 
         declare
 	    Op_Decl : Operation.Tree := 
@@ -2481,7 +2481,7 @@ yy.value_stack(yy.tos).Source_Pos);
     
 
 when  190 =>
---#line  1437
+--#line  1436
 
         -- TBD: allow an annotation after class_element_list
 	
@@ -2530,7 +2530,7 @@ yy.value_stack(yy.tos).Label);
    
 
 when  191 =>
---#line  1471
+--#line  1470
 
         -- TBD: allow an annotation after class_element_list
 	
@@ -2580,7 +2580,7 @@ yy.value_stack(yy.tos).Label);
    
 
 when  192 =>
---#line  1503
+--#line  1502
 
         
 yyval := (Optional_End_Token, Check_Label => False,
@@ -2589,7 +2589,7 @@ yyval := (Optional_End_Token, Check_Label => False,
     
 
 when  193 =>
---#line  1508
+--#line  1507
 
         
 yyval := (Optional_End_Token, Check_Label => True,
@@ -2600,18 +2600,18 @@ yy.value_stack(yy.tos-1).Tree, others => Null_Optional_Tree);
     
 
 when  195 =>
---#line  1516
+--#line  1515
 
 	yyerror("Should be ""end class <id>"" rather than ""end <id>""");
     
 
 when  196 =>
---#line  1521
+--#line  1520
  
 yyval := (One_List, Lists.Empty_List); 
 
 when  197 =>
---#line  1522
+--#line  1521
 
 	if Lists.Is_Empty(
 yy.value_stack(yy.tos).List) then
@@ -2626,7 +2626,7 @@ yy.value_stack(yy.tos);
     
 
 when  198 =>
---#line  1534
+--#line  1533
 
 	
 yyval := (Two_Lists, Lists.Empty_List, 
@@ -2634,7 +2634,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  199 =>
---#line  1545
+--#line  1544
 
 	-- Include annotation at end of locals
       declare
@@ -2654,7 +2654,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  200 =>
---#line  1557
+--#line  1556
 
 	yyerror("Missing ""exports"" keyword");
 	
@@ -2663,14 +2663,14 @@ yy.value_stack(yy.tos).List);
     
 
 when  204 =>
---#line  1565
+--#line  1564
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  205 =>
---#line  1568
+--#line  1567
 
 	
 yyval := 
@@ -2681,38 +2681,38 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  206 =>
---#line  1575
+--#line  1574
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  207 =>
---#line  1576
+--#line  1575
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  208 =>
---#line  1577
+--#line  1576
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  209 =>
---#line  1578
+--#line  1577
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  210 =>
---#line  1581
+--#line  1580
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  211 =>
---#line  1584
+--#line  1583
 
 	
 yyval := 
@@ -2723,7 +2723,7 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  212 =>
---#line  1588
+--#line  1587
 
 	
 yyval := 
@@ -2734,7 +2734,7 @@ yy.value_stack(yy.tos-1).Tree);
     
 
 when  213 =>
---#line  1592
+--#line  1591
 
 	
 yyval := 
@@ -2745,7 +2745,7 @@ yy.value_stack(yy.tos-1).Tree);
     
 
 when  214 =>
---#line  1596
+--#line  1595
 
 	yyerror("This kind of declaration not permitted after ""exports""",
           At_Token => 
@@ -2759,7 +2759,7 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  215 =>
---#line  1602
+--#line  1601
 
 	
 yyval := 
@@ -2767,13 +2767,13 @@ yy.value_stack(yy.tos-2);
     
 
 when  216 =>
---#line  1608
+--#line  1607
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  217 =>
---#line  1609
+--#line  1608
  
 	
 yyval := (One_Tree, Annotation.Make(Annotations => 
@@ -2781,7 +2781,7 @@ yy.value_stack(yy.tos).List));
     
 
 when  218 =>
---#line  1612
+--#line  1611
 
 	
 yyval := 
@@ -2792,37 +2792,37 @@ yy.value_stack(yy.tos-1).List, Precedes => True);
     
 
 when  219 =>
---#line  1619
+--#line  1618
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  220 =>
---#line  1620
+--#line  1619
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  221 =>
---#line  1621
+--#line  1620
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  222 =>
---#line  1625
+--#line  1624
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  223 =>
---#line  1626
+--#line  1625
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  224 =>
---#line  1627
+--#line  1626
 
 	
 yyval := 
@@ -2833,13 +2833,13 @@ yy.value_stack(yy.tos).List);
     
 
 when  225 =>
---#line  1634
+--#line  1633
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  226 =>
---#line  1635
+--#line  1634
 
 	
 yyval := 
@@ -2850,13 +2850,13 @@ yy.value_stack(yy.tos-1).List);
     
 
 when  227 =>
---#line  1641
+--#line  1640
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  228 =>
---#line  1642
+--#line  1641
 
 	
 yyval := 
@@ -2867,7 +2867,7 @@ yy.value_stack(yy.tos-1).List);
     
 
 when  229 =>
---#line  1649
+--#line  1648
 
         
 yyval := 
@@ -2875,7 +2875,7 @@ yy.value_stack(yy.tos);
     
 
 when  230 =>
---#line  1652
+--#line  1651
 
         --  A labeled annotation list becomes a separate nested annotation
         
@@ -2887,7 +2887,7 @@ yy.value_stack(yy.tos-1).Tree))));
     
 
 when  231 =>
---#line  1662
+--#line  1661
 
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -2895,7 +2895,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  232 =>
---#line  1665
+--#line  1664
 
 	
 yyval := 
@@ -2906,7 +2906,7 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  233 =>
---#line  1669
+--#line  1668
 
 	
 yyval := 
@@ -2914,37 +2914,37 @@ yy.value_stack(yy.tos-2);
     
 
 when  234 =>
---#line  1675
+--#line  1674
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  235 =>
---#line  1676
+--#line  1675
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  236 =>
---#line  1677
+--#line  1676
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  237 =>
---#line  1678
+--#line  1677
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  238 =>
---#line  1679
+--#line  1678
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  239 =>
---#line  1680
+--#line  1679
 
         --  An annotation of the form <property_id> => <expression>
         --  is used to associate a property with a declaration,
@@ -2959,7 +2959,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  240 =>
---#line  1689
+--#line  1688
 
 	-- Nested annotations are intended to represent
 	-- "correctness" rather than "safety" concerns,
@@ -2972,25 +2972,25 @@ yy.value_stack(yy.tos).List));
     
 
 when  241 =>
---#line  1699
+--#line  1698
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  242 =>
---#line  1702
+--#line  1701
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  243 =>
---#line  1703
+--#line  1702
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  244 =>
---#line  1708
+--#line  1707
 
 	
 yyval := (One_Tree, Operation.Make(
@@ -3021,7 +3021,7 @@ yy.value_stack(yy.tos-3)));
     
 
 when  245 =>
---#line  1727
+--#line  1726
 
 	
 yyval := (One_Tree, Operation.Make(
@@ -3054,7 +3054,7 @@ yy.value_stack(yy.tos-6)));
     
 
 when  246 =>
---#line  1747
+--#line  1746
  
 	
 yyval := (Construct_Qualifier,
@@ -3064,7 +3064,7 @@ yy.value_stack(yy.tos).Source_Pos,
     
 
 when  247 =>
---#line  1752
+--#line  1751
  
 	
 yyval := (Construct_Qualifier,
@@ -3074,14 +3074,14 @@ yy.value_stack(yy.tos).Source_Pos,
     
 
 when  248 =>
---#line  1757
+--#line  1756
  
 yyval := (Construct_Qualifier,
              Source_Pos => PSC.Source_Positions.Null_Source_Position,
              others => False); 
 
 when  249 =>
---#line  1763
+--#line  1762
  
 	
 yyval := (Construct_Qualifier, 
@@ -3092,7 +3092,7 @@ yy.value_stack(yy.tos).Is_Present, others => False);
     
 
 when  250 =>
---#line  1768
+--#line  1767
  
 	
 yyval := (Construct_Qualifier, 
@@ -3103,7 +3103,7 @@ yy.value_stack(yy.tos).Is_Present, others => False);
     
 
 when  251 =>
---#line  1773
+--#line  1772
  
 	
 yyval := (Construct_Qualifier, 
@@ -3113,21 +3113,21 @@ yy.value_stack(yy.tos).Is_Present, others => False);
     
 
 when  252 =>
---#line  1781
+--#line  1780
 
 	
 yyval := (Optional, Is_Present => True);
     
 
 when  253 =>
---#line  1784
+--#line  1783
 
 	
 yyval := (Optional, Is_Present => False);
     
 
 when  254 =>
---#line  1790
+--#line  1789
  
 	
 yyval := (One_Tree, PSC.Trees.Identifier.Make(
@@ -3136,7 +3136,7 @@ yy.value_stack(yy.tos).Source_Pos));
     
 
 when  255 =>
---#line  1793
+--#line  1792
 
 	yyerror("Operator designator must be in quotes");
 	
@@ -3145,13 +3145,13 @@ yy.value_stack(yy.tos);
     
 
 when  257 =>
---#line  1800
+--#line  1799
 
 	yyerror("Use ""->"" in ParaSail rather than ""return""");
     
 
 when  258 =>
---#line  1806
+--#line  1805
 
 	
 yyval := 
@@ -3171,7 +3171,7 @@ yy.value_stack(yy.tos-1).Is_Queued;
     
 
 when  259 =>
---#line  1820
+--#line  1819
 
 	
 yyval := (One_Tree, Operation.Make(
@@ -3199,7 +3199,7 @@ yy.value_stack(yy.tos-3)));
     
 
 when  260 =>
---#line  1838
+--#line  1837
 
 	
 yyval := (One_Tree, Operation.Make(
@@ -3229,7 +3229,7 @@ yy.value_stack(yy.tos-6)));
     
 
 when  261 =>
---#line  1858
+--#line  1857
 
         if Qualified_Name.Contains_String (
 yy.value_stack(yy.tos).Tree) then
@@ -3241,7 +3241,7 @@ yy.value_stack(yy.tos);
     
 
 when  262 =>
---#line  1867
+--#line  1866
  
 	
 yyval := (Input_And_Global_Lists,
@@ -3251,7 +3251,7 @@ yy.value_stack(yy.tos).Tree)),
     
 
 when  263 =>
---#line  1872
+--#line  1871
 
 	
 yyval := 
@@ -3259,7 +3259,7 @@ yy.value_stack(yy.tos-1);
     
 
 when  264 =>
---#line  1875
+--#line  1874
 
       declare
 	Id_List : Lists.List := 
@@ -3286,7 +3286,7 @@ yyval.Inputs_List, Param_Decl.Make(
     
 
 when  265 =>
---#line  1894
+--#line  1893
 
 	yyerror("ParaSail requires at least ""()"" in operation definition");
 	
@@ -3294,19 +3294,19 @@ yyval := (Input_And_Global_Lists, others => Lists.Empty_List);
     
 
 when  266 =>
---#line  1901
+--#line  1900
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  267 =>
---#line  1902
+--#line  1901
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  268 =>
---#line  1903
+--#line  1902
 
         yyerror ("Expecting one ')'", At_Token => 
 yy.value_stack(yy.tos));
@@ -3317,7 +3317,7 @@ yyval := (One_Token,
     
 
 when  269 =>
---#line  1913
+--#line  1912
 
 	
 yyval := (One_Tree, Param_Decl.Make(
@@ -3339,7 +3339,7 @@ yy.value_stack(yy.tos).Tree),
     
 
 when  270 =>
---#line  1925
+--#line  1924
 
 	
 yyval := (One_Tree, Param_Decl.Make(
@@ -3360,7 +3360,7 @@ yy.value_stack(yy.tos).Tree),
     
 
 when  271 =>
---#line  1937
+--#line  1936
  
 	
 yyval := (One_Tree, Param_Decl.Make(
@@ -3375,13 +3375,13 @@ yy.value_stack(yy.tos).Tree,
     
 
 when  272 =>
---#line  1949
+--#line  1948
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  273 =>
---#line  1950
+--#line  1949
 
 	
 yyval := (Param_Mode, 
@@ -3390,13 +3390,13 @@ yyval := (Param_Mode,
     
 
 when  274 =>
---#line  1958
+--#line  1957
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  275 =>
---#line  1959
+--#line  1958
 
 	
 yyval := (Param_Mode, 
@@ -3405,7 +3405,7 @@ yyval := (Param_Mode,
     
 
 when  276 =>
---#line  1964
+--#line  1963
 
 	
 yyval := (Param_Mode, 
@@ -3414,7 +3414,7 @@ yyval := (Param_Mode,
     
 
 when  277 =>
---#line  1969
+--#line  1968
 
 	
 yyval := (Param_Mode, 
@@ -3424,7 +3424,7 @@ yy.value_stack(yy.tos).Param_Kind,
     
 
 when  278 =>
---#line  1974
+--#line  1973
 
 	
 yyval := (Param_Mode, 
@@ -3433,7 +3433,7 @@ yyval := (Param_Mode,
     
 
 when  279 =>
---#line  1979
+--#line  1978
 
 	
 yyval := (Param_Mode, 
@@ -3442,7 +3442,7 @@ yyval := (Param_Mode,
     
 
 when  280 =>
---#line  1984
+--#line  1983
 
 	
 yyval := (Param_Mode, 
@@ -3452,7 +3452,7 @@ yy.value_stack(yy.tos).Param_Kind,
     
 
 when  281 =>
---#line  1989
+--#line  1988
 
 	
 yyval := (Param_Mode, 
@@ -3461,13 +3461,13 @@ yyval := (Param_Mode,
     
 
 when  282 =>
---#line  1997
+--#line  1996
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  283 =>
---#line  1998
+--#line  1997
 
 	
 yyval := (Param_Mode, 
@@ -3476,7 +3476,7 @@ yyval := (Param_Mode,
     
 
 when  284 =>
---#line  2006
+--#line  2005
 
 	
 yyval := (Param_Mode, 
@@ -3485,7 +3485,7 @@ yyval := (Param_Mode,
     
 
 when  285 =>
---#line  2011
+--#line  2010
 
 	
 yyval := (Param_Mode, 
@@ -3494,7 +3494,7 @@ yyval := (Param_Mode,
     
 
 when  286 =>
---#line  2016
+--#line  2015
 
 	
 yyval := (Param_Mode, 
@@ -3503,7 +3503,7 @@ yyval := (Param_Mode,
     
 
 when  287 =>
---#line  2024
+--#line  2023
 
       
 yyval := (Input_And_Global_Lists,
@@ -3512,7 +3512,7 @@ yy.value_stack(yy.tos).List, others => Lists.Empty_List);
     
 
 when  288 =>
---#line  2028
+--#line  2027
 
         
 yyval := 
@@ -3523,7 +3523,7 @@ yy.value_stack(yy.tos-2).List;
     
 
 when  289 =>
---#line  2032
+--#line  2031
 
         
 yyval := 
@@ -3531,20 +3531,20 @@ yy.value_stack(yy.tos);
     
 
 when  290 =>
---#line  2035
+--#line  2034
 
 	
 yyval := (Input_And_Global_Lists, others => Lists.Empty_List);
     
 
 when  291 =>
---#line  2041
+--#line  2040
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  292 =>
---#line  2042
+--#line  2041
 
 	
 yyval := 
@@ -3555,7 +3555,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  293 =>
---#line  2049
+--#line  2048
 
         
 yyval := 
@@ -3572,7 +3572,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  294 =>
---#line  2057
+--#line  2056
 
 	-- Add annotations to first/last element of list
 	
@@ -3594,7 +3594,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  295 =>
---#line  2073
+--#line  2072
 
 	
 yyval := (One_List, Lists.Empty_List);
@@ -3622,7 +3622,7 @@ yy.value_stack(yy.tos).Tree, I)));
     
 
 when  296 =>
---#line  2091
+--#line  2090
 
 	
 yyval := (One_List, Lists.Empty_List);
@@ -3652,7 +3652,7 @@ yy.value_stack(yy.tos).Tree, I)));
     
 
 when  297 =>
---#line  2107
+--#line  2106
 
 	
 yyval := (One_List, Lists.Make((1 => Param_Decl.Make(
@@ -3667,7 +3667,7 @@ yy.value_stack(yy.tos).Tree))));
     
 
 when  298 =>
---#line  2117
+--#line  2116
 
 	
 yyval := (One_List, Lists.Make((1 => Param_Decl.Make(
@@ -3689,7 +3689,7 @@ yy.value_stack(yy.tos).Tree))));
     
 
 when  299 =>
---#line  2129
+--#line  2128
 
 	
 yyval := (One_List, Lists.Make((1 => Param_Decl.Make(
@@ -3706,7 +3706,7 @@ yy.value_stack(yy.tos).Tree))));
     
 
 when  300 =>
---#line  2139
+--#line  2138
 
 	
 yyval := (One_List, Lists.Make((1 => Param_Decl.Make(
@@ -3726,12 +3726,12 @@ yy.value_stack(yy.tos).Tree))));
     
 
 when  301 =>
---#line  2151
+--#line  2150
 
 	
 yyval := 
 yy.value_stack(yy.tos-1);
-	-- Set Is_Implicit_Module_Param and input-mode info on each parameter
+	-- Set Is_Implicit_Module_Param on each parameter
 	for I in 1..Lists.Length(
 yyval.List) loop
 	  declare
@@ -3740,22 +3740,18 @@ yyval.List) loop
 yyval.List, I)).all);
 	  begin
 	    Param_Decl_Tree.Is_Implicit_Module_Param := True;
-	    Param_Decl_Tree.Kind := 
-yy.value_stack(yy.tos-2).Param_Kind;
-	    Param_Decl_Tree.Locking := 
-yy.value_stack(yy.tos-2).Param_Locking;
 	  end;
 	end loop;
     
 
 when  302 =>
---#line  2168
+--#line  2165
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  303 =>
---#line  2169
+--#line  2166
 
 	
 yyval := (Construct_Qualifier,
@@ -3764,25 +3760,25 @@ yyval := (Construct_Qualifier,
     
 
 when  304 =>
---#line  2177
+--#line  2174
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  305 =>
---#line  2178
+--#line  2175
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  306 =>
---#line  2182
+--#line  2179
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  307 =>
---#line  2183
+--#line  2180
 
          -- NOTE: Operation can have "type" parameters 
          -- such as "Left_Type is Integer<>"
@@ -3796,7 +3792,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  308 =>
---#line  2191
+--#line  2188
 
         
 yyval := 
@@ -3804,7 +3800,7 @@ yy.value_stack(yy.tos);
     
 
 when  309 =>
---#line  2197
+--#line  2194
 
 	
 yyval := (Construct_Qualifier,
@@ -3815,13 +3811,13 @@ yy.value_stack(yy.tos).Source_Pos,
     
 
 when  310 =>
---#line  2206
+--#line  2203
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  311 =>
---#line  2207
+--#line  2204
 
 	
 yyval := (Construct_Qualifier,
@@ -3830,7 +3826,7 @@ yyval := (Construct_Qualifier,
     
 
 when  312 =>
---#line  2215
+--#line  2212
 
 	
 yyval := (Construct_Qualifier,
@@ -3841,7 +3837,7 @@ yy.value_stack(yy.tos).Source_Pos,
     
 
 when  313 =>
---#line  2224
+--#line  2221
 
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -3849,7 +3845,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  314 =>
---#line  2227
+--#line  2224
 
 	Annotation.Add_Annotation(
 yy.value_stack(yy.tos).Tree, 
@@ -3860,7 +3856,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  315 =>
---#line  2231
+--#line  2228
 
 	
 yyval := 
@@ -3868,7 +3864,7 @@ yy.value_stack(yy.tos-1);
     
 
 when  316 =>
---#line  2234
+--#line  2231
 
       declare
 	Id_List : Lists.List := 
@@ -3895,7 +3891,7 @@ yyval.List, Param_Decl.Make(
     
 
 when  317 =>
---#line  2253
+--#line  2250
 
       declare
 	Id_List : Lists.List := 
@@ -3922,7 +3918,7 @@ yyval.List, Param_Decl.Make(
     
 
 when  318 =>
---#line  2276
+--#line  2273
 
 	
 yyval := (One_Tree, Param_Decl.Make(
@@ -3944,7 +3940,7 @@ yy.value_stack(yy.tos).Tree),
     
 
 when  319 =>
---#line  2288
+--#line  2285
 
 	
 yyval := (One_Tree, Param_Decl.Make(
@@ -3965,7 +3961,7 @@ yy.value_stack(yy.tos).Tree),
     
 
 when  320 =>
---#line  2300
+--#line  2297
 
 	
 yyval := (One_Tree, Param_Decl.Make(
@@ -3981,7 +3977,7 @@ yy.value_stack(yy.tos).Tree,
     
 
 when  321 =>
---#line  2310
+--#line  2307
 
 	
 yyval := (One_Tree, Param_Decl.Make(
@@ -4001,7 +3997,7 @@ yy.value_stack(yy.tos).Tree),
     
 
 when  322 =>
---#line  2322
+--#line  2319
 
 	
 yyval := (One_Tree, Param_Decl.Make(
@@ -4020,7 +4016,7 @@ yy.value_stack(yy.tos).Tree),
     
 
 when  323 =>
---#line  2334
+--#line  2331
 
 	
 yyval := (One_Tree, Param_Decl.Make(
@@ -4034,7 +4030,7 @@ yy.value_stack(yy.tos).Tree,
     
 
 when  324 =>
---#line  2346
+--#line  2343
 
 	
 yyval := 
@@ -4042,7 +4038,7 @@ yy.value_stack(yy.tos);
     
 
 when  325 =>
---#line  2349
+--#line  2346
 
 	
 yyval := 
@@ -4053,7 +4049,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  326 =>
---#line  2356
+--#line  2353
 
 	if not Lists.Is_Empty(
 yy.value_stack(yy.tos).List) then
@@ -4074,7 +4070,7 @@ yy.value_stack(yy.tos-1);
     
 
 when  327 =>
---#line  2366
+--#line  2363
 
 	-- Add annotations to first/last element of list
 	
@@ -4098,7 +4094,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  328 =>
---#line  2382
+--#line  2379
 
 	
 yyval := (One_List, Lists.Empty_List);
@@ -4123,7 +4119,7 @@ yy.value_stack(yy.tos).Tree, I)),
     
 
 when  329 =>
---#line  2399
+--#line  2396
 
 	
 yyval := (One_List, Lists.Empty_List);
@@ -4150,7 +4146,7 @@ yy.value_stack(yy.tos).Tree, I)),
     
 
 when  330 =>
---#line  2414
+--#line  2411
 
 	
 yyval := (One_List, Lists.Make((1 => Param_Decl.Make(
@@ -4164,7 +4160,7 @@ yy.value_stack(yy.tos).Tree,
     
 
 when  331 =>
---#line  2423
+--#line  2420
 
 	
 yyval := (One_List, Lists.Make((1 => Param_Decl.Make(
@@ -4185,7 +4181,7 @@ yy.value_stack(yy.tos).Tree),
     
 
 when  332 =>
---#line  2435
+--#line  2432
 
 	
 yyval := (One_List, Lists.Make((1 => Param_Decl.Make(
@@ -4201,7 +4197,7 @@ yy.value_stack(yy.tos).Tree,
     
 
 when  333 =>
---#line  2444
+--#line  2441
 
 	
 yyval := (One_List, Lists.Make((1 => Param_Decl.Make(
@@ -4220,7 +4216,7 @@ yy.value_stack(yy.tos).Tree),
     
 
 when  334 =>
---#line  2460
+--#line  2457
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4239,7 +4235,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  335 =>
---#line  2472
+--#line  2469
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4258,7 +4254,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  336 =>
---#line  2483
+--#line  2480
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4276,7 +4272,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  337 =>
---#line  2496
+--#line  2493
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4293,7 +4289,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  338 =>
---#line  2508
+--#line  2505
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4310,7 +4306,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  339 =>
---#line  2520
+--#line  2517
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4327,7 +4323,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  340 =>
---#line  2531
+--#line  2528
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4346,7 +4342,7 @@ yy.value_stack(yy.tos).Tree,
     
 
 when  341 =>
---#line  2544
+--#line  2541
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4364,7 +4360,7 @@ yy.value_stack(yy.tos).Tree,
     
 
 when  342 =>
---#line  2558
+--#line  2555
 
 	yyerror("Must specify ""var,"" ""const,"" or ""ref""",
           At_Token => 
@@ -4384,52 +4380,52 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  343 =>
---#line  2573
+--#line  2570
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  344 =>
---#line  2574
+--#line  2571
 
 	
 yyval := (One_Tree, Null_Optional_Tree);
     
 
 when  345 =>
---#line  2580
+--#line  2577
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  346 =>
---#line  2581
+--#line  2578
 
 	
 yyval := (One_Tree, Null_Optional_Tree);
     
 
 when  347 =>
---#line  2587
+--#line  2584
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  348 =>
---#line  2588
+--#line  2585
 
 	
 yyval := (One_Tree, Null_Optional_Tree);
     
 
 when  349 =>
---#line  2593
+--#line  2590
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  350 =>
---#line  2596
+--#line  2593
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4447,7 +4443,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  351 =>
---#line  2607
+--#line  2604
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4463,7 +4459,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  352 =>
---#line  2617
+--#line  2614
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4479,7 +4475,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  353 =>
---#line  2627
+--#line  2624
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4495,7 +4491,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  354 =>
---#line  2637
+--#line  2634
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4512,7 +4508,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  355 =>
---#line  2648
+--#line  2645
 
 	
 yyval := (One_Tree, Obj_Decl.Make(
@@ -4529,25 +4525,25 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  356 =>
---#line  2661
+--#line  2658
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  357 =>
---#line  2662
+--#line  2659
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  358 =>
---#line  2665
+--#line  2662
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  359 =>
---#line  2668
+--#line  2665
 
 	
 yyval := (One_Tree, Type_Decl.Make(
@@ -4560,33 +4556,33 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  360 =>
---#line  2676
+--#line  2673
 
 	
 yyval := (Optional, True);
     
 
 when  361 =>
---#line  2679
+--#line  2676
 
 	
 yyval := (Optional, False);
     
 
 when  362 =>
---#line  2685
+--#line  2682
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  363 =>
---#line  2686
+--#line  2683
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  364 =>
---#line  2692
+--#line  2689
 
         declare
 	    Op_Decl : Operation.Tree := 
@@ -4612,7 +4608,7 @@ yy.value_stack(yy.tos).Label);
     
 
 when  365 =>
---#line  2710
+--#line  2707
 
         declare
 	    Op_Decl : Operation.Tree := 
@@ -4637,7 +4633,7 @@ yy.value_stack(yy.tos-1).Tree);
     
 
 when  366 =>
---#line  2727
+--#line  2724
 
         declare
 	    Op_Decl : Operation.Tree := 
@@ -4663,7 +4659,7 @@ yy.value_stack(yy.tos).Label);
     
 
 when  367 =>
---#line  2748
+--#line  2745
 
         declare
 	    Op_Decl : Operation.Tree := 
@@ -4689,7 +4685,7 @@ yy.value_stack(yy.tos).Label);
     
 
 when  368 =>
---#line  2766
+--#line  2763
 
         declare
 	    Op_Decl : Operation.Tree := 
@@ -4717,7 +4713,7 @@ yy.value_stack(yy.tos).Label);
     
 
 when  369 =>
---#line  2785
+--#line  2782
 
         declare
 	    Op_Decl : Operation.Tree := 
@@ -4743,7 +4739,7 @@ yy.value_stack(yy.tos-1).Tree);
     
 
 when  370 =>
---#line  2803
+--#line  2800
 
         declare
 	    Op_Decl : Operation.Tree := 
@@ -4771,7 +4767,7 @@ yy.value_stack(yy.tos-1).Tree);
     
 
 when  371 =>
---#line  2822
+--#line  2819
 
         declare
 	    Op_Decl : Operation.Tree := 
@@ -4797,7 +4793,7 @@ yy.value_stack(yy.tos).Label);
     
 
 when  372 =>
---#line  2840
+--#line  2837
 
         declare
 	    Op_Decl : Operation.Tree := 
@@ -4825,54 +4821,54 @@ yy.value_stack(yy.tos).Label);
     
 
 when  374 =>
---#line  2860
+--#line  2857
 
 	yyerror("Should be 'end op ""id""' not simply 'end ""id""'");
     
 
 when  376 =>
---#line  2866
+--#line  2863
 
 	yyerror("Should be ""end func <id>"" not simply ""end <id>""");
     
 
 when  377 =>
---#line  2872
+--#line  2869
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  378 =>
---#line  2873
+--#line  2870
  
 yyval := (One_Tree, Null_Optional_Tree); 
 
 when  379 =>
---#line  2877
+--#line  2874
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  380 =>
---#line  2878
+--#line  2875
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  381 =>
---#line  2881
+--#line  2878
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  382 =>
---#line  2883
+--#line  2880
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  383 =>
---#line  2887
+--#line  2884
 
 	
 yyval := (One_Tree, Conditionally_Complement(
@@ -4887,7 +4883,7 @@ yy.value_stack(yy.tos-3).Source_Pos);
     
 
 when  384 =>
---#line  2895
+--#line  2892
  
         --  Pop the indent stack
         if ParaSail_Lex.Debug_Indent then
@@ -4897,26 +4893,26 @@ when  384 =>
     
 
 when  386 =>
---#line  2905
+--#line  2902
 
         yyerror ("Syntax error before ':'", At_Token => 
 yy.value_stack(yy.tos));
     
 
 when  390 =>
---#line  2915
+--#line  2912
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  391 =>
---#line  2916
+--#line  2913
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  392 =>
---#line  2917
+--#line  2914
 
         yyerror("Extra ')'", At_Token => 
 yy.value_stack(yy.tos-1));
@@ -4926,7 +4922,7 @@ yy.value_stack(yy.tos);
     
 
 when  393 =>
---#line  2921
+--#line  2918
 
         yyerror("Syntax error in condition", At_Token => 
 yy.value_stack(yy.tos));
@@ -4936,7 +4932,7 @@ yy.value_stack(yy.tos);
     
 
 when  394 =>
---#line  2928
+--#line  2925
 
         
 yyval := (Optional_End_Token, Check_Label => False,
@@ -4945,7 +4941,7 @@ yyval := (Optional_End_Token, Check_Label => False,
     
 
 when  395 =>
---#line  2933
+--#line  2930
 
         
 yyval := (Optional_End_Token, Check_Label => True,
@@ -4956,7 +4952,7 @@ yy.value_stack(yy.tos-1).Tree, others => Null_Optional_Tree);
     
 
 when  396 =>
---#line  2941
+--#line  2938
 
         
 yyval := (Optional_End_Token, Check_Label => False,
@@ -4965,7 +4961,7 @@ yyval := (Optional_End_Token, Check_Label => False,
     
 
 when  397 =>
---#line  2946
+--#line  2943
 
         
 yyval := (Optional_End_Token, Check_Label => True,
@@ -4976,7 +4972,7 @@ yy.value_stack(yy.tos-1).Tree, others => Null_Optional_Tree);
     
 
 when  398 =>
---#line  2954
+--#line  2951
 
 	
 yyval := 
@@ -4984,25 +4980,25 @@ yy.value_stack(yy.tos-1);
     
 
 when  399 =>
---#line  2959
+--#line  2956
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  400 =>
---#line  2960
+--#line  2957
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  401 =>
---#line  2964
+--#line  2961
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  402 =>
---#line  2965
+--#line  2962
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -5014,13 +5010,13 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  403 =>
---#line  2974
+--#line  2971
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  404 =>
---#line  2975
+--#line  2972
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -5032,25 +5028,25 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  405 =>
---#line  2984
+--#line  2981
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  406 =>
---#line  2985
+--#line  2982
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  407 =>
---#line  2989
+--#line  2986
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  408 =>
---#line  2990
+--#line  2987
 
 	-- "then" forces sequential processing; it has lower precedence
 	-- than "||" so declarations preceding "then" are visible to both
@@ -5067,7 +5063,7 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  409 =>
---#line  3000
+--#line  2997
 
 	-- "then" forces sequential processing; it has lower precedence
 	-- than "||" so declarations preceding "then" are visible to both
@@ -5084,7 +5080,7 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  410 =>
---#line  3011
+--#line  3008
 
 	-- "begin" is not used in ParaSail; treat like "then" for now
 	
@@ -5097,7 +5093,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  411 =>
---#line  3018
+--#line  3015
 
 	-- "begin" is not used in ParaSail
 	
@@ -5106,7 +5102,7 @@ yy.value_stack(yy.tos);
     
 
 when  412 =>
---#line  3024
+--#line  3021
 
         if ParaSail_Lex.Debug_Indent
           and then ParaSail_Lex.Expecting_Indent
@@ -5120,7 +5116,7 @@ yy.value_stack(yy.tos);
     
 
 when  413 =>
---#line  3034
+--#line  3031
 
         
 yyval := 
@@ -5128,7 +5124,7 @@ yy.value_stack(yy.tos);
     
 
 when  414 =>
---#line  3037
+--#line  3034
 
         
 yyval := 
@@ -5136,7 +5132,7 @@ yy.value_stack(yy.tos-1);
     
 
 when  417 =>
---#line  3043
+--#line  3040
 
         if ParaSail_Lex.Debug_Indent
           and then ParaSail_Lex.Expecting_Indent
@@ -5147,19 +5143,19 @@ when  417 =>
     
 
 when  418 =>
---#line  3052
+--#line  3049
 
 	yyerror("No need for ""begin"" in ParaSail operation definition");
     
 
 when  419 =>
---#line  3058
+--#line  3055
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  420 =>
---#line  3059
+--#line  3056
 
 	-- "then" forces sequential processing; it has lower precedence
 	-- than "||" so declarations preceding "then" are visible to both
@@ -5174,7 +5170,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  421 =>
---#line  3068
+--#line  3065
 
 	-- "then" forces sequential processing; it has lower precedence
 	-- than "||" so declarations preceding "then" are visible to both
@@ -5189,7 +5185,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  422 =>
---#line  3080
+--#line  3077
  
 	
 yyval := 
@@ -5197,7 +5193,7 @@ yy.value_stack(yy.tos);
     
 
 when  423 =>
---#line  3083
+--#line  3080
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -5211,7 +5207,7 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  424 =>
---#line  3090
+--#line  3087
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -5225,7 +5221,7 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  425 =>
---#line  3099
+--#line  3096
 
         
 yyval := 
@@ -5233,7 +5229,7 @@ yy.value_stack(yy.tos);
     
 
 when  426 =>
---#line  3102
+--#line  3099
 
         
 yyval := 
@@ -5241,7 +5237,7 @@ yy.value_stack(yy.tos-1);
     
 
 when  427 =>
---#line  3107
+--#line  3104
  
 	
 yyval := 
@@ -5249,7 +5245,7 @@ yy.value_stack(yy.tos);
     
 
 when  428 =>
---#line  3110
+--#line  3107
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -5263,7 +5259,7 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  429 =>
---#line  3117
+--#line  3114
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -5277,13 +5273,13 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  430 =>
---#line  3127
+--#line  3124
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  431 =>
---#line  3128
+--#line  3125
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -5295,13 +5291,13 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  432 =>
---#line  3137
+--#line  3134
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  433 =>
---#line  3138
+--#line  3135
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -5313,7 +5309,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  434 =>
---#line  3147
+--#line  3144
 
         
 yyval := 
@@ -5321,7 +5317,7 @@ yy.value_stack(yy.tos);
     
 
 when  435 =>
---#line  3150
+--#line  3147
 
         
 yyval := 
@@ -5329,7 +5325,7 @@ yy.value_stack(yy.tos);
     
 
 when  436 =>
---#line  3156
+--#line  3153
 
         
 yyval := 
@@ -5337,7 +5333,7 @@ yy.value_stack(yy.tos-1);
     
 
 when  437 =>
---#line  3162
+--#line  3159
 
 	
 yyval := 
@@ -5351,7 +5347,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  438 =>
---#line  3167
+--#line  3164
 
 	
 yyval := 
@@ -5362,7 +5358,7 @@ yy.value_stack(yy.tos).List);
     
 
 when  439 =>
---#line  3171
+--#line  3168
 
 	-- An annotation can appear by itself
 	
@@ -5371,7 +5367,7 @@ yy.value_stack(yy.tos).List));
     
 
 when  440 =>
---#line  3178
+--#line  3175
 
             -- NOTE: these already allow trailing annotations
 	
@@ -5383,7 +5379,7 @@ yy.value_stack(yy.tos-1).List, Precedes => True);
     
 
 when  441 =>
---#line  3183
+--#line  3180
 
 	
 yyval := 
@@ -5394,13 +5390,13 @@ yy.value_stack(yy.tos-1).List, Precedes => True);
     
 
 when  442 =>
---#line  3187
+--#line  3184
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  443 =>
---#line  3189
+--#line  3186
 
 	
 yyval := 
@@ -5408,19 +5404,19 @@ yy.value_stack(yy.tos);
     
 
 when  444 =>
---#line  3195
+--#line  3192
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  445 =>
---#line  3198
+--#line  3195
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  446 =>
---#line  3199
+--#line  3196
  
 	if Not_Null(
 yy.value_stack(yy.tos).Tree) then
@@ -5437,7 +5433,7 @@ yy.value_stack(yy.tos);
     
 
 when  447 =>
---#line  3208
+--#line  3205
  
 	if Not_Null(
 yy.value_stack(yy.tos).Tree) then
@@ -5454,7 +5450,7 @@ yy.value_stack(yy.tos);
     
 
 when  448 =>
---#line  3221
+--#line  3218
 
 	
 yyval := 
@@ -5462,7 +5458,7 @@ yy.value_stack(yy.tos);
   
 
 when  449 =>
---#line  3224
+--#line  3221
 
 	
 yyval := (One_Tree, Assign_Stmt.Make(
@@ -5474,7 +5470,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  450 =>
---#line  3230
+--#line  3227
  
 	-- A "null" statement (i.e. a no-op)
 	
@@ -5488,7 +5484,7 @@ yy.value_stack(yy.tos).Source_Pos));
     
 
 when  451 =>
---#line  3239
+--#line  3236
 
 	
 yyval := (One_Tree, Invocation.Make(
@@ -5500,13 +5496,13 @@ yy.value_stack(yy.tos-1).List));
     
 
 when  452 =>
---#line  3245
+--#line  3242
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  453 =>
---#line  3246
+--#line  3243
 
 	
 yyval := (One_Tree, Control_Stmt.Make(
@@ -5521,7 +5517,7 @@ yy.value_stack(yy.tos-3).Source_Pos));
     
 
 when  454 =>
---#line  3254
+--#line  3251
 
 	
 yyval := (One_Tree, Control_Stmt.Make(
@@ -5537,7 +5533,7 @@ yy.value_stack(yy.tos-3).Source_Pos));
     
 
 when  455 =>
---#line  3262
+--#line  3259
 
         yyerror ("Extra ')'", At_Token => 
 yy.value_stack(yy.tos));
@@ -5547,7 +5543,7 @@ yy.value_stack(yy.tos-1);
     
 
 when  456 =>
---#line  3269
+--#line  3266
 
         if ParaSail_Lex.Debug_Indent
           and then ParaSail_Lex.Expecting_Indent
@@ -5558,7 +5554,7 @@ when  456 =>
     
 
 when  457 =>
---#line  3279
+--#line  3276
 
 	
 yyval := (One_Tree, Control_Stmt.Make(
@@ -5572,7 +5568,7 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  458 =>
---#line  3287
+--#line  3284
 
 	
 yyval := (One_Tree, Control_Stmt.Make(
@@ -5586,13 +5582,13 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  459 =>
---#line  3298
+--#line  3295
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  460 =>
---#line  3299
+--#line  3296
 
 	yyerror("""loop"" required after ""continue""");
 	
@@ -5602,7 +5598,7 @@ yyval := (One_Token,
     
 
 when  461 =>
---#line  3308
+--#line  3305
 
 	
 yyval := (One_Tree, Assign_Stmt.Make(
@@ -5615,7 +5611,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  462 =>
---#line  3314
+--#line  3311
 
 	
 yyval := (One_Tree, Assign_Stmt.Make(
@@ -5627,7 +5623,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  463 =>
---#line  3320
+--#line  3317
 
 	
 yyval := (One_Tree, Assign_Stmt.Make(
@@ -5639,7 +5635,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  464 =>
---#line  3326
+--#line  3323
 
 	
 yyval := (One_Tree, Assign_Stmt.Make(
@@ -5651,7 +5647,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  465 =>
---#line  3332
+--#line  3329
 
 	
 yyval := (One_Tree, Assign_Stmt.Make(
@@ -5663,7 +5659,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  466 =>
---#line  3338
+--#line  3335
 
 	-- multiple assignment 
 	-- NOTE: Using "opt_operation_actual_list" rather 
@@ -5683,33 +5679,33 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  467 =>
---#line  3354
+--#line  3351
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  468 =>
---#line  3355
+--#line  3352
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  469 =>
---#line  3361
+--#line  3358
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  470 =>
---#line  3362
+--#line  3359
 
 	
 yyval := (One_Tree, Null_Optional_Tree);
     
 
 when  471 =>
---#line  3367
+--#line  3364
 
 	-- NOTE: This used to be '(' operation_actual_list ')'
 	--       but that prevented continuing with a single expression.
@@ -5719,26 +5715,26 @@ yy.value_stack(yy.tos);
     
 
 when  472 =>
---#line  3374
+--#line  3371
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  473 =>
---#line  3375
+--#line  3372
 
 	
 yyval := (One_Tree, Null_Optional_Tree);
     
 
 when  474 =>
---#line  3381
+--#line  3378
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  475 =>
---#line  3382
+--#line  3379
  
 	yyerror(
 	  """loop,"" ""if,"" ""case,"" or ""block"" must follow ""exit""");
@@ -5747,35 +5743,35 @@ yyval := (Construct_Kind, Control_Stmt.Loop_Stmt);
     
 
 when  476 =>
---#line  3390
+--#line  3387
 
 	
 yyval := (Construct_Kind, Control_Stmt.Loop_Stmt);
     
 
 when  477 =>
---#line  3393
+--#line  3390
 
 	
 yyval := (Construct_Kind, Control_Stmt.If_Stmt);
     
 
 when  478 =>
---#line  3396
+--#line  3393
 
 	
 yyval := (Construct_Kind, Control_Stmt.Case_Stmt);
     
 
 when  479 =>
---#line  3399
+--#line  3396
 
 	
 yyval := (Construct_Kind, Control_Stmt.Block_Stmt);
     
 
 when  480 =>
---#line  3404
+--#line  3401
 
         if ParaSail_Lex.Debug_Indent
           and then ParaSail_Lex.Expecting_Indent
@@ -5786,108 +5782,108 @@ when  480 =>
     
 
 when  481 =>
---#line  3414
+--#line  3411
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  482 =>
---#line  3415
+--#line  3412
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  483 =>
---#line  3416
+--#line  3413
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  484 =>
---#line  3420
+--#line  3417
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  485 =>
---#line  3421
+--#line  3418
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  486 =>
---#line  3422
+--#line  3419
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  487 =>
---#line  3425
+--#line  3422
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  488 =>
---#line  3426
+--#line  3423
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  489 =>
---#line  3427
+--#line  3424
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  490 =>
---#line  3430
+--#line  3427
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  491 =>
---#line  3433
+--#line  3430
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  492 =>
---#line  3434
+--#line  3431
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  493 =>
---#line  3435
+--#line  3432
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  494 =>
---#line  3436
+--#line  3433
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  495 =>
---#line  3437
+--#line  3434
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  496 =>
---#line  3438
+--#line  3435
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  497 =>
---#line  3439
+--#line  3436
  
 yyval := (One_Tree, Null_Optional_Tree); 
 
 when  498 =>
---#line  3445
+--#line  3442
 
 	
 yyval := (One_Tree, Conditional.Make(Kind => Conditional.If_Stmt,
@@ -5908,7 +5904,7 @@ yy.value_stack(yy.tos).Label));
     
 
 when  499 =>
---#line  3460
+--#line  3457
 
 	
 yyval := (One_Tree, Conditional.Make(Kind => Conditional.Elsif_Stmt,
@@ -5923,7 +5919,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  500 =>
---#line  3467
+--#line  3464
 
 	
 yyval := 
@@ -5931,14 +5927,14 @@ yy.value_stack(yy.tos-1);
     
 
 when  501 =>
---#line  3470
+--#line  3467
 
 	
 yyval := (One_Tree, Null_Optional_Tree);
     
 
 when  502 =>
---#line  3478
+--#line  3475
 
 	
 yyval := (One_Tree, Conditional.Make(Kind => Conditional.Elsif_Stmt,
@@ -5953,7 +5949,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  503 =>
---#line  3486
+--#line  3483
 
 	
 yyval := 
@@ -5961,20 +5957,20 @@ yy.value_stack(yy.tos-1);
     
 
 when  504 =>
---#line  3489
+--#line  3486
 
 	
 yyval := (One_Tree, Null_Optional_Tree);
     
 
 when  505 =>
---#line  3494
+--#line  3491
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  510 =>
---#line  3505
+--#line  3502
 
         
 yyval := (Optional_End_Token, Check_Label => False,
@@ -5983,7 +5979,7 @@ yyval := (Optional_End_Token, Check_Label => False,
     
 
 when  511 =>
---#line  3510
+--#line  3507
 
         
 yyval := (Optional_End_Token, Check_Label => True,
@@ -5995,7 +5991,7 @@ yy.value_stack(yy.tos-1).Tree);
     
 
 when  512 =>
---#line  3521
+--#line  3518
 
 	declare
 	    Case_Alt_List : Lists.List := 
@@ -6023,19 +6019,19 @@ yy.value_stack(yy.tos).Label));
     
 
 when  515 =>
---#line  3542
+--#line  3539
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  516 =>
---#line  3543
+--#line  3540
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  517 =>
---#line  3544
+--#line  3541
 
         yyerror
           ("Use ""of"" rather than ""is"" for a case statement",
@@ -6047,7 +6043,7 @@ yy.value_stack(yy.tos);
     
 
 when  518 =>
---#line  3550
+--#line  3547
 
         yyerror ("Extra ')'", At_Token => 
 yy.value_stack(yy.tos-1));
@@ -6057,7 +6053,7 @@ yy.value_stack(yy.tos);
     
 
 when  519 =>
---#line  3561
+--#line  3558
 
         
 yyval := (Optional_End_Token, Check_Label => False,
@@ -6066,7 +6062,7 @@ yyval := (Optional_End_Token, Check_Label => False,
     
 
 when  520 =>
---#line  3566
+--#line  3563
 
         
 yyval := (Optional_End_Token, Check_Label => True,
@@ -6078,7 +6074,7 @@ yy.value_stack(yy.tos-1).Tree);
     
 
 when  521 =>
---#line  3574
+--#line  3571
 
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -6086,7 +6082,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  522 =>
---#line  3577
+--#line  3574
 
 	
 yyval := 
@@ -6097,7 +6093,7 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  523 =>
---#line  3585
+--#line  3582
 
 	
 yyval := (One_Tree, Reference.Make(
@@ -6112,7 +6108,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  524 =>
---#line  3594
+--#line  3591
 
         yyerror("Missing ']'", At_Token => 
 yy.value_stack(yy.tos-1));
@@ -6129,7 +6125,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  525 =>
---#line  3605
+--#line  3602
 
         if ParaSail_Lex.Debug_Indent then
            Text_IO.Put(" [indent on] "); Text_IO.Flush;
@@ -6142,13 +6138,13 @@ yy.value_stack(yy.tos);
     
 
 when  526 =>
---#line  3615
+--#line  3612
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  527 =>
---#line  3617
+--#line  3614
  
 	
 yyval := (One_Tree, Param_Decl.Make(
@@ -6163,7 +6159,7 @@ yy.value_stack(yy.tos).Tree,
      
 
 when  528 =>
---#line  3630
+--#line  3627
 
 	
 yyval := (One_Tree, Reference.Make(
@@ -6178,38 +6174,38 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  529 =>
---#line  3638
+--#line  3635
 
 	
 yyval := (One_Tree, Null_Optional_Tree);
     
 
 when  530 =>
---#line  3644
+--#line  3641
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  531 =>
---#line  3645
+--#line  3642
  
 yyval := 
 yy.value_stack(yy.tos-2); 
 
 when  532 =>
---#line  3646
+--#line  3643
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  533 =>
---#line  3650
+--#line  3647
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  534 =>
---#line  3651
+--#line  3648
 
 	
 yyval := (One_Tree, Param_Decl.Make(
@@ -6224,7 +6220,7 @@ yy.value_stack(yy.tos).Tree,
      
 
 when  535 =>
---#line  3662
+--#line  3659
 
 	
 yyval := (One_Tree, Binary.Make(Binary.Closed_Interval_Op,
@@ -6235,7 +6231,7 @@ yy.value_stack(yy.tos).Source_Pos));
      
 
 when  536 =>
---#line  3673
+--#line  3670
 
 	
 yyval := (One_Tree, While_Stmt.Make(
@@ -6253,7 +6249,7 @@ yy.value_stack(yy.tos).Label));
     
 
 when  537 =>
---#line  3687
+--#line  3684
 
 	
 yyval := (One_Tree, While_Stmt.Make(
@@ -6274,7 +6270,7 @@ yy.value_stack(yy.tos).Label));
     
 
 when  538 =>
---#line  3700
+--#line  3697
  
 yyval := (Construct_Qualifier,
                       Source_Pos => 
@@ -6282,7 +6278,7 @@ yy.value_stack(yy.tos).Source_Pos,
                       Is_While => True, others => False); 
 
 when  539 =>
---#line  3703
+--#line  3700
  
 yyval := (Construct_Qualifier,
                       Source_Pos => 
@@ -6290,19 +6286,19 @@ yy.value_stack(yy.tos).Source_Pos,
                       Is_Until => True, others => False); 
 
 when  542 =>
---#line  3711
+--#line  3708
  
 yyval := 
 yy.value_stack(yy.tos); ParaSail_Lex.Inside_For_Header := False; 
 
 when  543 =>
---#line  3712
+--#line  3709
  
 yyval := 
 yy.value_stack(yy.tos); ParaSail_Lex.Inside_For_Header := False; 
 
 when  544 =>
---#line  3713
+--#line  3710
 
         yyerror ("Extra ')'", At_Token => 
 yy.value_stack(yy.tos-1));
@@ -6313,7 +6309,7 @@ yy.value_stack(yy.tos);
     
 
 when  545 =>
---#line  3718
+--#line  3715
 
         yyerror ("Syntax error in loop header", At_Token => 
 yy.value_stack(yy.tos));
@@ -6324,7 +6320,7 @@ yy.value_stack(yy.tos);
     
 
 when  546 =>
---#line  3726
+--#line  3723
 
         
 yyval := (Optional_End_Token, Check_Label => False,
@@ -6333,7 +6329,7 @@ yyval := (Optional_End_Token, Check_Label => False,
     
 
 when  547 =>
---#line  3731
+--#line  3728
 
         
 yyval := (Optional_End_Token, Check_Label => True,
@@ -6345,7 +6341,7 @@ yy.value_stack(yy.tos-1).Tree);
     
 
 when  548 =>
---#line  3743
+--#line  3740
 
 	
 yyval := (One_Tree, For_Loop_Construct.Make(
@@ -6369,7 +6365,7 @@ yy.value_stack(yy.tos).Label));
     
 
 when  549 =>
---#line  3757
+--#line  3754
 
         ParaSail_Lex.Inside_For_Header := True;  
 yyval := 
@@ -6377,7 +6373,7 @@ yy.value_stack(yy.tos);
     
 
 when  550 =>
---#line  3763
+--#line  3760
 
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -6385,13 +6381,13 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  551 =>
---#line  3766
+--#line  3763
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  552 =>
---#line  3770
+--#line  3767
 
 	declare
 	    use type PSC.Strings.U_String;
@@ -6409,7 +6405,7 @@ yyval := (One_List, Lists.Make((1 => Iterator_Tree)));
     
 
 when  553 =>
---#line  3781
+--#line  3778
 
 	declare
 	    use type PSC.Strings.U_String;
@@ -6430,7 +6426,7 @@ yyval.List, Iterator_Tree);
     
 
 when  554 =>
---#line  3793
+--#line  3790
 
 	declare
 	    use type PSC.Strings.U_String;
@@ -6454,13 +6450,13 @@ yyval.List, Iterator_Tree);
     
 
 when  555 =>
---#line  3810
+--#line  3807
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  556 =>
---#line  3811
+--#line  3808
 
 	
 yyval := (One_Token, 
@@ -6469,13 +6465,13 @@ yyval := (One_Token,
     
 
 when  557 =>
---#line  3819
+--#line  3816
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  558 =>
---#line  3820
+--#line  3817
  
 	yyerror("Use ""for ..."" or ""for each ..."" rather " &
           "than ""for all ..."" in iterator of for-loop",
@@ -6487,13 +6483,13 @@ yy.value_stack(yy.tos);
     
 
 when  559 =>
---#line  3826
+--#line  3823
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  560 =>
---#line  3827
+--#line  3824
  
 	yyerror("""for-each"" iterator uses ""of"" rather than ""in""",
           At_Token => 
@@ -6504,7 +6500,7 @@ yy.value_stack(yy.tos);
     
 
 when  561 =>
---#line  3832
+--#line  3829
  
 	yyerror("Use ""for each ..."" rather than ""for all ..."" in " &
           "container element iterator",
@@ -6516,7 +6512,7 @@ yy.value_stack(yy.tos);
     
 
 when  562 =>
---#line  3838
+--#line  3835
  
 	yyerror("Missing ""each"" in container element ""for-each"" iterator",
           At_Token => 
@@ -6527,19 +6523,19 @@ yy.value_stack(yy.tos);
     
 
 when  563 =>
---#line  3843
+--#line  3840
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  564 =>
---#line  3844
+--#line  3841
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  565 =>
---#line  3848
+--#line  3845
 
 	
 yyval := (One_Tree, Iterator.Make(
@@ -6554,13 +6550,13 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  567 =>
---#line  3858
+--#line  3855
 
 	yyerror("The ""reverse"" keyword goes immediately before ""loop""");
     
 
 when  568 =>
---#line  3863
+--#line  3860
 
 	
 yyval := (One_Tree, Iterator.Make(
@@ -6575,7 +6571,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  569 =>
---#line  3871
+--#line  3868
 
 	
 yyval := (One_Tree, Iterator.Make(
@@ -6591,7 +6587,7 @@ yy.value_stack(yy.tos-5).Tree));
     
 
 when  570 =>
---#line  3882
+--#line  3879
 
         if ParaSail_Lex.Debug_Indent
           and then ParaSail_Lex.Expecting_Indent
@@ -6602,7 +6598,7 @@ when  570 =>
     
 
 when  571 =>
---#line  3893
+--#line  3890
 
 	
 yyval := (One_Tree, Iterator.Make(
@@ -6621,7 +6617,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  572 =>
---#line  3904
+--#line  3901
 
 	
 yyval := (One_Tree, Iterator.Make(
@@ -6640,7 +6636,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  573 =>
---#line  3917
+--#line  3914
 
 	
 yyval := (One_Tree, Iterator.Make(
@@ -6657,7 +6653,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  574 =>
---#line  3926
+--#line  3923
 
 	
 yyval := (One_Tree, Iterator.Make(
@@ -6674,7 +6670,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  575 =>
---#line  3938
+--#line  3935
 
 	
 yyval := 
@@ -6682,14 +6678,14 @@ yy.value_stack(yy.tos);
     
 
 when  576 =>
---#line  3941
+--#line  3938
 
 	
 yyval := (One_Tree, Null_Optional_Tree);
     
 
 when  577 =>
---#line  3947
+--#line  3944
  
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -6697,7 +6693,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  578 =>
---#line  3950
+--#line  3947
 
 	
 yyval := 
@@ -6708,7 +6704,7 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  579 =>
---#line  3957
+--#line  3954
  
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -6716,7 +6712,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  580 =>
---#line  3960
+--#line  3957
 
 	
 yyval := 
@@ -6727,7 +6723,7 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  581 =>
---#line  3967
+--#line  3964
 
 	
 yyval := (One_Tree, Conditionally_Complement(
@@ -6738,20 +6734,20 @@ yy.value_stack(yy.tos-1).Is_Until));
     
 
 when  582 =>
---#line  3972
+--#line  3969
 
 	
 yyval := (One_Tree, Null_Optional_Tree);
     
 
 when  583 =>
---#line  3977
+--#line  3974
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  584 =>
---#line  3978
+--#line  3975
  
 	
 yyval := (One_Token, 
@@ -6760,7 +6756,7 @@ yyval := (One_Token,
     
 
 when  585 =>
---#line  3986
+--#line  3983
 
 	
 yyval := (One_Token, PSC.Syntax.Cur_Source_Pos,
@@ -6768,13 +6764,13 @@ yyval := (One_Token, PSC.Syntax.Cur_Source_Pos,
     
 
 when  586 =>
---#line  3990
+--#line  3987
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  587 =>
---#line  3994
+--#line  3991
 
 	
 yyval := (One_Token, PSC.Syntax.Cur_Source_Pos,
@@ -6782,7 +6778,7 @@ yyval := (One_Token, PSC.Syntax.Cur_Source_Pos,
     
 
 when  588 =>
---#line  3998
+--#line  3995
 
 	
 yyval := (One_Token, PSC.Syntax.Cur_Source_Pos,
@@ -6790,7 +6786,7 @@ yyval := (One_Token, PSC.Syntax.Cur_Source_Pos,
     
 
 when  589 =>
---#line  4007
+--#line  4004
 
 	
 yyval := (One_Tree, Block_Stmt.Make(
@@ -6807,13 +6803,13 @@ yy.value_stack(yy.tos).Label));
     
 
 when  591 =>
---#line  4018
+--#line  4015
 
 	yyerror("Should be ""end block <id>"" rather than ""end <id>""");
     
 
 when  592 =>
---#line  4024
+--#line  4021
 
         
 yyval := (Optional_End_Token, Check_Label => False,
@@ -6822,7 +6818,7 @@ yyval := (Optional_End_Token, Check_Label => False,
     
 
 when  593 =>
---#line  4029
+--#line  4026
 
         
 yyval := (Optional_End_Token, Check_Label => True,
@@ -6834,7 +6830,7 @@ yy.value_stack(yy.tos-1).Tree);
     
 
 when  594 =>
---#line  4037
+--#line  4034
 
 	
 yyval := 
@@ -6842,7 +6838,7 @@ yy.value_stack(yy.tos);
     
 
 when  595 =>
---#line  4040
+--#line  4037
  
 	-- Error recovery
 	
@@ -6858,7 +6854,7 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  596 =>
---#line  4051
+--#line  4048
  
 	yyerror("Use ""!="" rather than ""/="" in ParaSail");
 	
@@ -6867,13 +6863,13 @@ yy.value_stack(yy.tos).Source_Pos, Binary.NEQ_Op);
     
 
 when  597 =>
---#line  4058
+--#line  4055
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  598 =>
---#line  4061
+--#line  4058
 
 	
 yyval := (One_Tree, Conditional.Make(Kind => Conditional.Quest_Colon,
@@ -6891,13 +6887,13 @@ yy.value_stack(yy.tos-3).Source_Pos);
     
 
 when  599 =>
---#line  4069
+--#line  4066
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  600 =>
---#line  4074
+--#line  4071
 
 	
 yyval := (One_Tree, Operation.Make(
@@ -6921,14 +6917,14 @@ yy.value_stack(yy.tos-3)));
     
 
 when  601 =>
---#line  4092
+--#line  4089
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  602 =>
---#line  4095
+--#line  4092
 
         
 yyval := (One_List, Lists.Make ((1 => 
@@ -6936,7 +6932,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  603 =>
---#line  4098
+--#line  4095
 
         
 yyval := 
@@ -6944,7 +6940,7 @@ yy.value_stack(yy.tos-1);
     
 
 when  604 =>
---#line  4103
+--#line  4100
 
         
 yyval := (One_List, Lists.Make ((1 => 
@@ -6952,7 +6948,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  605 =>
---#line  4106
+--#line  4103
 
 	
 yyval := 
@@ -6963,7 +6959,7 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  606 =>
---#line  4112
+--#line  4109
 
         
 yyval := (One_Tree, Param_Decl.Make(
@@ -6977,13 +6973,13 @@ yy.value_stack(yy.tos).Tree,
     
 
 when  607 =>
---#line  4124
+--#line  4121
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  608 =>
---#line  4125
+--#line  4122
 
 	
 yyval := (One_Tree, Invocation.Make(
@@ -6996,7 +6992,7 @@ yy.value_stack(yy.tos-2).Source_Pos));
     
 
 when  609 =>
---#line  4134
+--#line  4131
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -7010,7 +7006,7 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  610 =>
---#line  4141
+--#line  4138
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -7024,31 +7020,31 @@ yy.value_stack(yy.tos-1).Source_Pos));
      
 
 when  611 =>
---#line  4151
+--#line  4148
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  612 =>
---#line  4152
+--#line  4149
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  613 =>
---#line  4153
+--#line  4150
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  614 =>
---#line  4157
+--#line  4154
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  615 =>
---#line  4158
+--#line  4155
 
       declare
 	Left_Tree : PSC.Trees.Tree'Class renames Tree_Ptr_Of(
@@ -7090,13 +7086,13 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  616 =>
---#line  4190
+--#line  4187
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  617 =>
---#line  4191
+--#line  4188
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -7110,7 +7106,7 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  618 =>
---#line  4198
+--#line  4195
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -7124,7 +7120,7 @@ yy.value_stack(yy.tos-2).Source_Pos));
     
 
 when  619 =>
---#line  4205
+--#line  4202
 
 	
 yyval := (One_Tree, Unary.Make(
@@ -7134,7 +7130,7 @@ yy.value_stack(yy.tos-2).Tree));
     
 
 when  620 =>
---#line  4210
+--#line  4207
 
 	-- We use adding_expression before "NOT" instead of simple_expression
 	-- to avoid ambiguity associated with polymorphic type names
@@ -7150,7 +7146,7 @@ yy.value_stack(yy.tos-2).Tree));
     
 
 when  621 =>
---#line  4221
+--#line  4218
 
 	
 yyval := (One_Tree, Invocation.Make(
@@ -7162,13 +7158,13 @@ yy.value_stack(yy.tos-1).List));
     
 
 when  622 =>
---#line  4230
+--#line  4227
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  623 =>
---#line  4231
+--#line  4228
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -7183,13 +7179,13 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  624 =>
---#line  4241
+--#line  4238
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  625 =>
---#line  4242
+--#line  4239
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -7203,13 +7199,13 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  626 =>
---#line  4252
+--#line  4249
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  627 =>
---#line  4253
+--#line  4250
  
 	
 yyval := (One_Tree, Binary.Make(
@@ -7224,13 +7220,13 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  628 =>
---#line  4277
+--#line  4274
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  629 =>
---#line  4278
+--#line  4275
 
         --  NOTE: We treat '+' here separately to avoid
         --        reduce/reduce conflicts
@@ -7246,7 +7242,7 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  630 =>
---#line  4287
+--#line  4284
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -7261,13 +7257,13 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  631 =>
---#line  4297
+--#line  4294
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  632 =>
---#line  4298
+--#line  4295
 
 	
 yyval := (One_Tree, Binary.Make(
@@ -7282,13 +7278,13 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  633 =>
---#line  4308
+--#line  4305
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  634 =>
---#line  4309
+--#line  4306
 
 	 -- right associative
 	
@@ -7304,7 +7300,7 @@ yy.value_stack(yy.tos-1).Source_Pos));
     
 
 when  635 =>
---#line  4317
+--#line  4314
 
 	-- unary ops have higher precedence 
 	-- than every operator except the power_operator.
@@ -7317,37 +7313,37 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  636 =>
---#line  4327
+--#line  4324
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  637 =>
---#line  4328
+--#line  4325
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  638 =>
---#line  4329
+--#line  4326
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  639 =>
---#line  4330
+--#line  4327
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  640 =>
---#line  4331
+--#line  4328
  
 yyval := 
 yy.value_stack(yy.tos-1); 
 
 when  641 =>
---#line  4332
+--#line  4329
 
         
 yyval := (One_Tree, Unary.Make(Unary.Magnitude_Op,
@@ -7356,13 +7352,13 @@ yy.value_stack(yy.tos-1).Tree));
     
 
 when  642 =>
---#line  4336
+--#line  4333
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  643 =>
---#line  4337
+--#line  4334
 
         --  This is used in a map_reduce expression to specify the initial val
         
@@ -7372,7 +7368,7 @@ yy.value_stack(yy.tos-1).Tree));
     
 
 when  644 =>
---#line  4345
+--#line  4342
  
 	
 yyval := (One_Tree, PSC.Trees.Identifier.Make(
@@ -7381,7 +7377,7 @@ yy.value_stack(yy.tos).Source_Pos));
     
 
 when  645 =>
---#line  4348
+--#line  4345
  
 	
 yyval := (One_Tree, PSC.Trees.Identifier.Make(
@@ -7390,7 +7386,7 @@ yy.value_stack(yy.tos).Source_Pos));
     
 
 when  646 =>
---#line  4351
+--#line  4348
  
 	
 yyval := (One_Tree, PSC.Trees.Identifier.Make(
@@ -7399,7 +7395,7 @@ yy.value_stack(yy.tos).Source_Pos));
     
 
 when  647 =>
---#line  4354
+--#line  4351
  
 	
 yyval := (One_Tree, PSC.Trees.Identifier.Make(
@@ -7408,7 +7404,7 @@ yy.value_stack(yy.tos).Source_Pos));
     
 
 when  648 =>
---#line  4357
+--#line  4354
  
 	
 yyval := (One_Tree, PSC.Trees.Identifier.Make("null", 
@@ -7416,7 +7412,7 @@ yy.value_stack(yy.tos).Source_Pos));
     
 
 when  649 =>
---#line  4363
+--#line  4360
  
 	if 
 yy.value_stack(yy.tos).Is_Present then
@@ -7432,7 +7428,7 @@ yy.value_stack(yy.tos-1);
     
 
 when  650 =>
---#line  4371
+--#line  4368
 
 	-- Use "::" to specify type of literal and
 	-- to disambiguate operator specified as a string.
@@ -7445,7 +7441,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  651 =>
---#line  4378
+--#line  4375
 
 	
 yyval := (One_Tree, Invocation.Make(
@@ -7457,7 +7453,7 @@ yy.value_stack(yy.tos-1).List));
     
 
 when  652 =>
---#line  4384
+--#line  4381
 
 	
 yyval := (One_Tree, Invocation.Make(
@@ -7469,7 +7465,7 @@ yy.value_stack(yy.tos-1).List));
     
 
 when  653 =>
---#line  4390
+--#line  4387
 
 	
 yyval := (One_Tree, Invocation.Make(
@@ -7481,7 +7477,7 @@ yy.value_stack(yy.tos-1).Tree))));
     
 
 when  654 =>
---#line  4396
+--#line  4393
 
 	
 yyval := (One_Tree, Selection.Make(
@@ -7492,13 +7488,13 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  655 =>
---#line  4404
+--#line  4401
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  656 =>
---#line  4405
+--#line  4402
 
         declare
            --  Substitute '@' for '#'
@@ -7517,12 +7513,12 @@ yy.value_stack(yy.tos).Source_Pos)));
     
 
 when  657 =>
---#line  4420
+--#line  4417
  
 yyval := (Optional, True); 
 
 when  658 =>
---#line  4421
+--#line  4418
 
 	yyerror("Use ""#"" instead of ""'"" to query property in ParaSail",
           At_Token => 
@@ -7532,12 +7528,12 @@ yyval := (Optional, True);
     
 
 when  659 =>
---#line  4426
+--#line  4423
  
 yyval := (Optional, False); 
 
 when  660 =>
---#line  4430
+--#line  4427
 
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -7545,7 +7541,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  661 =>
---#line  4433
+--#line  4430
 
 	
 yyval := 
@@ -7556,13 +7552,13 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  662 =>
---#line  4440
+--#line  4437
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  663 =>
---#line  4441
+--#line  4438
 
 	
 yyval := (One_Tree, Reference.Make(
@@ -7573,91 +7569,91 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  664 =>
---#line  4448
+--#line  4445
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  665 =>
---#line  4451
+--#line  4448
  
 yyval := (One_Unary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Unary.Plus_Op); 
 
 when  666 =>
---#line  4452
+--#line  4449
  
 yyval := (One_Unary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Unary.Minus_Op); 
 
 when  667 =>
---#line  4453
+--#line  4450
  
 yyval := (One_Unary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Unary.Abs_Op); 
 
 when  668 =>
---#line  4454
+--#line  4451
  
 yyval := (One_Unary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Unary.Not_Op); 
 
 when  669 =>
---#line  4455
+--#line  4452
  
 yyval := (One_Unary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Unary.Plus_Op); 
 
 when  670 =>
---#line  4456
+--#line  4453
  
 yyval := (One_Unary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Unary.Minus_Op); 
 
 when  671 =>
---#line  4460
+--#line  4457
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Minus_Op); 
 
 when  672 =>
---#line  4461
+--#line  4458
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Plus_Op); 
 
 when  673 =>
---#line  4462
+--#line  4459
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Minus_Op); 
 
 when  674 =>
---#line  4466
+--#line  4463
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Times_Op); 
 
 when  675 =>
---#line  4467
+--#line  4464
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Divide_Op); 
 
 when  676 =>
---#line  4468
+--#line  4465
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Mod_Op); 
 
 when  677 =>
---#line  4469
+--#line  4466
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Rem_Op); 
 
 when  678 =>
---#line  4472
+--#line  4469
  
 	
 yyval := (One_Binary_Op, 
@@ -7665,13 +7661,13 @@ yy.value_stack(yy.tos).Source_Pos, Binary.Power_Op);
     
 
 when  679 =>
---#line  4476
+--#line  4473
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  680 =>
---#line  4477
+--#line  4474
  
 	
 yyval := (One_Assign_Op, 
@@ -7679,7 +7675,7 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Divide_Assign_Op);
     
 
 when  681 =>
---#line  4483
+--#line  4480
 
 	
 yyval := (One_Assign_Op, 
@@ -7687,7 +7683,7 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Assign_Op);
      
 
 when  682 =>
---#line  4486
+--#line  4483
  
 	
 yyval := (One_Assign_Op, 
@@ -7695,7 +7691,7 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Plus_Assign_Op);
     
 
 when  683 =>
---#line  4489
+--#line  4486
  
 	
 yyval := (One_Assign_Op, 
@@ -7703,7 +7699,7 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Minus_Assign_Op);
     
 
 when  684 =>
---#line  4492
+--#line  4489
  
 	
 yyval := (One_Assign_Op, 
@@ -7711,7 +7707,7 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Times_Assign_Op);
     
 
 when  685 =>
---#line  4495
+--#line  4492
  
 	
 yyval := (One_Assign_Op, 
@@ -7719,7 +7715,7 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Power_Assign_Op);
     
 
 when  686 =>
---#line  4498
+--#line  4495
  
 	
 yyval := (One_Assign_Op, 
@@ -7727,7 +7723,7 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Combine_Assign_Op);
     
 
 when  687 =>
---#line  4501
+--#line  4498
  
 	
 yyval := (One_Assign_Op, 
@@ -7735,7 +7731,7 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.And_Assign_Op);
     
 
 when  688 =>
---#line  4504
+--#line  4501
  
 	
 yyval := (One_Assign_Op, 
@@ -7743,7 +7739,7 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Or_Assign_Op);
     
 
 when  689 =>
---#line  4507
+--#line  4504
  
 	
 yyval := (One_Assign_Op, 
@@ -7751,7 +7747,7 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Xor_Assign_Op);
     
 
 when  690 =>
---#line  4510
+--#line  4507
 
 	
 yyval := (One_Assign_Op, 
@@ -7759,7 +7755,7 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Left_Shift_Assign_Op);
     
 
 when  691 =>
---#line  4513
+--#line  4510
 
 	
 yyval := (One_Assign_Op, 
@@ -7767,7 +7763,7 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Right_Shift_Assign_Op);
     
 
 when  692 =>
---#line  4518
+--#line  4515
  
 	
 yyval := (One_Assign_Op, 
@@ -7775,13 +7771,13 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Assign_Op);
     
 
 when  693 =>
---#line  4521
+--#line  4518
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  694 =>
---#line  4524
+--#line  4521
 
 	yyerror("Use "":="" rather than ""="" in ParaSail");
 	
@@ -7790,61 +7786,61 @@ yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Assign_Op);
     
 
 when  695 =>
---#line  4531
+--#line  4528
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Compare_Op); 
 
 when  696 =>
---#line  4532
+--#line  4529
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Equal_Op); 
 
 when  697 =>
---#line  4533
+--#line  4530
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.NEQ_Op); 
 
 when  698 =>
---#line  4534
+--#line  4531
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Less_Op); 
 
 when  699 =>
---#line  4535
+--#line  4532
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.LEQ_Op); 
 
 when  700 =>
---#line  4536
+--#line  4533
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Greater_Op); 
 
 when  701 =>
---#line  4537
+--#line  4534
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.GEQ_Op); 
 
 when  702 =>
---#line  4538
+--#line  4535
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Left_Shift_Op ); 
 
 when  703 =>
---#line  4539
+--#line  4536
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos-1).Source_Pos, Binary.Right_Shift_Op); 
 
 when  704 =>
---#line  4540
+--#line  4537
  
 	yyerror("Use ""=="" rather than ""="" in ParaSail");
 	
@@ -7853,43 +7849,43 @@ yy.value_stack(yy.tos).Source_Pos, Binary.Equal_Op);
     
 
 when  705 =>
---#line  4547
+--#line  4544
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.And_Op); 
 
 when  706 =>
---#line  4548
+--#line  4545
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Or_Op); 
 
 when  707 =>
---#line  4549
+--#line  4546
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Xor_Op); 
 
 when  708 =>
---#line  4551
+--#line  4548
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos-1).Source_Pos, Binary.And_Then_Op); 
 
 when  709 =>
---#line  4553
+--#line  4550
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos-1).Source_Pos, Binary.Or_Else_Op); 
 
 when  710 =>
---#line  4554
+--#line  4551
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Implies_Op); 
 
 when  711 =>
---#line  4558
+--#line  4555
  
 	
 yyval := (One_Binary_Op, 
@@ -7897,7 +7893,7 @@ yy.value_stack(yy.tos).Source_Pos, Binary.Closed_Interval_Op);
     
 
 when  712 =>
---#line  4561
+--#line  4558
  
 	
 yyval := (One_Binary_Op, 
@@ -7905,7 +7901,7 @@ yy.value_stack(yy.tos).Source_Pos, Binary.Open_Interval_Op);
     
 
 when  713 =>
---#line  4564
+--#line  4561
  
 	
 yyval := (One_Binary_Op, 
@@ -7913,7 +7909,7 @@ yy.value_stack(yy.tos).Source_Pos, Binary.Closed_Open_Interval_Op);
     
 
 when  714 =>
---#line  4567
+--#line  4564
  
 	
 yyval := (One_Binary_Op, 
@@ -7921,19 +7917,19 @@ yy.value_stack(yy.tos).Source_Pos, Binary.Open_Closed_Interval_Op);
     
 
 when  715 =>
---#line  4573
+--#line  4570
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  716 =>
---#line  4574
+--#line  4571
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  717 =>
---#line  4578
+--#line  4575
 
 	
 yyval := (One_Tree, Invocation.Make(
@@ -7946,7 +7942,7 @@ yy.value_stack(yy.tos-2).Source_Pos));
     
 
 when  718 =>
---#line  4585
+--#line  4582
 
 	-- Error recovery
 	yyerror("Use ""!="" rather than ""/="" in ParaSail",
@@ -7969,7 +7965,7 @@ yy.value_stack(yy.tos-4).Source_Pos));
      
 
 when  719 =>
---#line  4599
+--#line  4596
 
 	-- Type of aggregate specified
 	
@@ -7984,7 +7980,7 @@ yy.value_stack(yy.tos-2).Source_Pos));
     
 
 when  720 =>
---#line  4610
+--#line  4607
 
 	
 yyval := 
@@ -7992,14 +7988,14 @@ yy.value_stack(yy.tos);
     
 
 when  721 =>
---#line  4613
+--#line  4610
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  722 =>
---#line  4619
+--#line  4616
 
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -8007,7 +8003,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  723 =>
---#line  4622
+--#line  4619
 
 	
 yyval := 
@@ -8018,13 +8014,13 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  724 =>
---#line  4629
+--#line  4626
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  725 =>
---#line  4630
+--#line  4627
 
 	
 yyval := (One_Tree, Reference.Make(
@@ -8035,7 +8031,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  726 =>
---#line  4635
+--#line  4632
 
 	
 yyval := (One_Tree, Assign_Stmt.Make(
@@ -8047,7 +8043,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  727 =>
---#line  4645
+--#line  4642
 
       declare
 	use type Invocation.Invocation_Kind_Enum;
@@ -8110,7 +8106,7 @@ yy.value_stack(yy.tos-2).Source_Pos));
     
 
 when  728 =>
---#line  4698
+--#line  4695
 
 	-- Type of result specified
       declare
@@ -8168,13 +8164,13 @@ yy.value_stack(yy.tos-2).Source_Pos));
     
 
 when  729 =>
---#line  4747
+--#line  4744
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  730 =>
---#line  4748
+--#line  4745
 
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -8182,14 +8178,14 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  731 =>
---#line  4751
+--#line  4748
 
 	
 yyval := (One_List, Lists.Empty_List);
     
 
 when  732 =>
---#line  4757
+--#line  4754
 
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -8197,7 +8193,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  733 =>
---#line  4760
+--#line  4757
 
 	
 yyval := 
@@ -8208,13 +8204,13 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  734 =>
---#line  4767
+--#line  4764
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  735 =>
---#line  4768
+--#line  4765
 
 	
 yyval := (One_Tree, Reference.Make(
@@ -8225,7 +8221,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  736 =>
---#line  4773
+--#line  4770
 
 	
 yyval := (One_Tree, Reference.Make(
@@ -8236,7 +8232,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  737 =>
---#line  4779
+--#line  4776
 
 	-- This gives an ID to an expression which can be used
 	-- to parameterize the initial value expression for each element.
@@ -8287,14 +8283,14 @@ yy.value_stack(yy.tos-6).Source_Pos);
     
 
 when  738 =>
---#line  4818
+--#line  4815
 
         
 yyval := (One_Tree, Null_Optional_Tree);
     
 
 when  739 =>
---#line  4822
+--#line  4819
 
         
 yyval := 
@@ -8302,19 +8298,19 @@ yy.value_stack(yy.tos);
     
 
 when  740 =>
---#line  4828
+--#line  4825
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  741 =>
---#line  4829
+--#line  4826
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  742 =>
---#line  4835
+--#line  4832
 
 	
 yyval := (One_Tree, Conditional.Make(Kind => Conditional.If_Expr,
@@ -8332,7 +8328,7 @@ yy.value_stack(yy.tos-4).Source_Pos);
     
 
 when  743 =>
---#line  4847
+--#line  4844
 
 	
 yyval := (One_Tree, Conditional.Make(Kind => Conditional.Elsif_Expr,
@@ -8350,7 +8346,7 @@ yy.value_stack(yy.tos-4).Source_Pos);
     
 
 when  744 =>
---#line  4855
+--#line  4852
 
 	
 yyval := 
@@ -8358,26 +8354,26 @@ yy.value_stack(yy.tos);
     
 
 when  745 =>
---#line  4858
+--#line  4855
 
 	
 yyval := (One_Tree, Null_Optional_Tree);
     
 
 when  746 =>
---#line  4865
+--#line  4862
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  747 =>
---#line  4866
+--#line  4863
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  748 =>
---#line  4867
+--#line  4864
 
         yyerror ("Extra ')'", At_Token => 
 yy.value_stack(yy.tos-1));
@@ -8387,7 +8383,7 @@ yy.value_stack(yy.tos);
     
 
 when  749 =>
---#line  4871
+--#line  4868
 
         yyerror ("Syntax error in condition", At_Token => 
 yy.value_stack(yy.tos));
@@ -8397,7 +8393,7 @@ yy.value_stack(yy.tos);
     
 
 when  750 =>
---#line  4879
+--#line  4876
 
 	
 yyval := (One_Tree, Case_Construct.Make(
@@ -8414,19 +8410,19 @@ yy.value_stack(yy.tos-3).Source_Pos);
     
 
 when  751 =>
---#line  4890
+--#line  4887
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  752 =>
---#line  4891
+--#line  4888
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  753 =>
---#line  4892
+--#line  4889
 
         yyerror
           ("Use ""of"" rather than ""is"" for a case statement",
@@ -8438,7 +8434,7 @@ yy.value_stack(yy.tos);
     
 
 when  754 =>
---#line  4898
+--#line  4895
 
         yyerror ("Extra ')'", At_Token => 
 yy.value_stack(yy.tos-1));
@@ -8448,7 +8444,7 @@ yy.value_stack(yy.tos);
     
 
 when  755 =>
---#line  4902
+--#line  4899
 
         yyerror ("Syntax error in case selector", At_Token => 
 yy.value_stack(yy.tos));
@@ -8458,7 +8454,7 @@ yy.value_stack(yy.tos);
     
 
 when  756 =>
---#line  4909
+--#line  4906
 
 	
 yyval := (One_List, Lists.Make((1 => 
@@ -8466,7 +8462,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  757 =>
---#line  4912
+--#line  4909
 
 	
 yyval := 
@@ -8477,7 +8473,7 @@ yy.value_stack(yy.tos).Tree);
     
 
 when  758 =>
---#line  4919
+--#line  4916
 
 	
 yyval := (One_Tree, Reference.Make(
@@ -8492,7 +8488,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  759 =>
---#line  4927
+--#line  4924
 
 	-- NOTE: ".." alternative must come last
 	
@@ -8508,7 +8504,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  760 =>
---#line  4936
+--#line  4933
 
         yyerror("Missing ']'", At_Token => 
 yy.value_stack(yy.tos-1));
@@ -8525,7 +8521,7 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  761 =>
---#line  4949
+--#line  4946
 
 	declare
 	    Kind_Of_For_Loop: constant array(Boolean) of 
@@ -8553,7 +8549,7 @@ yy.value_stack(yy.tos-5).Source_Pos);
     
 
 when  762 =>
---#line  4967
+--#line  4964
 
         -- This is a set iterator without the set, meaning it applies
         -- to all values of the given type, even if the type lacks
@@ -8600,7 +8596,7 @@ yy.value_stack(yy.tos-5).Source_Pos);
     
 
 when  763 =>
---#line  5002
+--#line  4999
 
         -- This is a set iterator without the set, meaning it applies
         -- to all values of the given type, even if the type lacks
@@ -8648,53 +8644,53 @@ yy.value_stack(yy.tos-6).Source_Pos);
     
 
 when  764 =>
---#line  5039
+--#line  5036
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  765 =>
---#line  5040
+--#line  5037
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  766 =>
---#line  5041
+--#line  5038
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  767 =>
---#line  5045
+--#line  5042
  
 yyval := (Optional, True); 
 
 when  768 =>
---#line  5046
+--#line  5043
  
 yyval := (Optional, False); 
 
 when  769 =>
---#line  5050
+--#line  5047
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  770 =>
---#line  5051
+--#line  5048
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  771 =>
---#line  5052
+--#line  5049
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  772 =>
---#line  5057
+--#line  5054
 
 	-- This does a map/reduce operation where the initial/next result
         -- is given in <...> and the overall expression represents the
@@ -8717,7 +8713,7 @@ yy.value_stack(yy.tos-2).Str));
     
 
 when  773 =>
---#line  5074
+--#line  5071
 
         
 yyval := (One_List, Lists.Make ((1 => 
@@ -8725,7 +8721,7 @@ yy.value_stack(yy.tos).Tree)));
     
 
 when  774 =>
---#line  5077
+--#line  5074
 
         
 yyval := 
@@ -8733,25 +8729,25 @@ yy.value_stack(yy.tos-1);
     
 
 when  775 =>
---#line  5083
+--#line  5080
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  776 =>
---#line  5084
+--#line  5081
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  777 =>
---#line  5085
+--#line  5082
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  778 =>
---#line  5089
+--#line  5086
 
 	declare
 	    use type PSC.Strings.U_String;
@@ -8769,7 +8765,7 @@ yyval := (One_List, Lists.Make((1 => Iterator_Tree)));
     
 
 when  779 =>
---#line  5100
+--#line  5097
 
 	declare
 	    use type PSC.Strings.U_String;
@@ -8790,7 +8786,7 @@ yyval.List, Iterator_Tree);
     
 
 when  780 =>
---#line  5112
+--#line  5109
 
 	declare
 	    use type PSC.Strings.U_String;

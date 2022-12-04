@@ -140,48 +140,6 @@ package PSC.Interpreter.Param_Signatures is
       Fetch_From_Phys_Addr => Fetch_From_Phys_Addr,
       Store_To_Phys_Addr => Store_To_Phys_Addr);
 
-   --  Functions for fetching/storing Large_Obj
-   --  The "Store" operations allocate a new large object in the region of
-   --  the old object.
-
-   function Fetch_Input
-       (Params : Word_Ptr;
-        Offset : Offset_Within_Area)
-        return Large_Obj;
-   --  Return a large object given the location of the word pointing at it
-
-   procedure Store_Output
-       (Context : Exec_Context;
-        Params : Word_Ptr;
-        Offset : Offset_Within_Area;
-        Value : Large_Obj);
-   --  Allocate a new large object given the location of the word to be
-   --  replaced with the address of this new object.
-   --  The word is presumed to currently contain a large "null"
-   --  which determines the region to use for the new object.
-
-   function Fetch_From_Phys_Addr
-       (Addr : Word_Ptr;
-        Offset : Offset_Within_Area)
-        return Large_Obj;
-
-   procedure Store_To_Phys_Addr
-       (Addr : Word_Ptr;
-        Offset : Offset_Within_Area;
-        Value : Large_Obj);
-   --  Allocate a new large object given the location of the word to be
-   --  replaced with the address of this new object.
-   --  The word is presumed to currently contain a large "null"
-   --  which determines the region to use for the new object.
-
-   --  Param Signature for Large_Obj
-   package Large_Obj_Param is new Param_Sig
-     (Param_Type => Large_Obj,
-      Fetch_Input => Fetch_Input,
-      Store_Output => Store_Output,
-      Fetch_From_Phys_Addr => Fetch_From_Phys_Addr,
-      Store_To_Phys_Addr => Store_To_Phys_Addr);
-
    --  Procedure for storing a Word_Ptr into the param area
    procedure Store_Word_Ptr
           (Context : Exec_Context;

@@ -745,8 +745,13 @@ package body PSC.Univ_Integers is
       elsif not Is_Large_Univ_Integer (Left)
         and then not Is_Large_Univ_Integer (Right)
       then
+         declare
+            Result : Word_Type;
          begin
-            return From_Word (Word_Op (Word_Type (Left), Word_Type (Right)));
+            Result := Word_Op (Word_Type (Left), Word_Type (Right));
+            if Result /= Interpreter.Null_Value then
+               return From_Word (Result);
+            end if;
          exception
             when others =>
                --  Handle overflow by converting both to Large_Integers

@@ -102,7 +102,9 @@ class PSC::Type_Desc_LLVM_Utils is
             //  Num_Nested_Objs(37), Nested_Objs, Nested_Objs'Range
       LL |= "   i32, %struct.ConstInfo*, i32*,"
             //  Operations(40), Operations'Range
-      LL |= "   %struct.RoutInfo*, i16*}"
+      LL |= "   %struct.RoutInfo*, i16*,"
+            //  Num_Int_Op_Maps(42), Interface_Op_Maps, Int_Op_Maps'Range
+      LL |= "   i16, %struct.OpMap**, i16*}"
 
             //  Magic_Num(0), Has_Op_Map, Index, Location, Corr_Poly_Type,
       LL |= "%struct.OpMap = type {i64, i8, i16, %struct.OL, %struct.TD*,"

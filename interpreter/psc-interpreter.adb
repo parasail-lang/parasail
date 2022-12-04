@@ -68,7 +68,6 @@ package body PSC.Interpreter is
    use PSC.Interpreter.Locks;
 
    Never_Deallocate            : constant Boolean := False;
-   Doing_Run_Time_Checks       : Boolean := True;
    Internal_Consistency_Checks : constant Boolean := False;
    Debug_Kill                  : constant Boolean := False;
    Debug_Delay                 : constant Boolean := False;
@@ -284,7 +283,7 @@ package body PSC.Interpreter is
       type Server_State is record
       --  We keep this information on each server (for debugging)
          Code               : Routine_Ptr;
-         Context            : Exec_Context_Ptr;
+         Context            : Exec_Context_RW_Ptr;
          Pc                 : Code_Offset := 0;
          Start_Pc           : Code_Offset := 0;  --  > 1 if nested block
          Src_Pos            : Source_Positions.Source_Position :=
@@ -763,32 +762,6 @@ package body PSC.Interpreter is
    Lock_Obj_Limit : Lock_Obj_Index := 0;
    --  Current maximum value for Lock_Obj_Index -- For debugging
 
-   -------- Header of large objects --------
-
-   type Large_Obj_Header is record
-      Size      : Offset_Within_Area := 0; --  64K size limit (in 64-bit words)
-      Stg_Rgn   : Stg_Rgn_Index      := 0; --  16 bit unique region index
-      Type_Info : Type_Index         := 0; --  16 bit unique type index
-      Lock_Obj  : Lock_Obj_Index     := 0; --  15 bit unique lock index
-      On_Stack  : Boolean            := False;  --  1 bit on-stack flag
-   end record;
-
-   for Large_Obj_Header use record
-      --  Representation intended to match that used by Large_Obj
-      --  NOTE: We are trying to match a pragma Pack
-      --        but with a specified a layout.
-      Size      at 0 range  0 .. 15;
-      Stg_Rgn   at 0 range 16 .. 31;
-      Type_Info at 0 range 32 .. 47;
-      Lock_Obj  at 0 range 48 .. 62;
-      On_Stack  at 0 range 63 .. 63;
-   end record;
-
-   for Large_Obj_Header'Size use Word_Size * Large_Obj_Header_Size;
-
-   type Large_Obj_Header_Ptr is access all Large_Obj_Header;
-   for Large_Obj_Header_Ptr'Storage_Size use 0;  --  not for allocators
-
    Large_Obj_Next_Block_Offset : constant Offset_Within_Area := 1;
    --  "Next_Block" is only used when on the reclaimed-block list
 
@@ -840,8 +813,8 @@ package body PSC.Interpreter is
    function Addr_To_Large_Obj_Ptr is
      new Ada.Unchecked_Conversion (System.Address, Large_Obj_Header_Ptr);
 
-   function To_Large_Obj_Ptr is
-     new Ada.Unchecked_Conversion (Word_Ptr, Large_Obj_Header_Ptr);
+--   function To_Large_Obj_Ptr is
+--     new Ada.Unchecked_Conversion (Word_Ptr, Large_Obj_Header_Ptr);
 
    function Addr_To_Word_Ptr is
      new Ada.Unchecked_Conversion (System.Address, Word_Ptr);
@@ -871,7 +844,7 @@ package body PSC.Interpreter is
        (Routine_Code_Address, Nested_Blk_Address);
 
    function Allocate_Local_Area
-     (Context           : Exec_Context;
+     (Context           : in out Exec_Context;
       Local_Area_Length : Offset_Within_Area) return Word_Ptr;
    --  Allocate/Find space for local area of routine about to be called
    --  TBD: How do we release the storage?
@@ -901,7 +874,7 @@ package body PSC.Interpreter is
    --  Caller must get a lock, if needed.
 
    procedure Assign_Word
-     (Context     : Exec_Context;
+     (Context     : in out Exec_Context;
       Destination : Object_Locator;
       Source      : Object_Locator;
       Type_Info   : Object_Locator);
@@ -909,7 +882,7 @@ package body PSC.Interpreter is
    --  it with source.
 
    procedure Call_Compiled_Routine
-     (Context     : Exec_Context;
+     (Context     : in out Exec_Context;
       Params      : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr;
       Code_Addr   : Routine_Code_Address;
@@ -936,7 +909,7 @@ package body PSC.Interpreter is
    --  Requires: Address.Enclosing_Chunk /= null
 
    procedure Create_Obj
-     (Context                 : Exec_Context;
+     (Context                 : in out Exec_Context;
       Destination             : Object_Locator;
       Existing_Obj_In_Stg_Rgn : Object_Locator;
       Type_Info               : Object_Locator);
@@ -947,7 +920,7 @@ package body PSC.Interpreter is
    --  If object is a wrapper, then recurse on component type.
 
    function Create_Operation_Desc
-     (Context               : Exec_Context;
+     (Context               : in out Exec_Context;
       Operation_Locator     : Object_Locator;
       Operation_Static_Link : Object_Locator;
       Existing_Obj_In_Stg_Rgn : Object_Locator;
@@ -960,7 +933,7 @@ package body PSC.Interpreter is
    --  operation.
 
    function Create_Operation_Desc_Exported
-     (Context                      : Exec_Context;
+     (Context                      : in out Exec_Context;
       Operation_Locator_Base       : Area_Base_Indicator;
       Operation_Locator_Offset     : Offset_Within_Area;
       Operation_Static_Link_Base   : Area_Base_Indicator;
@@ -984,13 +957,13 @@ package body PSC.Interpreter is
    --  Execute Call_Op instruction
 
    procedure Exit_Program
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
       --  Exit the ParaSail program
 
    procedure Find_Routine_Context
-     (Context           : Exec_Context;
+     (Context           : in out Exec_Context;
       Routine_Locator   : Object_Locator;
       Static_Link       : Object_Locator;
       Params            : Word_Ptr;
@@ -1017,7 +990,7 @@ package body PSC.Interpreter is
       --  and simply return immediately.
 
    function Get_Static_Link
-     (Context   : Exec_Context;
+     (Context   : in out Exec_Context;
       Static_Link_Locator : Object_Locator) return Word_Ptr;
    --  Get pointer to enclosing local area or enclosing type
 
@@ -1030,7 +1003,7 @@ package body PSC.Interpreter is
    --  Return pointer to local region
 
    procedure Make_Copy_In_Stg_Rgn
-     (Context                 : Exec_Context;
+     (Context                 : in out Exec_Context;
       Destination             : Object_Locator;
       Source                  : Object_Locator;
       Existing_Obj_In_Stg_Rgn : Object_Locator;
@@ -1039,7 +1012,7 @@ package body PSC.Interpreter is
    --  Existing_Obj_In_Stg_Rgn
 
    procedure Move_Obj
-     (Context   : Exec_Context;
+     (Context   : in out Exec_Context;
       LHS       : Object_Locator;
       RHS       : Object_Locator;
       Type_Info : Object_Locator);
@@ -1051,21 +1024,21 @@ package body PSC.Interpreter is
    --  Get a new region-chunk index
 
    procedure Num_Stack_Frames
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Return count of number of stack frames for current thread.
    pragma Export (Ada, Num_Stack_Frames, "_psc_num_stack_frames");
 
    procedure Nth_Stack_Frame
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Return nth stack frame for current thread.
    pragma Export (Ada, Nth_Stack_Frame, "_psc_nth_stack_frame");
 
    procedure Nth_Frame_Type_At_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Return type relative to nth stack frame for current thread.
@@ -1089,7 +1062,7 @@ package body PSC.Interpreter is
    --  We need Per-File string table to write these out
 
    procedure Peek_At_Address
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
       --  Return value at given address + offset
@@ -1102,7 +1075,7 @@ package body PSC.Interpreter is
       --  newly specified region.
 
    procedure Runtime_Message
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Print a message as part of some kind of runtime failure or warning.
@@ -1110,7 +1083,7 @@ package body PSC.Interpreter is
    pragma Export (Ada, Runtime_Message, "_psc_runtime_message");
 
    function Select_Ancestor_Part
-     (Context            : Exec_Context;
+     (Context            : in out Exec_Context;
       Source_Obj         : Word_Type;
       Ancestor_Type_Desc : Type_Descriptor_Ptr;
       Source_Type_Desc   : Type_Descriptor_Ptr;
@@ -1126,7 +1099,7 @@ package body PSC.Interpreter is
    pragma Export (Ada, Select_Ancestor_Part, "_psc_select_ancestor_part");
 
    procedure Select_Polymorphic_Ancestor_Part
-     (Context     : Exec_Context;
+     (Context     : in out Exec_Context;
       Destination : Object_Locator;
       Source      : Object_Locator;
       Type_Info   : Object_Locator;
@@ -1136,7 +1109,7 @@ package body PSC.Interpreter is
    --  object in Destination.
 
    function Shallow_Copy_Large_Obj
-     (Context   : Exec_Context;
+     (Context   : in out Exec_Context;
       Stack_Val : Word_Type) return Word_Type;
    --  Copy top level of large stack-resident object into local stg_rgn
 
@@ -1171,13 +1144,13 @@ package body PSC.Interpreter is
       --  all on the same server.
 
    function Stg_Rgn_Of_Existing_Large_Obj
-     (Context                 : Exec_Context;
+     (Context                 : in out Exec_Context;
       Existing_Obj_In_Stg_Rgn : Object_Locator) return Stg_Rgn_Ptr;
    --  Return region associated with existing large obj, unless locator is
    --  null, in which case return local region.
 
    procedure Store_Local_Null
-     (Context     : Exec_Context;
+     (Context     : in out Exec_Context;
       Destination : Object_Locator;
       Type_Info   : Object_Locator);
    --  We want to store a "large" null if the run-time type info implies that
@@ -1185,7 +1158,7 @@ package body PSC.Interpreter is
    --  We want to store the right "kind" of null if small.
 
    procedure Store_Null_Of_Same_Stg_Rgn
-     (Context                 : Exec_Context;
+     (Context                 : in out Exec_Context;
       Destination             : Object_Locator;
       Existing_Obj_In_Stg_Rgn : Object_Locator;
       Type_Info               : Object_Locator);
@@ -1203,7 +1176,7 @@ package body PSC.Interpreter is
    --  of Target.
 
    procedure Swap_Obj
-     (Context   : Exec_Context;
+     (Context   : in out Exec_Context;
       LHS       : Object_Locator;
       RHS       : Object_Locator;
       Type_Info : Object_Locator);
@@ -1370,165 +1343,6 @@ package body PSC.Interpreter is
    end Delay_Queue_Handling;
    use Delay_Queue_Handling;
 
-   --------------------------
-   -- Large_Obj_Header_Ops --
-   --------------------------
-
-   package Large_Obj_Header_Ops is
-
-      function Large_Obj_Lock_Obj
-        (Large_Obj_Addr : Object_Address) return Lock_Obj_Index;
-      --  Return lock-obj index associated with given large obj; zero means it
-      --  doesn't have a lock obj.
-
-      function Large_Obj_Lock_Obj
-        (Large_Obj_Addr : Object_Virtual_Address)
-         return Lock_Obj_Index;
-      --  Return lock-obj index associated with given large obj; zero means it
-      --  doesn't have a lock obj.
-
-      function Large_Obj_Lock_Obj
-        (Large_Obj_Addr : Word_Ptr) return Lock_Obj_Index;
-      --  Return lock-obj index associated with given large obj; zero means it
-      --  doesn't have a lock obj.
-
-      function Large_Obj_Next_Block
-        (Large_Obj_Addr : Object_Virtual_Address)
-         return Object_Virtual_Address;
-      --  Return link to next block in free-block chain
-
-      function Large_Obj_On_Stack
-        (Addr : Object_Virtual_Address) return Boolean;
-      --  Return True if given non-null large obj is residing on stack
-
-      function Large_Obj_Size
-        (Large_Obj_Addr : Object_Address)
-         return Offset_Within_Chunk;
-      --  Return size in words associated with large object
-
-      function Large_Obj_Size
-        (Large_Obj_Addr : Object_Virtual_Address)
-         return Offset_Within_Chunk;
-      --  Return size in words associated with large object
-
-      function Large_Obj_Size
-        (Large_Obj_Addr : Word_Ptr) return Offset_Within_Chunk;
-      --  Return size in words associated with large object
-
-      function Large_Obj_Stg_Rgn_Index
-        (Large_Obj_Addr : Object_Virtual_Address)
-         return Stg_Rgn_Index;
-      --  Return region index associated with (possibly null) large object
-
-      function Large_Obj_Stg_Rgn_Index
-        (Large_Obj_Addr : Word_Ptr) return Stg_Rgn_Index;
-      --  Return region associated with large object
-
-      function Large_Obj_Type_Info
-        (Large_Obj_Addr : Object_Address)
-         return Type_Index;
-      --  Return type index associated with given large obj; zero means it is a
-      --  large "null."
-
-      function Large_Obj_Type_Info
-        (Large_Obj_Addr : Object_Virtual_Address)
-         return Type_Index;
-      --  Return type index associated with given large obj;
-
-      function Large_Obj_Type_Info_Is_In_Range
-        (Large_Obj_Addr : Object_Virtual_Address)
-         return Boolean;
-      --  Return True if type info of given large object is in range of
-      --  existing type indices. This is for debugging mostly.
-
-      procedure Set_Large_Obj_Header
-        (Large_Obj_Addr : Object_Address;
-         Size           : Offset_Within_Area;
-         Stg_Rgn_Id     : Stg_Rgn_Index;
-         Type_Id        : Type_Index;
-         Lock_Obj       : Lock_Obj_Index := 0;
-         On_Stack       : Boolean := False);
-      --  Fill in header given large object address, and size/region/type
-      --  information
-
-      procedure Set_Large_Obj_Header
-        (Large_Obj_Addr : Object_Virtual_Address;
-         Size           : Offset_Within_Area;
-         Stg_Rgn_Id     : Stg_Rgn_Index;
-         Type_Id        : Type_Index;
-         Lock_Obj       : Lock_Obj_Index := 0;
-         On_Stack       : Boolean := False);
-      --  Fill in header given large object address, and size/region/type
-      --  information
-
-      procedure Set_Large_Obj_Lock_Obj
-        (Large_Obj_Addr : Object_Address;
-         Lock_Obj       : Lock_Obj_Index);
-      --  Set lock obj associated with large object
-
-      procedure Set_Large_Obj_Lock_Obj
-        (Large_Obj_Addr : Object_Virtual_Address;
-         Lock_Obj       : Lock_Obj_Index);
-      --  Set lock obj associated with large object
-
-      procedure Set_Large_Obj_Lock_Obj
-        (Large_Obj_Addr : Word_Ptr;
-         Lock_Obj       : Lock_Obj_Index);
-      --  Set lock obj associated with large object
-
-      procedure Set_Large_Obj_Next_Block
-        (Large_Obj_Addr : Object_Address;
-         Next_Block     : Object_Virtual_Address);
-      --  Set link to next block in free-block chain
-
-      procedure Set_Large_Obj_Next_Block
-        (Large_Obj_Addr : Object_Virtual_Address;
-         Next_Block     : Object_Virtual_Address);
-      --  Set link to next block in free-block chain
-
-      procedure Set_Large_Obj_On_Stack
-        (Large_Obj_Addr : Object_Virtual_Address;
-         On_Stack       : Boolean);
-      --  Indicate whether given object resides on stack rather than in stg rgn
-
-      procedure Set_Large_Obj_Size
-        (Large_Obj_Addr : Object_Address;
-         Size           : Offset_Within_Area);
-      --  Set size in words associated with large object
-
-      procedure Set_Large_Obj_Size
-        (Large_Obj_Addr : Object_Virtual_Address;
-         Size           : Offset_Within_Area);
-      --  Set size in words associated with large object
-
-      procedure Set_Large_Obj_Stg_Rgn_Index
-        (Large_Obj_Addr : Object_Virtual_Address;
-         Stg_Rgn_Id     : Stg_Rgn_Index);
-      --  Set region associated with large object
-
-      procedure Set_Large_Obj_Type_Info
-        (Large_Obj_Addr : Object_Address;
-         Type_Id        : Type_Index);
-      --  Set type associated with large object
-
-      procedure Set_Large_Obj_Type_Info
-        (Large_Obj_Addr : Object_Virtual_Address;
-         Type_Id        : Type_Index);
-      --  Set type associated with large object
-
-      function To_Large_Obj_Ptr
-        (Large_Obj_Addr : Object_Address)
-         return Large_Obj_Header_Ptr;
-      --  Convert Object_Address of large object to a pointer to header type
-
-   end Large_Obj_Header_Ops;
-   use Large_Obj_Header_Ops;
-
-   procedure Set_Large_Obj_Size
-     (Large_Obj_Addr : Object_Virtual_Address;
-      Size           : Offset_Within_Area)
-     renames Large_Obj_Header_Ops.Set_Large_Obj_Size;
-
    -----------------------
    -- Locked_And_Queued --
    -----------------------
@@ -1539,7 +1353,7 @@ package body PSC.Interpreter is
    package Locked_And_Queued is
 
       function Dequeue_Condition_Satisfied
-        (Context        : Exec_Context;
+        (Context        : in out Exec_Context;
          Calling_Tcb    : Word_Ptr;
          Server_Index   : Thread_Server_Index;
          Called_Routine : Routine_Ptr := null)
@@ -1554,7 +1368,7 @@ package body PSC.Interpreter is
       --        Called_Routine.
 
       procedure Execute_Nested_Block
-        (Context            : Exec_Context;
+        (Context            : in out Exec_Context;
          Instructions       : Routine_Ptr;
          Params_Address     : Word_Ptr;
          Static_Link        : Word_Ptr;
@@ -1654,7 +1468,7 @@ package body PSC.Interpreter is
       --  Look first on specified server's queue.
 
       procedure Wait_For_Threads
-        (Context          : Exec_Context;
+        (Context          : in out Exec_Context;
          Thread_Master    : Word_Ptr;
          Holding_Lock_Obj : Lock_Obj_Index;
          New_Local_Area   : Word_Ptr);
@@ -2098,7 +1912,7 @@ package body PSC.Interpreter is
          Index  : Master_Index);
 
       procedure Set_Enclosing_Master_Outcome
-        (Context         : Exec_Context;
+        (Context         : in out Exec_Context;
          Outcome         : Master_Outcome_Enum;
          Exit_Level_Diff : Natural := 0;
          Exit_Skip_Count : Code_Offset := 0);
@@ -2384,7 +2198,7 @@ package body PSC.Interpreter is
 
       procedure Dump_Param_Values
         (Code        : Routine_Ptr;
-         Context     : Exec_Context;
+         Context     : in out Exec_Context;
          On_Entering : Boolean);
 
       procedure Dump_Routine (Code : Routine_Ptr);
@@ -2558,7 +2372,7 @@ package body PSC.Interpreter is
    -------------------------
 
    function Allocate_Local_Area
-     (Context           : Exec_Context;
+     (Context           : in out Exec_Context;
       Local_Area_Length : Offset_Within_Area) return Word_Ptr is
    begin
       return null;  --  TBD
@@ -2569,7 +2383,7 @@ package body PSC.Interpreter is
    -----------------
 
    procedure Assign_Word
-     (Context     : Exec_Context;
+     (Context     : in out Exec_Context;
       Type_Desc   : Type_Descriptor_Ptr;
       Destination : Word_Ptr;
       New_Value   : Word_Type) is
@@ -2628,7 +2442,7 @@ package body PSC.Interpreter is
    end Assign_Word;
 
    procedure Assign_Word
-     (Context     : Exec_Context;
+     (Context     : in out Exec_Context;
       Destination : Object_Locator;
       Source      : Object_Locator;
       Type_Info   : Object_Locator)
@@ -2648,7 +2462,7 @@ package body PSC.Interpreter is
    ---------------------------
 
    procedure Call_Compiled_Routine
-     (Context     : Exec_Context;
+     (Context     : in out Exec_Context;
       Params      : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr;
       Code_Addr   : Routine_Code_Address;
@@ -2688,7 +2502,7 @@ package body PSC.Interpreter is
             when 0 =>
                declare
                   type Proc_Ptr is access procedure
-                    (Context : Exec_Context;
+                    (Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr);
                   function Conv is new Ada.Unchecked_Conversion
                                           (Routine_Code_Address, Proc_Ptr);
@@ -2701,7 +2515,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Proc_Ptr is access procedure
                     (Inp_1 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr);
                   function Conv is new Ada.Unchecked_Conversion
                                           (Routine_Code_Address, Proc_Ptr);
@@ -2715,7 +2529,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Proc_Ptr is access procedure
                     (Inp_1, Inp_2 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr);
                   function Conv is new Ada.Unchecked_Conversion
                                           (Routine_Code_Address, Proc_Ptr);
@@ -2731,7 +2545,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Proc_Ptr is access procedure
                     (Inp_1, Inp_2, Inp_3 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr);
                   function Conv is new Ada.Unchecked_Conversion
                                           (Routine_Code_Address, Proc_Ptr);
@@ -2748,7 +2562,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Proc_Ptr is access procedure
                     (Inp_1, Inp_2, Inp_3, Inp_4 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr);
                   function Conv is new Ada.Unchecked_Conversion
                                           (Routine_Code_Address, Proc_Ptr);
@@ -2766,7 +2580,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Proc_Ptr is access procedure
                     (Inp_1, Inp_2, Inp_3, Inp_4, Inp_5 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr);
                   function Conv is new Ada.Unchecked_Conversion
                                           (Routine_Code_Address, Proc_Ptr);
@@ -2792,7 +2606,7 @@ package body PSC.Interpreter is
                   Param_Array : Word_Array_Max renames
                     To_Word_Array (Params).all;
                   type Func_Ptr is access function
-                    (Context : Exec_Context;
+                    (Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr;
                      Inited_Output : Word_Type)
                     return Word_Type;
@@ -2808,7 +2622,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Func_Ptr is access function
                     (Inp_1 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr;
                      Inited_Output : Word_Type)
                     return Word_Type;
@@ -2825,7 +2639,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Func_Ptr is access function
                     (Inp_1, Inp_2 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr;
                      Inited_Output : Word_Type)
                     return Word_Type;
@@ -2844,7 +2658,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Func_Ptr is access function
                     (Inp_1, Inp_2, Inp_3 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr;
                      Inited_Output : Word_Type)
                     return Word_Type;
@@ -2864,7 +2678,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Func_Ptr is access function
                     (Inp_1, Inp_2, Inp_3, Inp_4 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr;
                      Inited_Output : Word_Type)
                     return Word_Type;
@@ -2885,7 +2699,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Func_Ptr is access function
                     (Inp_1, Inp_2, Inp_3, Inp_4, Inp_5 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr;
                      Inited_Output : Word_Type)
                     return Word_Type;
@@ -2911,7 +2725,7 @@ package body PSC.Interpreter is
             when 0 =>
                declare
                   type Func_Ptr is access function
-                    (Context : Exec_Context;
+                    (Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr)
                     return Word_Type;
                   function Conv is new Ada.Unchecked_Conversion
@@ -2926,7 +2740,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Func_Ptr is access function
                     (Inp_1 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr)
                     return Word_Type;
                   function Conv is new Ada.Unchecked_Conversion
@@ -2941,7 +2755,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Func_Ptr is access function
                     (Inp_1, Inp_2 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr)
                     return Word_Type;
                   function Conv is new Ada.Unchecked_Conversion
@@ -2958,7 +2772,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Func_Ptr is access function
                     (Inp_1, Inp_2, Inp_3 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr)
                     return Word_Type;
                   function Conv is new Ada.Unchecked_Conversion
@@ -2976,7 +2790,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Func_Ptr is access function
                     (Inp_1, Inp_2, Inp_3, Inp_4 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr)
                     return Word_Type;
                   function Conv is new Ada.Unchecked_Conversion
@@ -2995,7 +2809,7 @@ package body PSC.Interpreter is
                     To_Word_Array (Params).all;
                   type Func_Ptr is access function
                     (Inp_1, Inp_2, Inp_3, Inp_4, Inp_5 : Word_Type;
-                     Context : Exec_Context;
+                     Context : in out Exec_Context;
                      Static_Link : Non_Op_Map_Type_Ptr)
                     return Word_Type;
                   function Conv is new Ada.Unchecked_Conversion
@@ -3374,7 +3188,7 @@ package body PSC.Interpreter is
    ----------------
 
    procedure Create_Obj
-     (Context                 : Exec_Context;
+     (Context                 : in out Exec_Context;
       Destination             : Object_Locator;
       Existing_Obj_In_Stg_Rgn : Object_Locator;
       Type_Info               : Object_Locator)
@@ -3401,7 +3215,7 @@ package body PSC.Interpreter is
    end Create_Obj;
 
    procedure Create_Object_Exported
-     (Context      : Exec_Context;
+     (Context      : in out Exec_Context;
       Type_Info    : Type_Descriptor_Ptr;
       Destination  : Word_Ptr;
       Existing_Obj : Word_Ptr)
@@ -3434,7 +3248,7 @@ package body PSC.Interpreter is
    ---------------------------
 
    function Create_Operation_Desc
-     (Context               : Exec_Context;
+     (Context               : in out Exec_Context;
       Operation_Locator     : Object_Locator;
       Operation_Static_Link : Object_Locator;
       Existing_Obj_In_Stg_Rgn : Object_Locator;
@@ -3523,7 +3337,7 @@ package body PSC.Interpreter is
    end Create_Operation_Desc;
 
    function Create_Operation_Desc_Exported
-     (Context                      : Exec_Context;
+     (Context                      : in out Exec_Context;
       Operation_Locator_Base       : Area_Base_Indicator;
       Operation_Locator_Offset     : Offset_Within_Area;
       Operation_Static_Link_Base   : Area_Base_Indicator;
@@ -3737,7 +3551,7 @@ package body PSC.Interpreter is
    --------------------------
 
    procedure Find_Routine_Context
-     (Context           : Exec_Context;
+     (Context           : in out Exec_Context;
       Routine_Locator   : Object_Locator;
       Static_Link       : Object_Locator;
       Params            : Word_Ptr;
@@ -4686,7 +4500,7 @@ package body PSC.Interpreter is
    --------------------------
 
    procedure Make_Copy_In_Stg_Rgn
-     (Context                 : Exec_Context;
+     (Context                 : in out Exec_Context;
       Destination             : Object_Locator;
       Source                  : Object_Locator;
       Existing_Obj_In_Stg_Rgn : Object_Locator;
@@ -4718,7 +4532,7 @@ package body PSC.Interpreter is
    --------------------------
 
    procedure Make_Copy_In_Stg_Rgn_Exported
-     (Context                 : Exec_Context;
+     (Context                 : in out Exec_Context;
       Type_Info               : Type_Descriptor_Ptr;
       Destination             : Word_Ptr;
       Source                  : Word_Ptr;
@@ -4756,7 +4570,7 @@ package body PSC.Interpreter is
    --------------
 
    procedure Move_Obj
-     (Context   : Exec_Context;
+     (Context   : in out Exec_Context;
       LHS       : Object_Locator;
       RHS       : Object_Locator;
       Type_Info : Object_Locator)
@@ -4777,7 +4591,7 @@ package body PSC.Interpreter is
    -----------------
 
    procedure Move_Object
-     (Context   : Exec_Context;
+     (Context   : in out Exec_Context;
       Type_Info : Type_Descriptor_Ptr;
       LHS_Ptr   : Word_Ptr;
       RHS_Ptr   : Word_Ptr) is
@@ -4984,6 +4798,45 @@ package body PSC.Interpreter is
       Operation_Index'Write (Stream, Item'Length);
       Operation_Index_Array'Write (Stream, Item.all);
    end Operation_Index_Array_Ptr_Write;
+
+   ------------------------------------
+   -- Op_Map_Type_Array_Ptr_Read --
+   ------------------------------------
+
+   procedure Op_Map_Type_Array_Ptr_Read
+     (Stream : access Ada.Streams.Root_Stream_Type'Class;
+      Item : out Op_Map_Type_Array_Ptr) is
+   --  Read in the contents of the op-map array
+      Len : constant Op_Map_Count := Op_Map_Count'Input (Stream);
+      Op_Map_Arr : Op_Map_Type_Array (1 .. Len);
+   begin
+      Op_Map_Type_Array'Read (Stream, Op_Map_Arr);
+      if Stream.all in Buffered_Desc_Reader then
+         --  We have a map, these are worth saving
+         --  NOTE: We need to do the 'Reads anyway so everything
+         --        matches up correctly.
+         Item := new Op_Map_Type_Array'(Op_Map_Arr);
+      else
+         Item := null;
+      end if;
+   end Op_Map_Type_Array_Ptr_Read;
+
+   -------------------------------------
+   -- Op_Map_Type_Array_Ptr_Write --
+   -------------------------------------
+
+   procedure Op_Map_Type_Array_Ptr_Write
+     (Stream : access Ada.Streams.Root_Stream_Type'Class;
+      Item : Op_Map_Type_Array_Ptr) is
+   --  Write out the contents of the op-map array
+   begin
+      if Item /= null then
+         Op_Map_Count'Write (Stream, Item'Length);
+         Op_Map_Type_Array'Write (Stream, Item.all);
+      else
+         Op_Map_Count'Write (Stream, 0);
+      end if;
+   end Op_Map_Type_Array_Ptr_Write;
 
    ------------------------
    -- Phys_Base_Register --
@@ -5279,7 +5132,7 @@ package body PSC.Interpreter is
    --------------------------
 
    function Select_Ancestor_Part
-     (Context            : Exec_Context;
+     (Context            : in out Exec_Context;
       Source_Obj         : Word_Type;
       Ancestor_Type_Desc : Type_Descriptor_Ptr;
       Source_Type_Desc   : Type_Descriptor_Ptr;
@@ -5473,7 +5326,7 @@ package body PSC.Interpreter is
    --------------------------------------
 
    procedure Select_Polymorphic_Ancestor_Part
-     (Context     : Exec_Context;
+     (Context     : in out Exec_Context;
       Destination : Object_Locator;
       Source      : Object_Locator;
       Type_Info   : Object_Locator;
@@ -5510,7 +5363,7 @@ package body PSC.Interpreter is
    ----------------------------
 
    function Shallow_Copy_Large_Obj
-     (Context   : Exec_Context;
+     (Context   : in out Exec_Context;
       Stack_Val : Word_Type) return Word_Type is
    --  Copy top level of large stack-resident object into local stg_rgn
 
@@ -5568,7 +5421,7 @@ package body PSC.Interpreter is
    -----------------------------------
 
    function Stg_Rgn_Of_Existing_Large_Obj
-     (Context                 : Exec_Context;
+     (Context                 : in out Exec_Context;
       Existing_Obj_In_Stg_Rgn : Object_Locator) return Stg_Rgn_Ptr is
    begin
       if Is_Null_Obj_Locator (Existing_Obj_In_Stg_Rgn) then
@@ -5597,7 +5450,7 @@ package body PSC.Interpreter is
    ----------------------
 
    procedure Store_Local_Null
-     (Context     : Exec_Context;
+     (Context     : in out Exec_Context;
       Destination : Object_Locator;
       Type_Info   : Object_Locator)
    is
@@ -5622,7 +5475,7 @@ package body PSC.Interpreter is
    --------------------------------
 
    procedure Store_Null_Of_Same_Stg_Rgn
-     (Context                 : Exec_Context;
+     (Context                 : in out Exec_Context;
       Destination             : Object_Locator;
       Existing_Obj_In_Stg_Rgn : Object_Locator;
       Type_Info               : Object_Locator)
@@ -5673,7 +5526,7 @@ package body PSC.Interpreter is
    --------------
 
    procedure Swap_Obj
-     (Context   : Exec_Context;
+     (Context   : in out Exec_Context;
       LHS       : Object_Locator;
       RHS       : Object_Locator;
       Type_Info : Object_Locator)
@@ -5753,7 +5606,7 @@ package body PSC.Interpreter is
    --------------------------
 
    procedure Swap_Object_Exported
-     (Context   : Exec_Context;
+     (Context   : in out Exec_Context;
       Type_Info : Type_Descriptor_Ptr;
       LHS_Ptr   : Word_Ptr;
       RHS_Ptr   : Word_Ptr)
@@ -8729,7 +8582,7 @@ package body PSC.Interpreter is
       ---------------------------------
 
       function Dequeue_Condition_Satisfied
-        (Context : Exec_Context;
+        (Context : in out Exec_Context;
          Calling_Tcb : Word_Ptr;
          Server_Index : Thread_Server_Index;
          Called_Routine : Routine_Ptr := null)
@@ -8893,7 +8746,7 @@ package body PSC.Interpreter is
       --------------------------
 
       procedure Execute_Nested_Block
-        (Context            : Exec_Context;
+        (Context            : in out Exec_Context;
          Instructions       : Routine_Ptr;
          Params_Address     : Word_Ptr;
          Static_Link        : Word_Ptr;
@@ -10263,7 +10116,7 @@ package body PSC.Interpreter is
       ----------------------
 
       procedure Wait_For_Threads
-        (Context          : Exec_Context;
+        (Context          : in out Exec_Context;
          Thread_Master    : Word_Ptr;
          Holding_Lock_Obj : Lock_Obj_Index;
          New_Local_Area   : Word_Ptr) is
@@ -11517,7 +11370,7 @@ package body PSC.Interpreter is
       ----------------------------------
 
       procedure Set_Enclosing_Master_Outcome
-        (Context         : Exec_Context;
+        (Context         : in out Exec_Context;
          Outcome         : Master_Outcome_Enum;
          Exit_Level_Diff : Natural := 0;
          Exit_Skip_Count : Code_Offset := 0) is
@@ -14458,7 +14311,7 @@ package body PSC.Interpreter is
 
       procedure Dump_Param_Values
         (Code        : Routine_Ptr;
-         Context     : Exec_Context;
+         Context     : in out Exec_Context;
          On_Entering : Boolean)
       is
          Num_Inputs  : Natural := 0;
@@ -15805,7 +15658,7 @@ package body PSC.Interpreter is
    -------------------------
 
    procedure Call_Target_Routine
-     (Cur_Context    : Exec_Context;
+     (Cur_Context    : in out Exec_Context;
       New_Local_Area : Word_Ptr;
       Target_Routine : Routine_Ptr;
       Params         : Word_Ptr;
@@ -15813,7 +15666,7 @@ package body PSC.Interpreter is
       --  Call routine given its Routine_Ptr, Params, and Static link
 
    procedure Call_Target_Routine
-     (Cur_Context    : Exec_Context;
+     (Cur_Context    : in out Exec_Context;
       New_Local_Area : Word_Ptr;
       Target_Routine : Routine_Ptr;
       Params         : Word_Ptr;
@@ -15929,7 +15782,7 @@ package body PSC.Interpreter is
 
          Server_Index : constant Thread_Server_Index := Current_Server_Index;
 
-         Cur_State_Context : constant Exec_Context_Ptr :=
+         Cur_State_Context : constant Exec_Context_RW_Ptr :=
            Current_Server_Context (Server_Index);
 
          Enclosing_Local_Area : constant Word_Ptr :=
@@ -15971,7 +15824,7 @@ package body PSC.Interpreter is
    ------------------------------------------
 
    procedure Call_Through_Operation_Desc_Exported
-     (Context        : Exec_Context;
+     (Context        : in out Exec_Context;
       Operation_Desc : Word_Type;
       Params         : Word_Ptr) is
    --  Call a ParaSail routine given the execution context,
@@ -16265,7 +16118,7 @@ package body PSC.Interpreter is
    -----------------
 
    function Copy_Object
-     (Context    : Exec_Context;
+     (Context    : in out Exec_Context;
       Type_Desc  : Type_Descriptor_Ptr;
       Object     : Word_Type;
       Stg_Rgn_Of : Word_Type) return Word_Type is
@@ -16478,7 +16331,7 @@ package body PSC.Interpreter is
    -- Create_Lock_For_Obj_Exported --
    ----------------------------------
 
-   procedure Create_Lock_For_Obj_Exported (Context : Exec_Context;
+   procedure Create_Lock_For_Obj_Exported (Context : in out Exec_Context;
       Dest_Obj : Object_Virtual_Address) is
    begin
       Create_Lock_For_Obj (Dest_Obj, Context.Server_Index);
@@ -16500,7 +16353,7 @@ package body PSC.Interpreter is
 
    function Current_Server_Context
      (Server_Index : Thread_Server_Index := Current_Server_Index)
-     return Exec_Context_Ptr is
+     return Exec_Context_RW_Ptr is
    begin
       return Server_Info_Array (Server_Index).Current_State.Context;
    end Current_Server_Context;
@@ -16749,7 +16602,7 @@ package body PSC.Interpreter is
    ----------------
 
    procedure Create_Tcb (
-      Context : Exec_Context;
+      Context : in out Exec_Context;
       Parallel_Master : Word_Ptr;
       Parallel_Control : Word_Ptr;
       Num_Params : Integer) is
@@ -16774,7 +16627,7 @@ package body PSC.Interpreter is
    -----------------------------------------
 
    function Execute_Prepare_To_Exit_Parallel_Op
-      (Context        : Exec_Context;
+      (Context        : in out Exec_Context;
        Master_Address : Word_Ptr) return Boolean
    is
       --  Fields of Instruction are:
@@ -18795,7 +18648,7 @@ package body PSC.Interpreter is
    -- Create_Polymorphic_Obj --
    ----------------------------
 
-   procedure Create_Polymorphic_Obj (Context : Exec_Context;
+   procedure Create_Polymorphic_Obj (Context : in out Exec_Context;
       Stg_Rgn_For_Creation : Stg_Rgn_Ptr;
       Dest_Addr : Word_Ptr;
       Poly_Type_Desc : Non_Op_Map_Type_Ptr) is
@@ -18858,7 +18711,7 @@ package body PSC.Interpreter is
    -- Create_Poly_Obj_Exported --
    ------------------------------
 
-   procedure Create_Poly_Obj_Exported (Context : Exec_Context;
+   procedure Create_Poly_Obj_Exported (Context : in out Exec_Context;
       Existing_Obj : Word_Type;
       Dest_Addr : Word_Ptr;
       Poly_Type_Desc : Non_Op_Map_Type_Ptr) is
@@ -18929,7 +18782,7 @@ package body PSC.Interpreter is
    ------------------
 
    procedure Exit_Program
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  Exit the ParaSail program
@@ -19081,7 +18934,7 @@ package body PSC.Interpreter is
    -----------------------------
 
    procedure Init_Large_Obj_Exported
-     (Context      : Exec_Context;
+     (Context      : in out Exec_Context;
       Type_Info    : Type_Descriptor_Ptr;
       New_Obj      : Word_Type) is
    --  Init new large object in current region.
@@ -19540,7 +19393,7 @@ package body PSC.Interpreter is
    ---------------------
 
    function Get_Static_Link
-     (Context   : Exec_Context;
+     (Context   : in out Exec_Context;
       Static_Link_Locator : Object_Locator) return Word_Ptr is
    --  Get pointer to enclosing local area or enclosing type
    begin
@@ -20421,7 +20274,7 @@ package body PSC.Interpreter is
    -------------------------
 
    function New_Object_Exported
-     (Context      : Exec_Context;
+     (Context      : in out Exec_Context;
       Type_Info    : Type_Descriptor_Ptr;
       Existing_Obj : Word_Type) return Word_Type is
    --  Create new object in region based on Existing_Obj, unless is 0.
@@ -20450,7 +20303,7 @@ package body PSC.Interpreter is
    -------------
 
    function New_Tcb (
-      Context : Exec_Context;
+      Context : in out Exec_Context;
       Parallel_Master : Word_Ptr;
       Num_Params : Integer) return Word_Ptr is
       --  Execute the main part of the Create_Tcb instruction.
@@ -20572,7 +20425,7 @@ package body PSC.Interpreter is
    -----------------------
 
    procedure Null_Routine_Body
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
@@ -20607,7 +20460,7 @@ package body PSC.Interpreter is
    ----------------------
 
    procedure Num_Stack_Frames
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Return count of number of stack frames for current thread.
@@ -20628,7 +20481,7 @@ package body PSC.Interpreter is
    ---------------------
 
    procedure Nth_Stack_Frame
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Return nth stack frame for current thread.
@@ -20758,7 +20611,7 @@ package body PSC.Interpreter is
    -------------------------------
 
    procedure Nth_Frame_Type_At_Locator
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Return type relative to nth stack frame for current thread.
@@ -20883,7 +20736,7 @@ package body PSC.Interpreter is
    ---------------------
 
    procedure Peek_At_Address
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  Return value at given address + offset
@@ -21218,7 +21071,7 @@ package body PSC.Interpreter is
    --------------------------------
 
    procedure Raise_Exception_Occurrence
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Excep_Obj : in out Word_Type) is
       --  Raise exception given the exception object
       --  The exception object is moved to the handler's stg-rgn.
@@ -21636,7 +21489,7 @@ package body PSC.Interpreter is
    ---------------------
 
    procedure Runtime_Message
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Print a message as part of some kind of runtime failure or warning.
@@ -22377,8 +22230,10 @@ package body PSC.Interpreter is
 
    function Virtual_To_Object_Address
      (Virtual : Object_Virtual_Address) return Object_Address is
-      pragma Assert (not Virt_Is_Phys);  --  Not used if virt = phys
    begin
+      if Virt_Is_Phys then
+         pragma Assert (False);
+      end if;
       if Virtual < Chunk_Divisor then
          if Virtual <= 0 then
             --  Null address

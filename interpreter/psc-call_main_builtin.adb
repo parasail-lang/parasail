@@ -25,13 +25,13 @@ with PSC.Strings;
 pragma Elaborate (PSC.Interpreter);
 package body PSC.Call_Main_Builtin is
 
-   procedure parasail_main_routine (Context : Exec_Context;
+   procedure parasail_main_routine (Context : in out Exec_Context;
      Params : Word_Ptr; Static_Link : Type_Descriptor_Ptr);
    pragma Import (Ada, parasail_main_routine, "_parasail_main_routine");
    --  llvm generator uses this link-name for suitable main ParaSail routine
 
    procedure Call_Compiled_Main
-     (Context : Exec_Context;
+     (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    begin
