@@ -2637,12 +2637,14 @@ package body PSC.Interpreter.Builtins is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
+      Str_Word : constant Word_Type := Fetch_Word (Params, 1);
+      pragma Assert (not Is_Large_Null (Str_Word));
       Index : constant Word_Type := Fetch_Nonnull_Word (Params, 2);
    begin
       Store_Word
         (Params, 0,
            Univ_Strings.Nth_Univ_Character
-              (Univ_Strings.From_Word_Type (Fetch_Nonnull_Word (Params, 1)),
+              (Univ_Strings.From_Word_Type (Str_Word),
               Positive (Index)));
    end String_Indexing;
 
@@ -2656,8 +2658,10 @@ package body PSC.Interpreter.Builtins is
       Static_Link : Non_Op_Map_Type_Ptr)
    is
       Target : constant Word_Type := Fetch_Word (Params, 0);
+      Str_Word : constant Word_Type := Fetch_Word (Params, 1);
+      pragma Assert (not Is_Large_Null (Str_Word));
       Str : Wide_Wide_String
-        renames Word_To_Wide_Wide_String (Fetch_Nonnull_Word (Params, 1));
+        renames Word_To_Wide_Wide_String (Str_Word);
 
       Index_Range : constant Object_Virtual_Address :=
                       Fetch_Word (Params, 2);
@@ -2689,9 +2693,11 @@ package body PSC.Interpreter.Builtins is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
+      Str : constant Word_Type := Fetch_Word (Params, 1);
+      pragma Assert (not Is_Large_Null (Str));
    begin
       Store_Word (Params, 0, Word_Type (Univ_Strings.Length
-        (Univ_Strings.From_Word_Type (Fetch_Nonnull_Word (Params, 1)))));
+        (Univ_Strings.From_Word_Type (Str))));
    end String_Length;
 
    --------------------
@@ -2703,9 +2709,13 @@ package body PSC.Interpreter.Builtins is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
+      Str1 : constant Word_Type := Fetch_Word (Params, 1);
+      Str2 : constant Word_Type := Fetch_Word (Params, 2);
+      pragma Assert (not Is_Large_Null (Str1));
+      pragma Assert (not Is_Large_Null (Str2));
       Result : constant Ordering := Univ_Strings.Compare
-        (Univ_Strings.From_Word_Type (Fetch_Nonnull_Word (Params, 1)),
-         Univ_Strings.From_Word_Type (Fetch_Nonnull_Word (Params, 2)));
+        (Univ_Strings.From_Word_Type (Str1),
+         Univ_Strings.From_Word_Type (Str2));
    begin
       Store_Word (Params, 0, Ordering'Pos (Result));
    end String_Compare;
@@ -2862,7 +2872,8 @@ package body PSC.Interpreter.Builtins is
       --  or else (Type_Desc.Has_Op_Map and then
       --  Type_Desc.Actual_Type.Type_Kind = Basic_Array_Kind));
 
-      Arr : constant Word_Type := Fetch_Nonnull_Word (Params, 1);
+      Arr : constant Word_Type := Fetch_Word (Params, 1);
+      pragma Assert (not Is_Large_Null (Arr));
       Len : constant Word_Type :=
               Content_Of_Virtual_Address (Arr + Large_Obj_Header_Size);
    begin

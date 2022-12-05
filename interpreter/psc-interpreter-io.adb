@@ -182,14 +182,14 @@ package body PSC.Interpreter.IO is
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
-   --  Write_Obj (var Output_Object_Stream; Obj : Obj_Type is Any<>)
+   --  Write_Obj (var Output_Object_Stream; Obj : Obj_Type is Assignable<>)
    pragma Export (Ada, Write_Obj, "_psc_write_obj");
    procedure Write_Optional_Obj
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Write_Optional_Obj
-   --    (var Output_Object_Stream; Obj : optional Obj_Type is Any<>)
+   --    (var Output_Object_Stream; Obj : optional Obj_Type is Assignable<>)
    pragma Export (Ada, Write_Optional_Obj, "_psc_write_optional_obj");
 
    procedure Write_Default
@@ -197,28 +197,28 @@ package body PSC.Interpreter.IO is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Write_Default
-   --    (var Output_Object_Stream; Obj : Obj_Type is Any<>)
+   --    (var Output_Object_Stream; Obj : Obj_Type is Assignable<>)
    pragma Export (Ada, Write_Default, "_psc_write_default");
    procedure Write_Optional_Default
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Write_Optional_Default
-   --    (var Output_Object_Stream; Obj : optional Obj_Type is Any<>)
+   --    (var Output_Object_Stream; Obj : optional Obj_Type is Assignable<>)
    pragma Export (Ada, Write_Optional_Default, "_psc_write_optional_default");
 
    procedure Read_Obj
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
-   --  Read_Obj (var Input_Object_Stream; var Obj : Obj_Type is Any<>)
+   --  Read_Obj (var Input_Object_Stream; var Obj : Obj_Type is Assignable<>)
    pragma Export (Ada, Read_Obj, "_psc_read_obj");
    procedure Read_Optional_Obj
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Read_Optional_Obj
-   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Any<>)
+   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Assignable<>)
    pragma Export (Ada, Read_Optional_Obj, "_psc_read_optional_obj");
 
    procedure Read_Default
@@ -226,14 +226,14 @@ package body PSC.Interpreter.IO is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Read_Default
-   --    (var Input_Object_Stream; var Obj : Obj_Type is Any<>)
+   --    (var Input_Object_Stream; var Obj : Obj_Type is Assignable<>)
    pragma Export (Ada, Read_Default, "_psc_read_default");
    procedure Read_Optional_Default
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Read_Optional_Default
-   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Any<>)
+   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Assignable<>)
    pragma Export (Ada, Read_Optional_Default, "_psc_read_optional_default");
 
    procedure Set_Exit_Status
@@ -913,7 +913,7 @@ package body PSC.Interpreter.IO is
       Non_Map_Type_Desc : constant Non_Op_Map_Type_Ptr :=
                            Skip_Over_Op_Map (Obj_Type);
 
-      Debug : constant Boolean := True;
+      Debug : constant Boolean := False;
       use Ada.Text_IO;
 
    begin  --  Write_Obj_To_Stream
@@ -999,7 +999,11 @@ package body PSC.Interpreter.IO is
          --  Initialize val-stream parameter
          Param_Arr (0) := Val_Stream_Obj;
 
-         if Obj_Type.Type_Kind = Univ_String_Kind then
+         if Debug then
+            Put ("Write_Obj: ");
+         end if;
+
+         if Non_Map_Type_Desc.Type_Kind = Univ_String_Kind then
             --  write a Univ_String
             if Debug then
                Put_Line ('"' &
@@ -1029,9 +1033,8 @@ package body PSC.Interpreter.IO is
             Param_Arr (1) := Obj;
 
             --  Do type-kind-specific processing
-            case Obj_Type.Type_Kind is
-            when Normal_Kind
-               | Basic_Array_Kind
+            case Non_Map_Type_Desc.Type_Kind is
+            when Basic_Array_Kind
                | Univ_String_Kind
                | Aliased_Object_Kind =>
                --  These are "large" types
@@ -1040,6 +1043,7 @@ package body PSC.Interpreter.IO is
             when Univ_Integer_Kind
                | Univ_Char_Kind  --  TBD
                | Unsigned_64_Kind  --  TBD
+               | Normal_Kind  --  TBD
                | Integer_64_Kind =>  -- TBD
                --  These are all "integerish" types
                --  TBD -- need to convert to a real Univ_Integer
@@ -1065,11 +1069,19 @@ package body PSC.Interpreter.IO is
             pragma Assert (Is_Optional);  --  TBD: check earlier as well
 
             if Non_Map_Type_Desc.Type_Kind = Basic_Array_Kind then
+               if Debug then
+                  Put_Line ("null basic-array");
+               end if;
+
                Param_Arr (1) := 0;  --  Min_Len
                Param_Arr (2) := 2**31 - 1;  --  Max_Len
                Param_Arr (3) := Null_Value;  --  Actual_Len
                Op_Index := Begin_Seq_Op_Index;
             else
+               if Debug then
+                  Put_Line ("null large obj");
+               end if;
+
                Param_Arr (1) := 1;  -- Is_Null => #true
                Op_Index := Begin_Obj_Op_Index;
             end if;
@@ -1111,7 +1123,7 @@ package body PSC.Interpreter.IO is
 
                   begin
                      Param_Arr (1) := 0;  --  Min_Len
-                     Param_Arr (2) := 2**16 - 1;  --  Max_Len
+                     Param_Arr (2) := 2**31 - 1;  --  Max_Len
                      Param_Arr (3) := Len;  --  Actual_Len
                      Execute_Compiled_Nth_Op_Of_Type
                        (Context => Context,
@@ -1119,6 +1131,10 @@ package body PSC.Interpreter.IO is
                         Static_Link => Val_Stream_Type,
                         Target_Base => Type_Area,
                         Op_Index => Begin_Seq_Op_Index);
+
+                     if Debug then
+                        Put_Line (" Begin_Optional_Seq: Len = " & Len'Image);
+                     end if;
 
                      for I in 1 .. Offset_Within_Area (Len) loop
                         declare
@@ -1184,6 +1200,10 @@ package body PSC.Interpreter.IO is
             end;
          end if;  --  Whether is string, small, or large non-string
 
+         if Debug then
+            Put_Line ("  Op_Index = " & Op_Index'Image);
+         end if;
+
          --  Emit the (final) call to the appropriate Value_Stream operation
          Execute_Compiled_Nth_Op_Of_Type
            (Context => Context,
@@ -1199,7 +1219,7 @@ package body PSC.Interpreter.IO is
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
-   --  Write_Obj (var Output_Object_Stream; Obj : Obj_Type is Any<>)
+   --  Write_Obj (var Output_Object_Stream; Obj : Obj_Type is Assignable<>)
       Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
          --  Implicit module instance with one formal param
 
@@ -1221,7 +1241,7 @@ package body PSC.Interpreter.IO is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Write_Optional_Obj
-   --    (var Output_Object_Stream; Obj : optional Obj_Type is Any<>)
+   --    (var Output_Object_Stream; Obj : optional Obj_Type is Assignable<>)
 
       Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
          --  Implicit module instance with one formal param
@@ -1244,7 +1264,7 @@ package body PSC.Interpreter.IO is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Write_Default
-   --    (var Output_Object_Stream; Obj : Obj_Type is Any<>)
+   --    (var Output_Object_Stream; Obj : Obj_Type is Assignable<>)
       Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
          --  Implicit module instance with one formal param
 
@@ -1266,7 +1286,7 @@ package body PSC.Interpreter.IO is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Write_Optional_Default
-   --    (var Output_Object_Stream; Obj : optional Obj_Type is Any<>)
+   --    (var Output_Object_Stream; Obj : optional Obj_Type is Assignable<>)
       Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
          --  Implicit module instance with one formal param
 
@@ -1311,7 +1331,7 @@ package body PSC.Interpreter.IO is
       Non_Map_Type_Desc : constant Non_Op_Map_Type_Ptr :=
                            Skip_Over_Op_Map (Obj_Type);
 
-      Debug : constant Boolean := True;
+      Debug : constant Boolean := False;
       use Ada.Text_IO;
 
    begin  --  Read_Obj_From_Stream
@@ -1324,6 +1344,12 @@ package body PSC.Interpreter.IO is
 
       if Non_Map_Type_Desc.Is_Wrapper then
          --  Is a wrapper, recurse with only component
+         if Debug then
+            Put_Line
+              ("  [wrapper: " & Strings.To_String (Non_Map_Type_Desc.Name) &
+                  "]");
+         end if;
+
          Read_Obj_From_Stream
            (Context,
             Obj_Stream,
@@ -1333,6 +1359,9 @@ package body PSC.Interpreter.IO is
          return;  --  All done  --
       end if;
 
+      if Debug then
+         Put ("Read_Obj: ");
+      end if;
       declare
          --  (Polymorhic) Value stream is only component of Obj_Stream
          Val_Stream_Poly_Obj : constant Word_Type :=
@@ -1357,6 +1386,8 @@ package body PSC.Interpreter.IO is
             --  Null to use for output slot
 
          Result : Word_Type := Null_For_Obj;
+
+         --  Define operation indices for Value_Stream operations.
 
          Read_Int_Op_Index : constant Operation_Index := 4;
             --  func Read_Optional_Int
@@ -1411,8 +1442,7 @@ package body PSC.Interpreter.IO is
          elsif Is_Small (Non_Map_Type_Desc) then
             --  Init output slot
             case Obj_Type.Type_Kind is
-            when Normal_Kind
-               | Basic_Array_Kind
+            when Basic_Array_Kind
                | Univ_String_Kind
                | Aliased_Object_Kind =>
                --  These are "large" types
@@ -1421,19 +1451,31 @@ package body PSC.Interpreter.IO is
             when Univ_Integer_Kind
                | Univ_Char_Kind  --  TBD
                | Unsigned_64_Kind  --  TBD
+               | Normal_Kind  --  TBD
                | Integer_64_Kind =>  -- TBD
                --  These are all "integerish" types
                --  TBD -- need to convert to a real Univ_Integer
 
                --  Init rest of params for Read_Optional_Integer
                --  TBD: Low and High could be much larger!
+               --       These should ideally come from parameters to
+               --       the module instance defining the type, which
+               --       is probably a "wrapper", so we would need to
+               --       pass through more information from the outer
+               --       wrapper's type-descriptor.
                Param_Arr (2) := Word_Type'First + Word_Type'(1);
                Param_Arr (3) := Word_Type'Last;
                Op_Index := Read_Int_Op_Index;
 
             when Univ_Real_Kind =>
+               --  TBD: Univ_Float_Kind once we make Univ_Real a rational type
                --  Init rest of params for Read_Optional_Float
                Param_Arr (2) := 15;  --  Digits
+               --  TBD: As above, this should ideally come from a parameter
+               --       to the module instance defining the type, which
+               --       is probably a "wrapper", so we would need to
+               --       pass through more information from the outer
+               --       wrapper's type-descriptor.
                Op_Index := Read_Float_Op_Index;
 
             when Univ_Enum_Kind =>
@@ -1441,6 +1483,9 @@ package body PSC.Interpreter.IO is
 
             end case;
 
+            if Debug then
+               Put ("op_index = " & Op_Index'Image);
+            end if;
             Execute_Compiled_Nth_Op_Of_Type
               (Context => Context,
                Params => Param_Arr (0)'Unchecked_Access,
@@ -1450,6 +1495,10 @@ package body PSC.Interpreter.IO is
 
             --  Get result from output slot.
             Result := Param_Arr (0);
+
+            if Debug then
+               Put_Line(", value = 0x" & Hex_Image (Result));
+            end if;
 
          else
             --  Read large object
@@ -1486,7 +1535,7 @@ package body PSC.Interpreter.IO is
                   begin
                      Param_Arr (0) := 0;  --  Output slot
                      Param_Arr (2) := 0;  --  Min_Len
-                     Param_Arr (3) := 2**16 - 1;  --  Max_Len
+                     Param_Arr (3) := 2**31 - 1;  --  Max_Len
                      Execute_Compiled_Nth_Op_Of_Type
                        (Context => Context,
                         Params => Param_Arr (0)'Unchecked_Access,
@@ -1495,6 +1544,11 @@ package body PSC.Interpreter.IO is
                         Op_Index => Begin_Seq_Op_Index);
 
                      Len := Param_Arr (0);  --  Get Actual_Len
+
+                     if Debug then
+                        Put_Line (" Begin_Optional_Seq, Len = " &
+                          (if Len = Null_Value then "null" else Len'Image));
+                     end if;
 
                      if Len = Null_Value then
                         --  Result is null
@@ -1540,6 +1594,11 @@ package body PSC.Interpreter.IO is
                      Target_Base => Type_Area,
                      Op_Index => Begin_Obj_Op_Index);
 
+                  if Debug then
+                     Put_Line (" Begin_Optional_Obj, Is_Null = " &
+                       Param_Arr (0)'Image);
+                  end if;
+
                   if Param_Arr (0) = 1 then
                      --  Is_Null == #true
                      Result := Null_For_Obj;
@@ -1552,6 +1611,7 @@ package body PSC.Interpreter.IO is
                      Stg_Rgn => Stg_Rgn_Of_Large_Obj (Obj_Ptr.all),
                      Server_Index => Context.Server_Index);
 
+                  --  Read each component with a recursive call.
                   for I in 1 .. Non_Map_Type_Desc.Num_Components loop
                      declare
                         Comp_Type : constant Non_Op_Map_Type_Ptr :=
@@ -1567,6 +1627,7 @@ package body PSC.Interpreter.IO is
                            Put_Line
                              ("  Ref: " & Hex_Image (Comp_Value_Ptr.all));
                         else
+                           --  Recursive call to read in component.
                            Read_Obj_From_Stream
                              (Context,
                               Obj_Stream,
@@ -1582,6 +1643,10 @@ package body PSC.Interpreter.IO is
 
                end if;  --  Whether is Basic_Array
 
+               if Debug then
+                  Put_Line
+                    ("  end of large obj, op_index = " & Op_Index'Image);
+               end if;
                --  Emit the (final) call to the appropriate
                --  "End" Value_Stream operation
                Execute_Compiled_Nth_Op_Of_Type
@@ -1604,7 +1669,7 @@ package body PSC.Interpreter.IO is
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
-   --  Read_Obj (var Input_Object_Stream; var Obj : Obj_Type is Any<>)
+   --  Read_Obj (var Input_Object_Stream; var Obj : Obj_Type is Assignable<>)
       Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
          --  Implicit module instance with one formal param
 
@@ -1626,7 +1691,7 @@ package body PSC.Interpreter.IO is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Read_Optional_Obj
-   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Any<>)
+   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Assignable<>)
       Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
          --  Implicit module instance with one formal param
 
@@ -1648,7 +1713,7 @@ package body PSC.Interpreter.IO is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Read_Default
-   --    (var Input_Object_Stream; var Obj : Obj_Type is Any<>)
+   --    (var Input_Object_Stream; var Obj : Obj_Type is Assignable<>)
       Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
          --  Implicit module instance with one formal param
 
@@ -1670,7 +1735,7 @@ package body PSC.Interpreter.IO is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Read_Optional_Default
-   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Any<>)
+   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Assignable<>)
       Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
          --  Implicit module instance with one formal param
 
