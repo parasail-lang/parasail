@@ -2,4 +2,4 @@
 export Set LC_ALL=C
 RUN="psli ../aaa.psi"
 
-$RUN for_loop.psl -command Test_For_Loop 1 5 | sort
+$RUN for_loop.psl -command Test_For_Loop 1 5

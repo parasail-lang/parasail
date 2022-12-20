@@ -1,12 +1,34 @@
-func First_Time(var Seen : Countable_Set<Univ_Integer>; I : Univ_Integer) 
-  -> Boolean is
-    if I in Seen then
-	// Already seen it
-	return #false;
-    end if;
+concurrent interface Atomic_Set<Elem is Hashable<>> is
+    op "[]" () -> Atomic_Set;
+    op "in" (Left : Elem; locked Right : Atomic_Set) -> Boolean;
+    op "|=" (locked var Left : Atomic_Set; Right : Elem);
+    func First_Time_Included
+      (locked var Left : Atomic_Set; Right : Elem) -> Boolean;
+end interface Atomic_Set;
 
-    Seen |= I;
-    return #true;
+concurrent class Atomic_Set is
+    var Data : Set<Elem> := [];
+ exports
+    op "[]" () -> Atomic_Set
+      is (());
+
+    op "in" (Left : Elem; locked Right : Atomic_Set) -> Boolean
+      is (Left in Right.Data);
+
+    op "|=" (locked var Left : Atomic_Set; Right : Elem) is
+        Left.Data |= Right;
+    end op "|=";
+
+    func First_Time_Included
+      (locked var Left : Atomic_Set; Right : Elem) -> Result : Boolean is
+       Result :=  Right not in Left.Data;
+       Left.Data |= Right;
+    end func First_Time_Included;
+end class Atomic_Set;
+
+func First_Time(var Seen : Atomic_Set<Univ_Integer>; I : Univ_Integer) 
+-> Boolean is
+    return First_Time_Included (Seen, I);
 end func First_Time;
 
 func Test_For_Loop(X, Y : Univ_Integer) is
@@ -28,15 +50,17 @@ func Test_For_Loop(X, Y : Univ_Integer) is
 
     Println("concurrent loop:");
     for I in X..Y concurrent loop
-	Println("I = " | I);
+	Print('*');
     end loop;
+    Println("\nShould be `(Y-X+1) asterisks above");
 
     Println("then/while loop:");
     for I := X then I+1 while I <= Y loop
 	Println("I = " | I);
     end loop;
 
-    var Seen : Countable_Set<Univ_Integer> := [];
+    var Seen : Atomic_Set<Univ_Integer> := [];
+
     Println("then/while loop, combinations of powers of 2 and 3:");
     for I := X then 2*I || 3 * I while 
       I <= Y and then First_Time(Seen, I) loop
