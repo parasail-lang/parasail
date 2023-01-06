@@ -1775,8 +1775,8 @@ package body PSC.Univ_Strings is
                   return Null_Value;
 
                when U_String_Indicator =>
-                  return Character'Pos
-                    (Strings.To_String (To_U_String (Str)) (Index));
+                  return Wide_Wide_Character'Pos
+                    (Strings.To_Wide_Wide_String (To_U_String (Str)) (Index));
 
                when Short_String_Indicator =>
                   return Null_Value;
