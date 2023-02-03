@@ -1,0 +1,231 @@
+interface Pair<T1 is Assignable<>; T2 is Assignable<>> is
+   const A : T1;
+   const B : T2;
+end interface Pair;
+
+func Word_Search(Args : Basic_Array<Univ_String>) is
+   //  Create a matrix of letters which include each of
+   //  the passed-in argument strings, vertically,
+   //  horizontally, or on a diagonal, in forward or
+   //  reverse.
+
+   const Debug : Boolean := #false;
+
+   //  We will try multiple spots before using a spot with no "hits"
+   //  where a "hit" is a letter that already matches.
+   const Num_Tries_To_Find_Hit := 20;
+
+   const Max_Len : Univ_Integer :=
+     (for each Arg of Args => Max (<10>, |Arg|));
+   const Len_To_Use := (Max_Len + 1 + 9)/10 * 10;
+
+   if |Args| == 0 then
+      Println(" Pass in as arguments the set of words");
+      Println(" you want included in the word search.");
+      Println(" Use hyphens to join together the parts of a");
+      Println(" multi-word phrase -- the hyphens will be");
+      Println(" replaced by an arbitrary letter");
+      return;
+   end if;
+   if Debug then
+      Println ("Max_Len = `(Max_Len)");
+      Println ("Len_To_Use = `(Len_To_Use)");
+   end if;
+
+   var Table : Array<Array<Univ_Character, Indexed_By => Univ_Integer>,
+                Indexed_By => Univ_Integer> :=
+                  Create (1 .. Len_To_Use,
+                     Create (1 .. Len_To_Use, ' '));
+     //  [for I in 1 .. Len_To_Use =>
+       //  [for J in 1 .. Len_To_Use => ' ']];
+
+   //  There are eight directions a word can be written:
+   //    left-to-right = 0, 1; right-to-left = 0, -1; 
+   //    top-to-bottom = 1, 0; bottom-to-top = -1, 0;
+   //    diagonal NW to SE = 1, 1; SE to NW = -1, 1;
+   //    diagonal SW to NE = -1, 1; NE to SW = 1, -1.
+   //  The Offsets array is indexed 1 to 8, representing each of these
+   //  directions, with the directions 7 and 8 being the "easier" directions
+   //  of left-to-right and top-to-bottom.  The other six are considered
+   //  "harder" and we choose randomly among those six before giving up
+   //  and using one of the "easier" directions.
+   const Offsets : Array<Pair <Integer, Integer>,
+                   Indexed_By => Univ_Integer> :=
+     [1 => (-1, -1), 2 => (1, -1), 3 => (0, -1), 4 => (-1, 0),
+      5 => (-1, 1), 6 => (1, 1), 7 => (0, 1), 8 => (1, 0)];
+
+   //  Our seed for the random number generator is a function of the lengths
+   //  of the words, so given the same set of words in the same order,
+   //  it will always produce the same result.
+   var Ran : Random := Start ((for each Arg of Args => <7> * |Arg| + 3));
+
+   var Num_Tries := 1;
+
+   for each Arg of Args forward loop
+      //  For each word to be included in the result ...
+      const Len := |Arg|;
+      const Next_Ran := Ran.Next() mod 6;
+
+      //  Compute the position (within a row or column) of the character in
+      //  position Char_Pos within its word, given the position of
+      //  the upper left corner of the rectangle containing the word,
+      //  and the offset between each character.
+      func Adjust
+        (Base : Univ_Integer; Char_Pos : Univ_Integer; Offset : Integer)
+        -> Univ_Integer is
+         {Char_Pos in 0 .. Len - 1}
+         case Offset of
+           [0] => return Base;
+           [-1] => return Base + Len - 1 - Char_Pos;
+           [..] => return Base + Char_Pos;
+         end case;
+      end func Adjust;
+
+      var First_Match_I : Univ_Integer := 0;
+      var First_Match_J : Univ_Integer := 0;
+      var First_Match_Dir : Univ_Integer := 0;
+
+      Println ("Working on placing `(Arg)");
+
+      //  Try all directions, randomizing between the first 6.
+     *Dir_Loop*
+      for Dir_Base in 1 .. 8 forward loop
+         const Dir := (if Dir_Base >= 7 then Dir_Base
+                       else (Dir_Base + Next_Ran) mod 6 + 1);
+
+         const Offset := Offsets [Dir];
+
+         if Debug then
+            Println ("Dir = `(Dir), Offset = (`(Offset.A),`(Offset.B))");
+         end if;
+
+         const I_Max := Len_To_Use - (Len - 1) * abs(Offset.A);
+         const J_Max := Len_To_Use - (Len - 1) * abs(Offset.B);
+         const I_Ran := Ran.Next() mod I_Max;
+
+         //  For the topmost row for word, try every row that fits
+        *Outer_Loop*
+         for I_Base in 1 .. I_Max loop
+            const I := (I_Base + I_Ran) mod I_Max + 1;
+
+            const J_Ran := Ran.Next() mod J_Max;
+
+            //  For the leftmost column for word, try every column that fits
+           *Inner_Loop*
+            for J_Base in 1 .. J_Max loop
+               const J := (J_Base + J_Ran) mod J_Max + 1;
+
+               //  Remember whether we find a cell that already has
+               //  the correct letter.
+               var There_Was_A_Hit : Boolean := #false;
+
+               //  Remember the column/row of the "hit"
+               var Hit_I := 0;
+               var Hit_J := 0;
+
+               if Debug then
+                  Println ("I = `(I), J = `(J)");
+               end if;
+
+               //  Now see whether we can place the word in the given
+               //  direction (i.e. with the given Offset.A and Offset.B)
+               for (each C of Arg; Inx in 0 ..< Len) forward loop
+                  const Adj_I := Adjust (I, Inx, Offset.A);
+                  const Adj_J := Adjust (J, Inx, Offset.B);
+
+                  if Debug then
+                     Println
+                       ("Indices = `(Adj_I),`(Adj_J)");
+                  end if;
+
+                  const Old_C := Table[Adj_I][Adj_J];
+                  if C != ' ' and then C != '-'
+                    and then Old_C != C and then Old_C != ' '
+                  then
+                     //  Cell already occupied with a letter that doesn' match
+                     continue loop Inner_Loop;
+                  end if;
+
+                  if Old_C == C and then C != '-' and then C != ' ' then
+                     //  Cool, we had a "hit" (ignoring wildcards of '-')
+                     There_Was_A_Hit := #true;
+                     Hit_I := Adj_I;
+                     Hit_J := Adj_J;
+                  end if;
+               end loop;
+
+               if There_Was_A_Hit then
+                  Println ("  `(Arg) starting at " |
+                           "[`(Adjust(I,0,Offset.A))," |
+                           "`(Adjust(J,0,Offset.B))] " |
+                           "had a \"hit\" at [`(Hit_I),`(Hit_J)], " |
+                           "Offset = (`(Offset.A),`(Offset.B))");
+               end if;
+
+               //  Word fits
+               if First_Match_I == 0 or else There_Was_A_Hit then
+                  //  Remember I/J from first match or first hit
+                  First_Match_I := I;
+                  First_Match_J := J;
+                  First_Match_Dir := Dir;
+               end if;
+
+               if Num_Tries == 0 or else There_Was_A_Hit then
+                  //  We have tried enough, or we have a hit.
+                  exit loop Dir_Loop;
+               end if;
+
+               //  Keep trying until Num_Tries = 0 or we have a "hit"
+               Num_Tries -= 1;
+            end loop Inner_Loop;
+         end loop Outer_Loop;
+      end loop Dir_Loop;
+
+      if First_Match_I == 0 then
+         Println ("Cannot place `(Arg)");
+      else
+         //  Word fits and we have a hit, or we have already
+         //  tried too many times.
+
+         const Offset := Offsets[First_Match_Dir];
+
+         for (each C of Arg; Inx in 0 ..< Len) forward loop
+            if C != ' ' and then C != '-' then
+               const Adj_I := Adjust (First_Match_I, Inx, Offset.A);
+               const Adj_J := Adjust (First_Match_J, Inx, Offset.B);
+               Table[Adj_I][Adj_J] := C;
+            end if;
+         end loop;
+      end if;
+
+      //  Reset Num_Tries
+      Num_Tries := Num_Tries_To_Find_Hit;
+   end loop;
+   
+   for I in Table.Bounds forward loop
+      for J in Table[I].Bounds forward loop
+         Print (' ');
+         Print (Table[I][J]);
+      end loop;
+      Print ('\n');
+   end loop;
+    
+   Println ("\n-------------------------\n");
+
+   for I in Table.Bounds forward loop
+      for J in Table[I].Bounds forward loop
+         if Table[I][J] == ' ' then
+            Table[I][J] := Ran.Next() mod 26 + 'a';
+         end if;
+      end loop;
+   end loop;
+
+   for I in Table.Bounds forward loop
+      for J in Table[I].Bounds forward loop
+         Print (' ');
+         Print (Table[I][J]);
+      end loop;
+      Print ('\n');
+   end loop;
+    
+end func Word_Search;
