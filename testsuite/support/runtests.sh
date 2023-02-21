@@ -5,11 +5,18 @@
 #
 # Description:
 #   This script is used to emulate the basic functionality of the
-#   mailserver. It assumes that no test hungs forever!
+#   mailserver. It assumes that no test hangs forever!
 #
 # Requirement:
 #   ParaSail must be available in the PATH
 # ------------------------------------------------------------------------
+
+if [ "$DYLD_LIBRARY_PATH" = "" ]; then
+   # Overcome MacOSX SIP which nulls out DYLD_* environment variables
+   if test -f ../support/dyld_paths.source; then
+      source ../support/dyld_paths.source
+   fi
+fi
 
 LANGUAGE=`basename $PWD`
 

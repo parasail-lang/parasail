@@ -1142,7 +1142,11 @@ private package PSC.Trees.Semantics.Info is
       --  All of the univeral types
 
       Integer_Module : Module_Sem_Ptr;  -- Module for built-in Integer
+      Integer_64_Module : Module_Sem_Ptr;  -- Module for built-in Integer
+      Unsigned_64_Module : Module_Sem_Ptr;  -- Module for built-in Integer
       Float_Module : Module_Sem_Ptr;    -- Module for built-in Float
+      Univ_Real_Module : Module_Sem_Ptr;    -- Module for built-in Univ_Real
+         --  Some day change this to Univ_Float?
       Basic_Array_Module : Module_Sem_Ptr;  -- Module for built-in Basic_Array
       Aliased_Object_Module : Module_Sem_Ptr;
                                        --  Module for built-in Aliased Object
@@ -1158,6 +1162,8 @@ private package PSC.Trees.Semantics.Info is
       Boolean_Type : Type_Sem_Ptr;
       Ordering_Type : Type_Sem_Ptr;
       Unsigned_64_Type : Type_Sem_Ptr;
+      Integer_64_Type : Type_Sem_Ptr;
+      Univ_Real_Type : Type_Sem_Ptr;
    end record;
 
    type Builtin_Types_Ptr is access Builtin_Types_Rec;
@@ -1169,12 +1175,14 @@ private package PSC.Trees.Semantics.Info is
    --  Types of the various kinds of literals
    function Univ_Types return Univ_Types_Ptr;
    function Univ_Integer_Type return Type_Sem_Ptr;
-   function Univ_Real_Type return Type_Sem_Ptr;
    function Univ_Character_Type return Type_Sem_Ptr;
    function Univ_String_Type return Type_Sem_Ptr;
    function Univ_Enumeration_Type return Type_Sem_Ptr;
    function Optional_Type return Type_Sem_Ptr;
+
+   function Univ_Real_Type return Type_Sem_Ptr;
    function Unsigned_64_Type return Type_Sem_Ptr;
+   function Integer_64_Type return Type_Sem_Ptr;
 
    function Integer_Module return Module_Sem_Ptr;
    --  Module for built-in Integer

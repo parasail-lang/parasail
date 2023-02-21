@@ -27,7 +27,7 @@ func Named_Call(X : Univ_Integer) is
 
     // JM: This test just reverses the order of the arguments of the test
     //     The original test is filed under testsuite/ParaSail/named_call
-    type Four is Sub_Int<Default => 4, Default_Type => Univ_Integer>;
+    type Four is Sub_Int<Default => 4, Default_Type => Univ_Integer<>>;
 
     A := Four::Sub(X, 2);
     B := Four::Sub(Right => 2, Left => X);
@@ -40,3 +40,7 @@ func Named_Call(X : Univ_Integer) is
     Println("Four::Sub(Left => " | X | ") = " | E);
 
 end func Named_Call;
+
+func main(Args : Basic_Array<Univ_String>) is
+   Named_Call (10);
+end func main;

@@ -271,6 +271,27 @@ package body PSC.Interpreter.Builtins is
       Static_Link : Non_Op_Map_Type_Ptr);
    --  func Int_To_Real(Int : Univ_Integer) -> Univ_Real
 
+   procedure Rat_To_Float
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   --  func Rat_To_Float(Rat : Rational) -> Univ_Real
+   pragma Export (Ada, Rat_To_Float, "_psc_rat_to_float");
+
+   procedure Float_To_Rat
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   --  func Float_To_Rat(Real : Univ_Real) -> Rational
+   pragma Export (Ada, Float_To_Rat, "_psc_float_to_rat");
+
+   procedure GCD_Univ_Int
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+      --  func GCD (A, B : Univ_Integer) -> Univ_Integer
+   pragma Export (Ada, GCD_Univ_Int, "_psc_gcd_univ_int");
+
    procedure From_String_Int
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -3109,11 +3130,12 @@ package body PSC.Interpreter.Builtins is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
+      use PSC.Univ_Integers;
       Real_Val : constant Univ_Real :=
                    Fetch_Nonnull_Real (Params, 1);
    begin
-      Store_Word (Params, 0, Word_Type (Real_Val));
-      --  Round to int
+      Store_Univ_Integer (Params, 0, From_Word (Word_Type (Real_Val)));
+      --  Round to int  --  TBD:  Handle bigger integers
    end Round_To_Int;
 
    ------------------
@@ -3125,11 +3147,12 @@ package body PSC.Interpreter.Builtins is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
+      use PSC.Univ_Integers;
       Real_Val : constant Univ_Real :=
                    Univ_Real'Truncation (Fetch_Nonnull_Real (Params, 1));
    begin
-      Store_Word (Params, 0, Word_Type (Real_Val));
-      --  Trunc to int
+      Store_Univ_Integer (Params, 0, From_Word (Word_Type (Real_Val)));
+      --  Trunc to int  --  TBD:  Handle bigger integers
    end Trunc_To_Int;
 
    ------------------
@@ -3141,11 +3164,12 @@ package body PSC.Interpreter.Builtins is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
+      use PSC.Univ_Integers;
       Real_Val : constant Univ_Real :=
                    Univ_Real'Floor (Fetch_Nonnull_Real (Params, 1));
    begin
-      Store_Word (Params, 0, Word_Type (Real_Val));
-      --  Floor to int
+      Store_Univ_Integer (Params, 0, From_Word (Word_Type (Real_Val)));
+      --  Floor to int  --  TBD:  Handle bigger integers
    end Floor_To_Int;
 
    -----------------
@@ -3157,19 +3181,114 @@ package body PSC.Interpreter.Builtins is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr)
    is
-      Int_Val  : constant Word_Type := Fetch_Word (Params, 1);
-      Real_Val : Univ_Real;
-   begin
-      if Int_Val = Null_Value then
-         --  TBD: Should this work for null?
-         --  Null int => Null real (NaN)
-         Real_Val := Null_Real_Value;
-      else
-         Real_Val := Univ_Real (Int_Val);
-      end if;
+      use PSC.Univ_Integers;
 
+      Int_Val  : constant Univ_Integer := Fetch_Univ_Integer (Params, 1);
+      Real_Val : constant Univ_Real := Univ_Int_To_Float (Int_Val);
+   begin
       Store_Real (Params, 0, Real_Val);
    end Int_To_Real;
+
+   ------------------
+   -- Rat_To_Float --
+   ------------------
+
+   procedure Rat_To_Float
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+   --  func Rat_To_Float(Rat : Rational) -> Univ_Real
+      Rat_Val  : constant Word_Ptr := Fetch_Word_Ptr (Params, 1);
+      Real_Val : Univ_Real;
+
+      use PSC.Univ_Integers;
+   begin
+      if Interpreter.Is_Large_Null (Word_Ptr_To_Word (Rat_Val)) then
+         Real_Val := Null_Real_Value;
+      else
+         declare
+            Num : constant Univ_Integer := Fetch_Univ_Integer (Rat_Val, 1);
+            Den : constant Univ_Integer := Fetch_Univ_Integer (Rat_Val, 2);
+         begin
+            --  Divide the numerator by the denominator -- easy-peasy
+            Real_Val := Univ_Int_To_Float (Num) / Univ_Int_To_Float (Den);
+         end;
+      end if;
+      Store_Real (Params, 0, Real_Val);
+   end Rat_To_Float;
+
+   ------------------
+   -- Float_To_Rat --
+   ------------------
+
+   procedure Float_To_Rat
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+   --  func Float_To_Rat(Real : Univ_Real) -> Rational
+      Real_Val : constant Univ_Real := Fetch_Real (Params, 1);
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+   begin
+      if Real_Val = Null_Real_Value then
+         Store_Word (Params, 0,
+           Null_For_Stg_Rgn (Stg_Rgn_Of_Large_Obj (Target)));
+      else
+         declare
+            use PSC.Univ_Integers;
+
+            Rat : constant Word_Ptr := Word_To_Word_Ptr
+              (Create_Large_Obj
+                (Type_Desc => Static_Link,
+                 Stg_Rgn => Stg_Rgn_Of_Large_Obj (Target),
+                 Server_Index => Context.Server_Index));
+
+            --  Get the mantissa as an integer
+            Int_Mantissa : constant Univ_Integer := From_Word
+              (Word_Type (Univ_Real'Fraction (Real_Val) *
+                (Univ_Real (Univ_Real'Machine_Radix) **
+                   Univ_Real'Machine_Mantissa)));
+
+            --  Get the exponent that goes with the mantissa as an integer
+            Adj_Exp : constant Integer :=
+              Univ_Real'Exponent (Real_Val) - Univ_Real'Machine_Mantissa;
+
+            Radix : constant Univ_Integer :=
+              From_Word (Univ_Real'Machine_Radix);
+         begin
+            if Adj_Exp >= 0 then
+               --  (adj) Exponent >= 0; result is (Mant * Radix ^ Adj_Exp, 1)
+               Store_Univ_Integer (Rat, 1, Int_Mantissa * Radix ** Adj_Exp);
+               Store_Univ_Integer (Rat, 2, One);
+            else
+               --  (adj) Exponent < 0; result is (Mant, Radix ^ abs(Adj_Exp))
+               declare
+                  Num : constant Univ_Integer := Int_Mantissa;
+                  Den : constant Univ_Integer := Radix ** (-Adj_Exp);
+                  Div : constant Univ_Integer := GCD (Num, Den);
+               begin
+                  --  Reduce to lowest terms
+                  Store_Univ_Integer (Rat, 1, Num / Div);
+                  Store_Univ_Integer (Rat, 2, Den / Div);
+               end;
+            end if;
+            
+            Store_Word_Ptr (Params, 0, Rat);
+         end;
+      end if;
+   end Float_To_Rat;
+
+   procedure GCD_Univ_Int
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func GCD (A, B : Univ_Integer) -> Univ_Integer
+      --   is import (#gcd_univ_int);
+      use PSC.Univ_Integers;
+   begin
+      Store_Univ_Integer
+        (Params, 0, GCD
+           (Fetch_Univ_Integer (Params, 1), Fetch_Univ_Integer (Params, 2)));
+   end GCD_Univ_Int;
 
    --------------------
    -- Fixed_Real_Mul --
@@ -3511,6 +3630,11 @@ begin
    Register_Builtin (String_Lookup ("#trunc_to_int"), Trunc_To_Int'Access);
    Register_Builtin (String_Lookup ("#floor_to_int"), Floor_To_Int'Access);
    Register_Builtin (String_Lookup ("#int_to_real"), Int_To_Real'Access);
+
+   Register_Builtin (String_Lookup ("#rat_to_float"), Rat_To_Float'Access);
+   Register_Builtin (String_Lookup ("#float_to_rat"), Float_To_Rat'Access);
+
+   Register_Builtin (String_Lookup ("#gcd_univ_int"), GCD_Univ_Int'Access);
 
    Register_Builtin
      (String_Lookup ("#time_int_from_univ"),

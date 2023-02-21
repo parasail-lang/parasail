@@ -672,6 +672,9 @@ interface PSL::Core::Univ_Integer<> is
     op "|"(Left, Right : Univ_Integer) -> Countable_Set<Univ_Integer>
       is in Countable_Set<Univ_Integer>
 
+    func GCD (A, B : Univ_Integer) -> Univ_Integer
+      is import (#gcd_univ_int);
+
  implements for Summable
 
     func From_Int (Int : Univ_Integer) -> Univ_Integer is
@@ -5808,6 +5811,279 @@ func PSL::Test::Test_Real() is
     var Neg := -2.0;
     Println("Sqrt(-2.0) = " | Sqrt(Neg))
 end func PSL::Test::Test_Real
+
+interface PSL::Core::Rational<> is
+    //  Infinite precision rational numbers
+    func Create (Num, Den : Univ_Integer) -> Rational;
+
+    const Zero : Rational := Create (Num => 0, Den => 1);
+    const One : Rational := Create (Num => 1, Den => 1);
+    const Two : Rational := Create (Num => 2, Den => 1);
+    const One_Half : Rational := Create (Num => 1, Den => 2);
+    
+    func Num (Rational) -> Univ_Integer;
+    func Den (Rational) -> Univ_Integer;
+
+    func Inf () -> Rational is (Create (1, 0));
+    func Minus_Inf () -> Rational is (Create (-1, 0));
+
+    op "+"(Right : Rational) -> Rational is (Right);
+
+    op "-"(Right : Rational) -> Rational
+
+    op "abs"(Right : Rational) -> Rational
+
+    op "magnitude"(Rational) -> Rational is "abs"
+
+    op "+"(Left, Right : Rational) -> Result : Rational 
+
+    op "-"(Left, Right : Rational) -> Result : Rational
+
+    op "*"(Left, Right : Rational) -> Result : Rational 
+
+    op "*"(Left : Rational; Right : Univ_Integer) -> Rational
+
+    op "*"(Left : Univ_Integer; Right : Rational) -> Rational
+
+    op "/"(Left, Right : Rational) -> Result : Rational
+
+    op "/"(Left : Rational; Right : Univ_Integer) -> Rational
+
+    op "**"(Left : Rational; Right : Univ_Integer) -> Rational
+
+    op "+="(var Left : Rational; Right : Rational) 
+
+    op "-="(var Left : Rational; Right : Rational) 
+
+    op "*="(var Left : Rational; Right : Rational) 
+
+    op "/="(var Left : Rational; Right : Rational) 
+
+    op "**="(var Left : Rational; Right : Univ_Integer) 
+
+
+    op "=?"(Left, Right : Rational) -> Ordering
+
+    func Min(Left, Right : optional Rational) -> optional Rational
+    func Max(Left, Right : optional Rational) -> optional Rational
+
+    func Sqrt(Val : Rational {Val >= Zero}) -> Rational;
+
+    func Hash(Val : Rational) -> Unsigned_64;
+
+    func To_String(Val : optional Rational) -> Univ_String
+
+    func From_String(Str : Univ_String) -> optional Rational
+
+    op "from_univ" (Val : Univ_Real) -> Rational is import(#float_to_rat)
+    op "to_univ" (Val : Rational) -> Univ_Real is import(#rat_to_float)
+
+    func Print(X : Rational)
+    func Println(X : Rational) is (Println(To_String(X)))
+
+    func Round_To_Int(Rational : Rational) -> Univ_Integer
+
+    func Trunc_To_Int(Rational : Rational) -> Univ_Integer
+
+    func Floor_To_Int(Rational : Rational) -> Univ_Integer
+
+    func Int_To_Rational(Int : Univ_Integer) -> Rational
+
+    op "in"(Left : Rational; Right : Range_Set<Rational>) -> Boolean
+      is in Range_Set<Rational>
+
+end interface PSL::Core::Rational
+
+class PSL::Core::Rational is
+    const Num : Univ_Integer;
+    const Den : Univ_Integer;
+
+    func Reduce (Num, Den : Univ_Integer) -> Rational is
+       //  Reduce by GCD
+       case Den =? 0 of
+         [#less] =>
+          return Reduce (-Num, -Den);
+         [#equal] =>
+          return (Num => Num / abs(Num), Den => 0);
+         [#greater] =>
+          const Div := GCD (Num, Den);
+
+          return (Num => Num / Div, Den => Den / Div);
+       end case;
+    end func Reduce;
+
+  exports
+
+    func Create (Num, Den : Univ_Integer) -> Rational is
+      (Reduce (Num => Num, Den => Den));
+
+    func Num (Rational) -> Univ_Integer is (Rational.Num);
+    func Den (Rational) -> Univ_Integer is (Rational.Den);
+
+    op "-"(Right : Rational) -> Rational is
+      (Reduce (-Right.Num, Right.Den));
+
+    op "abs"(Right : Rational) -> Rational is
+      ((Num => abs(Right.Num), Den => Right.Den));
+
+    op "+"(Left, Right : Rational) -> Result : Rational is
+      (Reduce (Left.Num * Right.Den + Left.Den * Right.Num,
+               Left.Den * Right.Den));
+
+    op "-"(Left, Right : Rational) -> Result : Rational is
+      (Reduce (Left.Num * Right.Den - Left.Den * Right.Num,
+               Left.Den * Right.Den));
+
+    op "*"(Left, Right : Rational) -> Result : Rational is
+      (Reduce (Left.Num * Right.Num, Left.Den * Right.Den));
+
+    op "*"(Left : Rational; Right : Univ_Integer) -> Rational is
+      (Reduce (Left.Num * Right, Left.Den));
+
+    op "*"(Left : Univ_Integer; Right : Rational) -> Rational is
+      (Reduce (Left * Right.Num, Right.Den));
+
+    op "/"(Left, Right : Rational) -> Result : Rational is
+      (Reduce (Left.Num * Right.Den, Left.Den * Right.Num));
+
+    op "/"(Left : Rational; Right : Univ_Integer) -> Rational is
+      (Reduce (Left.Num, Left.Den * Right));
+
+    op "**"(Left : Rational; Right : Univ_Integer) -> Rational is
+      (Reduce (Left.Num ** Right, Left.Den ** Right));
+
+    op "+="(var Left : Rational; Right : Rational) is
+       Left := Left + Right;
+    end op "+=";
+
+    op "-="(var Left : Rational; Right : Rational) is
+       Left := Left - Right;
+    end op "-=";
+
+    op "*="(var Left : Rational; Right : Rational) is
+       Left := Left * Right;
+    end op "*=";
+
+    op "/="(var Left : Rational; Right : Rational) is
+       Left := Left / Right;
+    end op "/=";
+
+    op "**="(var Left : Rational; Right : Univ_Integer) is
+       Left := Left ** Right;
+    end op "**=";
+
+
+    op "=?"(Left, Right : Rational) -> Ordering is
+       const Diff := Left - Right;
+
+       return Diff.Num =? 0;
+    end op "=?";
+
+    func Min(Left, Right : optional Rational) -> optional Rational is
+       if Left is null then
+          return Right;
+       elsif Right is null
+         or else Left < Right
+       then
+          return Left;
+       else
+          return Right;
+       end if;
+    end func Min;
+
+    func Max(Left, Right : optional Rational) -> optional Rational is
+       if Left is null then
+          return Right;
+       elsif Right is null
+         or else Left > Right
+       then
+          return Left;
+       else
+          return Right;
+       end if;
+    end func Max;
+
+
+    func Sqrt(Val : Rational {Val >= Zero}) -> Result : Rational is
+        const Epsilon : Rational := (Num => 1, Den => 2 ** 100);
+        const Low := One - Epsilon;
+        const High := One + Epsilon;
+
+        Result := Val / Two
+        while Result.Num > 0
+          and then
+           Result * Result / Val not in Low .. High
+        loop
+            Result := (Val / Result + Result)/Two
+        end loop
+    end func Sqrt
+
+
+    func Hash(Val : Rational) -> Unsigned_64 is
+       return Univ_Integer::Hash (Val.Num) + Univ_Integer::Hash (Val.Den);
+    end func Hash;
+
+    func To_String(Val : optional Rational) -> Univ_String is
+       return Univ_Real::To_String ([[Val]]);  //  TBD
+    end func To_String;
+
+    func From_String(Str : Univ_String) -> optional Rational is
+       return Univ_Real::From_String (Str); // TBD
+    end func From_String;
+
+    func Print(X : Rational) is
+       Print (To_String (X));
+    end func Print;
+
+    func Round_To_Int(Rational : Rational) -> Univ_Integer is
+       return (Rational.Num * 2 + Rational.Den) / (2 * Rational.Den);
+    end func Round_To_Int;
+
+    func Trunc_To_Int(Rational : Rational) -> Univ_Integer is
+       return Rational.Num / Rational.Den;
+    end func Trunc_To_Int;
+
+    func Floor_To_Int(Rational : Rational) -> Univ_Integer is
+       if Rational.Num < 0 then
+          return (Rational.Num - Rational.Den + 1) / Rational.Den;
+       else
+          return Rational.Num / Rational.Den;
+       end if;
+    end func Floor_To_Int;
+
+    func Int_To_Rational(Int : Univ_Integer) -> Rational is
+       return (Num => Int, Den => 1);
+    end func Int_To_Rational;
+
+end class PSL::Core::Rational
+    
+func PSL::Test::Test_Rational() is
+    var X : Rational := 3.5
+    var Y : Rational := 5.22
+    var Z : Rational := X + Y
+
+    Println("X = " | X | ", Y = " | Y | ", X + Y = " | Z)
+    var Teeny : Rational := 0.000023
+    Println("Teeny = " | Teeny)
+    var Small : Rational := 0.005
+    Println("Small = " | Small)
+    var Medium : Rational := 235.123
+    Println("Medium = " | Medium)
+    var Big : Rational := 11.0**5
+    Println("Big = " | Big)
+    var Huge : Rational := 13.0**15
+    Println("Huge = " | Huge)
+
+    Println("Y in 1.0 .. 6.0 = " | ( Y in 1.0 .. 6.0 ))
+    
+    Println("Y in 1.0 ..< 5.22 = " | ( Y in 1.0 ..< 5.22 ))
+
+    Println("Sqrt(2.0) = " | Sqrt(2.0))
+
+    var Neg : Rational := -2.0;
+    Println("Sqrt(-2.0) = " | Sqrt(Neg))
+end func PSL::Test::Test_Rational
+
 abstract interface PSL::Core::Indexable
   <Elem_Type is Assignable<>; Index_Type is Countable<>> is
     // An indexable container

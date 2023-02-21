@@ -2345,7 +2345,7 @@ package PSC.Interpreter is
      Normal_Kind,
      Basic_Array_Kind,
      Univ_Integer_Kind,
-     Univ_Real_Kind,
+     Univ_Real_Kind,  --  NOTE: These are actually 64-bit floating point
      Univ_String_Kind,
      Univ_Char_Kind,
      Univ_Enum_Kind,

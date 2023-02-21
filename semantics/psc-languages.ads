@@ -94,6 +94,7 @@ package PSC.Languages is
    function Exception_Type_Module_Name return String;
    function Univ_Integer_Module_Name return String;
    function Unsigned_64_Module_Name return String;
+   function Integer_64_Module_Name return String;
    function Univ_Real_Module_Name return String;
    function Univ_Character_Module_Name return String;
    function Univ_String_Module_Name return String;

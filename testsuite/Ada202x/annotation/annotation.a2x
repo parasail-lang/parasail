@@ -1,9 +1,10 @@
-proc Test_Annotations() is
-    var X := 3;
-    assert X = 3
-    var Y := X * 2;
-    subtype Short is Univ_Integer {Short in -128 .. +127};
-    assert Y = X * 2
-    assert Y = X * 2 + 1, "this one should fail";
-    Println("X = " | X | ", Y = " | Y);
-end proc Test_Annotations;
+procedure Test_Annotations() is
+    X : Integer := 3;
+    pragma Assert(X = 3);
+    Y : Integer := X * 2;
+    subtype Short is Univ_Integer
+      with Static_Predicate => Short in -128 .. +127;
+    pragma Assert(Y = X * 2);
+    pragma Assert(Y = X * 2 + 1, "this one should fail");
+    Put_Line("X = " & X'Image & ", Y = " & Y'Image);
+end Test_Annotations;

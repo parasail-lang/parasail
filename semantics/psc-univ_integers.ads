@@ -79,6 +79,13 @@ package PSC.Univ_Integers is
      return Interpreter.Unsigned_Word_Type;
    --  Convert Univ_Integer to an Unsigned_Word, wrapping around if > 2**64
 
+   function Univ_Int_To_Float (Val : Univ_Integer)
+     return Interpreter.Univ_Real;
+   --  Convert Univ_Integer to a 64-bit float
+
+   function GCD (Left, Right : Univ_Integer) return Univ_Integer;
+   --  Greatest common divisor (absolute value)
+
    function Image (Val : Univ_Integer) return String;
    function Value (Str : String) return Univ_Integer;
 

@@ -109,6 +109,10 @@ package body PSC.Trees.Semantics.Static is
 
    Univ_Integer_Str : Strings.U_String;
 
+   Integer_64_Str : Strings.U_String;
+
+   Unsigned_64_Str : Strings.U_String;
+
    Univ_Real_Str : Strings.U_String;
 
    Univ_Character_Str : Strings.U_String;
@@ -675,7 +679,6 @@ package body PSC.Trees.Semantics.Static is
                New_Mod_Sem.Cur_Inst_Sem.Known_To_Be_Small :=
                  Name /= Languages.Univ_String_Module_Name;
                    --  Univ_String might use the "large" representation.
-                   --  TBD: Univ_Integer might as well some day.
                New_Mod_Sem.Cur_Inst_Sem.Known_To_Be_Assignable := True;
                New_Mod_Sem.Cur_Inst_Sem.All_Parameters_Known := True;
                New_Mod_Sem.Cur_Inst_Sem.Is_Formal_Type := False;
@@ -3543,10 +3546,20 @@ package body PSC.Trees.Semantics.Static is
            Builtin_Types.Ordering_Type);
          Builtin_Type_Init (Mod_Sem, Exception_Type_Str,
            Builtin_Types.Exception_Type);
+
          Builtin_Type_Init (Mod_Sem, Univ_Integer_Str,
            Builtin_Types.Univ_Types (Integer_Literal));
+         Builtin_Type_Init (Mod_Sem, Integer_64_Str,
+           Builtin_Types.Integer_64_Type);
+         Builtin_Type_Init (Mod_Sem, Unsigned_64_Str,
+           Builtin_Types.Unsigned_64_Type);
+
          Builtin_Type_Init (Mod_Sem, Univ_Real_Str,
-           Builtin_Types.Univ_Types (Real_Literal));
+           Builtin_Types.Univ_Real_Type);
+         if Univ_Real_Type /= Builtin_Types.Univ_Types (Real_Literal) then
+            Builtin_Types.Univ_Types (Real_Literal) := Univ_Real_Type;
+         end if;
+
          Builtin_Type_Init (Mod_Sem, Univ_Character_Str,
            Builtin_Types.Univ_Types (Char_Literal));
          Builtin_Type_Init (Mod_Sem, Univ_String_Str,
@@ -3555,6 +3568,7 @@ package body PSC.Trees.Semantics.Static is
            (Mod_Sem,
             Univ_Enumeration_Str,
             Builtin_Types.Univ_Types (Enum_Literal));
+
          Builtin_Type_Init
            (Mod_Sem, Optional_Str, Builtin_Types.Univ_Types (Null_Literal));
 
@@ -23582,6 +23596,9 @@ package body PSC.Trees.Semantics.Static is
                           (Module_Sem.Definition).all);
                      Num_Formals : constant Natural :=
                        Num_Module_Parameters (Module_Sem);
+                     Actuals : array (1 .. Num_Formals) of Optional_Tree;
+                     Defaulted : array (1 .. Num_Formals) of Boolean :=
+                       (others => False);
                      Actual_Sem_Infos : constant Sem_Info_Array_Ptr :=
                        new Sem_Info_Array'(1 .. Num_Formals => null);
                      Num_Actuals : constant Natural :=
@@ -23890,8 +23907,7 @@ package body PSC.Trees.Semantics.Static is
                           (T,
                            "Too many parameters in module instantiation");
                      else
-                        --  Visit actuals before calling Find_U_[Base_]Type
-                        --  routines
+                        --  Copy actuals into array indexed by Formal Index
                         for Actual_Index in 1 .. Num_Actuals loop
                            declare
                               Formal_Index : Positive := Actual_Index;
@@ -23926,9 +23942,7 @@ package body PSC.Trees.Semantics.Static is
                                        Module_Formal_Index (Formal_Sym);
                                     Seen_Named := True;
 
-                                    if Actual_Sem_Infos (Formal_Index) /=
-                                       null
-                                    then
+                                    if Not_Null (Actuals (Formal_Index)) then
                                        Sem_Error
                                          (Reference.Tree (Actual_Tree).Key,
                                           "Duplicate definition for formal " &
@@ -23938,9 +23952,8 @@ package body PSC.Trees.Semantics.Static is
                                                   Formal_Index)));
                                     end if;
 
-                                    Handle_Nth_Formal
-                                      (Formal_Index,
-                                       Reference.Tree (Actual_Tree).Referent);
+                                    Actuals (Formal_Index) :=
+                                      Reference.Tree (Actual_Tree).Referent;
                                  end;
                               else
                                  --  Positional notation
@@ -23951,7 +23964,7 @@ package body PSC.Trees.Semantics.Static is
                                        "all named operands in " &
                                        Subtree_Image (T));
                                  end if;
-                                 Handle_Nth_Formal (Formal_Index, Actual);
+                                 Actuals (Formal_Index) := Actual;
                               end if;
                            end;
                         end loop;
@@ -23959,13 +23972,13 @@ package body PSC.Trees.Semantics.Static is
                         if Num_Actuals < Num_Formals then
                            --  Process defaults
                            for I in 1 .. Num_Formals loop
-                              if Actual_Sem_Infos (I) = null then
+                              if Is_Null (Actuals (I)) then
                                  --  See whether formal has a default
                                  declare
+                                    Formal_OT : constant Optional_Tree :=
+                                        Nth_Module_Parameter (Module_Sem, I);
                                     Formal_Tree : Trees.Tree'Class
-                                      renames Tree_Ptr_Of
-                                        (Nth_Module_Parameter
-                                          (Module_Sem, I)).all;
+                                      renames Tree_Ptr_Of (Formal_OT).all;
                                  begin
                                     if Formal_Tree in Type_Decl.Tree then
                                        Sem_Error
@@ -23987,14 +24000,13 @@ package body PSC.Trees.Semantics.Static is
                                             Param_Decl.Tree (Formal_Tree).
                                             Param_Default;
                                        begin
-                                          Handle_Nth_Formal
-                                            (I,
+                                          Defaulted (I) := True;
+                                          Actuals (I) :=
                                              Substitute_Actuals_In_Operand
                                                (Optional
                                                  (Tree_Ptr_Of (Default).all),
                                                 U_Base_Type_Region
-                                                  (Enclosing_Type)),
-                                             Is_Default => True);
+                                                  (Enclosing_Type));
                                        end;
                                     elsif Formal_Tree in Operation.Tree
                                       and then Not_Null
@@ -24021,6 +24033,15 @@ package body PSC.Trees.Semantics.Static is
                               end if;
                            end loop;
                         end if;
+
+                        --  Now visit actuals in order of formals,
+                        --  before calling Find_U_[Base_]Type routines.
+                        for Formal_Index in 1 .. Num_Formals loop
+                           Handle_Nth_Formal
+                             (Formal_Index,
+                              Actuals (Formal_Index),
+                              Is_Default => Defaulted (Formal_Index));
+                        end loop;
                      end if;
 
                      Set_Type_Sem_Info
@@ -25618,6 +25639,12 @@ package body PSC.Trees.Semantics.Static is
 
       Univ_Integer_Str :=
         Strings.String_Lookup (Languages.Univ_Integer_Module_Name);
+
+      Integer_64_Str :=
+        Strings.String_Lookup (Languages.Integer_64_Module_Name);
+
+      Unsigned_64_Str :=
+        Strings.String_Lookup (Languages.Unsigned_64_Module_Name);
 
       Univ_Real_Str :=
         Strings.String_Lookup (Languages.Univ_Real_Module_Name);

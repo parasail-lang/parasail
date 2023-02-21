@@ -1395,6 +1395,17 @@ package body PSC.Trees.Semantics.Info is
       return Builtin_Types_Array (PSC.Languages.Language).Unsigned_64_Type;
    end Unsigned_64_Type;
 
+   function Integer_64_Type return Type_Sem_Ptr is
+      Builtin_Types : constant Builtin_Types_Ptr :=
+        Builtin_Types_Array (PSC.Languages.Language);
+   begin
+      if Builtin_Types = null then
+         return null;
+      end if;
+
+      return Builtin_Types_Array (PSC.Languages.Language).Integer_64_Type;
+   end Integer_64_Type;
+
    function Univ_Real_Type return Type_Sem_Ptr is
       Builtin_Types : constant Builtin_Types_Ptr :=
         Builtin_Types_Array (PSC.Languages.Language);
@@ -1403,7 +1414,8 @@ package body PSC.Trees.Semantics.Info is
          return null;
       end if;
 
-      return Builtin_Types.Univ_Types (Real_Literal);
+      return
+        Builtin_Types.Univ_Real_Type;
    end Univ_Real_Type;
 
    function Univ_Character_Type return Type_Sem_Ptr is

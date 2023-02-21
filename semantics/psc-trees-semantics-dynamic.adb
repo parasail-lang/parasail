@@ -5298,6 +5298,8 @@ package body PSC.Trees.Semantics.Dynamic is
         and then (Assoc_Module.Other_Part = null
                   or else
                     Assoc_Module.Other_Part.Code_Has_Been_Generated);
+      Builtin_Types : constant Builtin_Types_Ptr :=
+        Builtin_Types_Array (PSC.Languages.Language);
    begin
       if Debug_Code_Gen then
          Put_Line
@@ -5324,25 +5326,35 @@ package body PSC.Trees.Semantics.Dynamic is
       Type_Desc.Is_Partially_Abstract := Assoc_Module.Is_Partially_Abstract;
       Type_Desc.Is_Concurrent := Assoc_Module.Is_Concurrent;
 
-      if Assoc_Module = Basic_Array_Module then
-         --  Mark instances of Basic_Array module specially
-         Type_Desc.Type_Kind := Basic_Array_Kind;
-      elsif Assoc_Module = Aliased_Object_Module then
-         --  Mark instances of Aliased Object module specially
-         Type_Desc.Type_Kind := Aliased_Object_Kind;
-      elsif Obj_Type.Is_Universal then
+      if Obj_Type.Is_Universal then
          --  Set the Type_Kind to reflect the kind of universal type it is
          for I in Univ_Literal_Kinds loop
             if Obj_Type = Univ_Types (I) then
                Type_Desc.Type_Kind := Univ_Type_Kinds (I);
                exit;
             end if;
-            if I = Univ_Literal_Kinds'Last then
-               Sem_Error ("Internal: " & Type_Image (Obj_Type) &
-                   " doesn't match any univ type.",
-                 Src_Pos => Find_Source_Pos (Obj_Type.Definition));
-            end if;
          end loop;
+
+         if Type_Desc.Type_Kind = Normal_Kind then
+            Sem_Error ("Internal: " & Type_Image (Obj_Type) &
+                " doesn't match any univ type.",
+              Src_Pos => Find_Source_Pos (Obj_Type.Definition));
+         end if;
+      elsif Assoc_Module = Basic_Array_Module then
+         --  Mark instances of Basic_Array module specially
+         Type_Desc.Type_Kind := Basic_Array_Kind;
+      elsif Assoc_Module = Aliased_Object_Module then
+         --  Mark instances of Aliased Object module specially
+         Type_Desc.Type_Kind := Aliased_Object_Kind;
+      elsif Builtin_Types = null then
+         --  Nothing more to check
+         null;
+      elsif Assoc_Module = Builtin_Types.Unsigned_64_Module then
+         --  Unsigned_64 has its own kind
+         Type_Desc.Type_Kind := Unsigned_64_Kind;
+      elsif Assoc_Module = Builtin_Types.Integer_64_Module then
+         --  Integer_64 has its own kind
+         Type_Desc.Type_Kind := Integer_64_Kind;
       end if;
 
       Type_Desc.Is_Polymorphic := False;

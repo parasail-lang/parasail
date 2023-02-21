@@ -213,6 +213,16 @@ package body PSC.Languages is
       end case;
    end Unsigned_64_Module_Name;
 
+   function Integer_64_Module_Name return String is
+   begin
+      case Current_Language is
+         when ParaSail => return "Integer_64";
+         when Ada_Ish  => return "Integer_64";
+         when Parython => return "Integer_64";
+         when Javallel => return "Integer64";
+      end case;
+   end Integer_64_Module_Name;
+
    function Univ_Real_Module_Name return String is
    begin
       case Current_Language is

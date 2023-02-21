@@ -426,6 +426,47 @@ package body PSC.Univ_Integers is
       end if;
    end To_Unsigned_Word;
 
+   function Univ_Int_To_Float (Val : Univ_Integer)
+     return Interpreter.Univ_Real is
+   --  Convert Univ_Integer to a 64-bit float
+   begin
+      if Val = Null_Univ_Integer then
+         --  Null int => Null real (NaN)
+         return Null_Real_Value;
+      elsif Fits_In_Word (Val) then
+         --  Can use "normal" mechanism to convert to a real
+         return Univ_Real (From_Univ_Integer (Val));
+      else
+         --  Need to reduce size of integer
+         declare
+            Real_Val : Univ_Real := 0.0;
+            Rest : Univ_Integer := abs (Val);
+            Partial : Univ_Integer;
+            Bits_Per_Chunk : constant := 31;
+            Modulus : constant Univ_Integer := Two ** Bits_Per_Chunk;
+            Real_Modulus : constant Univ_Real := 2.0 ** Bits_Per_Chunk;
+            Real_Mult : Univ_Real := 1.0;
+         begin
+            --  Convert in 31-bit pieces
+            loop
+               Partial := Rest mod Modulus;
+               Real_Val := Real_Val +
+                 Univ_Real (From_Univ_Integer (Partial)) * Real_Mult;
+               exit when Rest = Partial;
+
+               Rest := Rest / Modulus;
+               Real_Mult := Real_Mult * Real_Modulus;
+            end loop;
+            if Val < Zero then
+               --  Carry over the sign
+               return -Real_Val;
+            else
+               return Real_Val;
+            end if;
+         end;
+      end if;
+   end Univ_Int_To_Float;
+
    function Hex_Image
      (Val : Unsigned_Word_Type;
       Underscores_Every : Natural := 4;
@@ -845,6 +886,29 @@ package body PSC.Univ_Integers is
    begin
       return not (Left < Right);
    end ">=";
+
+   function GCD (Left, Right : Univ_Integer) return Univ_Integer is
+   --  Greatest common divisor (absolute value)
+      function GCD_Rec (Left, Right : Univ_Integer) return Univ_Integer is
+         --  Left >= 0; Left <= Right
+      begin
+         if Left = 0 then
+            return Right;
+         else
+            return GCD_Rec (Right mod Left, Left);
+         end if;
+      end GCD_Rec;
+      
+   begin  --  GCD
+
+      if Left = Null_Univ_Integer or else Right = Null_Univ_Integer then
+         return Null_Univ_Integer;
+      elsif abs (Left) > abs (Right) then
+         return GCD_Rec (abs (Right), abs (Left));
+      else
+         return GCD_Rec (abs (Left), abs (Right));
+      end if;
+   end GCD;
 
    procedure Store_Univ_Integer
      (Context : Exec_Context;
