@@ -3598,7 +3598,7 @@ case_alt :
             Source_Pos => $1.Source_Pos),
 	  Referent => $4.Tree));
     }
-  | '<' simple_expression_opt_named '>' REFERS_TO_with_indent
+  | '<' pattern_tree '>' REFERS_TO_with_indent
       indented_statement_list_with_term {
 	$$ := (One_Tree, Reference.Make(
 	  Key => Invocation.Make(Invocation.Container_Aggregate,
@@ -3606,6 +3606,28 @@ case_alt :
 	    Operands => Lists.Make((1 => $2.Tree)),
             Source_Pos => $1.Source_Pos),
 	  Referent => $5.Tree));
+    }
+  ;
+
+pattern_tree : simple_pattern {
+        $$ := $1;
+    }
+  | pattern_tree ',' simple_pattern {
+	$$ := (One_Tree, Binary.Make(
+	  Operator => Binary.Next_Stmt_Op,
+	  Left_Operand => $1.Tree,
+	  Right_Operand => $3.Tree,
+          Source_Pos => $2.Source_Pos));
+    }
+  ; 
+
+simple_pattern : simple_expression_opt_named {
+        $$ := $1;
+    }  
+  | id REFERS_TO simple_expression_opt_named {
+        $$ := (One_Tree, Reference.Make(
+                 Key => $1.Tree,
+                 Referent => $3.Tree));
     }
   ;
 
