@@ -47,6 +47,7 @@
 %token MOVE   -- "<=="
 %token COMBINE_MOVE -- "<|="
 %token DOT_DOT -- ".."
+%token ANGLE_DOT_DOT_ANGLE -- "<..>"
 %token OPEN_CLOSED_INTERVAL -- "<.."
 %token OPEN_INTERVAL -- "<..<"
 %token CLOSED_OPEN_INTERVAL -- "..<"
@@ -3597,6 +3598,15 @@ case_alt :
             Source_Pos => $1.Source_Pos),
 	  Referent => $4.Tree));
     }
+  | '<' simple_expression_opt_named '>' REFERS_TO_with_indent
+      indented_statement_list_with_term {
+	$$ := (One_Tree, Reference.Make(
+	  Key => Invocation.Make(Invocation.Container_Aggregate,
+	    Prefix => Null_Optional_Tree,
+	    Operands => Lists.Make((1 => $2.Tree)),
+            Source_Pos => $1.Source_Pos),
+	  Referent => $5.Tree));
+    }
   ;
 
 REFERS_TO_with_indent : REFERS_TO {
@@ -3631,6 +3641,28 @@ opt_default_alt :
 	    Operands => Lists.Make((1 => $2.Tree)),
             Source_Pos => $1.Source_Pos),
 	  Referent => $5.Tree));
+    }
+  | '<' dot_dot_opt_named '>' REFERS_TO_with_indent
+      indented_statement_list_with_term {
+	$$ := (One_Tree, Reference.Make(
+	  Key => Invocation.Make(Invocation.Container_Aggregate,
+	    Prefix => Null_Optional_Tree,
+	    Operands => Lists.Make((1 => $2.Tree)),
+            Source_Pos => $1.Source_Pos),
+	  Referent => $5.Tree));
+    }
+  | ANGLE_DOT_DOT_ANGLE REFERS_TO_with_indent
+      indented_statement_list_with_term {
+	$$ := (One_Tree, Reference.Make(
+	  Key => Invocation.Make(Invocation.Container_Aggregate,
+	    Prefix => Null_Optional_Tree,
+	    Operands => Lists.Make((1 =>
+	      Binary.Make(Binary.Closed_Interval_Op,
+	        Left_Operand => Null_Optional_Tree,
+	        Right_Operand => Null_Optional_Tree,
+                Source_Pos => $1.Source_Pos))),
+            Source_Pos => $1.Source_Pos),
+	  Referent => $3.Tree));
     }
   | {
 	$$ := (One_Tree, Null_Optional_Tree);

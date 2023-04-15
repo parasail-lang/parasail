@@ -17,7 +17,7 @@
 
 pragma Style_Checks (Off);
 
-with Parython_Parser, Parython_Lex_IO, Parython_Lex,
+with Parython_Parser, Parython_Lex_IO, Parython_Lex, Parython_Tokens,
   Text_IO;
 use  Parython_Parser, Text_IO;
 with PSC.Languages;
@@ -52,7 +52,8 @@ begin  --  Parython_Main
         Parython_Lex.Init'Access,
         Parython_Lex_IO.Open_Input'Access,
         Parython_Lex_IO.Close_Input'Access,
-        Parython_Parser.YYParse'Access)));
+        Parython_Parser.YYParse'Access,
+        Parython_Tokens.Syntax_Error'Identity)));
 
    PSC.Trees.Semantics.Analyze_And_Interpret_All (Total_Errors, Command_Given);
 end Parython_Main;

@@ -15,7 +15,7 @@
 -- of the license.                                                          --
 ------------------------------------------------------------------------------
 
-with Javallel_Parser, Javallel_Lex_IO, Javallel_Lex,
+with Javallel_Parser, Javallel_Lex_IO, Javallel_Lex, Javallel_Tokens,
   Text_IO;
 use  Javallel_Parser, Text_IO;
 with PSC.Languages;
@@ -49,7 +49,8 @@ begin  --  Javallel_Main
         Javallel_Lex.Init'Access,
         Javallel_Lex_IO.Open_Input'Access,
         Javallel_Lex_IO.Close_Input'Access,
-        Javallel_Parser.YYParse'Access)));
+        Javallel_Parser.YYParse'Access,
+        Javallel_Tokens.Syntax_Error'Identity)));
 
    PSC.Trees.Semantics.Analyze_And_Interpret_All (Total_Errors, Command_Given);
 

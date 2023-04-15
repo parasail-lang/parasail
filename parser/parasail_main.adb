@@ -18,7 +18,7 @@
 -- S. Tucker Taft.                                                          --
 ------------------------------------------------------------------------------
 
-with ParaSail_Parser, ParaSail_Lex_IO, ParaSail_Lex;
+with ParaSail_Parser, ParaSail_Lex_IO, ParaSail_Lex, ParaSail_Tokens;
 with PSC.Languages;
 with PSC.Syntax;
 with PSC.Trees.Semantics;
@@ -46,7 +46,8 @@ begin  --  Parasail_Main
         ParaSail_Lex.Init'Access,
         ParaSail_Lex_IO.Open_Input'Access,
         ParaSail_Lex_IO.Close_Input'Access,
-        ParaSail_Parser.YYParse'Access)));
+        ParaSail_Parser.YYParse'Access,
+        ParaSail_Tokens.Syntax_Error'Identity)));
 
    PSC.Trees.Semantics.Analyze_And_Interpret_All (Total_Errors, Command_Given);
 

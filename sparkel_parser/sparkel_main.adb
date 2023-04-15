@@ -15,7 +15,7 @@
 -- of the license.                                                          --
 ------------------------------------------------------------------------------
 
-with Sparkel_Parser, Sparkel_Lex_IO, Sparkel_Lex,
+with Sparkel_Parser, Sparkel_Lex_IO, Sparkel_Lex, Sparkel_Tokens,
   Text_IO;
 use  Sparkel_Parser, Text_IO;
 with PSC.Languages;
@@ -50,7 +50,8 @@ begin  --  Sparkel_Main
         Sparkel_Lex.Init'Access,
         Sparkel_Lex_IO.Open_Input'Access,
         Sparkel_Lex_IO.Close_Input'Access,
-        Sparkel_Parser.YYParse'Access)));
+        Sparkel_Parser.YYParse'Access,
+        Sparkel_Tokens.Syntax_Error'Identity)));
 
    PSC.Trees.Semantics.Analyze_And_Interpret_All (Total_Errors, Command_Given);
 

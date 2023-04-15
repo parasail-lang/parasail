@@ -161,16 +161,22 @@ package body PSC.Syntax is
 
          PSC.Trees.Semantics.Start_New_Source_File;
 
+         declare
+            use Ada.Exceptions;
          begin
             Parser.Yyparse.all;
          exception
 
             when E : others =>
-               PSC.Messages.Put_Message
-                 ("Exception raised: " &
-                     Ada.Exceptions.Exception_Information (E),
-                  Src_Pos => Cur_Source_Pos,
-                  Message_Kind => "Info");
+               if Exception_Identity (E) /= Parser.Syn_Err then
+                  --  Announce exception unless is simply "Syntax_Error."
+                  PSC.Messages.Put_Message
+                    ("Exception raised: " &
+                        Ada.Exceptions.Exception_Information (E),
+                     Src_Pos => Cur_Source_Pos,
+                     Message_Kind => "Info");
+               end if;
+
                PSC.Messages.Put_Message
                  ("skipping to end of file",
                   Src_Pos => Cur_Source_Pos,

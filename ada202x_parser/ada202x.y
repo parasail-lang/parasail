@@ -3850,6 +3850,10 @@ primary :
              Source_Pos => $2.Source_Pos),
 	  Operands => $5.List));
     }
+  | '<' id '>' { 
+        $$ := (One_Tree,
+                 Unary.Make(Unary.Initial_Value_Op, Operand => $2.Tree));
+    }
   ;
   
 literal:  -- NOTE: See "name" for String_Literal

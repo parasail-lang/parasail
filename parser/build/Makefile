@@ -28,7 +28,7 @@ parasail-parser: ../gen/parasail_tokens.ads
 	@mkdir -p ../gen
 	$(RM) parasail.y parasail_lex.l parasail.verbose
 	cp ../parasail.y ../parasail_lex.l .
-	bin/ayacc parasail.y verbose "=>" on
+	bin/ayacc parasail.y verbose "=>" on debug "=>" off
 	bin/aflex -s parasail_lex.l
 	cd ../gen; $(GNATCHOP) -w ../build/parasail*.ad?
 	$(RM) parasail*.ad? parasail.y parasail_lex.l

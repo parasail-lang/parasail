@@ -807,6 +807,11 @@ EXPONENT          [Ee][-+]?{DIGIT_SEQUENCE}
 	yylval := Create_Token;
 	return(DOT_DOT);
 }
+"<..>"		{
+	ECHO_L; ENTER(CHARLIT); 
+	yylval := Create_Token;
+	return(ANGLE_DOT_DOT_ANGLE);
+}
 "<..<"		{
 	ECHO_L; ENTER(CHARLIT); 
 	yylval := Create_Token;

@@ -18,6 +18,7 @@
 -- S. Tucker Taft.                                                          --
 ------------------------------------------------------------------------------
 
+with Ada.Exceptions;
 with PSC.Languages;
 with PSC.Strings;
 with PSC.Source_Positions;
@@ -50,6 +51,7 @@ package PSC.Syntax is
       Lexer_Open_Input : Acc_Open_Proc;
       Lexer_Close_Input : Acc_Proc;
       YYParse : Acc_Proc;
+      Syn_Err : Ada.Exceptions.Exception_Id;
    end record;
 
    type Parser_Array is array (Positive range <>) of Parser_Operations;

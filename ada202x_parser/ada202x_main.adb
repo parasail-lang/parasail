@@ -15,12 +15,12 @@
 -- of the license.                                                          --
 ------------------------------------------------------------------------------
 
-with Ada202x_Parser, Ada202x_Lex_IO, Ada202x_Lex,
+with Ada202x_Parser, Ada202x_Lex_IO, Ada202x_Lex, Ada202x_Tokens,
   Text_IO;
 use  Ada202x_Parser, Text_IO;
 with Ada202x_Lex_DFA;
 
-with ParaSail_Parser, ParaSail_Lex_IO, ParaSail_Lex;
+with ParaSail_Parser, ParaSail_Lex_IO, ParaSail_Lex, Parasail_Tokens;
 with ParaSail_Lex_DFA;
 
 with PSC.Languages;
@@ -55,12 +55,14 @@ begin  --  Ada202x_Main
          Ada202x_Lex.Init'Access,
          Ada202x_Lex_IO.Open_Input'Access,
          Ada202x_Lex_IO.Close_Input'Access,
-         Ada202x_Parser.YYParse'Access),
+         Ada202x_Parser.YYParse'Access,
+         Ada202x_Tokens.Syntax_Error'Identity),
         (PSC.Languages.ParaSail,
          ParaSail_Lex.Init'Access,
          ParaSail_Lex_IO.Open_Input'Access,
          ParaSail_Lex_IO.Close_Input'Access,
-         ParaSail_Parser.YYParse'Access)));
+         ParaSail_Parser.YYParse'Access,
+         ParaSail_Tokens.Syntax_Error'Identity)));
 
    PSC.Trees.Semantics.Analyze_And_Interpret_All (Total_Errors, Command_Given);
 
