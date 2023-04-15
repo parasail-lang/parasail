@@ -3513,7 +3513,7 @@ opt_END_IF :
   ;
 
 case_statement : 
-    CASE_kw comparison_expression COLON_or_OF_kw_INDENT
+    CASE_kw comparison_expression_tree COLON_or_OF_kw_INDENT
       case_alt_list
       opt_default_alt
     OUTDENT_opt_NEWLINE opt_END_CASE {
@@ -3568,6 +3568,26 @@ opt_END_CASE :
     }
   ;
 
+comparison_expression_tree : comparison_expression {
+        $$ := $1;
+    }
+  | comparison_expression_list {
+        $$ := (One_Tree, Invocation.Make(Invocation.Class_Aggregate,
+	    Prefix => Null_Optional_Tree,
+	    Operands => $1.List));
+    }
+  ;
+
+comparison_expression_list :
+    comparison_expression ',' comparison_expression {
+        $$ := (One_List, Lists.Make (($1.Tree, $3.Tree)));
+    }
+  | comparison_expression_list ',' comparison_expression {
+	$$ := $1;
+        Lists.Append ($$.List, $3.Tree);
+    }
+  ;
+
 case_alt_list : 
     case_alt {
 	$$ := (One_List, Lists.Make((1 => $1.Tree)));
@@ -3598,37 +3618,29 @@ case_alt :
             Source_Pos => $1.Source_Pos),
 	  Referent => $4.Tree));
     }
-  | '<' pattern_tree '>' REFERS_TO_with_indent
+  | '<' pattern_list '>' REFERS_TO_with_indent
       indented_statement_list_with_term {
 	$$ := (One_Tree, Reference.Make(
-	  Key => Invocation.Make(Invocation.Container_Aggregate,
+	  Key => Invocation.Make(Invocation.Class_Aggregate,
 	    Prefix => Null_Optional_Tree,
-	    Operands => Lists.Make((1 => $2.Tree)),
+	    Operands => $1.List,
             Source_Pos => $1.Source_Pos),
 	  Referent => $5.Tree));
     }
   ;
 
-pattern_tree : simple_pattern {
-        $$ := $1;
+pattern_list : simple_pattern {
+        $$ := (One_List, Lists.Make ((1 => $1.Tree)));
     }
-  | pattern_tree ',' simple_pattern {
-	$$ := (One_Tree, Binary.Make(
-	  Operator => Binary.Next_Stmt_Op,
-	  Left_Operand => $1.Tree,
-	  Right_Operand => $3.Tree,
-          Source_Pos => $2.Source_Pos));
+  | pattern_list ',' simple_pattern {
+	$$ := $1;
+        Lists.Append ($$.List, $1.Tree);
     }
   ; 
 
 simple_pattern : simple_expression_opt_named {
         $$ := $1;
     }  
-  | id REFERS_TO simple_expression_opt_named {
-        $$ := (One_Tree, Reference.Make(
-                 Key => $1.Tree,
-                 Referent => $3.Tree));
-    }
   ;
 
 REFERS_TO_with_indent : REFERS_TO {
@@ -4926,7 +4938,7 @@ COLON_or_THEN_no_indent :
   ;
 
 case_expression : 
-    CASE_kw comparison_expression COLON_or_OF_no_indent
+    CASE_kw comparison_expression_tree COLON_or_OF_no_indent
       case_expr_alt_list {
 	$$ := (One_Tree, Case_Construct.Make(
           Source_Pos => $1.Source_Pos,

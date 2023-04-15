@@ -31,6 +31,7 @@ with PSC.Trees.Invocation;
 with PSC.Trees.Module;
 with PSC.Trees.Param_Decl;
 with PSC.Trees.Qualifier;
+with PSC.Trees.Reference;
 with PSC.Trees.Type_Decl;
 with PSC.Trees.Unary;
 
@@ -788,6 +789,13 @@ package body PSC.Trees.Semantics.Info is
                --  Is an initial value operand (<...>)
                Result := Resolved_Tree (Unary.Tree (Body_Tree).Operand);
                Num_Found.all := Num_Found.all + 1;
+
+            elsif Body_Tree in Reference.Tree then
+               --  Skip over the "Key" of the Key => Referent notation.
+               --  This is important because within a pattern, we use
+               --  <A> as a wildcard that introduces the identifier "A".
+               return Initial_Value_Operand
+                        (Reference.Tree (Body_Tree).Referent, Num_Found);
             end if;
 
             for I in 1 .. Num_Operands (Body_Tree) loop

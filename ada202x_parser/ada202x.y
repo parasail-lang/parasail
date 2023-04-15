@@ -3085,7 +3085,7 @@ END_IF :
   ;
 
 case_statement : 
-    CASE_kw simple_comparison_expression IS_kw_INDENT
+    CASE_kw comparison_expression_tree IS_kw_INDENT
       case_alt_list
       opt_default_alt
     OUTDENT_opt_NEWLINE END_CASE {
@@ -3117,6 +3117,26 @@ END_CASE :
     }
   ;
 
+comparison_expression_tree : simple_comparison_expression {
+        $$ := $1;
+    }
+  | comparison_expression_list {
+        $$ := (One_Tree, Invocation.Make(Invocation.Class_Aggregate,
+	    Prefix => Null_Optional_Tree,
+	    Operands => $1.List));
+    }
+  ;
+
+comparison_expression_list :
+    simple_comparison_expression ',' simple_comparison_expression {
+        $$ := (One_List, Lists.Make (($1.Tree, $3.Tree)));
+    }
+  | comparison_expression_list ',' simple_comparison_expression {
+	$$ := $1;
+        Lists.Append ($$.List, $3.Tree);
+    }
+  ;
+
 case_alt_list : 
     case_alt {
 	$$ := (One_List, Lists.Make((1 => $1.Tree)));
@@ -3128,14 +3148,28 @@ case_alt_list :
   ;
 
 case_alt :
-    WHEN_kw simple_expression_opt_named REFERS_TO_with_indent
+    WHEN_kw pattern_list REFERS_TO_with_indent
       opt_indented_statement_sequence_with_term {
 	$$ := (One_Tree, Reference.Make(
-	  Key => Invocation.Make(Invocation.Container_Aggregate,
+	  Key => Invocation.Make(Invocation.Class_Aggregate,
 	    Prefix => Null_Optional_Tree,
-	    Operands => Lists.Make((1 => $2.Tree))),
+	    Operands => $2.List),
 	  Referent => $4.Tree));
     }
+  ;
+
+pattern_list : simple_pattern {
+        $$ := (One_List, Lists.Make((1 => $1.Tree)));
+    }
+  | pattern_list ',' simple_pattern {
+	$$ := $1;
+        Lists.Append ($$.List, $3.Tree);
+    }
+  ; 
+
+simple_pattern : simple_expression_opt_named {
+        $$ := $1;
+    }  
   ;
 
 REFERS_TO_with_indent : REFERS_TO {
@@ -3851,8 +3885,14 @@ primary :
 	  Operands => $5.List));
     }
   | '<' id '>' { 
-        $$ := (One_Tree,
-                 Unary.Make(Unary.Initial_Value_Op, Operand => $2.Tree));
+        --  In a pattern, < id > is an implicit declaration of "id".
+	$$ := (One_Tree, Param_Decl.Make(
+          Name => $2.Tree,
+          Kind => Param_Decl.Default_Param,
+          Locking => Param_Decl.Not_Locked,
+          Is_Optional => False,
+          Param_Type => Null_Optional_Tree,
+          Param_Default => Null_Optional_Tree));
     }
   ;
   
@@ -4297,7 +4337,7 @@ opt_else_expr :
 
 
 case_expression : 
-    CASE_kw simple_comparison_expression IS_no_indent
+    CASE_kw comparison_expression_tree IS_no_indent
       case_expr_alt_list {
 	$$ := (One_Tree, Case_Construct.Make(
           Source_Pos => $1.Source_Pos,
