@@ -59,7 +59,7 @@ func Intersperse (Error_File : Univ_String; Max_Line : Univ_Integer := 79) is
                  or else X == Max_Line - Max_Chop
                then
                   //  Found a place to split
-                  Result |= Indent * ' ' | Remainder[1 .. X-1];
+                  Result |= Indent * ' ' | Remainder[1 ..< X];
                   Remainder := Remainder [X .. |Remainder|];
                   exit loop;
                end if;
