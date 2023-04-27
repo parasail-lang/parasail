@@ -1706,6 +1706,9 @@ interface PSL::Core::Univ_String<> is
     op "index_set"(Str : Univ_String) -> Countable_Range<Univ_Integer>
         // Return set of indices for string
 
+    func Bounds(Str : Univ_String) -> Countable_Range<Univ_Integer>
+      is "index_set"
+
     op "slicing"(Str : Univ_String;
       Index_Set : Countable_Range<Univ_Integer>) 
       -> Univ_String is import(#string_slicing)

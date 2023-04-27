@@ -1,0 +1,255 @@
+interface Source_Pos<> is
+   type Line_Num is new Integer<0 .. 10**6>;
+   type Col_Num is new Integer<0 .. 10**6>;
+
+   const File_Name : Univ_String;
+   const Line : Line_Num;
+   const Col : Col_Num;
+
+   op "=?" (Left, Right : Source_Pos) -> Ordering is
+     (Left.File_Name != Right.File_Name? Left.File_Name =? Right.File_Name:
+      Left.Line != Right.Line? Left.Line =? Right.Line:
+      Left.Col =? Right.Col);
+
+   func Hash (Source_Pos) -> Unsigned_64 is
+     (Hash(Source_Pos.File_Name) +
+        Hash(Source_Pos.Line) + Hash(Source_Pos.Col));
+
+end interface Source_Pos;
+
+func Intersperse (Error_File : Univ_String; Max_Line : Univ_Integer := 79) is
+   //  Intersperse errors into associated source files.
+   //  Input is Errors, which contains lines such as:
+   //  source_file.ext:line:col blah blah
+   //  and output is source_file.ext.lst with "blah blah" interspersed
+   //  after <line> with a "^" showing the <col>.
+   var IO := IO::Get_IO();
+   var Err_File : File_Input_Stream := IO.Open (Error_File);
+   const Indent := 8;
+
+   func Pad (S : Univ_String; Width : Univ_Integer) -> Result : Univ_String
+     {|Result| == Width} is
+      case |S| =? Width of
+       [#less] =>
+         return ((Width - |S|) * ' ') | S;
+       [#equal] =>
+         return S;
+       [#greater] =>
+         //  Doesn't fit
+         return Width * '*';
+      end case;
+   end func Pad;
+
+   func Indent_And_Split (S : Univ_String) -> Result : Vector<Univ_String>
+     {for all L of Result => |L| <= Max_Line} is
+      Result := [];
+      const Max_Chop := 2 * Max_Line / 3;
+      var Remainder := S;
+
+      loop
+         if |Remainder| + Indent <= Max_Line then
+            //  No further need to split
+            Result |= (Indent * ' ' | Remainder);
+            exit loop;
+         else
+            //  Split off a chunk, ideally at a word boundary
+            for X in Max_Line - Max_Chop - Indent .. Max_Line - Indent + 1
+              reverse loop
+               if Remainder[X] in ' ' | '\t' 
+                 or else X == Max_Line - Max_Chop
+               then
+                  //  Found a place to split
+                  Result |= Indent * ' ' | Remainder[1 .. X-1];
+                  Remainder := Remainder [X .. |Remainder|];
+                  exit loop;
+               end if;
+            end loop;
+         end if;
+      end loop;
+   end func Indent_And_Split;
+
+   func Parse_Error_Msg
+     (Error_Msg : Univ_String;
+      var Source_Pos;
+      var Text : Univ_String) is
+
+      Source_Pos := (File_Name => "", Line => 0, Col => 0);
+      Text := "";
+
+      var I := Error_Msg.Bounds().First;
+      const Last := Error_Msg.Bounds().Last;
+
+      func Skip_White_Space() is
+         //  Skip leading blanks
+         while I <= Last and then
+           Error_Msg[I] in ' '|'\t' loop
+            I += 1;
+         end loop;
+      end func Skip_White_Space;
+
+      Skip_White_Space();
+
+      //  Get file name
+      var File_Name : Univ_String := "";
+
+      while I <= Last
+        and then Error_Msg[I] != ':'
+      loop
+         File_Name |= Error_Msg[I];
+         I += 1;
+      end loop;
+
+      if I > Last then
+         //  Not able to parse error msg
+         return;
+      end if;
+
+      I += 1;
+
+      //  Get line number
+      var Line : Source_Pos::Line_Num := 0;
+      while I <= Last
+        and then Error_Msg[I] != ':'
+      loop
+         if Error_Msg[I] in '0'..'9' then
+            Line := Line * 10 + (Error_Msg[I] - '0');
+         end if;
+         I += 1;
+      end loop;
+
+      if I > Last then
+         //  Not able to parse error msg
+         return;
+      end if;
+      
+      I += 1;
+
+      //  Get col number (optional)
+      var Col : Source_Pos::Col_Num := 0;
+
+      Skip_White_Space();
+      if Error_Msg[I] in '0'..'9' then
+         while I <= Last
+           and then Error_Msg[I] != ':'
+         loop
+            if Error_Msg[I] in '0'..'9' then
+               Col := Col * 10 + (Error_Msg[I] - '0');
+            end if;
+            I += 1;
+         end loop;
+         I += 1;  //  Skip the final ':'
+      end if;
+
+      if I > Last then
+         //  Not able to parse error msg
+         return;
+      end if;
+
+      Source_Pos := (File_Name, Line, Col);
+
+      //  Rest of message, after skipping leading white space
+
+      Skip_White_Space();
+
+      Text := Error_Msg[I .. Last];
+   end func Parse_Error_Msg;
+
+   if Err_File is null then
+      Println ("Cannot open `(Error_File)");
+      return;
+   end if;
+
+   var Errors : Ordered_Map <Source_Pos, Vector<Univ_String>> := [];
+   //  Map from source position to set of errors at that position
+
+   loop
+      const Line := Err_File.Readln();
+      if Line is null then
+         exit loop;
+      end if;
+
+      var Error_Pos: Source_Pos;
+      var Text : Univ_String;
+
+      Parse_Error_Msg
+        (Line, Source_Pos => Error_Pos, Text => Text);
+
+      if Error_Pos not in Errors then
+         Errors |= [Error_Pos => []];
+      end if;
+      Errors [Error_Pos] |= Text;
+   end loop;
+
+   Err_File.Close();
+
+   var Cur_Source : Univ_String := "";
+   var Cur_Inp_File : optional File_Input_Stream := null;
+   var Cur_Line : Source_Pos::Line_Num := 0;
+   var Cur_Col : Source_Pos::Col_Num := 0;
+   var Cur_Lst_File : optional File_Output_Stream := null;
+
+   func Finish_Listing() is
+      if Cur_Inp_File not null then
+         //  Copy rest of prior source file to its listing file.
+         if Cur_Lst_File not null then
+            loop
+               const Line := Cur_Inp_File.Readln();
+               if Line is null then
+                  exit loop;
+               end if;
+               Cur_Line += 1;
+               Cur_Lst_File.Println(Pad (Cur_Line | "  ", Indent) | Line);
+            end loop;
+         end if;
+         Cur_Inp_File.Close();
+         Cur_Lst_File.Close();
+      end if;
+   end func Finish_Listing;
+
+   for each [Error_Pos => Text_Vec] of Errors forward loop
+      if Error_Pos.File_Name != Cur_Source then
+         //  New source file
+         Finish_Listing();  //  Finish listing of prior source file, if any
+
+         //  Get new source file name
+         Cur_Source := Error_Pos.File_Name;
+
+         //  and open it.
+         Cur_Inp_File := IO.Open (Cur_Source);
+         if Cur_Inp_File not null then
+            //  Create corresponding listing file.
+            Cur_Lst_File := IO.Create (Cur_Source | ".lst");
+            Cur_Line := 0;
+            Cur_Col := 0;
+         end if;
+      end if;
+
+      if Cur_Inp_File not null then
+         while Cur_Line < Error_Pos.Line loop
+            const Line := Cur_Inp_File.Readln();
+            Cur_Line += 1;
+            if Line not null then
+               Cur_Lst_File.Println(Pad (Cur_Line | "  ", Indent) | Line);
+            end if;
+            Cur_Col := 0;
+         end loop;
+         if Cur_Col != Error_Pos.Col then
+            //  Print out indicator of column where error is located
+            Cur_Lst_File.Println
+              (Indent * ' ' | ((Error_Pos.Col-1) * ' ') | '^');
+            Cur_Col := Error_Pos.Col;
+         end if;
+         for each T of Text_Vec forward loop
+            //  Print out the error messages, split into lines if longer
+            //  than Max_Line
+            for each S of Indent_And_Split (T) forward loop
+               Cur_Lst_File.Println(S);
+            end loop;
+         end loop;
+      end if;
+         
+   end loop;
+
+   Finish_Listing();  //  Finish listing of last source file, if any
+
+end func Intersperse;
