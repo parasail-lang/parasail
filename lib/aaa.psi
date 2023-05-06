@@ -3644,16 +3644,31 @@ abstract interface PSL::Containers::Keyed<Key_Type is Hashable<>> is
         // Return a Keyed object given a key, having no associated value
 end interface PSL::Containers::Keyed
 
-interface PSL::Containers::Key_Value
-  <Key_Type is Assignable<>; Value_Type is Assignable<>> 
-  implements Keyed<Key_Type> is
+interface PSL::Containers::Basic_Key_Value
+  <Key_Type is Assignable<>; Value_Type is Assignable<>>  is
   // This supports the use of [Key => Value] as a way to
   // add a single element to an existing indexable container of some sort.
     var Key : optional Key_Type
     var Value : optional Value_Type
-    op "[]"() -> Key_Value is ((Key => null, Value => null))
-    op "var_indexing"(ref var KV : Key_Value; Index : Key_Type) 
+    op "[]"() -> Basic_Key_Value is ((Key => null, Value => null))
+    op "var_indexing"(ref var KV : Basic_Key_Value; Index : Key_Type) 
       -> ref var Value_Type
+end interface PSL::Containers::Basic_Key_Value
+
+class PSL::Containers::Basic_Key_Value is
+  exports
+    op "var_indexing"(ref var KV : Basic_Key_Value; Index : Key_Type) 
+      -> ref var Value_Type is
+        KV.Key := Index
+        return KV.Value
+    end op "var_indexing"
+end class PSL::Containers::Basic_Key_Value
+
+interface PSL::Containers::Key_Value
+  extends Basic_Key_Value
+  implements Keyed<Key_Type> is
+  // This supports the use of [Key => Value] as a way to
+  // add a single element to an existing indexable container of some sort.
     func Key_Of(ref const KV : Key_Value) -> ref const Key_Type
     func Has_Value(KV : Key_Value) -> Boolean
         // Return #true if Key_Value object has a non-null value
@@ -3663,12 +3678,6 @@ end interface PSL::Containers::Key_Value
 
 class PSL::Containers::Key_Value is
   exports
-    op "var_indexing"(ref var KV : Key_Value; Index : Key_Type) 
-      -> ref var Value_Type is
-        KV.Key := Index
-        return KV.Value
-    end op "var_indexing"
-
     func Key_Of(ref const KV : Key_Value) -> ref const Key_Type is
         return KV.Key
     end func Key_Of
@@ -5217,6 +5226,9 @@ interface PSL::Containers::Range_Set<Element_Type is Comparable<>> is
     func Singleton(Elem : Element_Type) -> Range_Set
         // Return a set consisting of a single element
 
+    func Single_Interval(Ival : Interval<Element_Type>) -> Range_Set
+        // Return a set consisting of a single interval
+
     op ".."(Left, Right : Element_Type) -> Range_Set
         // Closed interval of values
     op "<.."(Left, Right : Element_Type) -> Range_Set
@@ -5378,6 +5390,13 @@ class PSL::Containers::Range_Set is
         Result.Items |= Singleton(Elem)
     end func Singleton
 
+    func Single_Interval(Ival : Interval<Element_Type>)
+      -> Result : Range_Set is
+        // Return a set consisting of a single interval
+        Result := []
+        Result.Items |= Ival
+    end func Single_Interval
+
     op ".."(Left, Right : Element_Type) -> Result : Range_Set is
         Result := []
         if Left <= Right then
@@ -5527,22 +5546,29 @@ class PSL::Containers::Range_Set is
 
         // Add elements that are in both Right and Left into result
         Result := []
-        for Right_IV in Right loop
-            for Remaining_IV := Right_IV while Remaining_IV not null loop
-                var Left_IV := Overlapping(Left.Items, Remaining_IV)
 
-                if Left_IV is null then
-                    exit loop
-                end if
+        var Right_Pieces := Right;
 
-                // Compute overlap, add into result, and then loop
-                // around after removing it from Remaining_IV
-                const Overlap := Remaining_IV and Left_IV
+        for Right_IV := Remove_Any(Right_Pieces) then Remove_Any(Right_Pieces)
+          while Right_IV not null
+        loop
+            var Left_IV := Overlapping(Left.Items, Right_IV)
 
-                Result.Items |= Overlap
+            if Left_IV is null then
+                continue loop
+            end if
 
-                continue loop with Remaining_IV => Remaining_IV - Overlap
-            end loop
+            // Compute overlap and add into result
+            const Overlap := Right_IV and Left_IV
+
+            Result.Items |= Overlap
+
+            //  Create a set out of Right_IV and remove interval Overlap
+            //  from it, and then add what is left back into Right_Pieces.
+            var Right_IV_Set for Right_Pieces := Single_Interval(Right_IV);
+
+            Remove_Interval(Right_IV_Set, Overlap);
+            Right_Pieces <|= Right_IV_Set;
         end loop
     end op "and"
 
@@ -10162,7 +10188,7 @@ interface PSL::Containers::Ordered_Map
   // An ordered map module, allowing iterating over the keys in
   // forward or reverse order.
 
-    interface Pair<> extends Key_Value<Key_Type, Value_Type> is
+    interface Pair<> extends Basic_Key_Value<Key_Type, Value_Type> is
        op "=?"(Left, Right : Pair) -> Ordering is (Left.Key =? Right.Key)
     end interface Pair
 

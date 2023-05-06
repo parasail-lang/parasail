@@ -542,7 +542,7 @@ package body PSC.Interpreter is
          pragma Storage_Size (Server_Stack_Size);
       end Thread_Server;
 
-      task Server_Creator is
+      task type Server_Creator is
          --  Task which creates thread servers dynamically
          --  NOTE: We can't do this inside the Thread_Manager
          --       since thread creation isn't permitted
@@ -557,6 +557,11 @@ package body PSC.Interpreter is
          --      made it to getting a thread to serve.
          entry Start;
       end Server_Creator;
+
+      type Server_Creator_Ptr is access Server_Creator;
+      --  We use a pointer and a task type, even though we will
+      --  only create one of these, so we can postpone creating
+      --  the thread until we are ready to start it up.
 
       function Caller_Of (State : Server_State) return Server_State_Ptr;
       --  Return pointer to server state for caller of given stack frame.
@@ -7760,7 +7765,8 @@ package body PSC.Interpreter is
 
    --------------- Local Task ------------------
 
-   task Delay_Server;
+   task type Delay_Server;
+   type Delay_Server_Ptr is access Delay_Server;
 
    task body Delay_Server is
       Shut_Down_Now    : Boolean := False;
@@ -21936,6 +21942,8 @@ package body PSC.Interpreter is
 
    procedure Start_Up_Thread_Servers is
    --  Start up the default number of thread servers
+      Server_Creator_Instance : Server_Creator_Ptr;
+      Delay_Server_Instance : Delay_Server_Ptr;
    begin
       if Thread_Servers_Started then
          --  Already did this
@@ -21945,12 +21953,17 @@ package body PSC.Interpreter is
       --  Prevent multiple executions
       Thread_Servers_Started := True;
 
+      --  Start up delay server
+      Delay_Server_Instance := new Delay_Server;
+
+      --  Start up initial thread servers
       for I in 1 .. Num_Initial_Thread_Servers loop
          Thread_Servers (I) := new Thread_Server;
       end loop;
 
       --  Now allow the creation of "dynamically allocated" thread servers
-      Server_Creator.Start;
+      Server_Creator_Instance := new Server_Creator;
+      Server_Creator_Instance.Start;
    end Start_Up_Thread_Servers;
 
    --------------------------

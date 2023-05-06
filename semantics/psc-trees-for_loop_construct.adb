@@ -478,8 +478,6 @@ package body PSC.Trees.For_Loop_Construct is
             --  Quantified expression or map-reduce expression
             pragma Assert (Is_Null (T.Label));
             pragma Assert (Is_Null (T.End_With_Values));
-            pragma Assert (T.Kind = Map_Reduce_Expr
-                           or else Lists.Length (T.Iterators) = 1);
 
             Put (On, "(for ");
             case T.Kind is

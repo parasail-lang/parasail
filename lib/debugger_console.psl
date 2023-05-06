@@ -673,7 +673,10 @@ func PSC::Debugging::Console(Reason : Stack_Frame_Info::Debugger_Reason)
       if Info.Code not null then
          const Params := Parameters(Info.Code);
 
-         if Mod_Name != "" and then Mod_Name != "null" then
+         if Mod_Name not null
+           and then Mod_Name != ""
+           and then Mod_Name != "null"
+         then
             Print("  func `(Mod_Name)::");
          else
             Print("  func ");

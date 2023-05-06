@@ -8650,8 +8650,8 @@ yyval := (One_Tree, For_Loop_Construct.Make(
 yy.value_stack(yy.tos-5).Source_Pos,
 	      Kind => Kind_Of_For_Loop(
 yy.value_stack(yy.tos-4).Is_Present),
-	      Iterators => Lists.Make((1 => 
-yy.value_stack(yy.tos-3).Tree)),
+	      Iterators => 
+yy.value_stack(yy.tos-3).List,
 	      Filter => 
 yy.value_stack(yy.tos-2).List,
 	      Loop_Body => 
@@ -8787,24 +8787,88 @@ yyval := (Optional, False);
 
 when  779 =>
 --#line  5113
- 
-yyval := 
-yy.value_stack(yy.tos); 
+
+        
+yyval := (One_List, Lists.Make ((1 => 
+yy.value_stack(yy.tos).Tree)));
+    
 
 when  780 =>
---#line  5114
- 
+--#line  5116
+
+        
 yyval := 
-yy.value_stack(yy.tos); 
+yy.value_stack(yy.tos-1);
+    
 
 when  781 =>
---#line  5115
+--#line  5122
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  782 =>
---#line  5120
+--#line  5123
+ 
+yyval := 
+yy.value_stack(yy.tos); 
+
+when  783 =>
+--#line  5124
+ 
+yyval := 
+yy.value_stack(yy.tos); 
+
+when  784 =>
+--#line  5128
+
+	declare
+	    use type PSC.Strings.U_String;
+	    Iterator_Tree : constant Optional_Tree := 
+yy.value_stack(yy.tos).Tree;
+	begin
+	    
+yyval := (One_List, Lists.Make((1 => Iterator_Tree)));
+	end;
+    
+
+when  785 =>
+--#line  5136
+
+	declare
+	    use type PSC.Strings.U_String;
+	    Iterator_Tree : Optional_Tree := 
+yy.value_stack(yy.tos).Tree;
+	begin
+	    
+yyval := 
+yy.value_stack(yy.tos-2);
+	    Lists.Append(
+yyval.List, Iterator_Tree);
+	end;
+    
+
+when  786 =>
+--#line  5145
+
+	declare
+	    use type PSC.Strings.U_String;
+	    Iterator_Tree : constant Optional_Tree := 
+yy.value_stack(yy.tos).Tree;
+	begin
+	    yyerror("Iterators must be separated by "";""",
+              At_Token => 
+yy.value_stack(yy.tos-1));
+	    
+yyval := 
+yy.value_stack(yy.tos-2);
+	    Lists.Append(
+yyval.List, Iterator_Tree);
+	end;
+    
+
+when  787 =>
+--#line  5160
 
 	-- This does a map/reduce operation where the initial/next result
         -- is given in <...> and the overall expression represents the
@@ -8826,42 +8890,42 @@ yy.value_stack(yy.tos).Tree,
 yy.value_stack(yy.tos-2).Str));
     
 
-when  783 =>
---#line  5137
+when  788 =>
+--#line  5177
 
         
 yyval := (One_List, Lists.Make ((1 => 
 yy.value_stack(yy.tos).Tree)));
     
 
-when  784 =>
---#line  5140
+when  789 =>
+--#line  5180
 
         
 yyval := 
 yy.value_stack(yy.tos-1);
     
 
-when  785 =>
---#line  5146
+when  790 =>
+--#line  5186
  
 yyval := 
 yy.value_stack(yy.tos); 
 
-when  786 =>
---#line  5147
+when  791 =>
+--#line  5187
  
 yyval := 
 yy.value_stack(yy.tos); 
 
-when  787 =>
---#line  5148
+when  792 =>
+--#line  5188
  
 yyval := 
 yy.value_stack(yy.tos); 
 
-when  788 =>
---#line  5152
+when  793 =>
+--#line  5192
 
 	declare
 	    use type PSC.Strings.U_String;
@@ -8878,8 +8942,8 @@ yyval := (One_List, Lists.Make((1 => Iterator_Tree)));
 	end;
     
 
-when  789 =>
---#line  5163
+when  794 =>
+--#line  5203
 
 	declare
 	    use type PSC.Strings.U_String;
@@ -8899,8 +8963,8 @@ yyval.List, Iterator_Tree);
 	end;
     
 
-when  790 =>
---#line  5175
+when  795 =>
+--#line  5215
 
 	declare
 	    use type PSC.Strings.U_String;

@@ -5008,8 +5008,8 @@ case_expr_alt :
   ;
 
 quantified_expression :
-    FOR_kw_set_flag ALL_or_SOME_kw quantified_iterator opt_annotation REFERS_TO
-      condition_or_quantified_expression {
+    FOR_kw_set_flag ALL_or_SOME_kw quantified_iterator_spec opt_annotation
+      REFERS_TO condition_or_quantified_expression {
 	declare
 	    Kind_Of_For_Loop: constant array(Boolean) of 
 	      For_Loop_Construct.For_Loop_Kind_Enum := (
@@ -5020,7 +5020,7 @@ quantified_expression :
 	    $$ := (One_Tree, For_Loop_Construct.Make(
               Source_Pos => $1.Source_Pos,
 	      Kind => Kind_Of_For_Loop($2.Is_Present),
-	      Iterators => Lists.Make((1 => $3.Tree)),
+	      Iterators => $3.List,
 	      Filter => $4.List,
 	      Loop_Body => $6.Tree));
             Set_Source_Pos($$.Tree, Source_Pos => $1.Source_Pos);
@@ -5109,10 +5109,50 @@ ALL_or_SOME_kw :
   | SOME_kw { $$ := (Optional, False); }
   ;
 
+quantified_iterator_spec :
+    quantified_iterator {
+        $$ := (One_List, Lists.Make ((1 => $1.Tree)));
+    }
+  | '(' quantified_iterator_list ')' {
+        $$ := $2;
+    }
+  ;
+
 quantified_iterator :
     index_set_iterator { $$ := $1; }
   | element_iterator { $$ := $1; }
   | initial_next_value_iterator { $$ := $1; }
+  ;
+
+quantified_iterator_list :
+    quantified_iterator {
+	declare
+	    use type PSC.Strings.U_String;
+	    Iterator_Tree : constant Optional_Tree := $1.Tree;
+	begin
+	    $$ := (One_List, Lists.Make((1 => Iterator_Tree)));
+	end;
+    }
+  | quantified_iterator_list ';' quantified_iterator {
+	declare
+	    use type PSC.Strings.U_String;
+	    Iterator_Tree : Optional_Tree := $3.Tree;
+	begin
+	    $$ := $1;
+	    Lists.Append($$.List, Iterator_Tree);
+	end;
+    }
+  | quantified_iterator_list ',' quantified_iterator {
+	declare
+	    use type PSC.Strings.U_String;
+	    Iterator_Tree : constant Optional_Tree := $3.Tree;
+	begin
+	    yyerror("Iterators must be separated by "";""",
+              At_Token => $2);
+	    $$ := $1;
+	    Lists.Append($$.List, Iterator_Tree);
+	end;
+    }
   ;
 
 map_reduce_expression :
