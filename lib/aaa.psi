@@ -33,6 +33,9 @@ interface PSL::Core::Boolean<> is
       is import("=?")
         // NOTE: #true > #false
 
+    func Strict_Compare(Left, Right : Boolean) -> Ordered::Full_Ordering
+      is import("=?")
+
     op "not"(Boolean) -> Boolean is import("not")
     op "and"(Left, Right : Boolean) -> Boolean is import("and")
     op "or"(Left, Right : Boolean) -> Boolean is import("or")
@@ -78,6 +81,78 @@ interface PSL::Core::Boolean<> is
     op "<..<"(Left, Right : Boolean) -> Countable_Set<Boolean>
     op "|"(Left, Right : Boolean) -> Countable_Set<Boolean>
 end interface PSL::Core::Boolean
+
+interface PSL::Core::Ordering<> is
+  // Enumeration type used to represent value of "=?" operator
+    op "from_univ"(Lit : Univ_Enumeration) 
+      {*"Literal not defined for Ordering"*
+       Lit in [#less, #equal, #greater, #unordered]}
+      -> Ordering is import(#ordering_from_univ)
+
+    op "to_univ"(Val : Ordering) -> Univ_Enumeration 
+      is import(#ordering_to_univ)
+
+    op "to_bool"(Ord : Ordering; Mask : Univ_Integer) -> Boolean 
+      is import(#ordering_to_bool)
+
+    op "=?"(Left, Right : Ordering) -> Ordering is import("=?")
+    func Strict_Compare(Left, Right : Ordering)
+      -> Ordered::Full_Ordering is import("=?")
+
+    func Hash(Val : Ordering) -> Unsigned_64
+      is import(#identity)
+
+    // For Imageable
+    func To_String(Val : Ordering) -> Univ_String
+    func From_String(Str : Univ_String) -> optional Ordering
+
+    // Operators for Countable
+    op "+"(Left : Univ_Integer; Right : Ordering) -> Ordering 
+      is import("+")
+    op "+"(Left : Ordering; Right : Univ_Integer) -> Ordering 
+      is import("+")
+    op "-"(Left, Right : Ordering) -> Univ_Integer 
+      is import("-")
+    op "-"(Left : Ordering; Right : Univ_Integer) -> Ordering 
+      is import("-")
+    op "+="(var Left : Ordering; Right : Univ_Integer)
+      is import("+=");
+    op "-="(var Left : Ordering; Right : Univ_Integer)
+      is import("-=");
+
+    func Min(Left, Right : optional Ordering) -> optional Ordering
+      is import(#min)
+    func Max(Left, Right : optional Ordering) -> optional Ordering
+      is import(#max)
+
+    // TBD: These should be properties some day (e.g. Ordering#first).
+    func First()->Ordering
+    func Last()->Ordering
+
+    op ".."(Left, Right : Ordering) -> Countable_Set<Ordering>
+    op "<.."(Left, Right : Ordering) -> Countable_Set<Ordering>
+    op "..<"(Left, Right : Ordering) -> Countable_Set<Ordering>
+    op "<..<"(Left, Right : Ordering) -> Countable_Set<Ordering>
+    op "|"(Left, Right : Ordering) -> Countable_Set<Ordering>
+end interface PSL::Core::Ordering
+
+abstract interface PSL::Core::Comparable<> implements Assignable<> is
+    op "=?"(Left, Right : Comparable) -> Ordering
+end interface PSL::Core::Comparable
+
+abstract interface PSL::Core::Ordered<> implements Comparable<> is
+  // An Ordered type provides a Strict_Compare operation in addition
+  // to a "=?" operator.  The Strict_Compare operation never returns
+  // #unordered.
+
+    type Full_Ordering is Ordering
+      // {Full_Ordering in #less | #equal | #greater}
+
+    op "=?"(Left, Right : Ordered) -> Ordering;
+
+    func Strict_Compare(Left, Right : Ordered) -> Ordered::Full_Ordering
+      {Strict_Compare != #unordered};
+end interface PSL::Core::Ordered
 
 class PSL::Core::Boolean is
     type Boolean_Set is Countable_Set<Boolean>
@@ -261,61 +336,11 @@ interface PSL::Core::Univ_Enumeration<> is
       is in Set<Univ_Enumeration>
 
 end interface PSL::Core::Univ_Enumeration
+
 abstract interface PSL::Core::Optional<> is
     op "null"() -> Optional
     op "is null"(Optional) -> Boolean
 end interface PSL::Core::Optional
-interface PSL::Core::Ordering<> is
-  // Enumeration type used to represent value of "=?" operator
-    op "from_univ"(Lit : Univ_Enumeration) 
-      {*"Literal not defined for Ordering"*
-       Lit in [#less, #equal, #greater, #unordered]}
-      -> Ordering is import(#ordering_from_univ)
-
-    op "to_univ"(Val : Ordering) -> Univ_Enumeration 
-      is import(#ordering_to_univ)
-
-    op "to_bool"(Ord : Ordering; Mask : Univ_Integer) -> Boolean 
-      is import(#ordering_to_bool)
-
-    op "=?"(Left, Right : Ordering) -> Ordering is import("=?")
-
-    func Hash(Val : Ordering) -> Unsigned_64
-      is import(#identity)
-
-    // For Imageable
-    func To_String(Val : Ordering) -> Univ_String
-    func From_String(Str : Univ_String) -> optional Ordering
-
-    // Operators for Countable
-    op "+"(Left : Univ_Integer; Right : Ordering) -> Ordering 
-      is import("+")
-    op "+"(Left : Ordering; Right : Univ_Integer) -> Ordering 
-      is import("+")
-    op "-"(Left, Right : Ordering) -> Univ_Integer 
-      is import("-")
-    op "-"(Left : Ordering; Right : Univ_Integer) -> Ordering 
-      is import("-")
-    op "+="(var Left : Ordering; Right : Univ_Integer)
-      is import("+=");
-    op "-="(var Left : Ordering; Right : Univ_Integer)
-      is import("-=");
-
-    func Min(Left, Right : optional Ordering) -> optional Ordering
-      is import(#min)
-    func Max(Left, Right : optional Ordering) -> optional Ordering
-      is import(#max)
-
-    // TBD: These should be properties some day (e.g. Ordering#first).
-    func First()->Ordering
-    func Last()->Ordering
-
-    op ".."(Left, Right : Ordering) -> Countable_Set<Ordering>
-    op "<.."(Left, Right : Ordering) -> Countable_Set<Ordering>
-    op "..<"(Left, Right : Ordering) -> Countable_Set<Ordering>
-    op "<..<"(Left, Right : Ordering) -> Countable_Set<Ordering>
-    op "|"(Left, Right : Ordering) -> Countable_Set<Ordering>
-end interface PSL::Core::Ordering
 
 class PSL::Core::Ordering is
     type Ordering_Set is Countable_Set<Ordering>
@@ -378,28 +403,7 @@ class PSL::Core::Ordering is
         return Ordering_Set::"|"(Left, Right)
     end op "|"
 end class PSL::Core::Ordering
-abstract interface PSL::Core::Comparable<> implements Assignable<> is
-    op "=?"(Left, Right : Comparable) -> Ordering
-end interface PSL::Core::Comparable
-abstract interface PSL::Core::Ordered<> implements Comparable<> is
-  // The "=?" operator on Ordered types never returns #unordered
-  // They also provide a Min and Max operator.
 
-  // Note that Min and Max may be given null operands.
-  // They each return null if both operands are null, and return the
-  // non-null operand if only one of the operands is null.
-  // This allows null to be used as the initial value when computing
-  // the "Max" or "Min" of a possibly-empty sequence, rather than
-  // having to start with the equivalent of negative or positive infinity.
-
-    type Full_Ordering is Ordering
-      // {Full_Ordering in #less | #equal | #greater}
-
-    op "=?"(Left, Right : Ordered) -> Full_Ordering
-
-    func Min(Left, Right : optional Ordered) -> optional Ordered
-    func Max(Left, Right : optional Ordered) -> optional Ordered
-end interface PSL::Core::Ordered
 abstract interface PSL::Core::Hashable<> implements Comparable<> is
     // Types which aren't ordered nevertheless are often
     // hashable, which makes it possible to create an efficient
@@ -429,6 +433,7 @@ abstract interface PSL::Core::Summable<> implements Hashable<> is
     op "/="(var Left : Summable; Right : Summable) 
     op "**="(var Left : Summable; Right : Univ_Integer) 
     op "=?"(Left, Right : Summable) -> Ordering
+    func Strict_Compare(Left, Right : Summable) -> Ordered::Full_Ordering
     func Min(Left, Right : optional Summable) -> optional Summable
     func Max(Left, Right : optional Summable) -> optional Summable
     func Hash(Val : Summable) -> Unsigned_64
@@ -505,6 +510,16 @@ interface PSL::Containers::Countable_Set<Element_Type is Countable<>> is
         // Return #greater if Left is a proper superset of Right
         // Return #unordered otherwise
 
+    func Strict_Compare(Left, Right : Countable_Set) -> Ordered::Full_Ordering
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left has fewer elements than Right
+        //   or Left has same number of elements and Left appears
+        //   earlier in a lexicographic ordering
+        // Return #greater if Left has more elements than Right
+        //   or Left has same number of elements and Left appears
+        //   later in a lexicographic ordering
+        // Never return #unordered
+
     func Count(S : Countable_Set) -> Univ_Integer
 
     op "magnitude"(Countable_Set) -> Univ_Integer is Count
@@ -553,12 +568,19 @@ abstract interface PSL::Core::Countable<> implements Ordered<> is
     op "+="(var Left : Countable; Right : Univ_Integer)
     op "-="(var Left : Countable; Right : Univ_Integer)
 
-    op "=?"(Left, Right : Countable) -> Ordered::Full_Ordering
+    op "=?"(Left, Right : Countable) -> Ordering
+    func Strict_Compare(Left, Right : Countable) -> Ordered::Full_Ordering
 
     func First() -> Countable
 
     func Last() -> Countable
 
+     // Note that Min and Max may be given null operands.
+     // They each return null if both operands are null, and return the
+     // non-null operand if only one of the operands is null.
+     // This allows null to be used as the initial value when computing
+     // the "Max" or "Min" of a possibly-empty sequence, rather than
+     // having to start with the equivalent of negative or positive infinity.
     func Min(Left, Right : optional Countable) -> optional Countable
     func Max(Left, Right : optional Countable) -> optional Countable
 
@@ -630,6 +652,9 @@ interface PSL::Core::Univ_Integer<> is
 
 
     op "=?"(Left, Right : Univ_Integer) -> Ordering
+      is import(#univ_compare)
+
+    func Strict_Compare(Left, Right : Univ_Integer) -> Ordered::Full_Ordering
       is import(#univ_compare)
 
     op ">>"(Univ_Integer; Univ_Integer) -> Univ_Integer
@@ -716,6 +741,16 @@ interface PSL::Core::Countable_Range<Bound_Type is Countable<>> is
     //  Return #less if Left.Last < Right.First
     //  Return #greater Left.First > Right.Last
     //  Return #unordered otherwise (i.e. they overlap and are not identical)
+
+    func Strict_Compare(Left, Right : Countable_Range) ->
+      Ordered::Full_Ordering
+    //  Return #equal if Left.First == Right.First and Left.Last == Right.Last
+    //  Return #less if Left.First < Right.First
+    //    or (Left.First == Right.First and Left.Last < Right.Last)
+    //  Return #greater if Left.First > Right.First
+    //    or (Left.First == Right.First and Left.Last > Right.Last)
+    //  Never return #unordered
+
 end interface PSL::Core::Countable_Range
 
 class PSL::Core::Countable_Range is
@@ -849,6 +884,23 @@ exports  // check that indent of 0 works
            return #unordered
         end if
     end op "=?"
+
+    func Strict_Compare(Left, Right : Countable_Range) ->
+      Result : Ordered::Full_Ordering is
+    //  Return #equal if Left.First == Right.First and Left.Last == Right.Last
+    //  Return #less if Left.First < Right.First
+    //    or (Left.First == Right.First and Left.Last < Right.Last)
+    //  Return #greater if Left.First > Right.First
+    //    or (Left.First == Right.First and Left.Last > Right.Last)
+    //  Never return #unordered
+
+        Result := Left.First =? Right.First
+
+        if Result == #equal then
+            return Left.Last =? Right.Last
+        end if
+    end func Strict_Compare
+
 end class PSL::Core::Countable_Range
 
 func PSL::Test::Test_Countable_Range(A, X, Y : Integer) is
@@ -902,6 +954,9 @@ interface PSL::Core::Univ_Character<> is
         // Produce specified number of "Left" chars in a row
 
     op "=?"(Left, Right : Univ_Character) -> Ordering
+      is import("=?")
+
+    func Strict_Compare(Left, Right : Univ_Character) -> Ordered::Full_Ordering
       is import("=?")
 
     func To_String(Val : optional Univ_Character) -> Univ_String
@@ -1695,6 +1750,8 @@ interface PSL::Core::Univ_String<> is
 
     op "=?"(Left, Right : Univ_String) -> Ordering
       is import(#string_compare)
+    func Strict_Compare(Left, Right : Univ_String) -> Ordered::Full_Ordering
+      is import(#string_compare)
 
     op "|="(var Left : Univ_String; Right : optional Univ_String)
       is import(#assign_concat_string)
@@ -2123,6 +2180,8 @@ interface PSL::Core::Direction<> is
 
     op "=?"(Left, Right : Direction) -> Ordering
       is import("=?")
+    func Strict_Compare(Left, Right : Direction) -> Ordered::Full_Ordering
+      is import("=?")
 end interface PSL::Core::Direction
 interface PSL::Core::Integer_64 <> is
     //  Normal 64-bit Integer, but with a "null" value.
@@ -2181,6 +2240,8 @@ interface PSL::Core::Integer_64 <> is
       is import("**=")
 
     op "=?"(Left, Right : Integer_64) -> Ordering
+      is import("=?")
+    func Strict_Compare(Left, Right : Integer_64) -> Ordered::Full_Ordering
       is import("=?")
 
     op ">>"(Integer_64; Integer_64) -> Integer_64 is import(">>")
@@ -2315,6 +2376,9 @@ interface PSL::Core::Integer
       is import("**=")
 
     op "=?"(Left, Right : Integer) -> Ordering
+      is import("=?")
+
+    func Strict_Compare(Left, Right : Integer) -> Ordered::Full_Ordering
       is import("=?")
 
     op ">>"(Integer; Integer) -> Integer is import(">>")
@@ -2590,7 +2654,7 @@ class PSL::Core::Closed_Interval is
         end if
     end op "=?"
 end class PSL::Core::Closed_Interval
-interface PSL::Core::Interval<Bound_Type is Comparable<>> is
+interface PSL::Core::Interval<Bound_Type is Ordered<>> is
     // This supports closed, half-open, and open intervals.
     // This is appropriate for uncountable types where you
     // can't normalize all intervals into closed intervals.
@@ -2613,6 +2677,16 @@ interface PSL::Core::Interval<Bound_Type is Comparable<>> is
       // "#less" means Left is strictly less than Right
       // "#equal" means Left and Right are the same interval
       // "#unordered" means anything else
+
+    func Strict_Compare(Left, Right : Interval) -> Ordered::Full_Ordering
+      //  Return #equal if same interval
+      //  Return #less if Left.Low[_Is_Open] < Right.Low[_Is_Open]
+      //    or (Left.Low[_Is_Open] == Right.Low[_Is_Open]
+      //        and Left.High[_Is_Open] < Right.High[_Is_Open])
+      //  Return #greater if Left.Low[_Is_Open] > Right.Low[_Is_Open]
+      //    or (Left.Low[_Is_Open] == Right.Low[_Is_Open]
+      //        and Left.High[_Is_Open] > Right.High[_Is_Open])
+      //  Never return #unordered
 
     op "and"(Left, Right : Interval) -> optional Interval
       // Return intersection of the two intervals
@@ -2737,6 +2811,34 @@ class PSL::Core::Interval is
             end case
         end case
     end op "=?"
+
+    func Strict_Compare(Left, Right : Interval) -> Ordered::Full_Ordering
+      //  Return #equal if same interval
+      //  Return #less if Left.Low[_Is_Open] < Right.Low[_Is_Open]
+      //    or (Left.Low[_Is_Open] == Right.Low[_Is_Open]
+      //        and Left.High[_Is_Open] < Right.High[_Is_Open])
+      //  Return #greater if Left.Low[_Is_Open] > Right.Low[_Is_Open]
+      //    or (Left.Low[_Is_Open] == Right.Low[_Is_Open]
+      //        and Left.High[_Is_Open] > Right.High[_Is_Open])
+      //  Never return #unordered
+    is
+       const Low_Comp := Strict_Compare(Left.Low, Right.Low)
+
+       if Low_Comp != #equal then
+          return Low_Comp;
+       elsif Left.Low_Is_Open != Right.Low_Is_Open then
+          return Left.Low_Is_Open =? Right.Low_Is_Open
+       else
+          const High_Comp := Strict_Compare(Left.High, Right.High)
+          if High_Comp != #equal then
+             return High_Comp
+          else
+             //  Invert sense, since High_Is_Open implies the high bound
+             //  is High - epsilon
+             return Right.High_Is_Open =? Left.High_Is_Open
+          end if
+       end if
+    end func Strict_Compare
 
     op "and"(Left, Right : Interval) -> optional Interval is
       // Return intersection of the two intervals
@@ -2936,7 +3038,7 @@ func PSL::Test::Test_Interval(X, Y, Z : Univ_Integer) is
       (One_To_X =? Y_To_Z))
 
 end func PSL::Test::Test_Interval
-interface PSL::Core::AA_Tree<Element is Comparable<>> is
+interface PSL::Core::AA_Tree<Element is Ordered<>> is
 
     // This module implements a balanced "AA" tree, originally
     // described by Arne Andersson in the "Proceedings of the Workshop
@@ -3192,7 +3294,7 @@ class PSL::Core::AA_Tree is
             return
         end if
 
-        case X =? T.Value of
+        case Strict_Compare(X, T.Value) of
           [#less] =>
             T.Left <|= X
           [#greater] =>
@@ -3256,7 +3358,7 @@ class PSL::Core::AA_Tree is
             return
         end if
 
-        case X =? T.Value of
+        case Strict_Compare(X, T.Value) of
           [#less] =>
             Delete(T.Left, X)
           [#greater] =>
@@ -3302,7 +3404,7 @@ class PSL::Core::AA_Tree is
 
     op "in"(X : Element; T : optional AA_Tree) -> Result : Boolean is
         for P => T while P not null loop
-            case X =? P.Value of
+            case Strict_Compare(X, P.Value) of
               [#less] =>
                 continue loop with P => P.Left
               [#greater] =>
@@ -3348,7 +3450,7 @@ class PSL::Core::AA_Tree is
         if T is null then
             return null
         else
-            case X =? T.Value of
+            case Strict_Compare(X, T.Value) of
               [#less] =>
                 //  Recurse on Left half
                 const Result := Next(T.Left, X)
@@ -3376,7 +3478,7 @@ class PSL::Core::AA_Tree is
         if T is null then
             return null
         else
-            case X =? T.Value of
+            case Strict_Compare(X, T.Value) of
               [#less] =>
                 //  Recurse on Left half
                 return Prev(T.Left, X)
@@ -3404,7 +3506,7 @@ class PSL::Core::AA_Tree is
         if T is null then
             return null
         else
-            case X =? T.Value of
+            case Strict_Compare(X, T.Value) of
               [#less] =>
                 //  Recurse on Left half
                 const Result := Min_No_Less(T.Left, X)
@@ -3435,7 +3537,7 @@ class PSL::Core::AA_Tree is
         if T is null then
             return null
         else
-            case X =? T.Value of
+            case Strict_Compare(X, T.Value) of
               [#less] =>
                 //  Recurse on Left half
                 return Max_No_Greater(T.Left, X)
@@ -3537,6 +3639,10 @@ class PSL::Core::AA_Tree is
             return null
         else
             case X =? T.Value of
+              //  Note -- we do *not* want to use Strict_Compare here
+              //  as this is mainly used for Range_Set where "=?" on
+              //  the intervals that make up a Range_Set has a particular
+              //  meaning for "=?" which is a *partial* ordering.
               [#less] =>
                 return Overlapping(T.Left, X)
               [#greater] =>
@@ -3557,7 +3663,7 @@ class PSL::Core::AA_Tree is
 
         {T not null and then T.Value not null}
 
-        case X =? T.Value of
+        case Strict_Compare(X, T.Value) of
           [#less] =>
             return Unsafe_Indexing(T.Left, X)
           [#greater] =>
@@ -4901,6 +5007,29 @@ class PSL::Containers::Countable_Set is
         end if
     end op "=?"
 
+    func Strict_Compare(Left, Right : Countable_Set) -> Ordered::Full_Ordering
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left has fewer elements than Right
+        //   or Left has same number of elements and Left appears
+        //   earlier in a lexicographic ordering
+        // Return #greater if Left has more elements than Right
+        //   or Left has same number of elements and Left appears
+        //   later in a lexicographic ordering
+        // Never return #unordered
+    is
+        if |Left| != |Right| then
+           return |Left| =? |Right|
+        else
+           for (Left_Elem in Left; Right_Elem in Right) forward loop
+              const Result := Strict_Compare(Left_Elem, Right_Elem);
+              if Result != #equal then
+                 return Result
+              end if
+           end loop
+           return #equal
+        end if
+    end func Strict_Compare
+
     func Count(S : Countable_Set) -> Result : Univ_Integer is
         // Return count of items in set
 
@@ -5218,7 +5347,7 @@ func PSL::Test::Test_Countable_Set(A, X, Y, Z : Integer) is
        Print('\n')
     end loop
 end func PSL::Test::Test_Countable_Set
-interface PSL::Containers::Range_Set<Element_Type is Comparable<>> is
+interface PSL::Containers::Range_Set<Element_Type is Ordered<>> is
   // A set abstraction that supports efficiently storing potentially
   // large ranges of values
     op "[]"() -> Range_Set
@@ -5283,6 +5412,16 @@ interface PSL::Containers::Range_Set<Element_Type is Comparable<>> is
         // Return #less if Left is a proper subset of Right
         // Return #greater if Left is a proper superset of Right
         // Return #unordered otherwise
+    func Strict_Compare(Left, Right : Range_Set) -> Ordered::Full_Ordering
+        //  Return #equal if same interval
+        //  Return #less if Left.Low[_Is_Open] < Right.Low[_Is_Open]
+        //    or (Left.Lower_Bound[_Is_Open] == Right.Lower_Bound[_Is_Open]
+        //        and Left.Upper_Bound[_Is_Open] < Right.Upper_Bound[_Is_Open])
+        //  Return #greater if Left.Lower_Bound[_Is_Open] >
+        //                         Right.Lower_Bound[_Is_Open]
+        //    or (Left.Lower_Bound[_Is_Open] == Right.Lower_Bound[_Is_Open]
+        //        and Left.Upper_Bound[_Is_Open] > Right.Upper_Bound[_Is_Open])
+        //  Never return #unordered
 
     func Is_Empty(S : Range_Set) -> Boolean
 
@@ -5613,6 +5752,37 @@ class PSL::Containers::Range_Set is
         end if
     end op "=?"
 
+    func Strict_Compare(Left, Right : Range_Set) -> Ordered::Full_Ordering
+        //  Return #equal if same interval
+        //  Return #less if Left.Low[_Is_Open] < Right.Low[_Is_Open]
+        //    or (Left.Lower_Bound[_Is_Open] == Right.Lower_Bound[_Is_Open]
+        //        and Left.Upper_Bound[_Is_Open] < Right.Upper_Bound[_Is_Open])
+        //  Return #greater if Left.Lower_Bound[_Is_Open] >
+        //                         Right.Lower_Bound[_Is_Open]
+        //    or (Left.Lower_Bound[_Is_Open] == Right.Lower_Bound[_Is_Open]
+        //        and Left.Upper_Bound[_Is_Open] > Right.Upper_Bound[_Is_Open])
+        //  Never return #unordered
+    is
+        const Low_Comp :=
+          Strict_Compare(Left.Lower_Bound(), Right.Lower_Bound())
+
+        if Low_Comp != #equal then
+           return Low_Comp;
+        elsif Left.Lower_Bound_Is_Open() != Right.Lower_Bound_Is_Open() then
+           return Left.Lower_Bound_Is_Open() =? Right.Lower_Bound_Is_Open()
+        else
+           const High_Comp :=
+             Strict_Compare(Left.Upper_Bound(), Right.Upper_Bound())
+           if High_Comp != #equal then
+              return High_Comp
+           else
+              //  Invert sense, since High_Is_Open implies the high bound
+              //  is High - epsilon
+              return Right.Upper_Bound_Is_Open() =? Left.Upper_Bound_Is_Open()
+           end if
+        end if
+    end func Strict_Compare
+
     func Is_Empty(S : Range_Set) -> Boolean is
         // Return count of items in set
         return Count(S.Items) == 0
@@ -5758,6 +5928,8 @@ interface PSL::Core::Univ_Real<> is
 
     op "=?"(Left, Right : Univ_Real) -> Ordering
       is import(#real_compare)
+    func Strict_Compare(Left, Right : Univ_Real) -> Ordered::Full_Ordering
+      is import(#real_compare)
 
     func Min(Left, Right : optional Univ_Real) -> optional Univ_Real
       is import(#real_min)
@@ -5891,7 +6063,9 @@ interface PSL::Core::Rational<> is
     op "**="(var Left : Rational; Right : Univ_Integer) 
 
 
-    op "=?"(Left, Right : Rational) -> Ordering
+    func Strict_Compare(Left, Right : Rational)
+      -> Ordered::Full_Ordering
+    op "=?"(Left, Right : Rational) -> Ordering is Strict_Compare
 
     func Min(Left, Right : optional Rational) -> optional Rational
     func Max(Left, Right : optional Rational) -> optional Rational
@@ -6002,11 +6176,11 @@ class PSL::Core::Rational is
     end op "**=";
 
 
-    op "=?"(Left, Right : Rational) -> Ordering is
+    func Strict_Compare(Left, Right : Rational) -> Ordering is
        const Diff := Left - Right;
 
        return Diff.Num =? 0;
-    end op "=?";
+    end func Strict_Compare;
 
     func Min(Left, Right : optional Rational) -> optional Rational is
        if Left is null then
@@ -6786,6 +6960,8 @@ interface PSL::Core::ZString<> is
 
     op "=?"(Left, Right : ZString) -> Ordering
       is import(#string_compare)
+    func Strict_Compare(Left, Right : ZString) -> Ordered::Full_Ordering
+      is import(#string_compare)
 
     op "|="(var Left : ZString; Right : ZString)
       is import(#assign_concat_string)
@@ -7099,6 +7275,8 @@ interface PSL::Core::Enum<Literals : Vector<Univ_Enumeration>> is
       {Result is null or else (for some Lit of Literals => Lit == Result)}
 
     op "=?"(Left, Right : Enum) -> Ordering
+      is import("=?")
+    func Strict_Compare(Left, Right : Enum) -> Ordered::Full_Ordering
       is import("=?")
 
     // Functions for Imageable
@@ -7644,6 +7822,8 @@ interface PSL::Core::Float<Digits : Univ_Integer := 15> is
 
     op "=?"(Left, Right : Float) -> Ordering
       is import(#real_compare)
+    func Strict_Compare(Left, Right : Float) -> Ordered::Full_Ordering
+      is import(#real_compare)
 
     func Min(Left, Right : optional Float) -> optional Float
       is import(#real_min)
@@ -7783,7 +7963,10 @@ interface PSL::Core::Fixed<Delta : Univ_Real> is
     op "/="(var Left : Fixed; Right : Univ_Real)
 
     op "=?"(Left, Right : Fixed) -> Ordering
-      is import("=?")
+      is import(#univ_compare)
+
+    func Strict_Compare(Left, Right : Fixed) -> Ordered::Full_Ordering
+      is import(#univ_compare)
 
     func Min(Left, Right : optional Fixed) -> optional Fixed
       is import(#min)
@@ -8368,7 +8551,9 @@ interface PSL::Core::Time<> is
       is import("-")
 
     op "=?"(Left, Right : Time) -> Ordering
-      is import("=?")
+      is import(#univ_compare)
+    func Strict_Compare(Left, Right : Time) -> Ordered::Full_Ordering
+      is import(#univ_compare)
 
     func Min(Left, Right : optional Time) -> optional Time
       is import(#min)
@@ -8457,6 +8642,20 @@ func PSL::Test::Test_Time(X : Univ_Real) is
     Println("-5.0*Time::Minute = " | (-5.0*Time::Minute))
     Println("Time::Hour = " | Time::Hour )
     Println("-5.0*Time::Hour = " | (-5.0*Time::Hour))
+
+    Println("-5.0*Time::Hour = `(-5.0*Time::Hour)");
+    Println("-5.0*Time::Hour =? -12.0*Time::Hour = " |
+      (5.0*Time::Hour =? -12.0*Time::Hour));
+    Println("-5.0*Time::Hour =? +12.0*Time::Hour = " |
+      (5.0*Time::Hour =? +12.0*Time::Hour));
+      {-5.0*Time::Hour in -12.0*Time::Hour .. +12.0*Time::Hour};
+    Println("10*Time::Hour + 5*Time::Minute = " |
+      10*Time::Hour + 5*Time::Minute);
+    Println("10*Time::Hour + 5*Time::Minute =? 0.0 = " |
+      (10*Time::Hour + 5*Time::Minute =? 0.0));
+    Println("10*Time::Hour + 5*Time::Minute =? 86400.0 = " |
+      (10*Time::Hour + 5*Time::Minute =? 86400.0));
+      {10*Time::Hour + 5*Time::Minute in 0.0 .. 86400.0}
 
     var T : Time := Create(Year => 2011, Month => #Oct, Day_Of_Month => 18,
       Time_Of_Day => 10*Time::Hour + 5*Time::Minute,
@@ -8771,6 +8970,9 @@ interface PSL::Core::Unsigned_64<> is
     op "=?"(Left, Right : Unsigned_64) -> Ordering
       is import(#uns_compare)
 
+    func Strict_Compare(Left, Right : Unsigned_64) -> Ordered::Full_Ordering
+      is import(#uns_compare)
+
     op ">>"(Unsigned_64; Unsigned_64) -> Unsigned_64 is import(#uns_rshift)
 
     op "<<"(Unsigned_64; Unsigned_64) -> Unsigned_64 is import(#uns_lshift)
@@ -8931,6 +9133,8 @@ interface PSL::Core::Modular<Modulus : Unsigned_64> is
     op "**="(var Left : Modular; Right : Univ_Integer)
 
     op "=?"(Left, Right : Modular) -> Ordering
+      is import(#uns_compare)
+    func Strict_Compare(Left, Right : Modular) -> Ordered::Full_Ordering
       is import(#uns_compare)
 
     op ">>"(Modular; Modular) -> Modular is import(">>")
@@ -9197,7 +9401,8 @@ func PSL::Test::Test_Modular() is
     end loop
     Println("");
 end func PSL::Test::Test_Modular
-interface PSL::Containers::Ordered_Set<Element_Type is Comparable<>> is
+
+interface PSL::Containers::Ordered_Set<Element_Type is Ordered<>> is
   // A set over individual but ordered elements
     op "[]"() -> Ordered_Set
 
@@ -9256,6 +9461,16 @@ interface PSL::Containers::Ordered_Set<Element_Type is Comparable<>> is
         // Return #less if Left is a proper subset of Right
         // Return #greater if Left is a proper superset of Right
         // Return #unordered otherwise
+
+    func Strict_Compare(Left, Right : Ordered_Set) -> Ordered::Full_Ordering
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left has fewer elements than Right
+        //   or Left has same number of elements and Left appears
+        //   earlier in a lexicographic ordering
+        // Return #greater if Left has more elements than Right
+        //   or Left has same number of elements and Left appears
+        //   later in a lexicographic ordering
+        // Never return #unordered
 
     func Count(S : Ordered_Set) -> Univ_Integer
 
@@ -9477,6 +9692,29 @@ class PSL::Containers::Ordered_Set is
         end if
     end op "=?"
 
+    func Strict_Compare(Left, Right : Ordered_Set) -> Ordered::Full_Ordering
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left has fewer elements than Right
+        //   or Left has same number of elements and Left appears
+        //   earlier in a lexicographic ordering
+        // Return #greater if Left has more elements than Right
+        //   or Left has same number of elements and Left appears
+        //   later in a lexicographic ordering
+        // Never return #unordered
+    is
+        if |Left| != |Right| then
+           return |Left| =? |Right|
+        else
+           for (Left_Elem in Left; Right_Elem in Right) forward loop
+              const Result := Strict_Compare(Left_Elem, Right_Elem);
+              if Result != #equal then
+                 return Result
+              end if
+           end loop
+           return #equal
+        end if
+    end func Strict_Compare
+
     func Count(S : Ordered_Set) -> Result : Univ_Integer is
         // Return count of items in set
         return S.Count;
@@ -9547,6 +9785,7 @@ class PSL::Containers::Ordered_Set is
     end func Remove_Any
 
 end class PSL::Containers::Ordered_Set
+
 interface PSL::Core::Enum_With_Rep
   <Rep_Type is Imageable<>;
    Rep_Map : Two_Way_Map<Univ_Enumeration, Rep_Type>> is
@@ -9567,7 +9806,8 @@ interface PSL::Core::Enum_With_Rep
 
     op "[..]"() -> Ordered_Set<Enum_With_Rep>
 
-    op "=?"(Left, Right : Enum_With_Rep) -> Ordering
+    func Strict_Compare(Left, Right : Enum_With_Rep) -> Ordered::Full_Ordering
+    op "=?"(Left, Right : Enum_With_Rep) -> Ordering is Strict_Compare
 
     // Functions for Imageable
     func To_String(Val : optional Enum_With_Rep) -> Univ_String
@@ -9640,9 +9880,10 @@ class PSL::Core::Enum_With_Rep is
         return [for each Rep of Rep_Map => From_Rep(Rep)]
     end op "[..]";
 
-    op "=?"(Left, Right : Enum_With_Rep) -> Ordering is
+    func Strict_Compare(Left, Right : Enum_With_Rep) -> Ordered::Full_Ordering
+    is
         return Left.Rep =? Right.Rep
-    end op "=?"
+    end func Strict_Compare
 
     func Hash(Val : Enum_With_Rep) -> Unsigned_64 is
         return Hash (Val.Rep)
@@ -9789,7 +10030,9 @@ interface PSL::Containers::Imageable_Vector<Element_Type is Imageable<>>
     func From_String(Str : Univ_String<>) -> optional Imageable_Vector
       is (null)  // TBD
 
-    op "=?"(Left, Right : Imageable_Vector) -> Ordering
+    func Strict_Compare(Left, Right : Imageable_Vector)
+      -> Ordered::Full_Ordering
+    op "=?"(Left, Right : Imageable_Vector) -> Ordering is Strict_Compare
     func Hash(Val : Imageable_Vector) -> Unsigned_64
 
     func Print(Val : Imageable_Vector) is (Print(To_String(Val)))
@@ -9806,7 +10049,7 @@ class PSL::Containers::Imageable_Vector is
         return Result | "]"
     end func To_String
 
-    op "=?"(Left, Right : Imageable_Vector) -> Ordering is
+    func Strict_Compare(Left, Right : Imageable_Vector) -> Ordering is
         for I in 1 .. Min(|Left|, |Right|) forward loop
             const Result := Left[I] =? Right[I]
             if Result != #equal then
@@ -9816,7 +10059,7 @@ class PSL::Containers::Imageable_Vector is
         end loop
         //  Prefixes match, result determined by length comparison
         return |Left| =? |Right|
-    end op "=?"
+    end func Strict_Compare
 
     func Hash(Val : Imageable_Vector) -> Unsigned_64 is
         if |Val| == 0 then
@@ -10184,12 +10427,14 @@ func PSL::Test::Test_Indexed_Set() is
 end func PSL::Test::Test_Indexed_Set
 
 interface PSL::Containers::Ordered_Map
-  <Key_Type is Comparable<>; Value_Type is Assignable<>> is
+  <Key_Type is Ordered<>; Value_Type is Assignable<>> is
   // An ordered map module, allowing iterating over the keys in
   // forward or reverse order.
 
     interface Pair<> extends Basic_Key_Value<Key_Type, Value_Type> is
-       op "=?"(Left, Right : Pair) -> Ordering is (Left.Key =? Right.Key)
+       func Strict_Compare (Left, Right : Pair) -> Ordered::Full_Ordering
+         is (Strict_Compare (Left.Key, Right.Key))
+       op "=?"(Left, Right : Pair) -> Ordering is Strict_Compare
     end interface Pair
 
     op "[]"() -> Ordered_Map

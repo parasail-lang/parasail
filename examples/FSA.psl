@@ -513,12 +513,13 @@ class FSA is
            const Ival : Interval<Val_Type>;
            const Edge : Edge_Index;
 
-           op "=?" (Left, Right : Interval_And_Edge) -> Ordering
-             is ((if Left.Ival.Low != Right.Ival.Low then
-                    Left.Ival.Low =? Right.Ival.Low
-                  elsif Left.Ival.Low_Is_Open != Right.Ival.Low_Is_Open then
-                    Left.Ival.Low_Is_Open =? Right.Ival.Low_Is_Open
-                  else Left.Edge =? Right.Edge));
+           func Strict_Compare(Left, Right : Interval_And_Edge)
+             -> Ordered::Full_Ordering
+             is ((Strict_Compare(Left.Ival, Right.Ival) != #equal?
+                     Strict_Compare(Left.Ival, Right.Ival) :
+                     Left.Edge =? Right.Edge));
+           op "=?"(Left, Right : Interval_And_Edge) -> Ordering
+             is (Strict_Compare(Left, Right));
         end interface Interval_And_Edge;
 
         interface High_Bound_And_Edge<> is
@@ -527,36 +528,16 @@ class FSA is
            const High_Is_Open : Boolean;
            const Edge : Edge_Index;
 
-           op "=?" (Left, Right : High_Bound_And_Edge) -> Ordering
+           func Strict_Compare(Left, Right : High_Bound_And_Edge)
+             -> Ordered::Full_Ordering
              is ((if Left.High != Right.High then
                     Left.High =? Right.High
                   elsif Left.High_Is_Open != Right.High_Is_Open then
                     Right.High_Is_Open =? Left.High_Is_Open  // inverted
                   else Left.Edge =? Right.Edge));
+           op "=?"(Left, Right : High_Bound_And_Edge) -> Ordering
+              is (Strict_Compare(Left, Right));
         end interface High_Bound_And_Edge;
-
-        interface Fully_Ordered_Countable_Set<Elem_Type is Countable<>> is
-           var Set : Countable_Set<Elem_Type>;
-
-           op "=?" (Left, Right : Fully_Ordered_Countable_Set) -> Ordering;
-
-        end interface Fully_Ordered_Countable_Set;
-
-        class Fully_Ordered_Countable_Set is
-          exports
-           op "=?" (Left, Right : Fully_Ordered_Countable_Set) -> Ordering is
-              if |Left.Set| != |Right.Set| then
-                 return |Left.Set| =? |Right.Set|;
-              else
-                 for (L in Left.Set; R in Right.Set) forward loop
-                    if L != R then
-                       return L =? R;
-                    end if;
-                 end loop;
-                 return #equal;
-              end if;
-           end op "=?";
-        end class Fully_Ordered_Countable_Set;
 
         func Interval_Set(Ordered_Node)
           -> Result : Ordered_Set<Interval_And_Edge> is
@@ -654,18 +635,17 @@ class FSA is
               //  TBD: It would be good if we could set the Node_Univ_Set
 
            var Edge_Combos : Ordered_Set
-                <Fully_Ordered_Countable_Set<Edge_Index>> := [];
+                <Countable_Set<Edge_Index>> := [];
              //  Unique combinations of edges that all share some of the
              //  same values.
 
            var Edge_Val_Mapping :
-             Ordered_Map<Fully_Ordered_Countable_Set<Node_Id>,
+             Ordered_Map<Countable_Set<Node_Id>,
                          Value_Set_And_Edge> := [];
            //  Mapping from the Node_Ids that are being combined
            //  to produce a new node.
 
-           var Active_Combo : Fully_Ordered_Countable_Set<Edge_Index> :=
-              (Set => []);
+           var Active_Combo : Countable_Set<Edge_Index> := [];
              //  Edges associated with active intervals during iteration.
 
            func Remember_Combos
@@ -677,13 +657,13 @@ class FSA is
                  Println("Remember_Combos");
               end if;
 
-              if |Active_Combo.Set| > 0 then
+              if |Active_Combo| > 0 then
                  //  Active combo has at least one value unique to it
                  if Debug then
                     Println(" Adding full Active_Combo to Edge_Combos:" |
-                      (for each Edge of Active_Combo.Set forward =>
+                      (for each Edge of Active_Combo forward =>
                          <""> | " " | Edge) | ", Nodes:" |
-                      (for each Edge of Active_Combo.Set forward =>
+                      (for each Edge of Active_Combo forward =>
                          <""> | " " | Successor(N, Edge)));
                  end if;
 
@@ -719,9 +699,9 @@ class FSA is
                        //  is "interesting".
                        if Debug then
                           Println(" Adding to Edge_Combos:" |
-                            (for each Edge of Active_Combo.Set forward =>
+                            (for each Edge of Active_Combo forward =>
                                <""> | " " | Edge) | ", Nodes:" |
-                            (for each Edge of Active_Combo.Set forward =>
+                            (for each Edge of Active_Combo forward =>
                                <""> | " " | Successor(N, Edge)));
                        end if;
 
@@ -730,7 +710,7 @@ class FSA is
                           Println(" |Edge_Combos| = `(|Edge_Combos|)");
                        end if;
                     end if;
-                    Active_Combo.Set -= Finished_HB.Edge;
+                    Active_Combo -= Finished_HB.Edge;
 
                     //  Remember prior HB for next iteration
                     Prior_HB := Finished_HB;
@@ -786,7 +766,7 @@ class FSA is
 
               //  Add Next_IE to set of active intervals
               Active_Intervals += Next_IE;
-              Active_Combo.Set += Next_IE.Edge;
+              Active_Combo += Next_IE.Edge;
            end loop;
 
            //  Reached end of intervals, remember interesting combos
@@ -795,9 +775,9 @@ class FSA is
            if Debug then
               Println("Edge combos for Node `(Id(N)):");
               for each Combo of Edge_Combos loop
-                 Println((for Edge in Combo.Set forward => <""> | " " | Edge) |
+                 Println((for Edge in Combo forward => <""> | " " | Edge) |
                    ", Nodes:" |
-                   (for Edge in Combo.Set forward => <""> | " " |
+                   (for Edge in Combo forward => <""> | " " |
                       Successor(N, Edge)));
               end loop;
            end if;
@@ -810,10 +790,10 @@ class FSA is
            for each Combo of Edge_Combos loop
               var New_Node_Id : Node_Id;
 
-              if |Combo.Set| == 1 then
+              if |Combo| == 1 then
                  //  This successor node should remain, though its value
                  //  set might shrink.
-                 New_Node_Id := Successor(N, Any_Element(Combo.Set));
+                 New_Node_Id := Successor(N, Any_Element(Combo));
               else
                  //  Assign a new Node_Id
                  New_Node_Id := Assign_Node_Id(FSA);
@@ -821,19 +801,19 @@ class FSA is
 
               // Convert to a set of node ids
               const Old_Node_Set : Node_Set :=
-                (for Edge in Combo.Set => <[]> | Successor(N, Edge));
+                (for Edge in Combo => <[]> | Successor(N, Edge));
 
               //  Add a mapping to the set of old nodes from the edge combo
               Result |= [New_Node_Id => Old_Node_Set];
 
               // Compute intersection of value sets for the combined edges
               const Edge_Val_Intersection : Range_Set<Val_Type> :=
-                (for Edge in Combo.Set =>
+                (for Edge in Combo =>
                    <Node_Univ_Set(N)> and Successor_Values(N, Edge));
 
               if Debug then
                  Println("Node `(New_Node_Id) has Edge Combo:" |
-                   (for Edge in Combo.Set => <""> | " " | Edge) | ", Nodes:" |
+                   (for Edge in Combo => <""> | " " | Edge) | ", Nodes:" |
                    (for N_Id in Old_Node_Set => <""> | " " | N_Id));
                  Print(" Intersection of values is:");
                  Dump_Range_Set(Edge_Val_Intersection);
@@ -844,20 +824,16 @@ class FSA is
               Add_Successor (Updated_Node, New_Node_Id);
               const New_Edge : Edge_Index := |Num_Successors(Updated_Node)|;
 
-              const FO_Old_Node_Set : Fully_Ordered_Countable_Set<Node_Id> :=
-                (Set => Old_Node_Set);
-
-              Edge_Val_Mapping[FO_Old_Node_Set] :=
+              Edge_Val_Mapping[Old_Node_Set] :=
                 (Edge => New_Edge, Val_Set => Edge_Val_Intersection);
               
            end loop;
 
            //  Now remove values for a combo of nodes from all proper subsets
-           for each [FO_Old_Node_Set => Val_And_Edge] of Edge_Val_Mapping
+           for each [Old_Node_Set => Val_And_Edge] of Edge_Val_Mapping
              reverse loop
               //  Remove value set from subsets
               //  Convert to array of Node Ids
-              ref Old_Node_Set => FO_Old_Node_Set.Set;
 
               const Elems : Vector<Node_Id> :=
                 [for each N_Id of Old_Node_Set forward => N_Id];
@@ -883,11 +859,11 @@ class FSA is
 
                  //  If the subset appeared in Old_Node_Set, then
                  //  remove values of this superset from this subset.
-                 if (Set => Subset) in Edge_Val_Mapping then
+                 if Subset in Edge_Val_Mapping then
                     if Debug then
                        Println("  Subset is in Edge_Val_Mapping");
                     end if;
-                    Edge_Val_Mapping[(Set => Subset)].Val_Set -=
+                    Edge_Val_Mapping[Subset].Val_Set -=
                       Val_And_Edge.Val_Set;
                  end if;
               end loop;

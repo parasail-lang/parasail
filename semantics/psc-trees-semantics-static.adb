@@ -18501,7 +18501,9 @@ package body PSC.Trees.Semantics.Static is
                         " vs. " &
                         Type_Image (Param_Type2));
                   end if;
-                  return False;
+                  --  Match only if same symbol
+                  return Param_Type1.Associated_Symbol =
+                    Param_Type2.Associated_Symbol;
                elsif Param_Type1.U_Base_Type = Extra_Subst1
                  and then Param_Type2.U_Base_Type =
                           Extra_Subst2
