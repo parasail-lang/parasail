@@ -47,7 +47,7 @@ interface FSA<> is
   // that at each state, the various edges are labeled by non-overlapping
   // value sets, and every end state has exactly one Action ID.
 
-    const Debug : Boolean := #true;
+    const Debug : Boolean := #false;
 
     type Node_Id is new Integer<0..10**6>;
       // A unique id for each node in the FSA
@@ -57,6 +57,9 @@ interface FSA<> is
 
     type Query_Id is new Integer<0..10**6>;
       // A unique id for each distinct query that is performed
+
+    const Starting_Query_Id : Query_Id := 0;
+      // Query Id for starting node
 
     type Action_Id is new Integer<0..10**6>;
       // A unique id for each distinct action in the FSA
@@ -91,6 +94,13 @@ interface FSA<> is
     type Edge_Index is Edge_Count {Edge_Index >= 1};
 
     interface Node<> is
+      //  The FSA is a graph of Nodes, each representing a state in the
+      //  automaton.  Each Node has a Node_Id, a set of Action_Ids
+      //  if it is an end state, or a Query_Id if it is not an end state.
+      //  Each edge to a successor of a non-end state is labeled by
+      //  the set of values produced by the associated Query that lead
+      //  to that successor.  The node is non-deterministic if any two
+      //  edges are labeled with overlapping value sets.
 
         func Create(optional Node_Id := null; optional Query_Id := null)
           -> Node;
@@ -153,6 +163,37 @@ interface FSA<> is
         //  For other nodes in Nodes_To_Merge, create
         //  an unconditional edge to existing node.
     end interface Node;
+
+    interface Starting_Node<> extends Node is
+      //  There is only one Starting_Node.  Each separate "arm" of the
+      //  original pattern match is a successor of the starting node.
+      //  All successors effectively have a "universal" value set on
+      //  their edge, meaning that any edge can be chosen.
+
+       func Create(optional Node_Id := null; optional Query_Id := null)
+         -> Starting_Node;
+        //  Must override inherited constructors.
+
+        //  Create a node with given node id and query id.
+
+       func Is_End_State (Starting_Node) -> Boolean is (#false);
+         //  Return True if Node is an end state (never)
+
+       func Is_Nondeterministic (Starting_Node) -> Boolean is
+         (|Num_Successors(Starting_Node)| > 1);
+        //  Return True if Starting_Node has more than one outgoing edge
+
+       func Disambiguate (S : Starting_Node; var FSA)
+          -> Ordered_Map<Node_Id, Node_Set>;
+        //  All successor nodes will be mapped to a single new node.
+
+       func Merge_Nodes
+         (var New_Node : Starting_Node; FSA; Nodes_To_Merge : Node_Set)
+         is (null);
+        //  Not applicable to Starting_Node, since there is always
+        //  exactly one.
+
+    end interface Starting_Node;
 
     interface Action_Node<> extends Node is
       //  End state of FSA contains a set of actions
@@ -302,10 +343,8 @@ interface FSA<> is
         
     end interface Countable_Node;
 
-    func Create() -> FSA {Num_Nodes (Create) == 0};
-      // Create an empty FSA
-
-    op "[]"() -> FSA is Create;
+    func Create() -> FSA {Num_Nodes (Create) == 1};
+      // Create an FSA with a single Start node
 
     func Assign_Node_Id (var FSA) -> Node_Id
       {Num_Nodes (FSA') == Num_Nodes (FSA) + 1;
@@ -324,6 +363,13 @@ interface FSA<> is
       //  Add a node to a FSA, and return its node id
       //  This is equivalent to Assign_Node_Id followed by Set_Node.
 
+    func Add_Root_Successor(var FSA; To : Node_Id);
+      //  Add a successor to the Starting Node of the FSA
+
+    func Add_Root_Successor(var FSA; To : Node+)
+      is (Add_Root_Successor(FSA, FSA.Add_Node(To)));
+      //  Add a successor to the Starting Node of the FSA
+
     op "in"(Node_Id; FSA) -> Boolean;
       // Return #true if Node_Id is in FSA
 
@@ -335,19 +381,21 @@ interface FSA<> is
     func Node_Range(FSA) -> Countable_Range<Node_Id>;
       // The range of node-ids in use in FSA
 
-    func Set_Root(var FSA; Node_Id);
-
-    func Root(FSA) -> optional Node_Id;
+    func Root_Id(FSA) -> optional Node_Id;
 
     func Dump_One_Node(FSA; Node_Id; Indent : Univ_Integer);
       // Produce a human-readable representation of the node, if any, with
       // given Node_Id, at given indent.
  
-    func Dump_FSA(FSA) {Root(FSA) not null};
+    func Dump_FSA(FSA)
       // Produce a human-readable representation of the FSA
 
     func Is_Nondeterministic(FSA) -> Boolean;
       //  Return True if some node within the FSA is nondeterministic
+
+    func Queries_Are_Ordered(FSA; Node_Id) -> Boolean;
+      //  Return True if a sequence of non-end-states have queries
+      //  ordered by Query_Id.
 
     func Disambiguate_FSA(var FSA);
       //  Remove nondeterminism from FSA
@@ -356,10 +404,12 @@ end interface FSA;
 
 class FSA is
   // Class defining the FSA module
-    var Nodes : Vector<optional Node+> := [];
+    const Root_Node_Id : Node_Id := 1
+    var Nodes : Vector<optional Node+> :=
+      [Starting_Node::Create
+         (Node_Id => Root_Node_Id, Query_Id => Starting_Query_Id)];
     var Action_Strings : Vector<Univ_String> := [];
     var Query_Formulae : Vector<Univ_String> := [];
-    var Root_Node_Id : optional Node_Id := null;
 
   exports
 
@@ -397,7 +447,8 @@ class FSA is
     //  Count of distinct queries within FSA
 
     func Query_Formula (FSA; Query_Id) -> Univ_String
-      is (FSA.Query_Formulae[Query_Id]);
+      is (Query_Id == Starting_Query_Id?
+            "Starting node" : FSA.Query_Formulae[Query_Id]);
     //  Return query formula
     
     class Node<> is
@@ -459,6 +510,45 @@ class FSA is
            end loop;
         end func Dump_Node;
     end class Node;
+
+    class Starting_Node is
+
+      exports
+
+       func Create(optional Node_Id := null; optional Query_Id := null)
+         -> Starting_Node is ((Node => Create (Node_Id, Starting_Query_Id)));
+        //  Create the one and only Starting_Node
+
+       func Disambiguate (S : Starting_Node; var FSA)
+          -> Result : Ordered_Map<Node_Id, Node_Set> is
+        //  All successor nodes will be mapped to a single new node.
+          Result := [];
+
+          if Num_Successors(S) == 1 then
+             //  Weird special case where starting node has only one successor
+             const Only_Successor : Node_Id := Successor(S, 1);
+
+             Result |= [Only_Successor => [Only_Successor]];
+          else
+             var New_Start : Starting_Node :=
+               Create(Id(S), Starting_Query_Id)
+          
+             //  Assign new Node_Id into which all successors will be merged
+             const New_Node_Id : Node_Id := Assign_Node_Id(FSA);
+
+             Add_Successor (New_Start, New_Node_Id);
+
+             FSA[Root_Node_Id] := New_Start;
+
+             const All_Succs : Node_Set :=
+                    [for Edge in 1 .. Num_Successors(S) =>
+                       Successor(S, Edge)];
+
+             Result |= [New_Node_Id => All_Succs];
+          end if;
+       end func Disambiguate;
+
+    end class Starting_Node
 
     class Action_Node is
       //  End state of FSA contains a set of actions
@@ -930,7 +1020,7 @@ class FSA is
               then
                  //  Query Id matches, check type
                  case Old_Node of
-                  [O : Ordered_Node] =>
+                  [O : Ordered_Node+] =>
                     //  Type matches as well.  Carry over its successors.
                     if Debug then
                        Println("Old Ordered Node `(O_Id) being merged in");
@@ -1139,6 +1229,11 @@ class FSA is
        Set_Id (FSA.Nodes[Result], Result);
     end func Add_Node;
 
+    func Add_Root_Successor(var FSA; To : Node_Id) is
+      //  Add a successor to the Starting Node of the FSA
+       Add_Successor(FSA[Root_Node_Id], To);
+    end func Add_Root_Successor;
+
     op "in"(Node_Id; FSA) -> Boolean is (Node_Id in 1 .. |FSA.Nodes|);
       // Return #true if Node_Id is in FSA
 
@@ -1150,11 +1245,7 @@ class FSA is
     func Node_Range(FSA) -> Countable_Range<Node_Id> is (1 .. |FSA.Nodes|);
       // The range of node-ids in use in FSA
 
-    func Set_Root(var FSA; Node_Id) is
-       FSA.Root_Node_Id := Node_Id;
-    end func Set_Root;
-
-    func Root(FSA) -> optional Node_Id is (FSA.Root_Node_Id);
+    func Root_Id(FSA) -> optional Node_Id is (Root_Node_Id);
  
     func Dump_One_Node(FSA; Node_Id; Indent : Univ_Integer) is
        if not FSA.Node_Is_Filled(Node_Id) then
@@ -1166,7 +1257,13 @@ class FSA is
 
     func Dump_FSA(FSA) is
       // Produce a human-readable representation of the FSA
-       Dump_One_Node(FSA, FSA.Root(), Indent => 0);
+       Println("Dump of Finite State Automaton:");
+       Println("  FSA is `(Is_Nondeterministic(FSA)? "non": "")deterministic");
+       Println
+         ("  FSA Queries_Are_Ordered: " |
+           FSA.Queries_Are_Ordered(FSA.Root_Id()));
+       Println("");
+       Dump_One_Node(FSA, FSA.Root_Id(), Indent => 0);
     end func Dump_FSA;
 
     func Is_Nondeterministic(FSA) -> Boolean is
@@ -1184,8 +1281,48 @@ class FSA is
           end if;
        end func Subtree_Is_Nondeterministic;
 
-       return Subtree_Is_Nondeterministic (Root (FSA));
+       return Subtree_Is_Nondeterministic (Root_Id (FSA));
     end func Is_Nondeterministic;
+
+    func Queries_Are_Ordered(FSA; Node_Id) -> Boolean is
+      //  Return True if a sequence of non-end-states have queries
+      //  ordered by Query_Id.
+       ref N : Node+ => FSA[Node_Id];
+
+       const Num_Outgoing := Num_Successors(N);
+       const Q_Id := Query(N);
+       var Some_In_Order : Boolean := #false;
+       var All_Are_End_States : Boolean := #true;
+          
+       for Edge in 1 .. Num_Outgoing loop
+          const Succ_Id := Successor(N, Edge);
+
+          if not Is_End_State(N)
+            and then Q_Id not null
+          then
+             ref Succ : Node+ => FSA[Succ_Id];
+
+             All_Are_End_States := #false;
+
+             if Query(Succ) is null
+                  or else
+                Query(Succ) > Q_Id
+             then
+                //  Something is in order
+                Some_In_Order := #true;
+             end if;
+          end if;
+
+          //  Recurse
+          if not Queries_Are_Ordered(FSA, Succ_Id) then
+             return #false;
+          end if;
+       end loop;
+
+       //  Make sure that at least one path is in the expected order
+       //  unless all are end states.
+       return Some_In_Order or else All_Are_End_States;
+    end func Queries_Are_Ordered;
 
     func Disambiguate_FSA(var FSA) is
       //  Remove nondeterminism from FSA for all but Action_Nodes
@@ -1281,7 +1418,7 @@ class FSA is
           end loop;
        end func Disambiguate_Subtree;
 
-       Disambiguate_Subtree(Root(FSA));
+       Disambiguate_Subtree(Root_Id(FSA));
     end func Disambiguate_FSA;
 
 end class FSA;
@@ -1300,32 +1437,33 @@ func Test_FSA() is
    const Action_A := FSA1.Add_Action_Node("A");
    var Y_Eq_2 := Int_Node::Create(Query_Id => Query_Y);
    Y_Eq_2.Add_Successor (To => Action_A, Values => 2..2);
-   const Y_Eq_2_Id := FSA1.Add_Node(Y_Eq_2);
+   var X_Eq_2 := Int_Node::Create(Query_Id => Query_X);
+   X_Eq_2.Add_Successor (To => FSA1.Add_Node(Y_Eq_2), Values => 2..2);
+   FSA1.Add_Root_Successor (X_Eq_2);
 
    const Action_B := FSA1.Add_Action_Node("B");
    var Y_In_2_3 := Int_Node::Create(Query_Id => Query_Y);
    Y_In_2_3.Add_Successor (To => Action_B, Values => 2..3);
-   const Y_In_2_3_Id := FSA1.Add_Node(Y_In_2_3);
+   var X_In_1_2 := Int_Node::Create(Query_Id => Query_X);
+   X_In_1_2.Add_Successor (To => FSA1.Add_Node(Y_In_2_3), Values => 1..2);
+   FSA1.Add_Root_Successor (X_In_1_2);
 
    const Action_C := FSA1.Add_Action_Node("C");
    var Y_In_1_2 := Int_Node::Create(Query_Id => Query_Y);
    Y_In_1_2.Add_Successor (To => Action_C, Values => 1..2);
-   const Y_In_1_2_Id := FSA1.Add_Node(Y_In_1_2);
+   var X_In_2_3 := Int_Node::Create(Query_Id => Query_X);
+   X_In_2_3.Add_Successor (To => FSA1.Add_Node(Y_In_1_2), Values => 2..3);
+   FSA1.Add_Root_Successor (X_In_2_3);
 
    const Action_E := FSA1.Add_Action_Node("E");
-
-   var X_Test := Int_Node::Create(Query_Id => Query_X);
-   X_Test.Add_Successor (To => Y_Eq_2_Id, Values => 2..2);
-   X_Test.Add_Successor (To => Y_In_2_3_Id, Values => 1..2);
-   X_Test.Add_Successor (To => Y_In_1_2_Id, Values => 2..3);
-   X_Test.Add_Successor (To => Action_E, Values => 1..3);
-   const X_Test_Id := FSA1.Add_Node(X_Test);
-
-   FSA1.Set_Root(X_Test_Id);
+   FSA1.Add_Root_Successor (Action_E);
 
    Dump_FSA(FSA1);
 
    Println("FSA is `(Is_Nondeterministic(FSA1)? "non": "")deterministic");
+   Println
+     ("  Queries_Are_Ordered? `(FSA1.Queries_Are_Ordered(FSA1.Root_Id()))");
+
    Println("\nAbout to disambiguate\n");
    Disambiguate_FSA(FSA1);
 
