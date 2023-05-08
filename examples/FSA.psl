@@ -111,7 +111,7 @@ interface FSA<> is
           {Successor_Index(From', To) not null};
          // Add an edge in the FSA
 
-        func Num_Successors (Node) -> Univ_Integer;
+        func Num_Successors (Node) -> Edge_Index;
         //  Number of successor nodes.
         //  Will be zero for an end state.
 
@@ -277,6 +277,31 @@ interface FSA<> is
 
     end interface Ordered_Node;
 
+    interface Countable_Node
+      <Val_Type is Countable<>; Univ_Set : Range_Set<Val_Type>>
+      extends Ordered_Node<Val_Type, Univ_Set> is
+       //  Same as ordered node, but takes advantage of fact
+       //  that Val_Type is countable so no need for open interval bounds.
+
+       func Disambiguate (N : Countable_Node; var FSA)
+          -> Ordered_Map<Node_Id, Node_Set>;
+       // Disambiguate and then remove open bounds from value sets
+
+       func Add_Successor(var From : Countable_Node; To : Node_Id;
+         Values : Range_Set<Val_Type>)
+         {Successor_Index(From', To) not null;
+          Successor_Values(From', Successor_Index(From', To)) == Values};
+         // Add an edge in the FSA
+
+       func Set_Successor_Values
+         (var From : Countable_Node;
+          Succ : Edge_Index;
+          Values : Range_Set<Val_Type>)
+         {Successor_Values(From', Succ) == Values};
+         //  Set values associated with given successor
+        
+    end interface Countable_Node;
+
     func Create() -> FSA {Num_Nodes (Create) == 0};
       // Create an empty FSA
 
@@ -405,7 +430,7 @@ class FSA is
             From.Successors |= To;
         end func Add_Successor;
 
-        func Num_Successors (Node) -> Univ_Integer is (|Node.Successors|);
+        func Num_Successors (Node) -> Edge_Index is (|Node.Successors|);
         //  Number of successor nodes.
         //  Will be zero for an end state.
 
@@ -580,6 +605,7 @@ class FSA is
               end if;
            end loop;
         end func Dump_Range_Set;
+
       exports
 
         func Create(optional Node_Id := null; optional Query_Id := null)
@@ -1003,6 +1029,81 @@ class FSA is
 
     end class Ordered_Node;
 
+    class Countable_Node is
+       //  Same as ordered node, but takes advantage of fact
+       //  that Val_Type is countable so no need for open interval bounds.
+
+       func Close_Bounds (Range_Set<Val_Type>)
+         -> Result : Range_Set<Val_Type>
+          //  Close any open intervals by adjusting bound up/down
+       is
+          Result := [];
+          for Ival in Range_Set loop
+             var Closed_Ival for Result := Ival;
+
+             //  Close either side of interval that is open
+             if Closed_Ival.Low_Is_Open then
+                Closed_Ival.Low_Is_Open := #false;
+                Closed_Ival.Low += 1;
+             end if;
+
+             if Closed_Ival.High_Is_Open then
+                Closed_Ival.High_Is_Open := #false;
+                Closed_Ival.High -= 1;
+             end if;
+
+             //  Add closed interval into result
+             Add_Interval (Result, Closed_Ival);
+          end loop;
+       end func Close_Bounds;
+
+       type Ordered_Base is Ordered_Node<Val_Type, Univ_Set>;
+
+     exports
+
+       func Add_Successor(var From : Countable_Node; To : Node_Id;
+         Values : Range_Set<Val_Type>) is
+         // Add an edge in the FSA
+          Add_Successor(From.Ordered_Node, To, Close_Bounds(Values));
+       end func Add_Successor
+
+       func Set_Successor_Values
+         (var From : Countable_Node;
+          Succ : Edge_Index;
+          Values : Range_Set<Val_Type>) is
+         //  Set values associated with given successor
+          Set_Successor_Values (From.Ordered_Node, Succ, Close_Bounds(Values));
+       end func Set_Successor_Values
+        
+       func Disambiguate (N : Countable_Node; var FSA)
+          -> Result : Ordered_Map<Node_Id, Node_Set> is
+       // Disambiguate and then remove open bounds from value sets
+
+          Result := Disambiguate (N.Ordered_Node, FSA);
+
+          case FSA[Id(N)] of
+            [Updated : Ordered_Base] =>
+
+              // Close bounds of all intervals in value sets of all edges
+              for Edge in 1 .. Num_Successors(Updated) loop
+                 const Vals := Successor_Values(Updated, Edge);
+                 Set_Successor_Values(Updated, Edge, Close_Bounds(Vals));
+              end loop;
+
+              // Update FSA node
+              // Build a Countable_Node with same content as ordered node
+              var C : Countable_Node := (Ordered_Node => Updated);
+              Set_Id (C, Id(N));
+
+              Set_Node(FSA, Id(N), C);
+
+            [X : Node+] =>
+               {*"Expecting Ordered_Node"* #false}
+          end case;
+       end func Disambiguate;
+
+    end class Countable_Node;
+
     func Create() -> FSA is
       // Create an empty FSA
        return ();
@@ -1186,7 +1287,10 @@ class FSA is
 end class FSA;
 
 func Test_FSA() is
-   type Int_Node is FSA::Ordered_Node<Integer, Univ_Set => 1..3>;
+
+   type Int_Node is
+     FSA::Countable_Node
+       <Integer, Univ_Set => 1..3>;
 
    var FSA1 := FSA::Create();
 

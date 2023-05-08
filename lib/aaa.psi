@@ -5350,6 +5350,7 @@ end func PSL::Test::Test_Countable_Set
 interface PSL::Containers::Range_Set<Element_Type is Ordered<>> is
   // A set abstraction that supports efficiently storing potentially
   // large ranges of values
+
     op "[]"() -> Range_Set
 
     func Singleton(Elem : Element_Type) -> Range_Set
@@ -5374,6 +5375,7 @@ interface PSL::Containers::Range_Set<Element_Type is Ordered<>> is
 
     op "|="(var Left : Range_Set; Right : Element_Type)
     op "|="(var Left : Range_Set; Right : Range_Set)
+    op "|="(var Left : Range_Set; Right : Interval<Element_Type>)
 
     op "<|="(var Left : Range_Set; var Right : optional Element_Type)
         // Move element into set, leaving Right null afterward.
@@ -5396,6 +5398,8 @@ interface PSL::Containers::Range_Set<Element_Type is Ordered<>> is
       -> Range_Set is "|"   // Union
     op "+="(var Left : Range_Set; Right : Range_Set) is "|="
     op "+="(var Left : Range_Set; Right : Element_Type) is "|="
+
+    //  TBD: op "+="(var Left : Range_Set; Right : Interval<Element_Type>) is "|="
    
     op "and"(Left, Right : Range_Set) -> Range_Set
         // Intersection
@@ -5444,6 +5448,12 @@ interface PSL::Containers::Range_Set<Element_Type is Ordered<>> is
     func Remove_Any(var S : Range_Set) -> optional Interval<Element_Type>
         // Remove an arbitrary interval of set
 
+    func Add_Interval
+      (var Left : Range_Set; var Right : Interval<Element_Type>)
+       // Move all elements of Right into Left, leaving Right empty.
+       // See whether Right overlaps with an existing interval
+       // in Left tree
+
 end interface PSL::Containers::Range_Set
 
 class PSL::Containers::Range_Set is
@@ -5469,7 +5479,7 @@ class PSL::Containers::Range_Set is
                 exit loop
             end if
         
-            // Found an overlapping interval; delete it and add back what's left
+            // Found an overlapping interval; delete and add back what's left
             Delete(S.Items, IV)
             if Is_Strictly_Within(Remaining_IV, IV) then
                 // Add back left and right remnants
@@ -5633,34 +5643,22 @@ class PSL::Containers::Range_Set is
                     return
                 end if
 
-                // See whether it overlaps with an existing interval
-                // in Left tree
-                var Left_IV for Left := Overlapping(Left.Items, Right_IV)
-                while Left_IV not null loop
-                    // Incorporate left interval into Right_IV
-                    Right_IV |= Left_IV
-
-                    if Right_IV == Left_IV then
-                        // Right_IV fully subsumed by existing interval
-                        Right_IV := null
-                        exit loop
-                    end if
-
-                    // Need to delete Left_IV 
-                    Delete(Left.Items, Left_IV)
-
-                    // Now see if there is anything still overlapping
-                    Left_IV := Overlapping(Left.Items, Right_IV)
-                end loop
-
-                if not Is_Empty(Right_IV) then
-                    // Add Right_IV
-                    Left.Items <|= Right_IV
-                end if
-
+                Add_Interval (Left, Right_IV);
             end loop
         end if
     end op "<|="
+
+    op "|="(var Left : Range_Set; Right : Interval<Element_Type>) is
+        if Count(Left.Items) == 0 then
+            Left := Single_Interval(Right)
+        else
+            // Make a copy of the Right set
+            var Right_Copy for Left := Right
+
+            // Merge all of its intervals into Left
+            Add_Interval (Left, Right_Copy)
+        end if
+    end op "|="
 
     op "-"(Left, Right : Range_Set) -> Result : Range_Set is
       // Set difference
@@ -5841,6 +5839,35 @@ class PSL::Containers::Range_Set is
         // Remove an arbitrary interval of set
         return Remove_Any(S.Items)
     end func Remove_Any
+
+    func Add_Interval
+      (var Left : Range_Set; var Right : Interval<Element_Type>) is
+       // Move all elements of Right into Left, leaving Right empty.
+       // See whether Right overlaps with an existing interval
+       // in Left tree
+       var Left_IV for Left := Overlapping(Left.Items, Right)
+       while Left_IV not null loop
+           // Incorporate left interval into Right
+           Right |= Left_IV
+
+           if Right == Left_IV then
+               // Right fully subsumed by existing interval
+               Right := null
+               exit loop
+           end if
+
+           // Need to delete Left_IV 
+           Delete(Left.Items, Left_IV)
+
+           // Now see if there is anything still overlapping
+           Left_IV := Overlapping(Left.Items, Right)
+       end loop
+
+       if not Is_Empty(Right) then
+           // Add Right
+           Left.Items <|= Right
+       end if
+    end func Add_Interval
 
 end class PSL::Containers::Range_Set
 

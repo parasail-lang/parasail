@@ -17015,8 +17015,8 @@ package body PSC.Trees.Semantics.Static is
                         --  Resolved type should be the same already
                         pragma Assert
                           (Object_Sem_Ptr (Underlying_Sem_Info).
-                             Resolved_Type.U_Type =
-                           Sym_Ref.Resolved_Type.U_Type);
+                             Resolved_Type.U_Base_Type =
+                           Sym_Ref.Resolved_Type.U_Base_Type);
                         null;
                      end if;
 

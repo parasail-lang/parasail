@@ -11693,7 +11693,10 @@ package body PSC.Interpreter is
          case Type_Info.Base is
             when Zero_Base =>
                --  Absolute identification of type
-               if Type_Info.Offset = 0 then
+               if Type_Info.Offset = 0
+                 or else
+                  Type_Info = Unknown_Func_Type_Obj_Locator
+               then
                   Result := null;
                else
                   Result :=
@@ -13639,6 +13642,7 @@ package body PSC.Interpreter is
          begin
             if Static_Link.Base = Zero_Base
               and then Static_Link.Offset /= 0
+              and then Static_Link /= Unknown_Func_Type_Obj_Locator
             then
                --  Type is known
                return Prefix &
