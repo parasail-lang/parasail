@@ -47,8 +47,6 @@ interface FSA<> is
   // that at each state, the various edges are labeled by non-overlapping
   // value sets, and every end state has exactly one Action ID.
 
-    const Debug : Boolean := #false;
-
     type Node_Id is new Integer<0..10**6>;
       // A unique id for each node in the FSA
 
@@ -76,7 +74,7 @@ interface FSA<> is
     //  Action is a string representing the action to be performed.
 
     func Num_Actions (FSA) -> Univ_Integer;
-    //  Count of end states ("action" nodes)
+    //  Count of distinct actions
 
     func Action_String(FSA; Action_Id) -> Univ_String;
       //  Return string representing action to be performed
@@ -140,8 +138,11 @@ interface FSA<> is
         func Dump_Node(FSA; Node; Indent : Univ_Integer);
         // Produce human-understandable dump of node, at given indent
 
-        abstract func Is_Nondeterministic (Node) -> Boolean;
-        //  Return True if Node has outgoing edges with overlapping value sets
+        abstract func Is_Nondeterministic
+          (Node; Check_Actions : Boolean := #false)
+         -> Boolean;
+         //  Return True if Node has outgoing edges with overlapping value sets
+         //  Only Check for ambiguous actions if Check_Actions is true.
 
         abstract func Disambiguate (Node; var FSA)
           -> Ordered_Map<Node_Id, Node_Set>;
@@ -179,7 +180,9 @@ interface FSA<> is
        func Is_End_State (Starting_Node) -> Boolean is (#false);
          //  Return True if Node is an end state (never)
 
-       func Is_Nondeterministic (Starting_Node) -> Boolean is
+       func Is_Nondeterministic
+          (Starting_Node; Check_Actions : Boolean := #false)
+         -> Boolean is
          (|Num_Successors(Starting_Node)| > 1);
         //  Return True if Starting_Node has more than one outgoing edge
 
@@ -207,10 +210,12 @@ interface FSA<> is
        func Is_End_State (Action_Node) -> Boolean is (#true);
          //  Return True if Node is an end state (i.e. is an Action_Node).
 
-       func Is_Nondeterministic (Action_Node) -> Boolean is
-         (|Action_Ids(Action_Node)| > 1);
-        //  Return True if Node has outgoing edges with overlapping value sets
-        //  or is a leaf node with multiple Action_Ids.
+        func Is_Nondeterministic
+          (Action_Node; Check_Actions : Boolean := #false)
+         -> Boolean is
+         (Check_Actions and then |Action_Ids(Action_Node)| > 1);
+         //  Return True if Node has outgoing edges with overlapping value sets
+         //  Only Check for ambiguous actions if Check_Actions is true.
 
        func Disambiguate (Action_Node; var FSA)
           -> Ordered_Map<Node_Id, Node_Set> is ([]);
@@ -235,7 +240,10 @@ interface FSA<> is
          //  Create an action node with initial single Action Id
 
        func Add_Action(var Action_Node; Action_Id);
-         // Add another action to the node
+         // Add another action id to the node
+
+       func Remove_Action(var Action_Node; Action_Id);
+         // Remove action id from the node
 
        func Action_Ids (Action_Node) -> Ordered_Set<Action_Id>;
         //  Action Ids of node.  
@@ -255,11 +263,14 @@ interface FSA<> is
           -> Ordered_Node {Num_Successors(Create) == 0};
          //  Create an ordered node, initially with no successors
 
-       func Add_Successor(var From : Ordered_Node; To : Node_Id)
+       func Add_Successor(var From : Ordered_Node; To : Node_Id);
          // Add an edge in the FSA, with a default value set of "Node_Univ_Set"
 
-       func Is_Nondeterministic (Ordered_Node) -> Boolean;
-        //  Return True if Node has outgoing edges with overlapping value sets
+       func Is_Nondeterministic
+         (Ordered_Node; Check_Actions : Boolean := #false)
+         -> Boolean;
+         //  Return True if Node has outgoing edges with overlapping value sets
+         //  Only Check for ambiguous actions if Check_Actions is true.
 
        func Disambiguate (N : Ordered_Node; var FSA)
           -> Ordered_Map<Node_Id, Node_Set>;
@@ -387,11 +398,16 @@ interface FSA<> is
       // Produce a human-readable representation of the node, if any, with
       // given Node_Id, at given indent.
  
-    func Dump_FSA(FSA)
+    func Dump_FSA(FSA; Check_Actions : Boolean := #false)
       // Produce a human-readable representation of the FSA
+      // Pass Check_Actions to Is_Nondeterministic.
 
-    func Is_Nondeterministic(FSA) -> Boolean;
-      //  Return True if some node within the FSA is nondeterministic
+    func Is_Nondeterministic
+      (FSA; Check_Actions : Boolean := #false)
+      -> Boolean;
+      //  Return True if some node within the FSA
+      //  has outgoing edges with overlapping value sets.
+      //  Only Check for ambiguous actions if Check_Actions is true.
 
     func Queries_Are_Ordered(FSA; Node_Id) -> Boolean;
       //  Return True if a sequence of non-end-states have queries
@@ -399,6 +415,19 @@ interface FSA<> is
 
     func Disambiguate_FSA(var FSA);
       //  Remove nondeterminism from FSA
+
+    func FSA_Node_Action_Sets(FSA)
+      -> Result : Ordered_Map<Node_Id, Ordered_Set<Action_Id>>;
+       //  Return map of reachable nodes that are action nodes
+       //  to their action sets
+
+    func Winnow_And_Check_Actions
+      (var FSA;
+       Error_Action : optional Action_Id := null)
+      //  Remove "superset" actions, and check for
+      //  Completeness, Ambiguity, and Redundancy
+      //  Patterns are incomplete if the Error_Action
+      //  (if any) remains after winnowing.
 
 end interface FSA;
 
@@ -410,6 +439,8 @@ class FSA is
          (Node_Id => Root_Node_Id, Query_Id => Starting_Query_Id)];
     var Action_Strings : Vector<Univ_String> := [];
     var Query_Formulae : Vector<Univ_String> := [];
+
+    const Debug : Boolean := #false;
 
   exports
 
@@ -435,7 +466,7 @@ class FSA is
       //  Return string representing action to be performed
 
     func Num_Actions (FSA) -> Univ_Integer is (|FSA.Action_Strings|);
-    //  Count of end states ("action" nodes)
+    //  Count of distinct actions
 
     func Add_Query_Id (var FSA; Formula : Univ_String) -> Query_Id is
     //  Add a new Query_Id to the FSA, representing the given Formula
@@ -504,7 +535,7 @@ class FSA is
         func Dump_Node(FSA; Node; Indent : Univ_Integer) is
            const Ind := Indent * " ";
            Println(Ind | "Node: `(Id(Node)), " |
-                   "Query: `(Query_Formula(FSA, Query(Node)))");
+                   "`(Query_Formula(FSA, Query(Node)))");
            for Succ_Ix in 1 .. Num_Successors(Node) forward loop
               Dump_One_Node(FSA, Successor(Node, Succ_Ix), Indent + 2);
            end loop;
@@ -609,6 +640,11 @@ class FSA is
           Action_Node.Actions |= Action_Id;
        end func Add_Action;
 
+       func Remove_Action(var Action_Node; Action_Id) is
+         // Remove action id from the node
+          Action_Node.Actions -= Action_Id;
+       end func Remove_Action;
+
        func Action_Ids (Action_Node) -> Ordered_Set<Action_Id>
          is (Action_Node.Actions);
         //  Action Ids of node.  
@@ -711,7 +747,9 @@ class FSA is
             From.Edge_Value_Sets |= Node_Univ_Set(From);
         end func Add_Successor;
 
-        func Is_Nondeterministic (Ordered_Node) -> Boolean is
+        func Is_Nondeterministic
+          (Ordered_Node; Check_Actions : Boolean := #false)
+         -> Boolean is
         //  Return True if Node has outgoing edges with overlapping value sets
 
            //  Look at the set of intervals associated with each edge,
@@ -756,7 +794,7 @@ class FSA is
              //  same values.
 
            var Edge_Val_Mapping :
-             Ordered_Map<Countable_Set<Node_Id>,
+             Ordered_Map<Node_Set,
                          Value_Set_And_Edge> := [];
            //  Mapping from the Node_Ids that are being combined
            //  to produce a new node.
@@ -1057,14 +1095,19 @@ class FSA is
         func Dump_Node(FSA; N : Ordered_Node; Indent : Univ_Integer) is
            const Ind := Indent * " ";
 
+           //  Build up a mapping ordered by value set
+           const Val_Ordered_Map :
+             Ordered_Map<Range_Set<Val_Type>, Node_Id> :=
+              [for Succ_Ix in 1 .. Num_Successors(N),
+                N.Successor_Values(Succ_Ix) => N.Successor(Succ_Ix)];
+
            Println(Ind | "Node: `(Id(N))");
-           for Succ_Ix in 1 .. Num_Successors(N) forward loop
-              const Vals := N.Successor_Values(Succ_Ix);
+           for each [Vals => Succ_Node_Id] of Val_Ordered_Map forward loop
 
               Print(Ind | " `(Query_Formula(FSA, Query(N))) in ");
               Dump_Range_Set(Vals);
               Println (" =>");
-              Dump_One_Node(FSA, N.Successor(Succ_Ix), Indent + 2);
+              Dump_One_Node(FSA, Succ_Node_Id, Indent + 2);
            end loop;
         end func Dump_Node;
 
@@ -1255,10 +1298,12 @@ class FSA is
        end if;
     end func Dump_One_Node;
 
-    func Dump_FSA(FSA) is
+    func Dump_FSA(FSA; Check_Actions : Boolean := #false) is
       // Produce a human-readable representation of the FSA
-       Println("Dump of Finite State Automaton:");
-       Println("  FSA is `(Is_Nondeterministic(FSA)? "non": "")deterministic");
+      // Pass Check_Actions to Is_Nondeterministic.
+       Println("  FSA is " |
+         (Is_Nondeterministic(FSA, Check_Actions)?  "non": "") |
+         "deterministic");
        Println
          ("  FSA Queries_Are_Ordered: " |
            FSA.Queries_Are_Ordered(FSA.Root_Id()));
@@ -1266,12 +1311,14 @@ class FSA is
        Dump_One_Node(FSA, FSA.Root_Id(), Indent => 0);
     end func Dump_FSA;
 
-    func Is_Nondeterministic(FSA) -> Boolean is
+    func Is_Nondeterministic(FSA; Check_Actions : Boolean := #false)
+      -> Boolean is
       //  Return True if some node within the FSA is nondeterministic
+      //  Only Check for ambiguous actions if Check_Actions is true.
        func Subtree_Is_Nondeterministic(Tree_Root : Node_Id) -> Boolean is
           ref Tree => FSA[Tree_Root];
 
-          if Is_Nondeterministic(Tree) then
+          if Is_Nondeterministic(Tree, Check_Actions) then
              //  Root of subtree is nondeterministic
              return #true;
           else
@@ -1421,6 +1468,174 @@ class FSA is
        Disambiguate_Subtree(Root_Id(FSA));
     end func Disambiguate_FSA;
 
+    func FSA_Node_Action_Sets(FSA)
+      -> Result : Ordered_Map<Node_Id, Ordered_Set<Action_Id>> is
+       //  Return map of reachable nodes that are action nodes
+       //  to their action sets
+       Result := [];
+
+       func Find_Action_Nodes(N : Node+) is
+          case N of
+             [A : Action_Node] =>
+                //  Found an action_node, add it to the mapping
+                Result |= [Id(A) => Action_Ids(A)];
+
+             [M : Node+] =>
+                for Edge in 1 .. Num_Successors(M) loop
+                   //  Recurse on all non-Action nodes
+                   Find_Action_Nodes (FSA[Successor(N, Edge)]);
+                end loop;
+          end case;
+       end func Find_Action_Nodes;
+       
+       Find_Action_Nodes(FSA[Root_Id(FSA)]);
+    end func FSA_Node_Action_Sets;
+
+    func Winnow_And_Check_Actions
+      (var FSA;
+       Error_Action : optional Action_Id := null) is
+      //  Remove "superset" actions, and check for
+      //  Completeness, Ambiguity, and Redundancy
+      //  Patterns are incomplete if the Error_Action
+      //  (if any) remains after winnowing.
+
+       var Initial_Node_Actions := FSA_Node_Action_Sets(FSA);
+
+       func Action_Node_Sets
+         (Node_Actions : Ordered_Map<Node_Id, Ordered_Set<Action_Id>>)
+         -> Result : Ordered_Map<Action_Id, Node_Set> is
+         //  Create a mappng from each Action_Id to the set of Node_Ids
+         //  where it appears.
+
+          Result := [];
+
+          for each [N => Act_Set] of Node_Actions loop
+             for each Act_Id of Act_Set loop
+                if Act_Id not in Result then
+                   //  First appearance of Act_Id in iteration
+                   Result |= [Act_Id => []];
+                end if;
+                //  Add node id to set associated with Act_Id
+                Result[Act_Id] |= N;
+             end loop;
+          end loop;
+       end func Action_Node_Sets;
+
+       if Debug then
+          Println("Action nodes are:" |
+            (for each [N => Act_Set] of Initial_Node_Actions forward =>
+               <""> | " " | N));
+       end if;
+
+       //  Create a mappng from each Action_Id to the set of Node_Ids
+       //  where it appears.
+       const Initial_Action_Node_Sets :=
+         Action_Node_Sets(Initial_Node_Actions);
+
+       if Debug then
+          Println("Initial Action Id => Node Id mapping:");
+          for each [Act_Id => N_Set] of Initial_Action_Node_Sets loop
+             Println("  `(FSA.Action_String(Act_Id)) =>" |
+               (for each N_Id of N_Set forward => <""> | " " | N_Id));
+          end loop;
+       end if;
+
+       //  Remove an Action_Id from a given node, if a second,
+       //  earlier, Action_Id also appears in the given node,
+       //  and the first Action_Id appears in all action nodes
+       //  where the second Action_Id appears (i.e. the first
+       //  Action_Id is a "superset" of the second Action_Id).
+
+       for each [N_Id => Orig_Act_Ids] of Initial_Node_Actions loop
+          //  Convert ordered set of action ids to a vector
+          const Orig_Act_Vec : Vector<Action_Id> :=
+            [for each Act_Id of Orig_Act_Ids forward => Act_Id];
+
+          for each [I => Later_Act_Id] of Orig_Act_Vec reverse loop
+            *Inner*
+             for J in 1 ..< I loop
+                const Earlier_Act_Id := Orig_Act_Vec[J];
+
+                if Initial_Action_Node_Sets[Earlier_Act_Id] <=
+                  Initial_Action_Node_Sets[Later_Act_Id]
+                then
+                   //  Later_Act_Id appears in a set of nodes that is a
+                   //  superset of the Earlier_Act_Id, so remove it from
+                   //  this node's Action_Ids
+                   if Debug then
+                      Println("  Removing `(Action_String
+                                             (FSA,Later_Act_Id)) from" |
+                        " node `(N_Id)");
+                   end if;
+
+                   case FSA[N_Id] of
+                    [A : Action_Node] =>
+                      Remove_Action(A, Later_Act_Id);
+                    [N : Node+] =>
+                      {*"Expected only Action_Nodes"* #false}
+                   end case;
+
+                   exit loop Inner;
+                end if;
+             end loop Inner;
+          end loop;
+       end loop;
+
+       //  Get the updated node action sets
+       const Final_Node_Actions := FSA_Node_Action_Sets(FSA);
+
+       //  Get the final mappng from Action_Id to the set of Node_Ids
+       //  where it still appears.
+       const Final_Action_Node_Sets := Action_Node_Sets(Final_Node_Actions);
+
+       if Debug then
+          Println("Final Action Id => Node Id mapping:");
+          for each [Act_Id => N_Set] of Final_Action_Node_Sets loop
+             Println("  `(FSA.Action_String(Act_Id)) =>" |
+               (for each N_Id of N_Set forward => <""> | " " | N_Id));
+          end loop;
+       end if;
+
+       Print("Completeness check: ");
+       if Error_Action is null then
+          Println("not performed since no Error_Action provided");
+       else
+          ref Error_Nodes => Final_Action_Node_Sets[Error_Action];
+
+          if |Error_Nodes| == 0 then
+             Println("Patterns are complete.");
+          else
+             Println("Patterns are incomplete; node" |
+               (|Error_Nodes| > 1? "s" : "") |
+               (for N_Id in Error_Nodes forward =>
+                          <""> | " " | N_Id) | " not covered.");
+          end if;
+       end if;
+
+       Print("Ambiguity check: ");
+       if (for all A_Set of Final_Node_Actions => |A_Set| == 1) then
+          Println("No ambiguity found.");
+       else
+          Println("");
+          for each [N_Id => A_Set] of Final_Node_Actions
+            {|A_Set| > 1} forward loop
+             Println("  Node `(N_Id) is ambiguous with actions" |
+               (for each A_Id of A_Set forward =>
+                 <""> | " " | Action_String(FSA, A_Id)));
+          end loop;
+       end if;
+
+       Print("Redundancy check: ");
+       if (for all N_Set of Final_Action_Node_Sets => |N_Set| > 0) then
+          Println("All actions are reachable.");
+       else
+          Println("Some actions not reachable:" |
+            (for each [A_Id => N_Set] of Final_Action_Node_Sets
+               {|N_Set| == 0} forward =>
+                  <""> | " " | Action_String(FSA, A_Id)));
+       end if;
+    end func Winnow_And_Check_Actions;
+
 end class FSA;
 
 func Test_FSA() is
@@ -1455,14 +1670,12 @@ func Test_FSA() is
    X_In_2_3.Add_Successor (To => FSA1.Add_Node(Y_In_1_2), Values => 2..3);
    FSA1.Add_Root_Successor (X_In_2_3);
 
-   const Action_E := FSA1.Add_Action_Node("E");
-   FSA1.Add_Root_Successor (Action_E);
+   const Action_E_Id := FSA1.Add_Action_Id("E");
+   const Action_E_Node := FSA::Action_Node::Create(Action_E_Id);
+   FSA1.Add_Root_Successor (Action_E_Node);
 
-   Dump_FSA(FSA1);
-
-   Println("FSA is `(Is_Nondeterministic(FSA1)? "non": "")deterministic");
-   Println
-     ("  Queries_Are_Ordered? `(FSA1.Queries_Are_Ordered(FSA1.Root_Id()))");
+   Println("\nDump of original FSA");
+   Dump_FSA(FSA1, Check_Actions => #true);
 
    Println("\nAbout to disambiguate\n");
    Disambiguate_FSA(FSA1);
@@ -1470,6 +1683,47 @@ func Test_FSA() is
    Println
      ("Now, FSA is `(Is_Nondeterministic(FSA1)? "non": "")deterministic");
 
-   Println("Dump of disambiguated FSA");
+   Println("\nDump of disambiguated FSA");
    Dump_FSA(FSA1);
+
+   Winnow_And_Check_Actions(FSA1, Error_Action => Action_E_Id);
+
+   Println("\nDump of winnowed FSA");
+   Dump_FSA(FSA1);
+
+   //  Println("Second FSA");
+// var FSA2 := FSA::Create();
+
+// //  Define the type of Countable_Node
+// //  to be used in the second FSA
+// type Op_Enum is
+//   Enum<[#Add, #Subtract, #Multiply, #Etc]>;
+// type Op_Node is
+//   FSA::Countable_Node
+//     <Op_Enum, Univ_Set => #Add..#Etc>;
+
+// //  Define the various Query_Ids
+// const Q_Val1_Op :=
+//   FSA2.Add_Query_Id("Val1.Op");
+// const Q_Val1_Has_Const :=
+//   FSA2.Add_Query_Id("Val1.Has_Const");
+// const Q_Val2_Op :=
+//   FSA2.Add_Query_Id("Val2.Op");
+// const Q_Val2_Eq_2nd_Val1 :=
+//   FSA2.Add_Query_Id("Val2 == 2nd(Val1)");
+
+   //  case Val1, Val2 is
+   //    when (Op => Add, Has_Const => True), <> => A;
+   //    when (Op => Subtract, Has_Const => True), <> => B;
+   //    when (Op => Multiply, Has_Const => True),
+   //       (VN_Equal (Second(Val1)) => True) => C;
+   //    when (Op => Multiply, Has_Const => True),
+   //       (Op => Multiply, Has_Const => True) => D;
+   //    when (Op => Subtract, Has_Const => False),
+   //       (VN_Equal (Second(Val1)) => True) => E;
+   //    when (Op => Subtract, Has_Const => False), 
+   //       (Op => Subtract) => F;
+   //    when (Op => Subtract, Has_Const => False),
+   //       (Op => Add) => G;
+   //  end case;
 end func Test_FSA;

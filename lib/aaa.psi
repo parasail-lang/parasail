@@ -512,12 +512,7 @@ interface PSL::Containers::Countable_Set<Element_Type is Countable<>> is
 
     func Strict_Compare(Left, Right : Countable_Set) -> Ordered::Full_Ordering
         // Return #equal if Left and Right have the same elements
-        // Return #less if Left has fewer elements than Right
-        //   or Left has same number of elements and Left appears
-        //   earlier in a lexicographic ordering
-        // Return #greater if Left has more elements than Right
-        //   or Left has same number of elements and Left appears
-        //   later in a lexicographic ordering
+        // Return #less or #greater based on a lexicographical ordering
         // Never return #unordered
 
     func Count(S : Countable_Set) -> Univ_Integer
@@ -5009,25 +5004,16 @@ class PSL::Containers::Countable_Set is
 
     func Strict_Compare(Left, Right : Countable_Set) -> Ordered::Full_Ordering
         // Return #equal if Left and Right have the same elements
-        // Return #less if Left has fewer elements than Right
-        //   or Left has same number of elements and Left appears
-        //   earlier in a lexicographic ordering
-        // Return #greater if Left has more elements than Right
-        //   or Left has same number of elements and Left appears
-        //   later in a lexicographic ordering
+        // Return #less or #greater based on a lexicographical ordering
         // Never return #unordered
     is
-        if |Left| != |Right| then
-           return |Left| =? |Right|
-        else
-           for (Left_Elem in Left; Right_Elem in Right) forward loop
-              const Result := Strict_Compare(Left_Elem, Right_Elem);
-              if Result != #equal then
-                 return Result
-              end if
-           end loop
-           return #equal
-        end if
+        for (Left_Elem in Left; Right_Elem in Right) forward loop
+           const Result := Strict_Compare(Left_Elem, Right_Elem);
+           if Result != #equal then
+              return Result
+           end if
+        end loop
+        return |Left| =? |Right|
     end func Strict_Compare
 
     func Count(S : Countable_Set) -> Result : Univ_Integer is
@@ -9491,12 +9477,7 @@ interface PSL::Containers::Ordered_Set<Element_Type is Ordered<>> is
 
     func Strict_Compare(Left, Right : Ordered_Set) -> Ordered::Full_Ordering
         // Return #equal if Left and Right have the same elements
-        // Return #less if Left has fewer elements than Right
-        //   or Left has same number of elements and Left appears
-        //   earlier in a lexicographic ordering
-        // Return #greater if Left has more elements than Right
-        //   or Left has same number of elements and Left appears
-        //   later in a lexicographic ordering
+        // Return #less or #greater based on a lexicographical ordering
         // Never return #unordered
 
     func Count(S : Ordered_Set) -> Univ_Integer
@@ -9721,25 +9702,16 @@ class PSL::Containers::Ordered_Set is
 
     func Strict_Compare(Left, Right : Ordered_Set) -> Ordered::Full_Ordering
         // Return #equal if Left and Right have the same elements
-        // Return #less if Left has fewer elements than Right
-        //   or Left has same number of elements and Left appears
-        //   earlier in a lexicographic ordering
-        // Return #greater if Left has more elements than Right
-        //   or Left has same number of elements and Left appears
-        //   later in a lexicographic ordering
+        // Return #less or #greater based on a lexicographical ordering
         // Never return #unordered
     is
-        if |Left| != |Right| then
-           return |Left| =? |Right|
-        else
-           for (Left_Elem in Left; Right_Elem in Right) forward loop
-              const Result := Strict_Compare(Left_Elem, Right_Elem);
-              if Result != #equal then
-                 return Result
-              end if
-           end loop
-           return #equal
-        end if
+        for (Left_Elem in Left; Right_Elem in Right) forward loop
+           const Result := Strict_Compare(Left_Elem, Right_Elem);
+           if Result != #equal then
+              return Result
+           end if
+        end loop
+        return |Left| =? |Right|
     end func Strict_Compare
 
     func Count(S : Ordered_Set) -> Result : Univ_Integer is
