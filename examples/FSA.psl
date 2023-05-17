@@ -73,7 +73,7 @@ interface FSA<> is
     //  Add a node that has one (new) action ID;
     //  Action is a string representing the action to be performed.
 
-    func Num_Actions (FSA) -> Univ_Integer;
+    func Num_Actions (FSA) -> Action_Id;
     //  Count of distinct actions
 
     func Action_String(FSA; Action_Id) -> Univ_String;
@@ -302,6 +302,11 @@ interface FSA<> is
           Successor_Values(From', Successor_Index(From', To)) == Values};
          // Add an edge in the FSA
 
+       func Add_Successor(var From : Ordered_Node; To : Node_Id;
+         Value : Val_Type) is
+         (Add_Successor(From, To, Value .. Value));
+         // Add an edge in the FSA
+
        func Successor_Values(From : Ordered_Node; Succ : Edge_Index)
          {Succ in 1 .. Num_Successors(From)}
          -> Range_Set<Val_Type>;
@@ -330,7 +335,8 @@ interface FSA<> is
     end interface Ordered_Node;
 
     interface Countable_Node
-      <Val_Type is Countable<>; Univ_Set : Range_Set<Val_Type>>
+      <Val_Type is Countable<>; Univ_Set : Range_Set<Val_Type> :=
+        Val_Type::First() .. Val_Type::Last()>
       extends Ordered_Node<Val_Type, Univ_Set> is
        //  Same as ordered node, but takes advantage of fact
        //  that Val_Type is countable so no need for open interval bounds.
@@ -465,7 +471,7 @@ class FSA is
       is (FSA.Action_Strings[Action_Id]);
       //  Return string representing action to be performed
 
-    func Num_Actions (FSA) -> Univ_Integer is (|FSA.Action_Strings|);
+    func Num_Actions (FSA) -> Action_Id is (|FSA.Action_Strings|);
     //  Count of distinct actions
 
     func Add_Query_Id (var FSA; Formula : Univ_String) -> Query_Id is
@@ -1096,18 +1102,24 @@ class FSA is
            const Ind := Indent * " ";
 
            //  Build up a mapping ordered by value set
-           const Val_Ordered_Map :
-             Ordered_Map<Range_Set<Val_Type>, Node_Id> :=
-              [for Succ_Ix in 1 .. Num_Successors(N),
-                N.Successor_Values(Succ_Ix) => N.Successor(Succ_Ix)];
+           var Val_Ordered_Map :
+             Ordered_Map<Range_Set<Val_Type>, Node_Set> := [];
+           for Succ_Ix in 1 .. Num_Successors(N) loop
+              const Vals := N.Successor_Values(Succ_Ix);
+              if Vals not in Val_Ordered_Map then
+                 Val_Ordered_Map |= [Vals => []];
+              end if;
+              Val_Ordered_Map[Vals] |= N.Successor(Succ_Ix);
+           end loop;
 
            Println(Ind | "Node: `(Id(N))");
-           for each [Vals => Succ_Node_Id] of Val_Ordered_Map forward loop
-
-              Print(Ind | " `(Query_Formula(FSA, Query(N))) in ");
-              Dump_Range_Set(Vals);
-              Println (" =>");
-              Dump_One_Node(FSA, Succ_Node_Id, Indent + 2);
+           for each [Vals => Succ_Nodes] of Val_Ordered_Map forward loop
+              for each Succ_Id of Succ_Nodes forward loop
+                 Print(Ind | " `(Query_Formula(FSA, Query(N))) in ");
+                 Dump_Range_Set(Vals);
+                 Println (" =>");
+                 Dump_One_Node(FSA, Succ_Id, Indent + 2);
+              end loop;
            end loop;
         end func Dump_Node;
 
@@ -1507,14 +1519,10 @@ class FSA is
          //  Create a mappng from each Action_Id to the set of Node_Ids
          //  where it appears.
 
-          Result := [];
+          Result := [for Act_Id in 1 .. Num_Actions(FSA) => []];
 
           for each [N => Act_Set] of Node_Actions loop
              for each Act_Id of Act_Set loop
-                if Act_Id not in Result then
-                   //  First appearance of Act_Id in iteration
-                   Result |= [Act_Id => []];
-                end if;
                 //  Add node id to set associated with Act_Id
                 Result[Act_Id] |= N;
              end loop;
@@ -1625,14 +1633,25 @@ class FSA is
           end loop;
        end if;
 
-       Print("Redundancy check: ");
-       if (for all N_Set of Final_Action_Node_Sets => |N_Set| > 0) then
-          Println("All actions are reachable.");
+       var All_Reachable : Boolean := #true;
+
+       for each [A_Id => N_Set] of Final_Action_Node_Sets
+         {Error_Action is null or else A_Id != Error_Action}
+           forward loop
+          if |N_Set| == 0 then
+             if All_Reachable then
+                Print("Some actions not reachable:");
+                All_Reachable := #false;
+             end if;
+             Print(" `(Action_String(FSA, A_Id))");
+
+          end if;
+       end loop;
+       if All_Reachable then
+          Println("All `(Error_Action not null?"non-error ":"")actions " |
+            "are reachable.");
        else
-          Println("Some actions not reachable:" |
-            (for each [A_Id => N_Set] of Final_Action_Node_Sets
-               {|N_Set| == 0} forward =>
-                  <""> | " " | Action_String(FSA, A_Id)));
+          Println("");
        end if;
     end func Winnow_And_Check_Actions;
 
@@ -1651,9 +1670,9 @@ func Test_FSA() is
 
    const Action_A := FSA1.Add_Action_Node("A");
    var Y_Eq_2 := Int_Node::Create(Query_Id => Query_Y);
-   Y_Eq_2.Add_Successor (To => Action_A, Values => 2..2);
+   Y_Eq_2.Add_Successor (To => Action_A, Value => 2);
    var X_Eq_2 := Int_Node::Create(Query_Id => Query_X);
-   X_Eq_2.Add_Successor (To => FSA1.Add_Node(Y_Eq_2), Values => 2..2);
+   X_Eq_2.Add_Successor (To => FSA1.Add_Node(Y_Eq_2), Value => 2);
    FSA1.Add_Root_Successor (X_Eq_2);
 
    const Action_B := FSA1.Add_Action_Node("B");
@@ -1689,41 +1708,81 @@ func Test_FSA() is
    Winnow_And_Check_Actions(FSA1, Error_Action => Action_E_Id);
 
    Println("\nDump of winnowed FSA");
-   Dump_FSA(FSA1);
+   Dump_FSA(FSA1, Check_Actions => #true);
 
-   //  Println("Second FSA");
-// var FSA2 := FSA::Create();
+   /////////////////////////
 
-// //  Define the type of Countable_Node
-// //  to be used in the second FSA
-// type Op_Enum is
-//   Enum<[#Add, #Subtract, #Multiply, #Etc]>;
-// type Op_Node is
-//   FSA::Countable_Node
-//     <Op_Enum, Univ_Set => #Add..#Etc>;
+   Println("\n--------------\n  Second FSA  \n--------------\n");
+   var FSA2 := FSA::Create();
 
-// //  Define the various Query_Ids
-// const Q_Val1_Op :=
-//   FSA2.Add_Query_Id("Val1.Op");
-// const Q_Val1_Has_Const :=
-//   FSA2.Add_Query_Id("Val1.Has_Const");
-// const Q_Val2_Op :=
-//   FSA2.Add_Query_Id("Val2.Op");
-// const Q_Val2_Eq_2nd_Val1 :=
-//   FSA2.Add_Query_Id("Val2 == 2nd(Val1)");
+   type Bool_Node is FSA::Countable_Node
+     <Boolean, Univ_Set => #false .. #true>;
 
-   //  case Val1, Val2 is
-   //    when (Op => Add, Has_Const => True), <> => A;
-   //    when (Op => Subtract, Has_Const => True), <> => B;
-   //    when (Op => Multiply, Has_Const => True),
-   //       (VN_Equal (Second(Val1)) => True) => C;
-   //    when (Op => Multiply, Has_Const => True),
-   //       (Op => Multiply, Has_Const => True) => D;
-   //    when (Op => Subtract, Has_Const => False),
-   //       (VN_Equal (Second(Val1)) => True) => E;
-   //    when (Op => Subtract, Has_Const => False), 
-   //       (Op => Subtract) => F;
-   //    when (Op => Subtract, Has_Const => False),
-   //       (Op => Add) => G;
-   //  end case;
+   type Kind_Enum is Enum<[#univ_string, #basic_array, #normal]>;
+   type Kind_Node is FSA::Countable_Node
+     <Kind_Enum, Univ_Set => #univ_string .. #normal>;
+
+   const Q_Null := FSA2.Add_Query_Id("Obj_Base.Is_Large_Null");
+   const Q_Bad := FSA2.Add_Query_Id("Obj_Base.Is_Bad_Address");
+   const Q_Kind := FSA2.Add_Query_Id("Type_Of_Obj.Kind");
+   const Q_Poly := FSA2.Add_Query_Id("Type_Of_Obj.Is_Polymorphic");
+
+   const A_Null := FSA2.Add_Action_Node("Prt(null)");
+   const A_Bad := FSA2.Add_Action_Node("Prt(bad)");
+   const A_Arr := FSA2.Add_Action_Node("ARR");
+   const A_Poly := FSA2.Add_Action_Node("POLY");
+   const A_Norm := FSA2.Add_Action_Node("NORM");
+   const A_Simp := FSA2.Add_Action_Node("SIMP");
+   const A_Error_Id := FSA2.Add_Action_Id("ERROR");
+
+   var Is_Null_Node := Bool_Node::Create(Query_Id => Q_Null);
+   Is_Null_Node.Add_Successor(A_Null, Value => #true);
+
+   var Is_Bad_Node := Bool_Node::Create(Query_Id => Q_Bad);
+   Is_Bad_Node.Add_Successor(A_Bad, Value => #true);
+   
+   var Is_Arr_Node := Kind_Node::Create(Query_Id => Q_Kind);
+   Is_Arr_Node.Add_Successor(A_Arr, Value => #basic_array);
+   Is_Bad_Node.Add_Successor(FSA2.Add_Node(Is_Arr_Node), Value => #false);
+
+   var Is_Poly_Node := Bool_Node::Create(Query_Id => Q_Poly);
+   Is_Poly_Node.Add_Successor(A_Poly, Value => #true);
+   var Is_Norm_Node := Kind_Node::Create(Query_Id => Q_Kind);
+   Is_Norm_Node.Add_Successor(FSA2.Add_Node(Is_Poly_Node), Value => #normal);
+   Is_Norm_Node.Add_Successor(A_Norm, Value => #normal);
+   Is_Bad_Node.Add_Successor(FSA2.Add_Node(Is_Norm_Node), Value => #false);
+
+   Is_Bad_Node.Add_Successor(A_Simp, Value => #false);
+   Is_Null_Node.Add_Successor(FSA2.Add_Node(Is_Bad_Node), Value => #false);
+   FSA2.Add_Root_Successor(Is_Null_Node);
+
+   //  Include an error action to detect incompleteness
+   FSA2.Add_Root_Successor(FSA::Action_Node::Create(A_Error_Id));
+
+   Println("Second FSA");
+   Dump_FSA(FSA2, Check_Actions => #true);
+
+   Disambiguate_FSA(FSA2);
+
+   Println("Disambiguated Second FSA");
+   Dump_FSA(FSA2);
+
+   Println("Winnow and Check Second FSA");
+   Winnow_And_Check_Actions(FSA2, Error_Action => A_Error_Id);
+
+   Println("Winnowed Second FSA");
+   Dump_FSA(FSA2, Check_Actions => #true);
+
+   //       case Obj_Base,Type_Of_Obj is
+   //         when (Is_Large_Null),<> =>
+   //           Prt("null");
+   //         when (not Is_Large_Null, Is_Bad_Address),<> =>
+   //           Prt("bad");
+   //         when (not Is_Large_Null, not Is_Bad_Address),<> then
+   //           when <>,(Kind => basic_array) => ARR;
+   //           when <>,(Kind => normal,Is_Polymorphic) => POLY;
+   //           when <>,(Kind => normal) => NORM;
+   //           when others => SIMP;
+   //         end when;
+   //       end case;
 end func Test_FSA;
