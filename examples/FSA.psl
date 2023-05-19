@@ -446,7 +446,7 @@ class FSA is
     var Action_Strings : Vector<Univ_String> := [];
     var Query_Formulae : Vector<Univ_String> := [];
 
-    const Debug : Boolean := #false;
+    const Debug : Boolean := #true;
 
   exports
 
@@ -1012,16 +1012,13 @@ class FSA is
                     Subset |= Elems[I+1];
                  end loop;
 
-                 if Debug then
-                    Println(" Subset of combo for Mask `(Mask):" |
-                      (for each N_Id of Subset forward => <""> | " " | N_Id));
-                 end if;
-
                  //  If the subset appeared in Old_Node_Set, then
                  //  remove values of this superset from this subset.
                  if Subset in Edge_Val_Mapping then
                     if Debug then
-                       Println("  Subset is in Edge_Val_Mapping");
+                       Println("  Subset of combo in Edge_Val_Mapping:" |
+                         (for each N_Id of Subset forward =>
+                           <""> | " " | N_Id));
                     end if;
                     Edge_Val_Mapping[Subset].Val_Set -=
                       Val_And_Edge.Val_Set;
