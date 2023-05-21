@@ -446,7 +446,7 @@ class FSA is
     var Action_Strings : Vector<Univ_String> := [];
     var Query_Formulae : Vector<Univ_String> := [];
 
-    const Debug : Boolean := #true;
+    const Debug : Boolean := #false;
 
   exports
 
@@ -799,12 +799,6 @@ class FSA is
              //  Unique combinations of edges that all share some of the
              //  same values.
 
-           var Edge_Val_Mapping :
-             Ordered_Map<Node_Set,
-                         Value_Set_And_Edge> := [];
-           //  Mapping from the Node_Ids that are being combined
-           //  to produce a new node.
-
            var Active_Combo : Countable_Set<Edge_Index> := [];
              //  Edges associated with active intervals during iteration.
 
@@ -967,9 +961,18 @@ class FSA is
               Result |= [New_Node_Id => Old_Node_Set];
 
               // Compute intersection of value sets for the combined edges
-              const Edge_Val_Intersection : Range_Set<Val_Type> :=
-                (for Edge in Combo =>
-                   <Node_Univ_Set(N)> and Successor_Values(N, Edge));
+              var Edge_Val_Intersection : Range_Set<Val_Type> :=
+                Node_Univ_Set(N);
+
+              for Edge in 1 .. Num_Successors(N) loop
+                 if Edge in Combo then
+                    --  *Keep* values in value set of present edge
+                    Edge_Val_Intersection and= Successor_Values(N, Edge);
+                 else
+                    --  *Remove* values in value set of absent edge
+                    Edge_Val_Intersection -= Successor_Values(N, Edge);
+                 end if;
+              end loop;
 
               if Debug then
                  Println("Node `(New_Node_Id) has Edge Combo:" |
@@ -982,54 +985,13 @@ class FSA is
 
               //  Add successor
               Add_Successor (Updated_Node, New_Node_Id);
+
               const New_Edge : Edge_Index := |Num_Successors(Updated_Node)|;
 
-              Edge_Val_Mapping[Old_Node_Set] :=
-                (Edge => New_Edge, Val_Set => Edge_Val_Intersection);
-              
-           end loop;
-
-           //  Now remove values for a combo of nodes from all proper subsets
-           for each [Old_Node_Set => Val_And_Edge] of Edge_Val_Mapping
-             reverse loop
-              //  Remove value set from subsets
-              //  Convert to array of Node Ids
-
-              const Elems : Vector<Node_Id> :=
-                [for each N_Id of Old_Node_Set forward => N_Id];
-
-              if Debug then
-                 Println("Combo of nodes:" |
-                   (for each N_Id of Elems forward => <""> | " " | N_Id));
-              end if;
-
-              //  Iterate over all proper subsets
-              for Mask in 1 .. Unsigned_64::(2**|Elems|-2) forward loop
-                 var Subset : Node_Set := [];
-
-                 //  Build up a proper subset
-                 for I in 0 ..< |Elems| {(Mask and 2**I) != 0} loop
-                    Subset |= Elems[I+1];
-                 end loop;
-
-                 //  If the subset appeared in Old_Node_Set, then
-                 //  remove values of this superset from this subset.
-                 if Subset in Edge_Val_Mapping then
-                    if Debug then
-                       Println("  Subset of combo in Edge_Val_Mapping:" |
-                         (for each N_Id of Subset forward =>
-                           <""> | " " | N_Id));
-                    end if;
-                    Edge_Val_Mapping[Subset].Val_Set -=
-                      Val_And_Edge.Val_Set;
-                 end if;
-              end loop;
-           end loop;
-
-           //  Now copy the value sets onto the edges
-           for each Val_And_Edge of Edge_Val_Mapping loop
+              //  Now copy the value sets onto the new edge
               Set_Successor_Values
-                (Updated_Node, Val_And_Edge.Edge, Val_And_Edge.Val_Set);
+                (Updated_Node, New_Edge, Edge_Val_Intersection);
+              
            end loop;
 
            //  Replace old node with updated node

@@ -125,6 +125,6 @@ set debugger_srcs = ($debugger_srcs $psl_dir/lib/psvm_debugging.ps?)
 set debugger_srcs = ($debugger_srcs $psl_dir/lib/debugger_console.psl)
 
 if ($verbose_flg) then
-   echo $do_time $psl_dir/build/bin/ada2x_main $psli_flags $standard_library $debugger_srcs -lang ada202x $*
+   echo $do_time $psl_dir/build/bin/ada202x_main $psli_flags $standard_library $debugger_srcs -lang ada202x $*
 endif
 $do_time $psl_dir/build/bin/ada202x_main $psli_flags $standard_library $debugger_srcs -lang ada202x $*

@@ -76,7 +76,7 @@ package A2X.Core.String is
      with Post => (for all C of "to_univ"'Result =>
         Univ_Character'(C) - Univ_Character'First < 2**8);
 
-   function "?=" (Left, Right : String) return Ordering
+   function "=?" (Left, Right : String) return Ordering
       with Import, External_Name => #string_compare;
 end A2X.Core.String;
 
