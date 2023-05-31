@@ -56,8 +56,10 @@ interface FSA<> is
     type Query_Id is new Integer<0..10**6>;
       // A unique id for each distinct query that is performed
 
-    const Starting_Query_Id : Query_Id := 0;
-      // Query Id for starting node
+    const Branching_Query_Id : Query_Id := Query_Id::Last();
+      // Query Id for a branching node
+      // Give it the maximum Query_Id value so it sorts last
+      // when looking for the lowest Query_Id when disambiguating.
 
     type Action_Id is new Integer<0..10**6>;
       // A unique id for each distinct action in the FSA
@@ -119,6 +121,17 @@ interface FSA<> is
           {Successor_Index(From', To) not null};
          // Add an edge in the FSA
 
+        func Add_Wildcard_Successor(var From : Node; To : Node_Id)
+          {not Has_Wildcard_Successor(From)}
+          {Has_Wildcard_Successor(From'); Successor_Index(From', To) not null};
+         // Add an edge in the FSA representing a "wildcard"
+         // Only one successor can be a wildcard successor, and
+         // it must be the last.
+
+        func Has_Wildcard_Successor (Node) -> Boolean;
+         // Return #true if Node has a "wildcard" successor.
+         // There may be only one, and it must be the last one.
+
         func Num_Successors (Node) -> Edge_Index;
         //  Number of successor nodes.
         //  Will be zero for an end state.
@@ -137,6 +150,10 @@ interface FSA<> is
 
         func Dump_Node(FSA; Node; Indent : Univ_Integer);
         // Produce human-understandable dump of node, at given indent
+
+        func Dump_Edge(FSA; N : Node; Outgoing_Edge : Edge_Index) is (null);
+        //  Dump query and value set associated with given outgoing edge
+        //  (by default is a no-op).
 
         abstract func Is_Nondeterministic
           (Node; Check_Actions : Boolean := #false)
@@ -165,38 +182,47 @@ interface FSA<> is
         //  an unconditional edge to existing node.
     end interface Node;
 
-    interface Starting_Node<> extends Node is
-      //  There is only one Starting_Node.  Each separate "arm" of the
-      //  original pattern match is a successor of the starting node.
-      //  All successors effectively have a "universal" value set on
-      //  their edge, meaning that any edge can be chosen.
+    interface Branching_Node<> extends Node is
+      //  A Branching_Node is used for the (one and only) starting node,
+      //  and for any nested pattern match constructs.
+      //  All successors of a Branching_Node effectively have a
+      //  "universal" value set on their edge, meaning that any
+      //  edge can be chosen.
+      //  Each separate "arm" of the original pattern match is a
+      //  successor of the starting node.
+      //  Each "arm" of a nested pattern match is a successor of the
+      //  Branching_Node representing the nested pattern match.
 
        func Create(optional Node_Id := null; optional Query_Id := null)
-         -> Starting_Node;
+         -> Branching_Node;
         //  Must override inherited constructors.
 
         //  Create a node with given node id and query id.
 
-       func Is_End_State (Starting_Node) -> Boolean is (#false);
+       func Is_End_State (Branching_Node) -> Boolean is (#false);
          //  Return True if Node is an end state (never)
 
        func Is_Nondeterministic
-          (Starting_Node; Check_Actions : Boolean := #false)
+          (Branching_Node; Check_Actions : Boolean := #false)
          -> Boolean is
-         (|Num_Successors(Starting_Node)| > 1);
-        //  Return True if Starting_Node has more than one outgoing edge
+         (|Num_Successors(Branching_Node)| > 1);
+        //  Return True if Branching_Node has more than one outgoing edge
 
-       func Disambiguate (S : Starting_Node; var FSA)
+       func Disambiguate (S : Branching_Node; var FSA)
           -> Ordered_Map<Node_Id, Node_Set>;
         //  All successor nodes will be mapped to a single new node.
 
        func Merge_Nodes
-         (var New_Node : Starting_Node; FSA; Nodes_To_Merge : Node_Set)
-         is (null);
-        //  Not applicable to Starting_Node, since there is always
-        //  exactly one.
+         (var New_Node : Branching_Node; FSA; Nodes_To_Merge : Node_Set);
+        //  Merge in nodes in Nodes_To_Merge of same Node type and with
+        //  matching Query_Id (will be null if an Action_Node) into New_Node.
+        //  For other nodes in Nodes_To_Merge, create
+        //  an unconditional edge to existing node.
+        //  For a Branching_Node, we combine all the branching nodes
+        //  together into New_Node, with an edge to each edge of the
+        //  original branching node.
 
-    end interface Starting_Node;
+    end interface Branching_Node;
 
     interface Action_Node<> extends Node is
       //  End state of FSA contains a set of actions
@@ -266,6 +292,13 @@ interface FSA<> is
        func Add_Successor(var From : Ordered_Node; To : Node_Id);
          // Add an edge in the FSA, with a default value set of "Node_Univ_Set"
 
+        func Add_Wildcard_Successor(var From : Ordered_Node; To : Node_Id)
+          {not Has_Wildcard_Successor(From)}
+          {Has_Wildcard_Successor(From'); Successor_Index(From', To) not null};
+         // Add an edge in the FSA representing a "wildcard"
+         // Only one successor can be a wildcard successor, and
+         // it must be the last.
+
        func Is_Nondeterministic
          (Ordered_Node; Check_Actions : Boolean := #false)
          -> Boolean;
@@ -291,6 +324,9 @@ interface FSA<> is
         //  matching Query_Id (will be null if an Action_Node) into New_Node.
         //  For other nodes in Nodes_To_Merge, create
         //  an unconditional edge to existing node.
+
+       func Dump_Edge(FSA; Ordered_Node; Outgoing_Edge : Edge_Index);
+        //  Dump query and value set associated with given outgoing edge
 
        func Dump_Node(FSA; Ordered_Node; Indent : Univ_Integer);
 
@@ -427,6 +463,12 @@ interface FSA<> is
        //  Return map of reachable nodes that are action nodes
        //  to their action sets
 
+    func FSA_Action_Node_Paths(FSA)
+      -> Result : Ordered_Map
+                    <Node_Id, Ordered_Set<Imageable_Vector<Edge_Index>>>;
+       //  Return map from reachable nodes that are action nodes
+       //  to the path(s) that reach(es) them (as a vector of edge indices).
+
     func Winnow_And_Check_Actions
       (var FSA;
        Error_Action : optional Action_Id := null)
@@ -441,12 +483,39 @@ class FSA is
   // Class defining the FSA module
     const Root_Node_Id : Node_Id := 1
     var Nodes : Vector<optional Node+> :=
-      [Starting_Node::Create
-         (Node_Id => Root_Node_Id, Query_Id => Starting_Query_Id)];
+      [Branching_Node::Create
+         (Node_Id => Root_Node_Id, Query_Id => Branching_Query_Id)];
     var Action_Strings : Vector<Univ_String> := [];
     var Query_Formulae : Vector<Univ_String> := [];
 
     const Debug : Boolean := #false;
+
+    func Dump_Node_Path
+      (FSA; Path : Imageable_Vector<Edge_Index>; Indent : Univ_Integer := 0) is
+    //  Dump edge information along the given path from the root node.
+       var N_Id : Node_Id := Root_Node_Id;
+       var Ind := Indent;
+
+       for each Edge of Path forward loop
+          ref Next_Node : Node+ => FSA[N_Id];
+
+          case Next_Node of
+           [S : Branching_Node] => null;
+
+           [A : Action_Node] =>
+             {*"Should not reach action node"* #false}
+
+           [N : Node+] =>
+             //  Show value set that selects edge
+             Print(Ind * " ");
+             Dump_Edge(FSA, N, Edge);
+             Println("");
+             Ind += 2;
+          end case;
+
+          N_Id := Next_Node.Successor(Edge);
+       end loop;
+    end func Dump_Node_Path;
 
   exports
 
@@ -484,8 +553,8 @@ class FSA is
     //  Count of distinct queries within FSA
 
     func Query_Formula (FSA; Query_Id) -> Univ_String
-      is (Query_Id == Starting_Query_Id?
-            "Starting node" : FSA.Query_Formulae[Query_Id]);
+      is (Query_Id == Branching_Query_Id?
+            "Branching node" : FSA.Query_Formulae[Query_Id]);
     //  Return query formula
     
     class Node<> is
@@ -493,6 +562,7 @@ class FSA is
         var Id : optional Node_Id := null;
         var Q_Id : optional Query_Id := null;
         var Successors : Vector<Node_Id> := [];
+        var Has_Wildcard_Successor : Boolean := #false;
 
       exports
         func Create(optional Node_Id; optional Query_Id) -> Node
@@ -518,6 +588,19 @@ class FSA is
             From.Successors |= To;
         end func Add_Successor;
 
+        func Add_Wildcard_Successor(var From : Node; To : Node_Id) is
+         // Add an edge in the FSA representing a "wildcard"
+         // Only one successor can be a wildcard successor, and
+         // it must be the last.
+            Add_Successor(From, To);
+            From.Has_Wildcard_Successor := #true;
+        end func Add_Wildcard_Successor;
+
+        func Has_Wildcard_Successor (Node) -> Boolean is
+         // Return #true if Node has a "wildcard" successor.
+         // There may be only one, and it must be the last one.
+          (Node.Has_Wildcard_Successor);
+
         func Num_Successors (Node) -> Edge_Index is (|Node.Successors|);
         //  Number of successor nodes.
         //  Will be zero for an end state.
@@ -541,41 +624,43 @@ class FSA is
         func Dump_Node(FSA; Node; Indent : Univ_Integer) is
            const Ind := Indent * " ";
            Println(Ind | "Node: `(Id(Node)), " |
-                   "`(Query_Formula(FSA, Query(Node)))");
+                   "`(Id(Node) == Root_Node_Id? "Starting node":
+                      Query_Formula(FSA, Query(Node)))");
            for Succ_Ix in 1 .. Num_Successors(Node) forward loop
               Dump_One_Node(FSA, Successor(Node, Succ_Ix), Indent + 2);
            end loop;
         end func Dump_Node;
     end class Node;
 
-    class Starting_Node is
+    class Branching_Node is
 
       exports
 
        func Create(optional Node_Id := null; optional Query_Id := null)
-         -> Starting_Node is ((Node => Create (Node_Id, Starting_Query_Id)));
-        //  Create the one and only Starting_Node
+         -> Branching_Node is ((Node => Create (Node_Id, Branching_Query_Id)));
+        //  Create the one and only Branching_Node
 
-       func Disambiguate (S : Starting_Node; var FSA)
+       func Disambiguate (S : Branching_Node; var FSA)
           -> Result : Ordered_Map<Node_Id, Node_Set> is
         //  All successor nodes will be mapped to a single new node.
           Result := [];
 
           if Num_Successors(S) == 1 then
-             //  Weird special case where starting node has only one successor
+             //  Weird special case where branching node has only one successor
              const Only_Successor : Node_Id := Successor(S, 1);
 
              Result |= [Only_Successor => [Only_Successor]];
           else
-             var New_Start : Starting_Node :=
-               Create(Id(S), Starting_Query_Id)
+             var New_B_Node : Branching_Node :=
+               Create(Id(S), Branching_Query_Id)
           
              //  Assign new Node_Id into which all successors will be merged
              const New_Node_Id : Node_Id := Assign_Node_Id(FSA);
 
-             Add_Successor (New_Start, New_Node_Id);
+             Add_Successor (New_B_Node, New_Node_Id);
 
-             FSA[Root_Node_Id] := New_Start;
+             //  Update node with disambiguated node
+             Set_Node(FSA, Id(S), New_B_Node);
 
              const All_Succs : Node_Set :=
                     [for Edge in 1 .. Num_Successors(S) =>
@@ -585,7 +670,52 @@ class FSA is
           end if;
        end func Disambiguate;
 
-    end class Starting_Node
+       func Merge_Nodes
+         (var New_Node : Branching_Node; FSA; Nodes_To_Merge : Node_Set) is
+        //  Merge in nodes in Nodes_To_Merge of same Node type and with
+        //  matching Query_Id (will be null if an Action_Node) into New_Node.
+        //  For other nodes in Nodes_To_Merge, create
+        //  an unconditional edge to existing node.
+        //  For a Branching_Node, we combine all the branching nodes
+        //  together into New_Node, with an edge to each edge of the
+        //  original branching node.
+           for each AB_Id of Nodes_To_Merge loop
+              ref Old_Node => FSA[AB_Id];
+              const Old_Q_Id := Query(Old_Node);
+
+              {*"All nodes should be branching nodes or action nodes"*
+                 Old_Q_Id is null
+                   or else Old_Q_Id == Branching_Query_Id}
+
+              case Old_Node of
+               [B : Branching_Node] =>
+                 //  Is a branching node; carry over its successors
+                 if Debug then
+                    Println("Old Branching Node `(AB_Id) being merged in");
+                 end if;
+                 for Succ in 1 .. Num_Successors(B) loop
+                    if Debug then
+                       Println(" Adding edge to `(Successor(B, Succ))");
+                    end if;
+                    New_Node.Add_Successor
+                      (To => Successor(B, Succ));
+                 end loop;
+
+                 //  Loop around to handle next old node
+                 continue loop;
+
+               [A : Action_Node] =>
+                 //  Create a successor to action node
+                 New_Node.Add_Successor(To => AB_Id);
+
+               [N : Node+] =>
+                 //  Should be a branching or action node
+                 {*"All nodes should be branching or action nodes"* #false}
+              end case;
+           end loop;
+       end func Merge_Nodes;
+
+    end class Branching_Node
 
     class Action_Node is
       //  End state of FSA contains a set of actions
@@ -752,6 +882,15 @@ class FSA is
             //  Provide a default for the edge value set
             From.Edge_Value_Sets |= Node_Univ_Set(From);
         end func Add_Successor;
+
+        func Add_Wildcard_Successor(var From : Ordered_Node; To : Node_Id) is
+         // Add an edge in the FSA representing a "wildcard"
+         // Only one successor can be a wildcard successor, and
+         // it must be the last.
+            Add_Wildcard_Successor(From.Node, To);
+            //  Provide a default for the edge value set
+            From.Edge_Value_Sets |= Node_Univ_Set(From);
+        end func Add_Wildcard_Successor;
 
         func Is_Nondeterministic
           (Ordered_Node; Check_Actions : Boolean := #false)
@@ -1056,6 +1195,12 @@ class FSA is
                  Values => Node_Univ_Set(New_Node));
            end loop;
         end func Merge_Nodes;
+
+        func Dump_Edge(FSA; N : Ordered_Node; Outgoing_Edge : Edge_Index) is
+         //  Dump query and value set associated with given edge
+           Print(Query_Formula(FSA, Query(N)) | " in ");
+           Dump_Range_Set (N.Successor_Values(Outgoing_Edge));
+        end func Dump_Edge;
 
         func Dump_Node(FSA; N : Ordered_Node; Indent : Univ_Integer) is
            const Ind := Indent * " ";
@@ -1387,7 +1532,11 @@ class FSA is
                 {New_Node_Id not in Old_Nodes;
                  not Node_Is_Filled(FSA, New_Node_Id)}
 
-                //  Determine which Query Id
+                //  Determine which Query Id to merge
+                //  by picking the query that comes first
+                //  in the total ordering of query ids.
+                //  NOTE: We are assuming the Branching_Query_Id
+                //        comes later in the order than any "real" query id.
                 var Old_Node_To_Clone : optional Node_Id := null;
                 var Earliest_Query : optional Query_Id := null;
                 for each O_Id of Old_Nodes forward loop
@@ -1453,7 +1602,7 @@ class FSA is
 
              [M : Node+] =>
                 for Edge in 1 .. Num_Successors(M) loop
-                   //  Recurse on all non-Action nodes
+                   //  Recurse on all successors of non-Action nodes
                    Find_Action_Nodes (FSA[Successor(N, Edge)]);
                 end loop;
           end case;
@@ -1461,6 +1610,48 @@ class FSA is
        
        Find_Action_Nodes(FSA[Root_Id(FSA)]);
     end func FSA_Node_Action_Sets;
+
+    func FSA_Action_Node_Paths(FSA)
+      -> Result : Ordered_Map
+                    <Node_Id, Ordered_Set<Imageable_Vector<Edge_Index>>> is
+       //  Return map from reachable nodes that are action nodes
+       //  to the path(s) that reach(es) them (as a vector of edge indices).
+       Result := [];
+
+       func Build_Edge_Vectors
+         (N : Node+; Path : Imageable_Vector<Edge_Index>) is
+          case N of
+             [A : Action_Node] =>
+                //  Found an action_node, add it to the mapping
+                if Id(A) not in Result then
+                   //  First appearance of this action node.
+                   //  Initialize its set of paths to []
+                   Result |= [Id(A) => []];
+                end if;
+
+                //  Add the path to the set of paths
+                Result[Id(A)] |= Path;
+
+             [M : Node+] =>
+                for Edge in 1 .. Num_Successors(M) loop
+                   //  Recurse on all successors of non-Action nodes
+                   //  with path augmented with edge index to the successor.
+                   Build_Edge_Vectors (FSA[Successor(N, Edge)], Path | Edge);
+                end loop;
+          end case;
+       end func Build_Edge_Vectors;
+       
+       Build_Edge_Vectors(FSA[Root_Id(FSA)], Path => []);
+       if Debug then
+          Println("Action Node Paths:");
+          for each [Act_Node_Id => Paths] of Result forward loop
+             Println(" `(Act_Node_Id) =>");
+             for each Path of Paths forward loop
+                Println("  " |(for each E of Path forward => <""> | " " | E));
+             end loop;
+          end loop;
+       end if;
+    end func FSA_Action_Node_Paths;
 
     func Winnow_And_Check_Actions
       (var FSA;
@@ -1470,12 +1661,14 @@ class FSA is
       //  Patterns are incomplete if the Error_Action
       //  (if any) remains after winnowing.
 
-       var Initial_Node_Actions := FSA_Node_Action_Sets(FSA);
+       const Initial_Node_Actions := FSA_Node_Action_Sets(FSA);
+
+       const Action_Node_Paths := FSA_Action_Node_Paths(FSA);
 
        func Action_Node_Sets
          (Node_Actions : Ordered_Map<Node_Id, Ordered_Set<Action_Id>>)
          -> Result : Ordered_Map<Action_Id, Node_Set> is
-         //  Create a mappng from each Action_Id to the set of Node_Ids
+         //  Create a mapping from each Action_Id to the set of Node_Ids
          //  where it appears.
 
           Result := [for Act_Id in 1 .. Num_Actions(FSA) => []];
@@ -1507,11 +1700,11 @@ class FSA is
           end loop;
        end if;
 
-       //  Remove an Action_Id from a given node, if a second,
+       //  Remove an Action_Id from a given node, if another,
        //  earlier, Action_Id also appears in the given node,
-       //  and the first Action_Id appears in all action nodes
-       //  where the second Action_Id appears (i.e. the first
-       //  Action_Id is a "superset" of the second Action_Id).
+       //  and the given Action_Id appears in all action nodes
+       //  where the earlier Action_Id appears (i.e. the given
+       //  Action_Id is a "superset" of the earlier Action_Id).
 
        for each [N_Id => Orig_Act_Ids] of Initial_Node_Actions loop
           //  Convert ordered set of action ids to a vector
@@ -1570,12 +1763,14 @@ class FSA is
           ref Error_Nodes => Final_Action_Node_Sets[Error_Action];
 
           if |Error_Nodes| == 0 then
-             Println("Patterns are complete.");
+             Println("Patterns cover all possible values.");
           else
-             Println("Patterns are incomplete; node" |
-               (|Error_Nodes| > 1? "s" : "") |
-               (for N_Id in Error_Nodes forward =>
-                          <""> | " " | N_Id) | " not covered.");
+             Println("Patterns are incomplete; values not covered:");
+             for N_Id in Error_Nodes forward loop
+                for Path in Action_Node_Paths[N_Id] forward loop
+                   Dump_Node_Path(FSA, Path, Indent => 2);
+                end loop;
+             end loop;
           end if;
        end if;
 
@@ -1586,9 +1781,13 @@ class FSA is
           Println("");
           for each [N_Id => A_Set] of Final_Node_Actions
             {|A_Set| > 1} forward loop
-             Println("  Node `(N_Id) is ambiguous with actions" |
-               (for each A_Id of A_Set forward =>
-                 <""> | " " | Action_String(FSA, A_Id)));
+             Println("  Actions" |
+               (for (each A_Id of A_Set;Sep := " " then ", ") forward =>
+                 <""> | Sep | Action_String(FSA, A_Id)) |
+               " overlap on values:");
+             for Path in Action_Node_Paths[N_Id] forward loop
+                Dump_Node_Path(FSA, Path, Indent => 4);
+             end loop;
           end loop;
        end if;
 
@@ -1602,7 +1801,32 @@ class FSA is
                 Print("Some actions not reachable:");
                 All_Reachable := #false;
              end if;
-             Print(" `(Action_String(FSA, A_Id))");
+             Println(" `(Action_String(FSA, A_Id)) is hidden by:");
+
+             //  Find all nodes where action originally appeared
+             //  and say which values now go elsewhere.
+             for each Orig_N_Id of Initial_Action_Node_Sets[A_Id] loop
+                ref Orig_Node => FSA[Orig_N_Id];
+                case Orig_Node of
+                 [A : Action_Node] =>
+                   const Final_Acts := Action_Ids(A);
+
+                   //  Normally only one action after winnowing
+                   //  unless there was ambiguity.
+                   for (Final_Act in Final_Acts;
+                        Is_First := #true then #false) forward loop
+                      Print (Is_First? "  ": " and ");
+                      Print(Action_String(FSA, Final_Act));
+                   end loop;
+                   Print(" with values:");
+                   for Path in Action_Node_Paths[Orig_N_Id] forward loop
+                      Dump_Node_Path(FSA, Path, Indent => 4);
+                   end loop;
+
+                 [N : Node+] =>
+                   {*"Expecting only action nodes"* #false}
+                end case;
+             end loop;
 
           end if;
        end loop;
@@ -1618,130 +1842,229 @@ end class FSA;
 
 func Test_FSA() is
 
-   type Int_Node is
-     FSA::Countable_Node
-       <Integer, Univ_Set => 1..3>;
+   func First_FSA() is
+      type Int_Node is
+        FSA::Countable_Node
+          <Integer, Univ_Set => 1..3>;
 
-   var FSA1 := FSA::Create();
+      var FSA1 := FSA::Create();
 
-   const Query_X := FSA1.Add_Query_Id("X");
-   const Query_Y := FSA1.Add_Query_Id("Y");
+      const Query_X := FSA1.Add_Query_Id("X");
+      const Query_Y := FSA1.Add_Query_Id("Y");
 
-   const Action_A := FSA1.Add_Action_Node("A");
-   var Y_Eq_2 := Int_Node::Create(Query_Id => Query_Y);
-   Y_Eq_2.Add_Successor (To => Action_A, Value => 2);
-   var X_Eq_2 := Int_Node::Create(Query_Id => Query_X);
-   X_Eq_2.Add_Successor (To => FSA1.Add_Node(Y_Eq_2), Value => 2);
-   FSA1.Add_Root_Successor (X_Eq_2);
+      const Action_A := FSA1.Add_Action_Node("A");
+      var Y_Eq_2 := Int_Node::Create(Query_Id => Query_Y);
+      Y_Eq_2.Add_Successor (To => Action_A, Value => 2);
+      var X_Eq_2 := Int_Node::Create(Query_Id => Query_X);
+      X_Eq_2.Add_Successor (To => FSA1.Add_Node(Y_Eq_2), Value => 2);
+      FSA1.Add_Root_Successor (X_Eq_2);
 
-   const Action_B := FSA1.Add_Action_Node("B");
-   var Y_In_2_3 := Int_Node::Create(Query_Id => Query_Y);
-   Y_In_2_3.Add_Successor (To => Action_B, Values => 2..3);
-   var X_In_1_2 := Int_Node::Create(Query_Id => Query_X);
-   X_In_1_2.Add_Successor (To => FSA1.Add_Node(Y_In_2_3), Values => 1..2);
-   FSA1.Add_Root_Successor (X_In_1_2);
+      const Action_B := FSA1.Add_Action_Node("B");
+      var Y_In_2_3 := Int_Node::Create(Query_Id => Query_Y);
+      Y_In_2_3.Add_Successor (To => Action_B, Values => 2..3);
+      var X_In_1_2 := Int_Node::Create(Query_Id => Query_X);
+      X_In_1_2.Add_Successor (To => FSA1.Add_Node(Y_In_2_3), Values => 1..2);
+      FSA1.Add_Root_Successor (X_In_1_2);
 
-   const Action_C := FSA1.Add_Action_Node("C");
-   var Y_In_1_2 := Int_Node::Create(Query_Id => Query_Y);
-   Y_In_1_2.Add_Successor (To => Action_C, Values => 1..2);
-   var X_In_2_3 := Int_Node::Create(Query_Id => Query_X);
-   X_In_2_3.Add_Successor (To => FSA1.Add_Node(Y_In_1_2), Values => 2..3);
-   FSA1.Add_Root_Successor (X_In_2_3);
+      const Action_C := FSA1.Add_Action_Node("C");
+      var Y_In_1_2 := Int_Node::Create(Query_Id => Query_Y);
+      Y_In_1_2.Add_Successor (To => Action_C, Values => 1..2);
+      var X_In_2_3 := Int_Node::Create(Query_Id => Query_X);
+      X_In_2_3.Add_Successor (To => FSA1.Add_Node(Y_In_1_2), Values => 2..3);
+      FSA1.Add_Root_Successor (X_In_2_3);
 
-   const Action_E_Id := FSA1.Add_Action_Id("E");
-   const Action_E_Node := FSA::Action_Node::Create(Action_E_Id);
-   FSA1.Add_Root_Successor (Action_E_Node);
+      const Action_E_Id := FSA1.Add_Action_Id("E");
+      const Action_E_Node := FSA::Action_Node::Create(Action_E_Id);
+      FSA1.Add_Root_Successor (Action_E_Node);
 
-   Println("\nDump of original FSA");
-   Dump_FSA(FSA1, Check_Actions => #true);
+      Println("\nDump of original FSA");
+      Dump_FSA(FSA1, Check_Actions => #true);
 
-   Println("\nAbout to disambiguate\n");
-   Disambiguate_FSA(FSA1);
+      Println("\nAbout to disambiguate\n");
+      Disambiguate_FSA(FSA1);
 
-   Println
-     ("Now, FSA is `(Is_Nondeterministic(FSA1)? "non": "")deterministic");
+      Println
+        ("Now, FSA is `(Is_Nondeterministic(FSA1)? "non": "")deterministic");
 
-   Println("\nDump of disambiguated FSA");
-   Dump_FSA(FSA1);
+      Println("\nDump of disambiguated FSA");
+      Dump_FSA(FSA1);
 
-   Winnow_And_Check_Actions(FSA1, Error_Action => Action_E_Id);
+      Winnow_And_Check_Actions(FSA1, Error_Action => Action_E_Id);
 
-   Println("\nDump of winnowed FSA");
-   Dump_FSA(FSA1, Check_Actions => #true);
+      Println("\nDump of winnowed FSA");
+      Dump_FSA(FSA1, Check_Actions => #true);
+   end func First_FSA;
 
    /////////////////////////
+   func Second_FSA() is
 
-   Println("\n--------------\n  Second FSA  \n--------------\n");
-   var FSA2 := FSA::Create();
+      Println("\n--------------\n  Second FSA  \n--------------\n");
+      var FSA2 := FSA::Create();
 
-   type Bool_Node is FSA::Countable_Node
-     <Boolean, Univ_Set => #false .. #true>;
+      type Bool_Node is FSA::Countable_Node
+        <Boolean, Univ_Set => #false .. #true>;
 
-   type Kind_Enum is Enum<[#univ_string, #basic_array, #normal]>;
-   type Kind_Node is FSA::Countable_Node
-     <Kind_Enum, Univ_Set => #univ_string .. #normal>;
+      type Kind_Enum is Enum<[#univ_string, #basic_array, #normal]>;
+      type Kind_Node is FSA::Countable_Node
+        <Kind_Enum, Univ_Set => #univ_string .. #normal>;
 
-   const Q_Null := FSA2.Add_Query_Id("Obj_Base.Is_Large_Null");
-   const Q_Bad := FSA2.Add_Query_Id("Obj_Base.Is_Bad_Address");
-   const Q_Kind := FSA2.Add_Query_Id("Type_Of_Obj.Kind");
-   const Q_Poly := FSA2.Add_Query_Id("Type_Of_Obj.Is_Polymorphic");
+      const Q_Null := FSA2.Add_Query_Id("Obj_Base.Is_Large_Null");
+      const Q_Bad := FSA2.Add_Query_Id("Obj_Base.Is_Bad_Address");
+      const Q_Kind := FSA2.Add_Query_Id("Type_Of_Obj.Kind");
+      const Q_Poly := FSA2.Add_Query_Id("Type_Of_Obj.Is_Polymorphic");
 
-   const A_Null := FSA2.Add_Action_Node("Prt(null)");
-   const A_Bad := FSA2.Add_Action_Node("Prt(bad)");
-   const A_Arr := FSA2.Add_Action_Node("ARR");
-   const A_Poly := FSA2.Add_Action_Node("POLY");
-   const A_Norm := FSA2.Add_Action_Node("NORM");
-   const A_Simp := FSA2.Add_Action_Node("SIMP");
-   const A_Error_Id := FSA2.Add_Action_Id("ERROR");
+      const A_Null := FSA2.Add_Action_Node("Prt(null)");
+      const A_Bad := FSA2.Add_Action_Node("Prt(bad)");
+      const A_Arr := FSA2.Add_Action_Node("ARR");
+      const A_Poly := FSA2.Add_Action_Node("POLY");
+      const A_Norm := FSA2.Add_Action_Node("NORM");
+      const A_Simp := FSA2.Add_Action_Node("SIMP");
+      const A_Error_Id := FSA2.Add_Action_Id("ERROR");
 
-   var Is_Null_Node := Bool_Node::Create(Query_Id => Q_Null);
-   Is_Null_Node.Add_Successor(A_Null, Value => #true);
+      var Is_Null_Node := Bool_Node::Create(Query_Id => Q_Null);
+      Is_Null_Node.Add_Successor(A_Null, Value => #true);
 
-   var Is_Bad_Node := Bool_Node::Create(Query_Id => Q_Bad);
-   Is_Bad_Node.Add_Successor(A_Bad, Value => #true);
-   
-   var Is_Arr_Node := Kind_Node::Create(Query_Id => Q_Kind);
-   Is_Arr_Node.Add_Successor(A_Arr, Value => #basic_array);
-   Is_Bad_Node.Add_Successor(FSA2.Add_Node(Is_Arr_Node), Value => #false);
+      var Is_Bad_Node := Bool_Node::Create(Query_Id => Q_Bad);
+      Is_Bad_Node.Add_Successor(A_Bad, Value => #true);
+      
+      var Nested_Case_Node := FSA::Branching_Node::Create();
 
-   var Is_Poly_Node := Bool_Node::Create(Query_Id => Q_Poly);
-   Is_Poly_Node.Add_Successor(A_Poly, Value => #true);
-   var Is_Norm_Node := Kind_Node::Create(Query_Id => Q_Kind);
-   Is_Norm_Node.Add_Successor(FSA2.Add_Node(Is_Poly_Node), Value => #normal);
-   Is_Norm_Node.Add_Successor(A_Norm, Value => #normal);
-   Is_Bad_Node.Add_Successor(FSA2.Add_Node(Is_Norm_Node), Value => #false);
+      var Is_Arr_Node := Kind_Node::Create(Query_Id => Q_Kind);
+      Is_Arr_Node.Add_Successor(A_Arr, Value => #basic_array);
+      Nested_Case_Node.Add_Successor(FSA2.Add_Node(Is_Arr_Node));
 
-   Is_Bad_Node.Add_Successor(A_Simp, Value => #false);
-   Is_Null_Node.Add_Successor(FSA2.Add_Node(Is_Bad_Node), Value => #false);
-   FSA2.Add_Root_Successor(Is_Null_Node);
+      var Is_Poly_Node := Bool_Node::Create(Query_Id => Q_Poly);
+      Is_Poly_Node.Add_Successor(A_Poly, Value => #true);
+      var Is_Norm_Node := Kind_Node::Create(Query_Id => Q_Kind);
+      Is_Norm_Node.Add_Successor
+        (FSA2.Add_Node(Is_Poly_Node), Value => #normal);
+      Is_Norm_Node.Add_Successor(A_Norm, Value => #normal);
+      Nested_Case_Node.Add_Successor(FSA2.Add_Node(Is_Norm_Node));
 
-   //  Include an error action to detect incompleteness
-   FSA2.Add_Root_Successor(FSA::Action_Node::Create(A_Error_Id));
+      Nested_Case_Node.Add_Successor(A_Simp);
 
-   Println("Second FSA");
-   Dump_FSA(FSA2, Check_Actions => #true);
+      Is_Bad_Node.Add_Successor
+        (FSA2.Add_Node(Nested_Case_Node), Value => #false);
 
-   Disambiguate_FSA(FSA2);
+      Is_Null_Node.Add_Successor(FSA2.Add_Node(Is_Bad_Node), Value => #false);
+      FSA2.Add_Root_Successor(Is_Null_Node);
 
-   Println("Disambiguated Second FSA");
-   Dump_FSA(FSA2);
+      //  Include an error action to detect incompleteness
+      FSA2.Add_Root_Successor(FSA::Action_Node::Create(A_Error_Id));
 
-   Println("Winnow and Check Second FSA");
-   Winnow_And_Check_Actions(FSA2, Error_Action => A_Error_Id);
+      Println("Second FSA");
+      Dump_FSA(FSA2, Check_Actions => #true);
 
-   Println("Winnowed Second FSA");
-   Dump_FSA(FSA2, Check_Actions => #true);
+      Disambiguate_FSA(FSA2);
 
-   //       case Obj_Base,Type_Of_Obj is
-   //         when (Is_Large_Null),<> =>
-   //           Prt("null");
-   //         when (not Is_Large_Null, Is_Bad_Address),<> =>
-   //           Prt("bad");
-   //         when (not Is_Large_Null, not Is_Bad_Address),<> then
-   //           when <>,(Kind => basic_array) => ARR;
-   //           when <>,(Kind => normal,Is_Polymorphic) => POLY;
-   //           when <>,(Kind => normal) => NORM;
-   //           when others => SIMP;
-   //         end when;
-   //       end case;
+      Println("Disambiguated Second FSA");
+      Dump_FSA(FSA2);
+
+      Println("Winnow and Check Second FSA");
+      Winnow_And_Check_Actions(FSA2, Error_Action => A_Error_Id);
+
+      Println("Winnowed Second FSA");
+      Dump_FSA(FSA2, Check_Actions => #true);
+
+      //       case Obj_Base,Type_Of_Obj is
+      //         when (Is_Large_Null),<> =>
+      //           Prt("null");
+      //         when (not Is_Large_Null, Is_Bad_Address),<> =>
+      //           Prt("bad");
+      //         when (not Is_Large_Null, not Is_Bad_Address),<> then
+      //           when <>,(Kind => basic_array) => ARR;
+      //           when <>,(Kind => normal,Is_Polymorphic) => POLY;
+      //           when <>,(Kind => normal) => NORM;
+      //           when others => SIMP;
+      //         end when;
+      //       end case;
+      /////////////////////////
+   end func Second_FSA;
+
+   func Third_FSA() is
+      Println("\n--------------\n  Third FSA  \n--------------\n");
+      var FSA3 := FSA::Create();
+
+      type Bool_Node is FSA::Countable_Node
+        <Boolean, Univ_Set => #false .. #true>;
+
+      type Kind_Enum is Enum<[#univ_string, #basic_array, #normal]>;
+      type Kind_Node is FSA::Countable_Node
+        <Kind_Enum, Univ_Set => #univ_string .. #normal>;
+
+      const Q_Null := FSA3.Add_Query_Id("Obj_Base.Is_Large_Null");
+      const Q_Bad := FSA3.Add_Query_Id("Obj_Base.Is_Bad_Address");
+      const Q_Kind := FSA3.Add_Query_Id("Type_Of_Obj.Kind");
+      const Q_Poly := FSA3.Add_Query_Id("Type_Of_Obj.Is_Polymorphic");
+
+      const A_Null := FSA3.Add_Action_Node("Prt(null)");
+      const A_Bad := FSA3.Add_Action_Node("Prt(bad)");
+      const A_Arr := FSA3.Add_Action_Node("ARR");
+      const A_Poly := FSA3.Add_Action_Node("POLY");
+      const A_Norm := FSA3.Add_Action_Node("NORM");
+      const A_Simp := FSA3.Add_Action_Node("SIMP");
+
+      const A_Error_Id := FSA3.Add_Action_Id("ERROR");
+
+      var Is_Null_Node := Bool_Node::Create(Query_Id => Q_Null);
+      Is_Null_Node.Add_Successor(A_Null, Value => #true);
+
+      var Is_Bad_Node := Bool_Node::Create(Query_Id => Q_Bad);
+      Is_Bad_Node.Add_Successor(A_Bad, Value => #true);
+
+      var Nested_Case_Node := FSA::Branching_Node::Create();
+      
+      var Is_Arr_Node := Kind_Node::Create(Query_Id => Q_Kind);
+      Is_Arr_Node.Add_Successor(A_Arr, Value => #basic_array);
+
+      var Is_Poly_Node := Bool_Node::Create(Query_Id => Q_Poly);
+      Is_Poly_Node.Add_Successor(A_Poly, Value => #true);
+      var Is_Norm_Node := Kind_Node::Create(Query_Id => Q_Kind);
+      Is_Norm_Node.Add_Successor
+        (FSA3.Add_Node(Is_Poly_Node), Value => #normal);
+      Is_Norm_Node.Add_Successor(A_Norm, Value => #normal);
+
+      Nested_Case_Node.Add_Successor(FSA3.Add_Node(Is_Arr_Node));
+      Nested_Case_Node.Add_Successor(FSA3.Add_Node(Is_Norm_Node));
+      Nested_Case_Node.Add_Successor(A_Simp);
+
+      FSA3.Add_Root_Successor(Is_Null_Node);
+      FSA3.Add_Root_Successor(Is_Bad_Node);
+      FSA3.Add_Root_Successor(Nested_Case_Node);
+
+      //  Include an error action to detect incompleteness
+      FSA3.Add_Root_Successor(FSA::Action_Node::Create(A_Error_Id));
+
+      Println("Third FSA");
+      Dump_FSA(FSA3, Check_Actions => #true);
+
+      Disambiguate_FSA(FSA3);
+
+      Println("Disambiguated Third FSA");
+      Dump_FSA(FSA3);
+
+      Println("Winnow and Check Third FSA");
+      Winnow_And_Check_Actions(FSA3, Error_Action => A_Error_Id);
+
+      Println("Winnowed Third FSA");
+      Dump_FSA(FSA3, Check_Actions => #true);
+
+      //       case Obj_Base,Type_Of_Obj is
+      //         when (Is_Large_Null),<> =>
+      //           Prt("null");
+      //         when (Is_Bad_Address),<> =>
+      //           Prt("bad");
+      //         when others =>
+      //           when <>,(Kind => basic_array) => ARR;
+      //           when <>,(Kind => normal,Is_Polymorphic) => POLY;
+      //           when <>,(Kind => normal) => NORM;
+      //           when others => SIMP;
+      //         end when;
+      //       end case;
+   end func Third_FSA;
+
+   First_FSA();
+   Second_FSA();
+   Third_FSA();
+
 end func Test_FSA;
