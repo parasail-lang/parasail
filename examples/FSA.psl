@@ -56,10 +56,14 @@ interface FSA<> is
     type Query_Id is new Integer<0..10**6>;
       // A unique id for each distinct query that is performed
 
-    const Branching_Query_Id : Query_Id := Query_Id::Last();
-      // Query Id for a branching node
+    const Others_Branching_Query_Id : Query_Id := Query_Id::Last();
+      // Query Id for a "others" branching node
       // Give it the maximum Query_Id value so it sorts last
       // when looking for the lowest Query_Id when disambiguating.
+
+    const Branching_Query_Id : Query_Id := Query_Id::Last() - 1;
+      // Give "normal" branching nodes a Query_Id that sorts
+      // after all non-branching nodes, but before an "others" branching node.
 
     type Action_Id is new Integer<0..10**6>;
       // A unique id for each distinct action in the FSA
@@ -120,17 +124,6 @@ interface FSA<> is
         func Add_Successor(var From : Node; To : Node_Id)
           {Successor_Index(From', To) not null};
          // Add an edge in the FSA
-
-        func Add_Wildcard_Successor(var From : Node; To : Node_Id)
-          {not Has_Wildcard_Successor(From)}
-          {Has_Wildcard_Successor(From'); Successor_Index(From', To) not null};
-         // Add an edge in the FSA representing a "wildcard"
-         // Only one successor can be a wildcard successor, and
-         // it must be the last.
-
-        func Has_Wildcard_Successor (Node) -> Boolean;
-         // Return #true if Node has a "wildcard" successor.
-         // There may be only one, and it must be the last one.
 
         func Num_Successors (Node) -> Edge_Index;
         //  Number of successor nodes.
@@ -218,9 +211,16 @@ interface FSA<> is
         //  matching Query_Id (will be null if an Action_Node) into New_Node.
         //  For other nodes in Nodes_To_Merge, create
         //  an unconditional edge to existing node.
-        //  For a Branching_Node, we combine all the branching nodes
+        //  For a Branching_Node, we combine all the non-others branching nodes
         //  together into New_Node, with an edge to each edge of the
         //  original branching node.
+
+     new
+
+       func Create_Others_Branch(optional Node_Id := null)
+         -> Result : Branching_Node is
+         (Create(Node_Id, Others_Branching_Query_Id));
+        //  Create an Others branching node, with special "others" Query ID
 
     end interface Branching_Node;
 
@@ -291,13 +291,6 @@ interface FSA<> is
 
        func Add_Successor(var From : Ordered_Node; To : Node_Id);
          // Add an edge in the FSA, with a default value set of "Node_Univ_Set"
-
-        func Add_Wildcard_Successor(var From : Ordered_Node; To : Node_Id)
-          {not Has_Wildcard_Successor(From)}
-          {Has_Wildcard_Successor(From'); Successor_Index(From', To) not null};
-         // Add an edge in the FSA representing a "wildcard"
-         // Only one successor can be a wildcard successor, and
-         // it must be the last.
 
        func Is_Nondeterministic
          (Ordered_Node; Check_Actions : Boolean := #false)
@@ -483,8 +476,7 @@ class FSA is
   // Class defining the FSA module
     const Root_Node_Id : Node_Id := 1
     var Nodes : Vector<optional Node+> :=
-      [Branching_Node::Create
-         (Node_Id => Root_Node_Id, Query_Id => Branching_Query_Id)];
+      [Branching_Node::Create(Node_Id => Root_Node_Id)];
     var Action_Strings : Vector<Univ_String> := [];
     var Query_Formulae : Vector<Univ_String> := [];
 
@@ -553,7 +545,9 @@ class FSA is
     //  Count of distinct queries within FSA
 
     func Query_Formula (FSA; Query_Id) -> Univ_String
-      is (Query_Id == Branching_Query_Id?
+      is (Query_Id == Others_Branching_Query_Id?
+            "Others Branching node" :
+          Query_Id == Branching_Query_Id?
             "Branching node" : FSA.Query_Formulae[Query_Id]);
     //  Return query formula
     
@@ -562,7 +556,6 @@ class FSA is
         var Id : optional Node_Id := null;
         var Q_Id : optional Query_Id := null;
         var Successors : Vector<Node_Id> := [];
-        var Has_Wildcard_Successor : Boolean := #false;
 
       exports
         func Create(optional Node_Id; optional Query_Id) -> Node
@@ -587,19 +580,6 @@ class FSA is
         is
             From.Successors |= To;
         end func Add_Successor;
-
-        func Add_Wildcard_Successor(var From : Node; To : Node_Id) is
-         // Add an edge in the FSA representing a "wildcard"
-         // Only one successor can be a wildcard successor, and
-         // it must be the last.
-            Add_Successor(From, To);
-            From.Has_Wildcard_Successor := #true;
-        end func Add_Wildcard_Successor;
-
-        func Has_Wildcard_Successor (Node) -> Boolean is
-         // Return #true if Node has a "wildcard" successor.
-         // There may be only one, and it must be the last one.
-          (Node.Has_Wildcard_Successor);
 
         func Num_Successors (Node) -> Edge_Index is (|Node.Successors|);
         //  Number of successor nodes.
@@ -637,8 +617,13 @@ class FSA is
       exports
 
        func Create(optional Node_Id := null; optional Query_Id := null)
-         -> Branching_Node is ((Node => Create (Node_Id, Branching_Query_Id)));
-        //  Create the one and only Branching_Node
+         -> Branching_Node is
+        //  Create a Branching_Node
+          {*"Query_Id if non-null should be a branching query_id"*
+            Query_Id is null or else Query_Id >= Branching_Query_Id}
+          return (Node =>
+            Create (Node_Id, Query_Id is null? Branching_Query_Id: Query_Id));
+       end func Create;
 
        func Disambiguate (S : Branching_Node; var FSA)
           -> Result : Ordered_Map<Node_Id, Node_Set> is
@@ -652,7 +637,7 @@ class FSA is
              Result |= [Only_Successor => [Only_Successor]];
           else
              var New_B_Node : Branching_Node :=
-               Create(Id(S), Branching_Query_Id)
+               Create(Id(S), Query(S))
           
              //  Assign new Node_Id into which all successors will be merged
              const New_Node_Id : Node_Id := Assign_Node_Id(FSA);
@@ -676,7 +661,7 @@ class FSA is
         //  matching Query_Id (will be null if an Action_Node) into New_Node.
         //  For other nodes in Nodes_To_Merge, create
         //  an unconditional edge to existing node.
-        //  For a Branching_Node, we combine all the branching nodes
+        //  For a Branching_Node, we combine all the non-others branching nodes
         //  together into New_Node, with an edge to each edge of the
         //  original branching node.
            for each AB_Id of Nodes_To_Merge loop
@@ -685,24 +670,32 @@ class FSA is
 
               {*"All nodes should be branching nodes or action nodes"*
                  Old_Q_Id is null
-                   or else Old_Q_Id == Branching_Query_Id}
+                   or else Old_Q_Id == Branching_Query_Id
+                   or else Old_Q_Id == Others_Branching_Query_Id}
 
               case Old_Node of
                [B : Branching_Node] =>
                  //  Is a branching node; carry over its successors
-                 if Debug then
-                    Println("Old Branching Node `(AB_Id) being merged in");
-                 end if;
-                 for Succ in 1 .. Num_Successors(B) loop
+                 //  unless is an "others" branching node
+                 if Query(B) == Others_Branching_Query_Id then
+                    //  Make the Others branching node a successor
                     if Debug then
-                       Println(" Adding edge to `(Successor(B, Succ))");
+                       Println
+                         ("Others Branching Node `(AB_Id) becoming successor");
                     end if;
-                    New_Node.Add_Successor
-                      (To => Successor(B, Succ));
-                 end loop;
-
-                 //  Loop around to handle next old node
-                 continue loop;
+                    New_Node.Add_Successor(To => AB_Id);
+                 else
+                    if Debug then
+                       Println("Old Branching Node `(AB_Id) being merged in");
+                    end if;
+                    for Succ in 1 .. Num_Successors(B) loop
+                       if Debug then
+                          Println(" Adding edge to `(Successor(B, Succ))");
+                       end if;
+                       New_Node.Add_Successor
+                         (To => Successor(B, Succ));
+                    end loop;
+                 end if;
 
                [A : Action_Node] =>
                  //  Create a successor to action node
@@ -750,6 +743,19 @@ class FSA is
              case FSA[N_Id] of
               [A : Action_Node] =>
                 New_Node.Actions |= A.Actions;
+
+              [B : Branching_Node] =>
+                if Query(B) == Others_Branching_Query_Id then
+                   //  We simply drop an "others" on the "floor" since
+                   //  we don't want the "others" nested pattern match
+                   //  to be ambiguous with any actions outside the
+                   //  nested pattern match.
+                   null;
+                else
+                   {*"Cannot merge non-others branching node into action node"*
+                     #false}
+                end if;
+
               [N : Node+] =>
                 {*"Cannot merge non-action into Action node"* #false}
                 null;
@@ -882,15 +888,6 @@ class FSA is
             //  Provide a default for the edge value set
             From.Edge_Value_Sets |= Node_Univ_Set(From);
         end func Add_Successor;
-
-        func Add_Wildcard_Successor(var From : Ordered_Node; To : Node_Id) is
-         // Add an edge in the FSA representing a "wildcard"
-         // Only one successor can be a wildcard successor, and
-         // it must be the last.
-            Add_Wildcard_Successor(From.Node, To);
-            //  Provide a default for the edge value set
-            From.Edge_Value_Sets |= Node_Univ_Set(From);
-        end func Add_Wildcard_Successor;
 
         func Is_Nondeterministic
           (Ordered_Node; Check_Actions : Boolean := #false)
@@ -1542,9 +1539,16 @@ class FSA is
                 for each O_Id of Old_Nodes forward loop
                    const Old_Q := Query(FSA[O_Id]);
 
-                   if Earliest_Query is null
+                   if Old_Node_To_Clone is null  //  Nothing saved yet
                      or else
-                      (Old_Q not null and then Old_Q < Earliest_Query)
+                      (Earliest_Query is null    //  Only actions so far
+                       and then Old_Q not null   //  This is not an action
+                       and then Old_Q != Others_Branching_Query_Id)
+                                                 //  and not an others branch
+                     or else
+                      (Earliest_Query not null   //  Non-action saved
+                       and then Old_Q not null   //  Next node not an action
+                       and then Old_Q < Earliest_Query)  // with earlier query
                    then
                       Earliest_Query := Old_Q;
                       Old_Node_To_Clone := O_Id;
@@ -2012,7 +2016,7 @@ func Test_FSA() is
       var Is_Bad_Node := Bool_Node::Create(Query_Id => Q_Bad);
       Is_Bad_Node.Add_Successor(A_Bad, Value => #true);
 
-      var Nested_Case_Node := FSA::Branching_Node::Create();
+      var Nested_Case_Node := FSA::Branching_Node::Create_Others_Branch();
       
       var Is_Arr_Node := Kind_Node::Create(Query_Id => Q_Kind);
       Is_Arr_Node.Add_Successor(A_Arr, Value => #basic_array);
