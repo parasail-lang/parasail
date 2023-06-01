@@ -1808,30 +1808,32 @@ class FSA is
                 All_Reachable := #false;
              end if;
              Println(" `(Action_String(FSA, A_Id)) is hidden by:");
+             ref Nodes_Of_Hidden_Act => Initial_Action_Node_Sets[A_Id];
 
              //  Find all nodes where action originally appeared
-             //  and say which values now go elsewhere.
-             for each Orig_N_Id of Initial_Action_Node_Sets[A_Id] loop
+             //  and collect which actions ultimately were chosen.
+             var Hiding_Acts : Ordered_Set<Action_Id> := [];
+             for each Orig_N_Id of Nodes_Of_Hidden_Act loop
                 ref Orig_Node => FSA[Orig_N_Id];
                 case Orig_Node of
                  [A : Action_Node] =>
-                   const Final_Acts := Action_Ids(A);
-
-                   //  Normally only one action after winnowing
-                   //  unless there was ambiguity.
-                   for (Final_Act in Final_Acts;
-                        Is_First := #true then #false) forward loop
-                      Print (Is_First? "  ": " and ");
-                      Print(Action_String(FSA, Final_Act));
-                   end loop;
-                   Print(" with values:");
-                   for Path in Action_Node_Paths[Orig_N_Id] forward loop
-                      Dump_Node_Path(FSA, Path, Indent => 4);
-                   end loop;
-
+                   Hiding_Acts |= Action_Ids(A);
                  [N : Node+] =>
                    {*"Expecting only action nodes"* #false}
                 end case;
+             end loop;
+
+             //  Now display the hiding actions, and the values that
+             //  lead to them.
+             for Hiding_Act in Hiding_Acts forward loop
+                Print("  `(Action_String(FSA, Hiding_Act)) with values:");
+                for Hiding_Node in Final_Action_Node_Sets[Hiding_Act]
+                  {Hiding_Node in Nodes_Of_Hidden_Act}
+                  forward loop
+                   for Path in Action_Node_Paths[Hiding_Node] forward loop
+                      Dump_Node_Path(FSA, Path, Indent => 4);
+                   end loop;
+                end loop;
              end loop;
 
           end if;
@@ -1849,6 +1851,13 @@ end class FSA;
 func Test_FSA() is
 
    func First_FSA() is
+      //   X, Y: Integer range 1 .. 3;
+      //   ...
+      //   case X, Y is
+      //     when 2, 2       => A;
+      //     when 1..2, 2..3 => B;
+      //     when 2..3, 1..2 => C;
+      //   end case;
       type Int_Node is
         FSA::Countable_Node
           <Integer, Univ_Set => 1..3>;
@@ -1903,6 +1912,19 @@ func Test_FSA() is
 
    /////////////////////////
    func Second_FSA() is
+      //       case Obj_Base,Type_Of_Obj is
+      //         when (Is_Large_Null),<> =>
+      //           Prt("null");
+      //         when (not Is_Large_Null, Is_Bad_Address),<> =>
+      //           Prt("bad");
+      //         when (not Is_Large_Null, not Is_Bad_Address),<> then
+      //           when <>,(Kind => basic_array) => ARR;
+      //           when <>,(Kind => normal,Is_Polymorphic) => POLY;
+      //           when <>,(Kind => normal) => NORM;
+      //           when others => SIMP;
+      //         end when;
+      //       end case;
+      /////////////////////////
 
       Println("\n--------------\n  Second FSA  \n--------------\n");
       var FSA2 := FSA::Create();
@@ -1972,22 +1994,22 @@ func Test_FSA() is
       Println("Winnowed Second FSA");
       Dump_FSA(FSA2, Check_Actions => #true);
 
+   end func Second_FSA;
+
+   func Third_FSA() is
       //       case Obj_Base,Type_Of_Obj is
       //         when (Is_Large_Null),<> =>
       //           Prt("null");
-      //         when (not Is_Large_Null, Is_Bad_Address),<> =>
+      //         when (Is_Bad_Address),<> =>
       //           Prt("bad");
-      //         when (not Is_Large_Null, not Is_Bad_Address),<> then
+      //         when others =>
       //           when <>,(Kind => basic_array) => ARR;
       //           when <>,(Kind => normal,Is_Polymorphic) => POLY;
       //           when <>,(Kind => normal) => NORM;
       //           when others => SIMP;
       //         end when;
       //       end case;
-      /////////////////////////
-   end func Second_FSA;
 
-   func Third_FSA() is
       Println("\n--------------\n  Third FSA  \n--------------\n");
       var FSA3 := FSA::Create();
 
@@ -2055,22 +2077,95 @@ func Test_FSA() is
       Println("Winnowed Third FSA");
       Dump_FSA(FSA3, Check_Actions => #true);
 
-      //       case Obj_Base,Type_Of_Obj is
-      //         when (Is_Large_Null),<> =>
-      //           Prt("null");
-      //         when (Is_Bad_Address),<> =>
-      //           Prt("bad");
-      //         when others =>
-      //           when <>,(Kind => basic_array) => ARR;
-      //           when <>,(Kind => normal,Is_Polymorphic) => POLY;
-      //           when <>,(Kind => normal) => NORM;
-      //           when others => SIMP;
-      //         end when;
-      //       end case;
    end func Third_FSA;
+
+   //////////////
+
+   func Fourth_FSA() is
+      //   X, Y: Integer range 1 .. 3;
+      //   ...
+      //   case X, Y is
+      //     when    2, 2    => A2;
+      //     when    3, 3    => A3;
+      //     when 1..2, 2..3 => B;
+      //     when 2..3, 2    => C;
+      //     when 1..3, 2..3 => D;
+      //     when others     => Null;
+      //   end case;
+
+      Println("\n--------------\n  Fourth FSA  \n--------------\n");
+
+      type Int_Node is
+        FSA::Countable_Node
+          <Integer, Univ_Set => 1..3>;
+
+      var FSA4 := FSA::Create();
+
+      const Query_X := FSA4.Add_Query_Id("X");
+      const Query_Y := FSA4.Add_Query_Id("Y");
+
+      const Action_A2 := FSA4.Add_Action_Node("A2");
+      var Y_Eq_2A := Int_Node::Create(Query_Id => Query_Y);
+      Y_Eq_2A.Add_Successor (To => Action_A2, Value => 2);
+      var X_Eq_2 := Int_Node::Create(Query_Id => Query_X);
+      X_Eq_2.Add_Successor (To => FSA4.Add_Node(Y_Eq_2A), Value => 2);
+
+      const Action_A3 := FSA4.Add_Action_Node("A3");
+      var Y_Eq_3A := Int_Node::Create(Query_Id => Query_Y);
+      Y_Eq_3A.Add_Successor (To => Action_A3, Value => 3);
+      var X_Eq_3 := Int_Node::Create(Query_Id => Query_X);
+      X_Eq_3.Add_Successor (To => FSA4.Add_Node(Y_Eq_3A), Value => 3);
+
+      const Action_B := FSA4.Add_Action_Node("B");
+      var Y_In_2_3B := Int_Node::Create(Query_Id => Query_Y);
+      Y_In_2_3B.Add_Successor (To => Action_B, Values => 2..3);
+      var X_In_1_2 := Int_Node::Create(Query_Id => Query_X);
+      X_In_1_2.Add_Successor (To => FSA4.Add_Node(Y_In_2_3B), Values => 1..2);
+
+      const Action_C := FSA4.Add_Action_Node("C");
+      var Y_Eq_2C := Int_Node::Create(Query_Id => Query_Y);
+      Y_Eq_2C.Add_Successor (To => Action_C, Value => 2);
+      var X_In_2_3 := Int_Node::Create(Query_Id => Query_X);
+      X_In_2_3.Add_Successor (To => FSA4.Add_Node(Y_Eq_2C), Values => 2..3);
+
+      const Action_D := FSA4.Add_Action_Node("D");
+      var Y_In_2_3D := Int_Node::Create(Query_Id => Query_Y);
+      Y_In_2_3D.Add_Successor (To => Action_D, Values => 2..3);
+      var X_In_1_3 := Int_Node::Create(Query_Id => Query_X);
+      X_In_1_3.Add_Successor (To => FSA4.Add_Node(Y_In_2_3D), Values => 1..3);
+
+      const Other_Action := FSA4.Add_Action_Node("Null");
+
+      FSA4.Add_Root_Successor (X_Eq_2);
+      FSA4.Add_Root_Successor (X_Eq_3);
+      FSA4.Add_Root_Successor (X_In_1_2);
+      FSA4.Add_Root_Successor (X_In_2_3);
+      FSA4.Add_Root_Successor (X_In_1_3);
+      FSA4.Add_Root_Successor (Other_Action);
+
+      Println("\nDump of original FSA");
+      Dump_FSA(FSA4, Check_Actions => #true);
+
+      Println("\nAbout to disambiguate\n");
+      Disambiguate_FSA(FSA4);
+
+      Println
+        ("Now, FSA is `(Is_Nondeterministic(FSA4)? "non": "")deterministic");
+
+      Println("\nDump of disambiguated FSA");
+      Dump_FSA(FSA4);
+
+      Winnow_And_Check_Actions(FSA4);
+
+      Println("\nDump of winnowed FSA");
+      Dump_FSA(FSA4, Check_Actions => #true);
+   end func Fourth_FSA;
+
+   /////////////////////////
 
    First_FSA();
    Second_FSA();
    Third_FSA();
+   Fourth_FSA();
 
 end func Test_FSA;
