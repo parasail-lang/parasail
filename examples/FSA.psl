@@ -750,7 +750,9 @@ class FSA is
                    //  we don't want the "others" nested pattern match
                    //  to be ambiguous with any actions outside the
                    //  nested pattern match.
-                   null;
+                   if Debug then
+                      Println("  Ignoring Others branch `(N_Id) in merge");
+                   end if;
                 else
                    {*"Cannot merge non-others branching node into action node"*
                      #false}
