@@ -6,8 +6,9 @@
 # Translators: Tucker Taft, Olivier Henley
 #
 # Description:
-#   This script is used to emulate the basic functionality of the
-#   mailserver. It assumes that no test hangs forever!
+#   This script runs all directorie's test contained 
+#   in /testsuite. Such directory contains code and
+#   and accompanying test files (test(-c).sh, test.out, test.opt).
 #
 
 import os
@@ -22,7 +23,6 @@ import shutil
 
 from enum import Enum
 
-# defining resources paths
 local_path = os.path.dirname(os.path.realpath(__file__))
 install_path = os.path.join(local_path, "..", "..", "install")
 
@@ -56,7 +56,7 @@ class SkipTarget(Enum):
 
 class Translator(Enum):
     Compiler = 1
-    Interpreter= 2
+    Interpreter = 2
 
 def compile_rts_library():
     """
@@ -69,6 +69,9 @@ def compile_rts_library():
     run(["tcsh", "../../bin/pslc.csh", "-b1" ,"-v"])
 
 def add_install_bins_to_path():
+    """
+    Add the ParaSail binaries to the PATH
+    """
     os.environ["PATH"] += ":" + os.path.join(install_path, "bin")
 
 def set_runtime_library():
@@ -107,7 +110,7 @@ def set_runtime_library():
 
 def init_runtests_files():
     """
-    Create/reset all the runtests files
+    Create/reset all the runtests.x files
     """
     for rt in runtests:
         with open (rt, "w") as file:
@@ -115,7 +118,8 @@ def init_runtests_files():
 
 def choose_test_script(dir, translator_choice):
     """
-    Choose the test script and the reference output file based on the translator choice (Compiler, Interpreter)
+    Choose the test script and the reference output file 
+    based on the translator choice: (Compiler, Interpreter)
     """
     test_script = "NONE"
     test_reference_out = "NONE"
@@ -136,7 +140,7 @@ def choose_test_script(dir, translator_choice):
 
 def handle_test_opt(test_opt_filepath):
     """
-    Handle the test.opt file and find out if we skip the test
+    Handle the test.opt file to find out if we skip the test
     """
     skip_target = SkipTarget.DoNot
     if os.path.exists(test_opt_filepath):
@@ -165,7 +169,7 @@ def run_test(dir, test_script, test_reference_out):
 
 def print_test_status(num_tests, num_dirs_to_test, num_failed_tests, test_name, skip_target):
     """
-    Inform of tests progress on cmd
+    Inform of tests progress on the console
     """
     skip_info = f" SKIPPED {skip_target.name}"
     if skip_target == SkipTarget.DoNot:
@@ -174,6 +178,9 @@ def print_test_status(num_tests, num_dirs_to_test, num_failed_tests, test_name, 
     print(f"Num_Tests = {num_tests}/{num_dirs_to_test} (Failed = {num_failed_tests}) {test_name} {skip_info}")
 
 def cleanup_tmp():
+    """
+    Delete /tmp directory
+    """
     shutil.rmtree(os.path.join(pwd, "tmp"), ignore_errors=True)
 
 def create_tmp_dir_with_test_files(dir):
@@ -184,9 +191,15 @@ def create_tmp_dir_with_test_files(dir):
     shutil.copytree(os.path.join(pwd, dir), os.path.join(pwd, "tmp"))
 
 def move_to_tmp_dir():
+    """
+    Move to the temporary directory
+    """
     os.chdir("tmp")
 
 def move_out_of_tmp_dir():
+    """
+    Move out of the temporary directory
+    """
     os.chdir("..")
 
 def log_to_file(filename, text_line):
@@ -230,7 +243,6 @@ def identify_dirs_to_test(args_left_to_consume):
     """
     Characterize the dirs to test
     """
-
     dirs_to_test = args_left_to_consume if len(args_left_to_consume) > 0 else os.listdir('.')
 
     aux = []
@@ -272,7 +284,6 @@ def run_tests(translator, dirs_to_test):
         if skip_target == SkipTarget.DoNot:
             if os.path.isdir(test_dir):
 
-
                 create_tmp_dir_with_test_files(test_dir)
 
                 move_to_tmp_dir()
@@ -297,6 +308,6 @@ if __name__ == '__main__':
 
     set_runtime_library()
     add_install_bins_to_path()
-    
+
     translator, args_left_to_consume = identify_translator()
     run_tests(translator, identify_dirs_to_test(args_left_to_consume))
