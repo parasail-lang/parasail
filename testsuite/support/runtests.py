@@ -116,7 +116,7 @@ def init_runtests_files():
         with open (rt, "w") as file:
             pass
 
-def choose_test_script(dir, translator_choice):
+def define_test_script(translator_choice):
     """
     Choose the test script and the reference output file 
     based on the translator choice: (Compiler, Interpreter)
@@ -133,10 +133,16 @@ def choose_test_script(dir, translator_choice):
     if not os.path.exists(test_reference_out):
         test_reference_out = "test.out"
 
+    return test_script, test_reference_out
+
+def check_test_script(dir, test_script, test_reference_out):
+    """
+    Check if test script is present and if not log the error
+    """
     if not os.path.exists(test_script):
         log_to_file(runtests[Runtests.Errors.value], f"{dir} {test_script} {test_reference_out} ({test_script} not found)")
-
-    return test_script, test_reference_out
+        return False
+    return True
 
 def handle_test_opt(test_opt_filepath):
     """
@@ -241,18 +247,18 @@ def identify_translator():
 
 def identify_dirs_to_test(args_left_to_consume):
     """
-    Characterize the dirs to test
+    Characterize the direrctories to test
     """
     dirs_to_test = args_left_to_consume if len(args_left_to_consume) > 0 else os.listdir('.')
 
-    aux = []
+    temp = []
     for dir in dirs_to_test:
         if os.path.isdir(dir):
             if dir != "support" and dir != "tmp.rts" and dir != "tmp":
                 skip_target = handle_test_opt(os.path.join(pwd, dir, "test.opt"))
-                aux.append((dir, skip_target))
+                temp.append((dir, skip_target))
 
-    dirs_to_test = aux
+    dirs_to_test = temp
 
     try:
         log_to_file(runtests[Runtests.Log.value], sys.argv[0])
@@ -263,7 +269,7 @@ def identify_dirs_to_test(args_left_to_consume):
 
     return dirs_to_test
 
-def run_tests(translator, dirs_to_test):
+def run_tests(test_script, test_reference_out, dirs_to_test):
     """
     Main loop where we run all the tests
     """
@@ -288,11 +294,11 @@ def run_tests(translator, dirs_to_test):
 
                 move_to_tmp_dir()
 
-                test_script, test_reference_out = choose_test_script(test_dir, translator)
-                run_test(test_dir, test_script, test_reference_out)
-                test_result = check_test_output(test_reference_out, "tmp.out", runtests[Runtests.Out.value], test_dir)
-                if test_result == TestResult.Failed:
-                    num_failed_tests = num_failed_tests + 1
+                if check_test_script(test_dir, test_script, test_reference_out):
+                    run_test(test_dir, test_script, test_reference_out)
+                    test_result = check_test_output(test_reference_out, "tmp.out", runtests[Runtests.Out.value], test_dir)
+                    if test_result == TestResult.Failed:
+                        num_failed_tests = num_failed_tests + 1
 
                 move_out_of_tmp_dir()
         else:
@@ -310,4 +316,7 @@ if __name__ == '__main__':
     add_install_bins_to_path()
 
     translator, args_left_to_consume = identify_translator()
-    run_tests(translator, identify_dirs_to_test(args_left_to_consume))
+    test_script, test_reference_out = define_test_script(translator)
+    dirs_to_test = identify_dirs_to_test(args_left_to_consume)
+
+    run_tests(test_script, test_reference_out, dirs_to_test)
