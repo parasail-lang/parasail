@@ -9,9 +9,6 @@
 #   This script is used to emulate the basic functionality of the
 #   mailserver. It assumes that no test hangs forever!
 #
-# Requirement:
-#   ParaSail must be available in the PATH
-# ------------------------------------------------------------------------
 
 import os
 import os.path
@@ -70,6 +67,9 @@ def compile_rts_library():
         sys.exit(-1)
 
     run(["tcsh", "../../bin/pslc.csh", "-b1" ,"-v"])
+
+def add_install_bins_to_path():
+    os.environ["PATH"] += ":" + os.path.join(install_path, "bin")
 
 def set_runtime_library():
     """
@@ -224,9 +224,6 @@ def identify_translator():
         translator = Translator.Compiler
         args = args[1:]
 
-    if language == "ParaSail" and translator == Translator.Interpreter:
-        os.environ["PATH"] += ":" + os.path.join(install_path, "bin")
-
     return translator, args
 
 def identify_dirs_to_test(args_left_to_consume):
@@ -299,5 +296,7 @@ if __name__ == '__main__':
         compile_rts_library()
 
     set_runtime_library()
+    add_install_bins_to_path()
+    
     translator, args_left_to_consume = identify_translator()
     run_tests(translator, identify_dirs_to_test(args_left_to_consume))
