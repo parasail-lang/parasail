@@ -270,7 +270,7 @@ def log_basic_infos():
     data = run(["uname", "-n"], capture_output=True, shell=True, text=True)
     log_to_file(runtests[Runtests.Log.value], data.stdout)
 
-def run_tests(test_script, test_reference_out, dirs_to_test):
+def run_tests(test_script, test_reference_out, tests):
     """
     Main loop where we run all the tests
     """
@@ -283,9 +283,9 @@ def run_tests(test_script, test_reference_out, dirs_to_test):
     init_runtests_files()
     log_basic_infos()
 
-    dirs_to_test.sort(key=lambda tup: tup[0]) 
+    tests.sort(key=lambda tup: tup[0]) 
 
-    for test in dirs_to_test:
+    for test in tests:
         test_dir = test[0]
         skip_target = test[1]
 
@@ -310,7 +310,7 @@ def run_tests(test_script, test_reference_out, dirs_to_test):
             log_to_file(runtests[Runtests.Log.value], f"{test_dir} SKIPPED {skip_target.name}")
 
         num_tests_done = num_tests_done + 1
-        print_test_status(num_tests_done, len(dirs_to_test), num_failed_tests, test_dir, skip_target)
+        print_test_status(num_tests_done, len(tests), num_failed_tests, test_dir, skip_target)
 
 if __name__ == '__main__':
 
@@ -322,6 +322,6 @@ if __name__ == '__main__':
 
     translator, args_left_to_consume = identify_translator()
     test_script, test_reference_out = define_test_script(translator)
-    dirs_to_test = identify_dirs_to_test(args_left_to_consume)
+    tests = identify_dirs_to_test(args_left_to_consume)
 
-    run_tests(test_script, test_reference_out, dirs_to_test)
+    run_tests(test_script, test_reference_out, tests)
