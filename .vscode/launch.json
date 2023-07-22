@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "type": "python",
+        "request": "launch",
+        "name": "Launch ParaSail Tests",
+        "console": "integratedTerminal",
+        "program": "${workspaceFolder}/testsuite/support/runtests.py",
+        "args": [],
+        "cwd": "${workspaceFolder}/testsuite/ParaSail"
+      }
+    ]
+  }
+
