@@ -140,7 +140,8 @@ def check_test_script(dir, test_script, test_reference_out):
     Check if test script is present and if not log the error
     """
     if not os.path.exists(test_script):
-        log_to_file(runtests[Runtests.Errors.value], f"{dir} {test_script} {test_reference_out} ({test_script} not found)")
+        log_to_file(runtests[Runtests.Errors.value], 
+                    f"{dir} {test_script} {test_reference_out} ({test_script} not found)")
         return False
     return True
 
@@ -169,7 +170,8 @@ def run_test(dir, test_script, test_reference_out):
     Run a given test using its script file
     """
     if os.path.exists(test_script):
-        log_to_file(runtests[Runtests.Log.value], f"{dir} {test_script} {test_reference_out} ")
+        log_to_file(runtests[Runtests.Log.value], 
+                    f"{dir} {test_script} {test_reference_out} ")
         with open("tmp.out", 'w') as fp:
             run([os.path.join(os.getcwd(), test_script)], shell=True, stdout=fp, stderr=fp)
 
@@ -251,23 +253,22 @@ def identify_dirs_to_test(args_left_to_consume):
     """
     dirs_to_test = args_left_to_consume if len(args_left_to_consume) > 0 else os.listdir('.')
 
-    temp = []
+    tests = []
     for dir in dirs_to_test:
         if os.path.isdir(dir):
             if dir != "support" and dir != "tmp.rts" and dir != "tmp":
                 skip_target = handle_test_opt(os.path.join(pwd, dir, "test.opt"))
-                temp.append((dir, skip_target))
+                tests.append((dir, skip_target))
 
-    dirs_to_test = temp
+    return tests
 
-    try:
-        log_to_file(runtests[Runtests.Log.value], sys.argv[0])
-        data = run(["uname", "-n"], capture_output=True, shell=True, text=True)
-        log_to_file(runtests[Runtests.Log.value], data.stdout)
-    except Exception as error:
-        print("An exception occurred:", error)
-
-    return dirs_to_test
+def log_basic_infos():
+    """
+    Log basic infos at the top of runtests.log
+    """
+    log_to_file(runtests[Runtests.Log.value], sys.argv[0])
+    data = run(["uname", "-n"], capture_output=True, shell=True, text=True)
+    log_to_file(runtests[Runtests.Log.value], data.stdout)
 
 def run_tests(test_script, test_reference_out, dirs_to_test):
     """
@@ -280,6 +281,7 @@ def run_tests(test_script, test_reference_out, dirs_to_test):
     num_failed_tests = 0
 
     init_runtests_files()
+    log_basic_infos()
 
     dirs_to_test.sort(key=lambda tup: tup[0]) 
 
@@ -296,7 +298,10 @@ def run_tests(test_script, test_reference_out, dirs_to_test):
 
                 if check_test_script(test_dir, test_script, test_reference_out):
                     run_test(test_dir, test_script, test_reference_out)
-                    test_result = check_test_output(test_reference_out, "tmp.out", runtests[Runtests.Out.value], test_dir)
+                    test_result = check_test_output(test_reference_out, 
+                                                    "tmp.out", 
+                                                    runtests[Runtests.Out.value], 
+                                                    test_dir)
                     if test_result == TestResult.Failed:
                         num_failed_tests = num_failed_tests + 1
 
