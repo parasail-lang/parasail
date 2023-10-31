@@ -1,0 +1,8 @@
+with "../common.gpr";
+project Prj is
+    for Source_Dirs use (".","..");
+    for Object_Dir use "obj";
+    package Linker is
+       for Default_Switches ("ada") use ("-Wl,-ld_classic"); 
+    end Linker;
+end Prj;
