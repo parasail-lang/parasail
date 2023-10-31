@@ -14,14 +14,17 @@ This library is organized as follows:
 | file | Description |
 | --- | --- |
 | lwt.ads | LWT root package
-| lwt-scheduler.ads  | LWT Scheduler, the primary API for using light-weight
-threading
+| lwt-scheduler.ads  | LWT Scheduler, the primary API for using light-weight threading
 | lwt-openmp.ads  | OpenMP interface.  Declaring an object of type OMP_Parallel indicates that the current task (if declared in a task body) or the environment task (if declared in the main subprogram) wants OpenMP to manage the light-weight threads.
 | lwt-work_stealing.ads  | Work-Stealing Scheduler interface.  Declaring an object of type WS_Parallel indicates that the current task (if declared in a task body) or the environment task (if declared in the main subprogram) wants the Work-Stealing scheduler to manage the light-weight threads.
-| lwt-parallelism.ads   | Some useful generic packages for creating parallel loops.
-| lwt-vector_par_iterator.ads   | Provides an implementation of the Parallel_Iterator_Interface'Class for Ada.Containers.Vectors
-| lwt-hashed_map_par_iterator.ads   | Provides an implementation of the Parallel_Iterator_Interface'Class for Ada.Containers.Hashed_Maps
+| lwt-parallelism.ads   | Some useful generic packages for creating parallel loops, plus a package Parallel_Iterator_Interfaces which provides the parallel
+iteration capability added to the Ada.Iterator_Interfaces by Ada 2022.
+| lwt-vector_par_iterator.ads   | Provides an implementation of the Parallel_Iterator'Class for Ada.Containers.Vectors
+| lwt-hashed_map_par_iterator.ads   | Provides an implementation of the Parallel_Iterator'Class for Ada.Containers.Hashed_Maps
 | examples/*.adb  | Several examples of using the LWT library, making use of both the OpenMP and the Work-Stealing schedulers.  "gprbuild *.adb" in the examples directory will build all of the executables and put them in the "obj" subdirectory.
+| common.gpr and examples/prj.gpr | Project files for building lwt library and examples
+| lwt-scheduler-*.ad{s,b} | Plug-in schedulers
+| other lwt-*.ad{s,b} | Other aspects of implementation of the various interfaces.
 
 Here is the spec for the LWT.Scheduler package:
 ```ada
