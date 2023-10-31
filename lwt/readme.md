@@ -11,18 +11,22 @@ At some point we will shift it to use the code in this "lwt" library.
 
 This library is organized as follows:
 
-- lwt.ads   LWT root package
-- lwt-scheduler.ads  LWT Scheduler, the primary API for using light-weight
+|---|---|
+| file | Description |
+| --- | --- |
+| lwt.ads | LWT root package
+| lwt-scheduler.ads  | LWT Scheduler, the primary API for using light-weight
 threading
-- lwt-openmp.ads  OpenMP interface.  Declaring an object of type OMP_Parallel
+| lwt-openmp.ads  | OpenMP interface.  Declaring an object of type OMP_Parallel
 indicates that the current task (if declared in a task body) or the environment task (if declared in the main subprogram) wants OpenMP to manage the light-weight threads.
-- lwt-work_stealing.ads   Work Stealing Scheduler interface.  Declaring an object of type WS_Parallel indicates
-- lwt-work_stealing.ads  Work-Stealing Scheduler interface.  Declaring an object of type WS_Parallel
+| lwt-work_stealing.ads   | Work Stealing Scheduler interface.  Declaring an object of type WS_Parallel indicates
+| lwt-work_stealing.ads  | Work-Stealing Scheduler interface.  Declaring an object of type WS_Parallel
 indicates that the current task (if declared in a task body) or the environment task (if declared in the main subprogram) wants the Work-Stealing scheduler to manage the light-weight threads.
-- lwt-parallelism.ads   Some useful generic packages for creating parallel loops.
-- lwt-vector_par_iterator.ads   Provides an implementation of the Parallel_Iterator_Interface'Class for Ada.Containers.Vectors
-- lwt-hashed_map_par_iterator.ads   Provides an implementation of the Parallel_Iterator_Interface'Class for Ada.Containers.Hashed_Maps
-- examples/*.adb  Several examples of using the LWT library, making use of both the OpenMP and the Work-Stealing schedulers.  "gprbuild *.adb" in the examples directory will build all of the executables and put them in the "obj" subdirectory.
+| lwt-parallelism.ads   | Some useful generic packages for creating parallel loops.
+| lwt-vector_par_iterator.ads   | Provides an implementation of the Parallel_Iterator_Interface'Class for Ada.Containers.Vectors
+| lwt-hashed_map_par_iterator.ads   | Provides an implementation of the Parallel_Iterator_Interface'Class for Ada.Containers.Hashed_Maps
+| examples/*.adb  | Several examples of using the LWT library, making use of both the OpenMP and the Work-Stealing schedulers.  "gprbuild *.adb" in the examples directory will build all of the executables and put them in the "obj" subdirectory.
+| --- | --- |
 
 Here is the spec for the LWT.Scheduler package:
 ```ada
