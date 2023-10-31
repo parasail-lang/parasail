@@ -16,7 +16,7 @@
 -- documentation/COPYING3 and documentation/GCC_RUNTIME3_1 for details.     --
 ------------------------------------------------------------------------------
 
---  Example using Prototype System.Parallelism package for Ada 202X
+--  Example using Prototype LWT.Parallelism package for Ada 202X
 
 with LWT.Parallelism; use LWT.Parallelism;
 with LWT.Work_Stealing; use LWT.Work_Stealing;
