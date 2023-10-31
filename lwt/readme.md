@@ -14,7 +14,17 @@ This library is organized as follows:
 - lwt.ads   LWT root package
 - lwt-scheduler.ads  LWT Scheduler, the primary API for using light-weight
 threading
+- lwt-openmp.ads  OpenMP interface.  Declaring an object of type OMP_Parallel
+indicates that the current task (if declared in a task body) or the environment task (if declared in the main subprogram) wants OpenMP to manage the light-weight threads.
+- lwt-work_stealing.ads   Work Stealing Scheduler interface.  Declaring an object of type WS_Parallel indicates
+- lwt-work_stealing.ads  Work-Stealing Scheduler interface.  Declaring an object of type WS_Parallel
+indicates that the current task (if declared in a task body) or the environment task (if declared in the main subprogram) wants the Work-Stealing scheduler to manage the light-weight threads.
+- lwt-parallelism.ads   Some useful generic packages for creating parallel loops.
+- lwt-vector_par_iterator.ads   Provides an implementation of the Parallel_Iterator_Interface'Class for Ada.Containers.Vectors
+- lwt-hashed_map_par_iterator.ads   Provides an implementation of the Parallel_Iterator_Interface'Class for Ada.Containers.Hashed_Maps
+- examples/*.adb  Several examples of using the LWT library, making use of both the OpenMP and the Work-Stealing schedulers.  "gprbuild *.adb" in the examples directory will build all of the executables and put them in the "obj" subdirectory.
 
+Here is the spec for the LWT.Scheduler package:
 ```ada
 package LWT.Scheduler is
    --  A light-weight thread scheduler
@@ -93,26 +103,7 @@ package LWT.Scheduler is
       --  Return LWT-scheduler-specific group associated with Group.
 
    private
-      type LWT_Group
-        (Aspects : access LWT.Aspects.Root_Aspect'Class := null)
-         is new Ada.Finalization.Limited_Controlled with
-      record
-         --  Wrapper type used to keep track of set of light-weight threads
-         --  all finishing at the same point.
-         --  LWT_Group is a controlled type.  Upon finalization,
-         --  if Wait_For_Group has not been called, the members of
-         --  the group will be canceled if possible and then awaited.
-         Sched_Group : LWT_Sched_Group_Ptr := Create_Group (Aspects);
-         Has_Been_Awaited : Boolean := False;
-      end record;
-
-      procedure Initialize (Group : in out LWT_Group) is null;
-      --  The LWT_Sched_Group is filled in by default initialization
-
-      procedure Finalize (Group : in out LWT_Group);
-      --  If the group has been awaited, just finish the LWT_Sched_Group.
-      --  If not, cancel the group, await the group, and then finish it.
-
+      . . .
    end LWT_Groups;
 
    subtype LWT_Group is LWT_Groups.LWT_Group;
