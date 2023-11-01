@@ -546,10 +546,11 @@ The ParaSail community congregates in a few places:
 
 * [Stack Overflow] - Direct questions about using the language.
 * [Gitter] - General discussion and broader questions.
-* 
+* [ParaSail Group] - Google Group for ParaSail
 
 [Stack Overflow]: https://stackoverflow.com/questions/tagged/parasail
 [Gitter]: https://gitter.im/parasail-lang/community
+[ParaSail Group]: https://groups.google.com/g/parasail-programming-language
 
 
 ## Contributing
