@@ -212,7 +212,7 @@ handles the light weight threads (by executing them in sequence!) in the absence
 
 ### OpenMP Scheduler Plug-in
 
-The files lwt-scheduler-openmp.ad{s,b} performs light-weight scheduling by using the GNU OpenMP implementation.  Simply by mentioning "LWT.OpenMP" is a "with clause" and declaring a local object of type
+The files lwt-scheduler-openmp.ad{s,b} perform light-weight scheduling by using the GNU OpenMP implementation.  Simply by mentioning `LWT.OpenMP` is a "with clause" and declaring a local object of type
 LWT.OpenMP.OMP_Parallel you can specify the maximum number of "heavy-weight" server threads to be devoted to the task in which the declaration occurs.
 Here is the declaration of the LWT.OpenMP package:
 ```ada
@@ -469,7 +469,7 @@ As an alternative to OpenMP, we provide a work-stealing-based scheduler plug-in,
 written entirely in Ada, which in many circumstances is more
 efficient than OpenMP.
 The plugin is in lwt-scheduler-work_stealing.ad{s,b}.  To activate it,
-mention "LWT.Work_Stealing" in a with clause and then declare an object
+mention `LWT.Work_Stealing` in a with clause and then declare an object
 of type WS_Parallel in your main subprogram or task body.
 
 Here is the package spec for LWT.Work_Stealing:
@@ -546,6 +546,7 @@ The ParaSail community congregates in a few places:
 
 * [Stack Overflow] - Direct questions about using the language.
 * [Gitter] - General discussion and broader questions.
+* 
 
 [Stack Overflow]: https://stackoverflow.com/questions/tagged/parasail
 [Gitter]: https://gitter.im/parasail-lang/community
