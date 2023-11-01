@@ -558,6 +558,7 @@ The ParaSail community congregates in a few places:
 If you are interested in contributing to the ParaSail project, please take a look
 at the [Getting Started][getting_started] section of the parasail-dev-guide.
 
+[getting_started]: https://github.com/parasail-lang/parasail/blob/main/parasail-dev-guide.md
 
 
 ## License
