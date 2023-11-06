@@ -5,6 +5,13 @@ This is a light-weight threading library that provides many of
 the features defined for Ada 2022, without depending on support
 for the new "parallel" loop or block syntax.
 
+Here is some background on how this library was mapped to OpenMP (note that this LWT library is _not_ under the language-defined package "System" even though that might be its ultimate resting place in a full Ada 2022 implementation):
+- A powerpoint on the [Ada 2022 lightweight parallelism features and their implementation][ada2022_powerpoint], including on top of OpenMP
+- An "Ada Interpretation" (AI) on the [Ada 2022 lightweight parallelism features in relation to OpenMP][ada2022_parallelism_ai] and to other programming languages
+
+[ada2022_powerpoint]: https://drive.google.com/file/d/156vq44aK2FF60cbd_I8hIOXmqEGjl1H7
+[ada2022_parallelism_ai]: https://docs.google.com/document/d/1biJ8v2m4CGcNd1qnRYsZc4J87OLHG12qXZgBoiTC_V8
+
 The ParaSail interpreter/compiler has its own version of this
 library built into the code in interpreter/psc-interpreter.adb.
 At some point we will shift it to use the code in this "lwt" library.
