@@ -212,8 +212,8 @@ handles the light weight threads (by executing them in sequence!) in the absence
 
 ### OpenMP Scheduler Plug-in
 
-The files lwt-scheduler-openmp.ad{s,b} performs light-weight scheduling by using the GNU OpenMP implementation.  Simply by mentioning "LWT.OpenMP" is a "with clause" and declaring a local object of type
-LWT.OpenMP.OMP_Parallel you can specify the maximum number of "heavy-weight" server threads to be devoted to the task in which the declaration occurs.
+The files lwt-scheduler-openmp.ad{s,b} performs light-weight scheduling by using the GNU OpenMP implementation.  Simply by mentioning "LWT.OpenMP" in a "with clause" and declaring a local object of type
+LWT.OpenMP.OMP_Parallel you can specify the maximum number of "heavy-weight" server threads to be devoted to the Ada task in which the declaration occurs.
 Here is the declaration of the LWT.OpenMP package:
 ```ada
 package LWT.OpenMP is
