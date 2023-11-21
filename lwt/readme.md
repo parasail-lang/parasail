@@ -5,6 +5,13 @@ This is a light-weight threading library that provides many of
 the features defined for Ada 2022, without depending on support
 for the new "parallel" loop or block syntax.
 
+Here is some background on how this library was mapped to OpenMP (note that this LWT library is _not_ under the language-defined package "System" even though that might be its ultimate resting place in a full Ada 2022 implementation):
+- A powerpoint on the [Ada 2022 lightweight parallelism features and their implementation][ada2022_powerpoint], including on top of OpenMP
+- An "Ada Interpretation" (AI) on the [Ada 2022 lightweight parallelism features in relation to OpenMP][ada2022_parallelism_ai] and to other programming languages
+
+[ada2022_powerpoint]: https://drive.google.com/file/d/156vq44aK2FF60cbd_I8hIOXmqEGjl1H7
+[ada2022_parallelism_ai]: https://docs.google.com/document/d/1biJ8v2m4CGcNd1qnRYsZc4J87OLHG12qXZgBoiTC_V8
+
 The ParaSail interpreter/compiler has its own version of this
 library built into the code in interpreter/psc-interpreter.adb.
 At some point we will shift it to use the code in this "lwt" library.
@@ -214,6 +221,7 @@ handles the light weight threads (by executing them in sequence!) in the absence
 
 The files lwt-scheduler-openmp.ad{s,b} performs light-weight scheduling by using the GNU OpenMP implementation.  Simply by mentioning "LWT.OpenMP" in a "with clause" and declaring a local object of type
 LWT.OpenMP.OMP_Parallel you can specify the maximum number of "heavy-weight" server threads to be devoted to the Ada task in which the declaration occurs.
+
 Here is the declaration of the LWT.OpenMP package:
 ```ada
 package LWT.OpenMP is
@@ -469,7 +477,7 @@ As an alternative to OpenMP, we provide a work-stealing-based scheduler plug-in,
 written entirely in Ada, which in many circumstances is more
 efficient than OpenMP.
 The plugin is in lwt-scheduler-work_stealing.ad{s,b}.  To activate it,
-mention "LWT.Work_Stealing" in a with clause and then declare an object
+mention `LWT.Work_Stealing` in a with clause and then declare an object
 of type WS_Parallel in your main subprogram or task body.
 
 Here is the package spec for LWT.Work_Stealing:
@@ -546,9 +554,11 @@ The ParaSail community congregates in a few places:
 
 * [Stack Overflow] - Direct questions about using the language.
 * [Gitter] - General discussion and broader questions.
+* [ParaSail Group] - Google Group for ParaSail
 
 [Stack Overflow]: https://stackoverflow.com/questions/tagged/parasail
 [Gitter]: https://gitter.im/parasail-lang/community
+[ParaSail Group]: https://groups.google.com/g/parasail-programming-language
 
 
 ## Contributing
@@ -556,6 +566,7 @@ The ParaSail community congregates in a few places:
 If you are interested in contributing to the ParaSail project, please take a look
 at the [Getting Started][getting_started] section of the parasail-dev-guide.
 
+[getting_started]: https://github.com/parasail-lang/parasail/blob/main/parasail-dev-guide.md
 
 
 ## License
