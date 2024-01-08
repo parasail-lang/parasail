@@ -936,7 +936,7 @@ package body PSC.Interpreter.IO is
       end if;
 
       declare
-         --  (Polymorhic) Value stream is only component of Obj_Stream
+         --  (Polymorphic) Value stream is only component of Obj_Stream
          Val_Stream_Poly_Obj : constant Word_Type :=
            Fetch_Word (Obj_Stream, Large_Obj_Header_Size);
 
@@ -983,11 +983,11 @@ package body PSC.Interpreter.IO is
          --  func Write_End_Seq (var Output_Value_Stream;
          --       Min_Len, Max_Len, Actual_Len : Univ_Integer);
 
-         Begin_Obj_Op_Index : constant Operation_Index := 18;
+         Begin_Obj_Op_Index : constant Operation_Index := 19;
          --  func Write_Begin_Optional_Obj
          --         (var Output_Value_Stream;
          --          Is_Null : Boolean);
-         End_Obj_Op_Index : constant Operation_Index := 19;
+         End_Obj_Op_Index : constant Operation_Index := 20;
          --  func Write_End_Obj (var Output_Value_Stream);
 
          Param_Arr : array (0 .. 4) of aliased Word_Type;
@@ -1363,7 +1363,7 @@ package body PSC.Interpreter.IO is
          Put ("Read_Obj: ");
       end if;
       declare
-         --  (Polymorhic) Value stream is only component of Obj_Stream
+         --  (Polymorphic) Value stream is only component of Obj_Stream
          Val_Stream_Poly_Obj : constant Word_Type :=
            Fetch_Word (Obj_Stream, Large_Obj_Header_Size);
 
