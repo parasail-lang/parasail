@@ -1,0 +1,1024 @@
+//  Streaming in ParaSail is a three layer cake:
+//    Byte Stream is the lowest layer
+//    Value Stream is the middle layer
+//    Object Stream is the top layer
+//
+//  This is a JSON-specific Value stream layer.  See byte_stream.psl for
+//  an overview of the purpose of each layer.
+//
+//  See value_stream.psl for the general interface for a Value
+//  stream, and an implementation of a binary value stream.
+interface PSL::Core::JSON_Output_Value_Stream<>
+  extends PSL::Core::Output_Value_Stream<> is
+
+   func Create(ref var Output_Byte_Stream+) -> JSON_Output_Value_Stream;
+
+   func Is_Self_Describing (JSON_Output_Value_Stream) -> Boolean;
+     //  If #false, then Begin_Obj/End_Obj are no-ops
+
+   func Reached_End(JSON_Output_Value_Stream) -> Boolean;
+
+   func Write_Int (var JSON_Output_Value_Stream; Val : Univ_Integer;
+      Low, High : Univ_Integer) {Val in Low .. High};
+   func Write_Optional_Int
+     (var JSON_Output_Value_Stream; Val : optional Univ_Integer;
+      Low, High : Univ_Integer);
+
+   func Write_Float (var JSON_Output_Value_Stream; Val : Univ_Float;
+      Digits : Univ_Integer);
+   func Write_Optional_Float
+     (var JSON_Output_Value_Stream; Val : optional Univ_Float;
+      Digits : Univ_Integer);
+
+   func Write_String (var JSON_Output_Value_Stream; Val : Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+      {Min_Len >= 0 and then |Val| in Min_Len .. Max_Len};
+   func Write_Optional_String
+     (var JSON_Output_Value_Stream; Val : optional Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer);
+
+   func Write_Begin_Seq (var JSON_Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer);
+   func Write_Begin_Optional_Seq (var JSON_Output_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer; Actual_Len : optional Univ_Integer);
+
+   func Write_End_Seq (var JSON_Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer);
+
+   func Write_Begin_Map (var JSON_Output_Value_Stream);
+   func Write_Begin_Optional_Map (var JSON_Output_Value_Stream;
+      Is_Null : Boolean);
+
+   func Write_End_Map (var JSON_Output_Value_Stream);
+
+   func Write_Begin_Poly
+     (var JSON_Output_Value_Stream; Type_Name : Univ_String);
+   func Write_Begin_Optional_Poly (var JSON_Output_Value_Stream;
+      Type_Name : optional Univ_String);
+   func Write_End_Poly (var JSON_Output_Value_Stream);
+
+   func Write_Begin_Obj (var JSON_Output_Value_Stream);
+   func Write_Begin_Optional_Obj (var JSON_Output_Value_Stream;
+      Is_Null : Boolean);
+   func Write_End_Obj (var JSON_Output_Value_Stream);
+end interface PSL::Core::JSON_Output_Value_Stream;
+
+class PSL::Core::JSON_Output_Value_Stream is
+   ref var Byte_Str : Output_Byte_Stream+;
+   var End_Reached : Boolean := #false;
+   type JSON_Output_State is Enum
+     <[#Initial, #Expecting_First_Seq_Elem, #Expecting_Seq_Elem,
+       #Expecting_First_Map_Key, #Expecting_Map_Key, #Expecting_Map_Value]>;
+   var State_Stack : Stack<JSON_Output_State> := [#Initial];
+   var Indent := 0;
+   const Indent_Inc := 2;  --  Indent by 2 each level of nesting
+
+   const Debug : Boolean := #false;
+
+   func Write_UTF8 (var OVS : JSON_Output_Value_Stream; Str : Univ_String) is
+      //  Convert Univ_String to UTF8 and then write to OVS.
+      //  Set OVS.End_Reached as appropriate.
+      const End_Reached := UTF::Output::Encode_Str (OVS.Byte_Str, Str);
+
+      if End_Reached then
+         if Debug then
+            Println("End Reached while UTF-8 encoding `(Str)");
+         end if;
+         OVS.End_Reached := #true;
+      end if;
+   end func Write_UTF8;
+
+   func Start_Item (var OVS : JSON_Output_Value_Stream) is
+      //  Emit extra JSON syntax according to current state
+      case OVS.State_Stack.Top() of
+       [#Initial] =>
+         //  Should probably only start an object in this state.
+         Write_UTF8 (OVS, "\n");
+
+       [#Expecting_First_Seq_Elem] =>
+         //  We have seen a Begin_Seq and have emitted a '['
+         //  Start a new line at the appropriate indent.
+         Write_UTF8 (OVS, "\n");
+         Write_UTF8 (OVS, OVS.Indent * ' ');
+
+         //  Switch into a state where we should emit a comma before the
+         //  emitting the newline.
+         OVS.State_Stack.Top() := #Expecting_Seq_Elem;
+
+       [#Expecting_Seq_Elem] =>
+         //  We have emitted at least one element of a sequence.
+         //  Emit a comma and then start a new line at the correct indent.
+         Write_UTF8 (OVS, ",\n");
+         Write_UTF8 (OVS, OVS.Indent * ' ');
+
+       [#Expecting_First_Map_Key] =>
+         //  We have seen a Begin_Map and have emitted a '{'
+         Write_UTF8 (OVS, "\n");
+         Write_UTF8 (OVS, OVS.Indent * ' ');
+
+         //  Switch into a state where we should emit a colon before the
+         //  value
+         OVS.State_Stack.Top() := #Expecting_Map_Value;
+
+       [#Expecting_Map_Key] =>
+         //  We have seen a map value, so this must be a key;
+         //  emit a ',' a newline, and an indent
+         Write_UTF8 (OVS, ",\n");
+         Write_UTF8 (OVS, OVS.Indent * ' ');
+
+         //  Switch back into Expecting_Map_Value,
+         //  since we are expecting a value
+         OVS.State_Stack.Top() := #Expecting_Map_Value;
+
+       [#Expecting_Map_Value] =>
+         //  We have seen a map key, emit a ':' and a space
+         Write_UTF8 (OVS, ": ");
+
+         //  Switch into a state where we should emit a comma and a newline
+         //  before the next key/value pair.
+         OVS.State_Stack.Top() := #Expecting_Map_Key;
+
+      end case;
+   end func Start_Item;
+
+   func Write_Begin_JSON_Array (var OVS: JSON_Output_Value_Stream) is
+      OVS.Indent += Indent_Inc;
+      Push (OVS.State_Stack, #Expecting_First_Seq_Elem);
+
+      Write_UTF8 (OVS, "[");
+   end func Write_Begin_JSON_Array;
+
+   func Write_End_JSON_Array (var OVS: JSON_Output_Value_Stream) is
+      OVS.Indent -= Indent_Inc;
+
+      //  Pop the state stack
+      const Old_State : JSON_Output_State := OVS.State_Stack.Pop();
+
+      case Old_State of
+       [#Expecting_First_Seq_Elem] =>
+         //  We have seen a Begin_JSON_Array and have emitted a '['
+         //  This must be an empty array.
+         Write_UTF8 (OVS, "]");
+
+       [#Expecting_Seq_Elem] =>
+         //  We have emitted at least one element of a sequence.
+         //  Start a new line and write the closing ']' with indent.
+         Write_UTF8 (OVS, "\n");
+         Write_UTF8 (OVS, OVS.Indent * ' ');
+         Write_UTF8 (OVS, "]");
+
+       [#Initial |
+        #Expecting_First_Map_Key |
+        #Expecting_Map_Key |
+        #Expecting_Map_Value] =>
+         //  Not expected!
+         if Debug then
+            Println ("Expected state of #Expecting_First_Seq_Elem or " |
+                     "#Expecting_Seq_Elem, found `(Old_State)");
+         end if;
+
+         {#false}
+      end case;
+   end func Write_End_JSON_Array;
+
+ exports
+
+   func Create(ref var Output_Byte_Stream+) -> JSON_Output_Value_Stream is
+     ((Byte_Str => Output_Byte_Stream));
+
+   func Is_Self_Describing (JSON_Output_Value_Stream) -> Boolean is
+     (#true);
+     //  If #false, then Begin_Obj/End_Obj are no-ops
+
+   func Reached_End(JSON_Output_Value_Stream) -> Boolean is
+     (JSON_Output_Value_Stream.End_Reached);
+
+   func Write_Int (var OVS: JSON_Output_Value_Stream; Val : Univ_Integer;
+      Low, High : Univ_Integer) is
+
+      {Val not null}
+      Write_Optional_Int (OVS, Val, Low, High);
+   end func Write_Int;
+
+   func Write_Optional_Int
+     (var OVS : JSON_Output_Value_Stream; Val : optional Univ_Integer;
+      Low, High : Univ_Integer) is
+
+      Start_Item (OVS);
+
+      if Debug then
+         Println
+           ("JSON Write_(Optional_)Int, Low = `(Low), High = `(High)" |
+            ", Val = `(Val)");
+      end if;
+
+      const Str := (if Val is null then "null" else To_String (Val));
+      Write_UTF8 (OVS, Str);
+   end func Write_Optional_Int;
+
+   func Write_Float (var OVS: JSON_Output_Value_Stream; Val : Univ_Float;
+      Digits : Univ_Integer) is
+      //  Just pass the buck to the optional one
+      Write_Optional_Float (OVS, Val, Digits);
+   end func Write_Float;
+
+   func Write_Optional_Float
+     (var OVS : JSON_Output_Value_Stream; Val : optional Univ_Float;
+      Digits : Univ_Integer) is
+
+      Start_Item(OVS);
+
+      if Debug then
+         Println
+           ("JSON Write_Optional_Float, Difits = `(Digits)" |
+            ", Val = `(Val)");
+      end if;
+
+      const Str := (if Val is null then "null" else To_String (Val));
+      Write_UTF8 (OVS, Str);
+   end func Write_Optional_Float;
+
+   func Write_String (var OVS : JSON_Output_Value_Stream; Val : Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer) is
+      //  Use UTF-8
+      
+      {Val not null}
+      //  Pass the buck
+      Write_Optional_String (OVS, Val, Max_Char, Min_Len, Max_Len);
+   end func Write_String;
+
+   func Write_Optional_String
+     (var OVS : JSON_Output_Value_Stream; Val : optional Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer) is
+     //  A null-valued string (as opposed to the empty string)
+     //  is represented by a length of zero followed a 0x7F.
+     //  An empty string is represented by a length of zero followed by a zero.
+     //  A fixed-length string that starts with a 0x7F has an extra
+     //  0x7F tagged on the front.
+
+      Start_Item (OVS);
+
+      const Str := (if Val is null then "null" else '"' | Val | '"');
+         //  TBD: Need to escape characters not allowed in a JSON string
+
+      Write_UTF8 (OVS, Str);
+   end func Write_Optional_String;
+
+   func Write_Begin_Seq (var OVS : JSON_Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer) is
+
+      {Actual_Len not null}
+      //  Just pass the buck to the "optional" version
+      Write_Begin_Optional_Seq (OVS, Min_Len, Max_Len, Actual_Len);
+   end func Write_Begin_Seq;
+    
+   func Write_Begin_Optional_Seq (var OVS : JSON_Output_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer; Actual_Len : optional Univ_Integer) is
+
+      Start_Item (OVS);
+
+      if Actual_Len is null then
+         Write_UTF8 (OVS, "null");
+      else
+         Write_Begin_JSON_Array (OVS);
+      end if;
+   end func Write_Begin_Optional_Seq;
+
+   func Write_End_Seq (var OVS : JSON_Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer) is
+      //  Emit "]" optionally preceded by a newline
+      //  Pop the state stack and reduce the indent
+
+      Write_End_JSON_Array (OVS);
+   end func Write_End_Seq;
+
+   func Write_Begin_Map (var OVS : JSON_Output_Value_Stream) is
+      //  Just pass the buck to the "optional" version
+      Write_Begin_Optional_Map (OVS, Is_Null => #false);
+   end func Write_Begin_Map;
+
+   func Write_Begin_Optional_Map (var OVS : JSON_Output_Value_Stream;
+      Is_Null : Boolean) is
+
+      Start_Item (OVS);
+
+      if Is_Null then
+         Write_UTF8 (OVS, "null");
+      else
+         OVS.Indent += Indent_Inc;
+         Push (OVS.State_Stack, #Expecting_First_Map_Key);
+
+         Write_UTF8 (OVS, "{");
+      end if;
+   end func Write_Begin_Optional_Map;
+
+   func Write_End_Map (var OVS : JSON_Output_Value_Stream) is
+      //  Emit "}" optionally preceded by a newline
+      //  Pop the state stack and reduce the indent
+
+      OVS.Indent -= Indent_Inc;
+
+      //  Pop the state stack
+      const Old_State : JSON_Output_State := OVS.State_Stack.Pop();
+
+      case Old_State of
+       [#Expecting_First_Map_Key] =>
+         //  We have seen a Begin_Map and have emitted a '{'
+         //  This must be an empty object.
+         Write_UTF8 (OVS, "}");
+
+       [#Expecting_Map_Key] =>
+         //  We have emitted at least one key/value pair.
+         //  Start a new line and write the closing '}' with indent.
+         Write_UTF8 (OVS, "\n");
+         Write_UTF8 (OVS, OVS.Indent * ' ');
+         Write_UTF8 (OVS, "}");
+
+       [#Initial |
+        #Expecting_First_Seq_Elem |
+        #Expecting_Seq_Elem |
+        #Expecting_Map_Value] =>
+         //  Not expected!
+         if Debug then
+            Println ("Expected state of #Expecting_First_Map_Key or " |
+                     "#Expecting_Map_Key, found `(Old_State)");
+         end if;
+
+         {#false}
+      end case;
+   end func Write_End_Map;
+
+   func Write_Begin_Poly
+     (var JSON_Output_Value_Stream; Type_Name : Univ_String)
+      is (null); -- TBD
+   func Write_Begin_Optional_Poly (var JSON_Output_Value_Stream;
+      Type_Name : optional Univ_String) is (null); -- TBD
+   func Write_End_Poly (var JSON_Output_Value_Stream) is (null); -- TBD
+
+   func Write_Begin_Obj (var OVS : JSON_Output_Value_Stream) is
+      //  Just pass the buck to the "optional" version
+      Write_Begin_Optional_Obj (OVS, Is_Null => #false);
+   end func Write_Begin_Obj;
+
+   func Write_Begin_Optional_Obj (var OVS : JSON_Output_Value_Stream;
+      Is_Null : Boolean) is
+      //  Treat an "object" as a sequence of components
+      //  Preferred would be a set of key/value pairs
+
+      Start_Item (OVS);
+
+      if Is_Null then
+         Write_UTF8 (OVS, "null");
+      else
+         Write_Begin_JSON_Array (OVS);
+      end if;
+   end func Write_Begin_Optional_Obj;
+
+   func Write_End_Obj (var OVS : JSON_Output_Value_Stream) is
+      //  Emit "]" optionally preceded by a newline
+      //  Pop the state stack and reduce the indent
+
+      Write_End_JSON_Array (OVS);
+   end func Write_End_Obj;
+end class PSL::Core::JSON_Output_Value_Stream;
+
+interface PSL::Core::JSON_Input_Value_Stream<>
+  extends PSL::Core::Input_Value_Stream<> is
+
+   func Create(ref var Input_Byte_Stream+) -> JSON_Input_Value_Stream;
+
+   func Is_Self_Describing (JSON_Input_Value_Stream) -> Boolean;
+
+   func Reached_End(JSON_Input_Value_Stream) -> Boolean;
+
+   func Read_Int (var IVS : JSON_Input_Value_Stream;
+      Low, High : Univ_Integer) -> Val : Univ_Integer
+      {Val in Low .. High};
+
+   func Read_Optional_Int
+     (var JSON_Input_Value_Stream;
+      Low, High : Univ_Integer) -> optional Univ_Integer;
+
+   func Read_Float (var JSON_Input_Value_Stream;
+      Digits : Univ_Integer) -> Univ_Float;
+   func Read_Optional_Float
+     (var JSON_Input_Value_Stream;
+      Digits : Univ_Integer) -> optional Univ_Float;
+
+   func Read_String (var JSON_Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> Univ_String;
+   func Read_Optional_String
+     (var JSON_Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> optional Univ_String;
+
+   func Read_Begin_Seq (var JSON_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer;
+   func Read_Begin_Optional_Seq (var JSON_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
+
+   func More_Seq_Elements (var JSON_Input_Value_Stream) -> Boolean;
+   func Read_End_Seq (var JSON_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer;
+
+   func Read_Begin_Map (var JSON_Input_Value_Stream);
+   func Read_Begin_Optional_Map (var JSON_Input_Value_Stream)
+     -> Is_Null : Boolean;
+
+   func More_Map_Elements (var JSON_Input_Value_Stream) -> Boolean;
+   func Read_End_Map (var JSON_Input_Value_Stream);
+
+   func Read_Begin_Poly (var JSON_Input_Value_Stream)
+     -> Type_Name : Univ_String;
+   func Read_Begin_Optional_Poly (var JSON_Input_Value_Stream)
+     -> Type_Name : optional Univ_String;
+   func Read_End_Poly (var JSON_Input_Value_Stream);
+
+   func Read_Begin_Obj (var JSON_Input_Value_Stream);
+   func Read_Begin_Optional_Obj (var JSON_Input_Value_Stream)
+     -> Is_Null : Boolean;
+
+   func Read_End_Obj (var JSON_Input_Value_Stream);
+end interface PSL::Core::JSON_Input_Value_Stream;
+
+class PSL::Core::JSON_Input_Value_Stream is
+   ref var Byte_Str : Input_Byte_Stream+;
+   var Peek_Char : optional Univ_Character := null;
+   var End_Reached : Boolean := #false;
+
+   const Debug : Boolean := #false;
+
+   func Scan_JSON_Token (var IVS : JSON_Input_Value_Stream;
+                         Ignore_Comma : Boolean := #false) -> Univ_String is
+      //  Read in one token from input stream, decoding it into a Univ_String
+      //  Ignore white space.
+      //  IVS.Peek_Char provides a one-character peek-ahead when non-null.
+
+      ref Peek => IVS.Peek_Char;
+
+      func Next() -> Univ_Character is
+         //  Get next decoded character from byte stream
+         return UTF::Input::Decode_Char (IVS.Byte_Str);
+      end func Next;
+
+      func Decode_Hex_Digit (X : optional Univ_Character)
+        -> optional Univ_Integer is
+         //  Return value in range 0..15 or null, based on hex digit
+         if X is null then
+            return null;
+         end if;
+         case X of
+          ['0'..'9'] =>
+            return X - '0';
+          ['a'..'f'] =>
+            return X - 'a' + 10;
+          ['A'..'F'] =>
+            return X - 'A' + 10;
+          [..] =>
+            return null;
+         end case;
+      end func Decode_Hex_Digit;
+
+      func Scan_Number () -> optional Univ_String is
+      //  Scan a number, append to Result_Vec
+      //  Presume IVS.Peek is initialized to first char of number
+      //  (either '0'..'9' or '-').
+         
+         var Result_Vec : Vector<Univ_Character> := [];
+
+         func Scan_Int () -> Boolean is
+         //  Scan an integer, append to Result_Vec
+         //  Presume IVS.Peek is initialized to first char of number
+         //  or null.  Return #true if OK syntax, #false if not
+            if Peek is null then
+               Peek := Next();
+               if Peek is null then
+                  return null;
+               end if;
+            end if;
+            if Peek not in '0' .. '9' then
+               return null;
+            end if;
+            while Peek in '0' .. '9' loop
+               Result_Vec |= Peek;
+               Peek := Next();
+            end loop;
+            // Syntax OK!
+            return #true;
+         end func Scan_Int;
+
+         if Peek == '-' then
+            //  Negative number
+            Result_Vec |= Peek;
+            Peek := Next();
+         end if;
+
+         if not Scan_Int () then
+            //  Syntax error
+            return null;
+         end if;
+
+         if Peek not null and then Peek == '.' then
+            //  Fraction part
+            Result_Vec |= Peek;
+            Peek := null;
+            if not Scan_Int () then
+               //  Syntax error
+               return null;
+            end if;
+         end if;
+
+         if Peek not null and then Peek in 'e' | 'E' then
+            //  Exponent part [E|e][+|-|]<int>
+            Result_Vec |= Peek;
+            Peek := Next();
+            if Peek is null then
+               //  Syntax error
+               return null;
+            end if;
+            if Peek in '+' | '-' then
+               Result_Vec |= Peek;
+               Peek := Next();
+               if Peek is null then
+                  //  Syntax error
+                  return null;
+               end if;
+            end if;
+            if not Scan_Int () then
+               //  Syntax error
+               return null;
+            end if;
+         end if;
+
+         return From_Vector (Result_Vec);
+      end func Scan_Number;
+
+      func Scan_String () -> optional Univ_String is
+         //  Read in a JSON string
+         var Result_Vec : Vector<Univ_Character> := [Peek];
+
+         loop
+            Peek := Next();
+            if Peek is null then
+               //  Syntax error
+               return null;
+            elsif Peek == '\n' then
+               //  Syntax error
+               return null;
+            elsif Peek == '\\' then
+               Peek := Next();
+               case Peek of
+                ['r'] =>
+                  Peek := '\r';
+                ['n'] =>
+                  Peek := '\n';
+                ['t'] =>
+                  Peek := '\t';
+                ['f'] =>
+                  Peek := '\f';
+                ['b'] =>
+                  Peek := '\b';
+                ['u'] =>
+                  //  Unicode using 4 hex digits 
+                  var U_Val := 0;
+
+                  for I in 1 .. 4 loop
+                     const Dig := Decode_Hex_Digit
+                               (Next());
+                     if Dig is null then
+                        return null;
+                     end if;
+                     U_Val := U_Val * 16 + Dig;
+                  end loop;
+                  Peek := UTF::Nul_Ch + U_Val;
+
+                [..] =>
+                  //  Peek not changed
+                  null;
+               end case;
+               Result_Vec |= Peek;
+            else
+               Result_Vec |= Peek;
+               if Peek == '"' then
+                  exit loop;
+               end if;
+            end if;
+         end loop;
+
+         if Peek is null then
+            //  Bad string
+            return null;
+         else
+            //  Good string.  No peek-ahead left.
+            Peek := null;
+            return From_Vector (Result_Vec);
+         end if;
+      end func Scan_String;
+
+      func Scan_Keyword (Keyword : Univ_String)
+         -> optional Univ_String is
+         for each C of Keyword forward loop
+            if Peek is null or else Peek != C then
+               return null;
+            end if;
+            Peek := Next();
+         end loop;
+
+         //  Syntax OK (TBD: should we require a separator after a keyword?)
+         return Keyword;
+      end func Scan_Keyword;
+
+      //////
+
+      if Peek is null then
+         Peek := Next();
+      end if;
+
+      while Peek not null loop
+         case Peek of
+          [' ' | '\t' | '\n' | '\r'] =>
+            //  Ignore white space; stay in loop
+            null;
+
+          ['0'..'9' | '-'] =>
+            //  A JSON number
+            return Scan_Number ();
+
+          ['"'] =>
+            //  A JSON string
+            return Scan_String ();
+
+          ['[' | ']' | '{' | '}' | ','] =>
+            //  A separator
+            const Result := Peek | "";
+            //  No peak-ahead after a separator which means it can
+            //  be "pushed back"
+            Peek := null;
+            if not Ignore_Comma or else Result != "," then
+               return Result;
+            end if;
+
+          ['t'] =>
+            return Scan_Keyword ("true");
+
+          ['f'] =>
+            return Scan_Keyword ("false");
+
+          ['n'] =>
+            return Scan_Keyword ("null");
+
+          [..] =>
+            //  Syntax error
+            return null;
+         end case;
+
+         //  Advance to next character
+         Peek := Next();
+      end loop;
+   end func Scan_JSON_Token;
+
+ exports
+
+   func Create(ref var Input_Byte_Stream+) -> JSON_Input_Value_Stream is
+     ((Byte_Str => Input_Byte_Stream));
+
+   func Is_Self_Describing (JSON_Input_Value_Stream) -> Boolean is (#true);
+     //  If #false, then Begin_Obj/End_Obj are no-ops
+
+   func Reached_End(JSON_Input_Value_Stream) -> Boolean
+     is (JSON_Input_Value_Stream.End_Reached);
+
+   func Read_Int (var IVS : JSON_Input_Value_Stream;
+      Low, High : Univ_Integer) -> Val : Univ_Integer is
+
+      Val := Read_Optional_Int (IVS, Low, High);
+      {Val not null}
+   end func Read_Int;
+
+   func Read_Optional_Int
+     (var IVS : JSON_Input_Value_Stream;
+      Low, High : Univ_Integer) -> optional Univ_Integer is
+
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null or Token == "" then
+         //  Syntax error
+         {#false}
+         return null;
+      end if;
+
+      case Token[1] of
+       ['n'] =>
+         //  "null"
+         return null;
+       ['0' .. '9' | '-'] =>
+         //  From_String will return null if not good integer syntax
+         return From_String (Token);
+       [..] =>
+         //  Syntax error
+         Println ("Syntax error, expecting '-' or a digit," |
+                  " found \"`(Token)\"");
+         {#false}
+         return null;
+      end case;
+   end func Read_Optional_Int;
+
+   func Read_Float (var JSON_Input_Value_Stream;
+      Digits : Univ_Integer) -> Univ_Float is
+      (Read_Optional_Float (JSON_Input_Value_Stream, Digits));
+
+   func Read_Optional_Float
+     (var IVS : JSON_Input_Value_Stream;
+      Digits : Univ_Integer) -> Result : optional Univ_Float is
+
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null or Token == "" then
+         //  Syntax error
+         {#false}
+         return null;
+      end if;
+
+      case Token[1] of
+       ['n'] =>
+         //  "null"
+         return null;
+       ['0' .. '9' | '-'] =>
+         //  From_String will return null if not good integer syntax
+         return From_String (Token);
+       [..] =>
+         //  Syntax error
+         {#false}
+         return null;
+      end case;
+   end func Read_Optional_Float;
+
+   func Read_String (var IVS : JSON_Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> Univ_String is
+      return Read_Optional_String (IVS, Max_Char, Min_Len, Max_Len);
+   end func Read_String;
+      
+   func Read_Optional_String
+     (var IVS : JSON_Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> optional Univ_String is
+      
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null or Token == "" then
+         //  Syntax error
+         {#false}
+         return null;
+      end if;
+
+      case Token[1] of
+       ['"'] =>
+         //  Strip off the double quotes
+         return Token[2 .. |Token|-1];
+
+       ['n'] =>
+         //  "null"
+         return null;
+
+       [..] =>
+         //  Syntax error
+         {#false}
+         return null;
+      end case;
+   end func Read_Optional_String;
+
+   func Read_Begin_Seq (var IVS : JSON_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer is
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null or else Token != "[" then
+         {#false}
+         return 0;
+      end if;
+
+      //  Always variable length
+      return -1;
+   end func Read_Begin_Seq;
+
+   func Read_Begin_Optional_Seq (var IVS : JSON_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer is
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null then
+         {#false}
+         return 0;
+      elsif Token == "null" then
+         return null;
+      elsif Token == "[" then
+         //  Always variable length
+         return -1;
+      else
+         {#false}
+         return 0;
+      end if;
+   end func Read_Begin_Optional_Seq;
+
+   func More_Seq_Elements (var IVS : JSON_Input_Value_Stream) -> Boolean is
+      loop
+         if IVS.Peek_Char not null then
+            case IVS.Peek_Char of
+             [' ' | '\t' | '\n' | '\r'] =>
+               //  Ignore white space; stay in loop
+               null;
+             [']'] =>
+               //  End of sequence
+               return #false;
+             [..] =>
+               //  Anything might come immediately after a '['
+               return #true;
+            end case;
+         end if;
+         //  Get next character
+         IVS.Peek_Char := UTF::Input::Decode_Char (IVS.Byte_Str);
+      end loop;
+   end func More_Seq_Elements;
+
+   func Read_End_Seq (var IVS : JSON_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer is
+      const Token := Scan_JSON_Token (IVS);
+      {Token not null and then Token == "]"}
+      return -1;
+   end func Read_End_Seq;
+
+   func Read_Begin_Map (var JSON_Input_Value_Stream)
+      is (null);  --  TBD
+   func Read_Begin_Optional_Map (var JSON_Input_Value_Stream)
+     -> Is_Null : Boolean
+      is (#false);  --  TBD
+
+   func More_Map_Elements (var JSON_Input_Value_Stream) -> Boolean
+      is (#false);  --  TBD
+   func Read_End_Map (var JSON_Input_Value_Stream)
+      is (null);  --  TBD
+
+   func Read_Begin_Poly (var JSON_Input_Value_Stream)
+     -> Type_Name : Univ_String
+      is ("");  --  TBD
+   func Read_Begin_Optional_Poly (var JSON_Input_Value_Stream)
+     -> Type_Name : optional Univ_String
+      is (null);  --  TBD
+   func Read_End_Poly (var JSON_Input_Value_Stream)
+      is (null);  --  TBD
+
+   func Read_Begin_Obj (var IVS : JSON_Input_Value_Stream) is
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null or else Token != "[" then
+         {#false}
+         return;
+      end if;
+   end func Read_Begin_Obj;
+
+   func Read_Begin_Optional_Obj (var IVS : JSON_Input_Value_Stream)
+     -> Is_Null : Boolean is
+
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null then
+         {#false}
+         return #true;
+
+      elsif Token == "null" then
+         return #true;
+
+      elsif Token == "[" then
+         return #false;
+
+      else
+         if Debug then
+            Println("Expecting '[' or 'null' but found '`(Token)'");
+         end if;
+         {#false}
+         return #true;
+      end if;
+      
+   end func Read_Begin_Optional_Obj;
+
+   func Read_End_Obj (var IVS : JSON_Input_Value_Stream) is 
+      const Token := Scan_JSON_Token (IVS);
+      {Token not null and then Token == "]"}
+   end func Read_End_Obj;
+end class PSL::Core::JSON_Input_Value_Stream;
+
+func PSL::Test::Test_JSON_Stream() is
+
+   var IO := IO::Get_IO();
+   var B_File : Byte_Stream_Output_File := IO.Create ("json_test.json");
+
+   ref var OVS : JSON_Output_Value_Stream => Create(B_File);
+
+   ref var OOS : Output_Object_Stream => Create(OVS);
+
+   var Next_Val_Out := 1111;
+   var Next_Val_In := 1111;
+
+   func Next_Out() -> Univ_Integer is
+   //  Return a unique value
+      Next_Val_Out := Next_Val_Out + 123;
+      return Next_Val_Out;
+   end func Next_Out;
+
+   func Next_In() -> Univ_Integer is
+   //  Return a unique value
+      Next_Val_In := Next_Val_In + 123;
+      return Next_Val_In;
+   end func Next_In;
+
+   Println ("Testing Read/Write_Optional_Object with a JSON value stream");
+   Println (" output in json_test.json");
+
+   for I in 1 .. 7 forward loop
+      if I == 3 then
+         Write_Optional_Obj (OOS, Univ_Integer::(null));
+      else
+         Write_Optional_Obj (OOS, I**3);
+      end if;
+        
+   end loop;
+
+   Println ("Testing write sets rather than integers");
+
+   type Int_Set is Set<Integer>;
+
+   func Img(II : Int_Set) -> Univ_String is
+      return "[" | (for (I : Integer in II; Sep := "" then ",") =>
+                 <""> | Sep | To_String (I)) | "]";
+   end func Img;
+
+   for I in 1 .. 7 forward loop
+      if I == 3 then
+         Write_Optional_Obj (OOS, Int_Set::(null));
+      else
+         var Test_Set : Int_Set := [for J in 1 .. I => Next_Out()];
+
+         Write_Optional_Obj (OOS, Test_Set);
+      end if;
+        
+   end loop;
+
+   B_File.Close();
+
+   //  Read back in
+
+   var I_File : Byte_Stream_Input_File := IO.Open ("json_test.json");
+   ref var IVS : JSON_Input_Value_Stream => Create(I_File);
+   ref var IOS : Input_Object_Stream => Create(IVS);
+
+   Println ("About to read in 7 (optional) Integers");
+
+   for I in 1 .. 7 forward loop
+      var Z : Univ_Integer;
+      // Read_Optional_Obj (IOS, Z);
+      Z := Read_Optional_Int (IVS, 0, High => 7**3);
+      if I == 3 then
+         if Z not null then
+            Println ("Expected null but found `(Z)");
+         end if;
+      else
+         if Z != I**3 then
+            Println ("Expected `(I**3) but found `(Z)");
+         end if;
+      end if;
+      // Println
+      //   ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+
+   Println ("Successful read of 7 optional integers");
+   
+   Println ("About to read in 7 (optional) Integer sets");
+   for I in 1 .. 7 forward loop
+      // Println ("Bytes_To_Read = `(Buf.Bytes_To_Read())");
+      Println ("Reading set `(I)");
+      const Expected : optional Int_Set :=
+        (if I == 3 then null else [for J in 1 .. I => Next_In()]);
+
+      if Expected is null then
+         Println ("Expecting null");
+      else
+
+         Println ("Expecting `(Img(Expected))");
+      end if;
+
+      var Z : Int_Set;
+      Read_Optional_Obj (IOS, Z);
+      if Expected is null then
+         if Z not null then
+            Println ("Expected null but found `(Img(Z))");
+         end if;
+      else
+         if Z != Expected then
+            Println ("Expected `(Img(Expected)) but found `(Img(Z))");
+         end if;
+      end if;
+      // Println
+      //   ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+   Println ("All done");
+end func PSL::Test::Test_JSON_Stream;

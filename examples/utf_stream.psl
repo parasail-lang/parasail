@@ -1,0 +1,249 @@
+interface PSL::Core::UTF<> is
+   const Nul_Ch : Univ_Character := Univ_Character::First();
+end interface PSL::Core::UTF;
+
+interface PSL::Core::UTF::Output<> is
+
+   func To_UTF8_Stream (Str : Univ_String)
+     -> Byte_Stream::Stream_Element_Array;
+   //  Build up UTF8 representation as a vector of stream elements
+   //  and then convert to a packed representation.
+
+   func Encode_Str (var OBS : Output_Byte_Stream+; Str : Univ_String)
+     -> End_Reached : Boolean;
+   //  Write UTF-8 encoding of Str to byte stream.
+   //  Return #true if we reach end of stream.
+
+end interface PSL::Core::UTF::Output;
+
+interface PSL::Core::UTF::Input<> is
+
+   func From_UTF8_Stream (Stream : Byte_Stream::Stream_Element_Array)
+     -> Univ_String;
+   //  Convert UTF-8-encoded Stream into a Univ_String
+
+   func Decode_Char (var IBS : Input_Byte_Stream+)
+     -> optional Univ_Character;
+   //  Read UTF-8-encoded character from IBS.
+   //  Return null if not a valid UTF-8 character or reach end of stream.
+end interface PSL::Core::UTF::Input;
+
+class PSL::Core::UTF::Output is
+   const Debug := #false;
+  exports
+
+   func To_UTF8_Stream (Str : Univ_String)
+     -> Result : Byte_Stream::Stream_Element_Array is
+
+      //  Build up UTF8 representation as a vector of stream elements
+      //  and then convert to a packed representation.
+      var UTF8_Bytes : Vector<Byte_Stream::Stream_Element> := [];
+
+      for each C of Str forward loop
+         const Code : Univ_Integer := C - Nul_Ch;
+
+         case Code of
+            [0 .. 0x7F] => 
+               UTF8_Bytes |= Code;
+            [0x80 .. 0x7FF] =>
+               UTF8_Bytes |= 0xC0 + (Code >> 6);
+               UTF8_Bytes |= 0x80 + (Code and 0x3F);
+            [0x800 .. 0xFFFF] =>
+               UTF8_Bytes |= 0xE0 + (Code >> 12);
+               UTF8_Bytes |= 0x80 + (Code >> 6 and 0x3F);
+               UTF8_Bytes |= 0x80 + (Code and 0x3F);
+            [0x1_0000 .. 0x1F_FFFF] =>
+               UTF8_Bytes |= 0xF0 + (Code >> 18);
+               UTF8_Bytes |= 0x80 + (Code >> 12 and 0x3F);
+               UTF8_Bytes |= 0x80 + (Code >> 6 and 0x3F);
+               UTF8_Bytes |= 0x80 + (Code and 0x3F);
+            [..] => //  Nonstandard
+               UTF8_Bytes |= 0xF8 + (Code >> 24)
+               UTF8_Bytes |= 0x80 + (Code >> 18 and 0x3F)
+               UTF8_Bytes |= 0x80 + (Code >> 12 and 0x3F)
+               UTF8_Bytes |= 0x80 + (Code >> 6 and 0x3F)
+               UTF8_Bytes |= 0x80 + (Code and 0x3F);
+         end case;
+
+      end loop
+
+      if Debug then
+         Print("Str = \"`(Str)\", ");
+         for (each B of UTF8_Bytes;
+              Sep := "UTF8 = [" then ", ") forward loop
+            Print(Sep | "0x" | Hex_Image(B));
+         end loop;
+         Println("]");
+      end if;
+
+      --  Pack vector into Result
+      Result :=
+        Create (UTF8_Bytes.Bounds().First .. UTF8_Bytes.Bounds().Last, 0);
+      for I in UTF8_Bytes.Bounds() loop
+         Set (Result, I, UTF8_Bytes[I]);
+      end loop;
+
+   end func To_UTF8_Stream;
+
+   func Encode_Str (var OBS : Output_Byte_Stream+; Str : Univ_String)
+     -> End_Reached : Boolean is
+
+      const Arr := To_UTF8_Stream (Str);
+
+      const Bytes_Written := Write (OBS, Arr);
+
+      if Bytes_Written != |Arr| then
+         if Debug then
+            Println("End Reached: |Arr| = `(|Arr|), " |
+                    "Bytes_Written = `(Bytes_Written)");
+         end if;
+         return #true;
+      else
+         return #false;
+      end if;
+   end func Encode_Str;
+end class PSL::Core::UTF::Output;
+
+class PSL::Core::UTF::Input is
+   const Debug := #false;
+  exports
+   func From_UTF8_Stream (Stream : Byte_Stream::Stream_Element_Array)
+     -> Univ_String is
+      //  Convert UTF-8-encoded Stream into a Univ_String
+      var Buf : Byte_Stream_Buffer := Create (Stream);
+      var Decoded_Vec : Vector<Univ_Character> := [];
+
+      while Buf.Bytes_To_Read() > 0 loop
+         const Ch := Decode_Char (Buf);
+
+         if Ch is null then
+            //  Not a valid UTF8 character
+            {#false}
+            exit loop;
+         end if;
+
+         Decoded_Vec |= Ch;
+      end loop;
+
+      //  Convert vector into Univ_String and return it
+      return From_Vector (Decoded_Vec);
+   end func From_UTF8_Stream;
+
+   func Decode_Char (var IBS : Input_Byte_Stream+)
+     -> optional Univ_Character is
+      var Arr : Byte_Stream::Stream_Element_Array := Create(1 .. 1, 0);
+
+      const Bytes_Read := Read(IBS, Arr);
+      if Bytes_Read != 1 then
+         return null;
+      end if;
+
+      var C : Univ_Integer;
+
+      const Code := Arr[1];
+
+      case Code of
+         [0 .. 0x7F] => 
+            C := Code;
+
+         [0xC0 .. 0xDF] =>
+            const More_Read := Read(IBS, Arr);
+            if More_Read != 1 then
+               return null;
+            end if;
+
+            const Code2 := Arr[1];
+            C := ([[Code and 0x1F]] << 6) + [[Code2 and 0x3F]];
+
+         [0xE0 .. 0xEF] =>
+            var Arr2 : Byte_Stream::Stream_Element_Array := Create(1 .. 2, 0);
+            const More_Read := Read(IBS, Arr2);
+            if More_Read != 2 then
+               return null;
+            end if;
+            C :=
+               ([[Code and 0xF]] << 12) +
+               ([[Arr2[1] and 0x3F]] << 6) +
+                [[Arr2[2] and 0x3F]];
+
+         [0xF0 .. 0xF7] =>
+            var Arr3 : Byte_Stream::Stream_Element_Array := Create(1 .. 3, 0);
+            const More_Read := Read(IBS, Arr3);
+            if More_Read != 3 then
+               return null;
+            end if;
+            C :=
+               ([[Code and 0x7]] << 18) +
+               ([[Arr3[1] and 0x3F]] << 12) +
+               ([[Arr3[2] and 0x3F]] << 6) +
+                [[Arr3[3] and 0x3F]]
+
+            if Debug then
+               Print
+                 ("C = \"`(Nul_Ch + C)\", " |
+                  "Code = 0x`(Hex_Image(C)), " |
+                  "Arr = [0x`(Hex_Image(Code)), ");
+               for (each A of Arr3; Sep := "" then ", ")
+                forward loop
+                  Print(Sep | "0x" | Hex_Image(A));
+               end loop;
+               Println("]");
+            end if;
+
+         [0xF8 .. 0xFB] => // Non standard
+            var Arr4 : Byte_Stream::Stream_Element_Array := Create(1 .. 4, 0);
+            const More_Read := Read(IBS, Arr4);
+            if More_Read != 4 then
+               return null;
+            end if;
+            C :=
+               ([[Code and 0x3]] << 24) +
+               ([[Arr4[1] and 0x3F]] << 18) +
+               ([[Arr4[2] and 0x3F]] << 12) +
+               ([[Arr4[3] and 0x3F]] << 6) +
+                [[Arr4[4] and 0x3F]]
+
+         [..] => //  Not UTF-8
+            return null;
+      end case;
+      return Nul_Ch + C;
+   end func Decode_Char;
+end class PSL::Core::UTF::Input;
+
+func PSL::Test::Test_UTF_Stream() is
+   var IO := IO::Get_IO()
+
+   var Out_File : Byte_Stream_Output_File := IO.Create ("test_file");
+
+   Println ("Writing to test_file");
+
+   if UTF::Output::Encode_Str
+     (Out_File, "This is a green box: \#1_F7_E9#\n")
+   then
+      Println ("End reached putting green box");
+   elsif UTF::Output::Encode_Str
+      (Out_File, "This is a grey box: \#2B_1C#\n")
+   then
+      Println ("End reached putting grey box");
+   elsif UTF::Output::Encode_Str
+      (Out_File, "This is a yellow box: \#1_F7_E8#\n")
+   then
+      Println ("End reached putting yellow box");
+   end if;
+
+   Out_File.Close();
+
+   var In_File : Byte_Stream_Input_File := IO.Open ("test_file");
+
+   Println ("Reading from test_file");
+   loop
+      const C := UTF::Input::Decode_Char(In_File);
+      if C is null then
+         exit loop;
+      end if;
+      Print(C);
+   end loop;
+   In_File.Close();
+   
+   Println ("All done");
+end func PSL::Test::Test_UTF_Stream;
