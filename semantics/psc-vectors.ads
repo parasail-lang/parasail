@@ -61,6 +61,11 @@ package PSC.Vectors is
       Elem : Element_Type);
    --  Overwrite nth element.
 
+   procedure Set_Empty
+     (Vec : in out Vector);
+   --  Set the vector back to the initial, empty state.
+   --  Release any heap storage in use.
+
 private
 
    type Vector_Rec;  --  completed in package body

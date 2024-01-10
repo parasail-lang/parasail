@@ -315,4 +315,34 @@ package body PSC.Vectors is
       Set_Nth_Element (Vec.Data.all, Index, To => Elem);
    end Set_Nth_Element;
 
+   procedure Set_Empty
+     (Vec : in out Vector) is
+   --  Set the vector back to the initial, empty state.
+   --  Release any heap storage in use.
+
+      procedure Set_Empty_Ptr (Ptr : in out Vector_Ptr) is
+      --  Recursive routine to set the entire vector "tree" to empty
+      begin
+         if Ptr = null then
+            --  Nothing to do
+            return;
+         elsif Ptr.Level > 0 then
+            --  Recurse on each of the sub-vectors.
+            for I in 1 .. Ptr.Len loop
+               Set_Empty_Ptr (Ptr.Sub_Vecs (I));
+            end loop;
+         end if;
+         --  Now free this level
+         Free (Ptr);
+      end Set_Empty_Ptr;
+
+   begin  --  Set_Empty
+
+      --  Free the entire tree
+      Set_Empty_Ptr (Vec.Data);
+
+      --  Set the count back to zero.
+      Vec.Count := 0;
+   end Set_Empty;
+
 end PSC.Vectors;

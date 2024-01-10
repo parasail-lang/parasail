@@ -1313,7 +1313,9 @@ package body PSC.Interpreter.IO is
       Obj_Ptr : Word_Ptr;
       Obj_Type : Type_Descriptor_Ptr;
       Is_Optional, Use_Default : Boolean);
-   --  Read Obj of type Obj_Type from Obj_Stream.
+   --  Read Obj of type Obj_Type from Obj_Stream into Obj_Ptr.all.
+   --  If Obj_Type implies a large object, then Obj_Ptr must be
+   --  initialized to point to a large "null" of the appropriate region.
    --  If Is_Optional is True, then Obj is allowed to be null.
    --  Is Use_Default is True, then any definition of the "read"
    --  operation for Obj_Type should be ignored, and the default
@@ -1333,6 +1335,8 @@ package body PSC.Interpreter.IO is
 
       Debug : constant Boolean := False;
       use Ada.Text_IO;
+
+      package Vec_Of_Words is new PSC.Vectors (Word_Type);
 
    begin  --  Read_Obj_From_Stream
 
@@ -1410,6 +1414,9 @@ package body PSC.Interpreter.IO is
          --        (var Input_Value_Stream;
          --         Min_Len, Max_Len : Univ_Integer)
          --         -> Actual_Len : optional Univ_Integer;
+
+         More_Seq_Elements_Op_Index : constant Operation_Index := 11;
+         --  func More_Seq_Elements (var Input_Value_Stream) -> Boolean;
 
          End_Seq_Op_Index : constant Operation_Index := 12;
          --  func Read_End_Seq (var Input_Value_Stream;
@@ -1532,10 +1539,19 @@ package body PSC.Interpreter.IO is
                      Comp_Type : constant Type_Descriptor_Ptr :=
                        Basic_Array_Comp_Type (Non_Map_Type_Desc);
                      Len : Word_Type := 0;
+
+                     Saved_Elements : Vec_Of_Words.Vector;
+                        --  Elements saved up if length unknown in advance
+                     use Vec_Of_Words;
+
+                     Elems_Were_Saved : Boolean := False;
+
+                     Max_Len : constant := Offset_Within_Area'Last;
                   begin
+
                      Param_Arr (0) := 0;  --  Output slot
                      Param_Arr (2) := 0;  --  Min_Len
-                     Param_Arr (3) := 2**31 - 1;  --  Max_Len
+                     Param_Arr (3) := Max_Len;
                      Execute_Compiled_Nth_Op_Of_Type
                        (Context => Context,
                         Params => Param_Arr (0)'Unchecked_Access,
@@ -1556,6 +1572,51 @@ package body PSC.Interpreter.IO is
                         return;  --  All done  --
                      end if;
 
+                     if Len < 0 then
+                        --  Variable length.
+                        --  Use More_Seq to determine when we are done
+                        Len := 0;  --  Reset Len to zero
+                        --  Now read until "More" returns #false.
+                        for I in 1 .. Offset_Within_Area (Max_Len) loop
+                           declare
+                              Comp : aliased Word_Type := Null_For_Obj;
+                              Comp_Value_Ptr : constant Word_Ptr :=
+                                Comp'Unchecked_Access;
+                              Comp_Index : Vec_Of_Words.Elem_Index;
+                           begin
+
+                              --  Invoke More_Seq_Elements
+                              Param_Arr (0) := 0;
+                                 --  output slot tells if more
+                              pragma Assert (Param_Arr (1) = Val_Stream_Obj);
+
+                              Execute_Compiled_Nth_Op_Of_Type
+                                (Context => Context,
+                                 Params => Param_Arr (0)'Unchecked_Access,
+                                 Static_Link => Val_Stream_Type,
+                                 Target_Base => Type_Area,
+                                 Op_Index => More_Seq_Elements_Op_Index);
+
+                              exit when Param_Arr (0) = 0;  --  exit at end
+
+                              --  Read the component
+                              Read_Obj_From_Stream
+                                (Context,
+                                 Obj_Stream,
+                                 Comp_Value_Ptr,
+                                 Comp_Type,
+                                 Is_Optional => True,  --  TBD
+                                 Use_Default => False);
+
+                              --  Save element in the vector
+                              Add_Element (Saved_Elements, Comp, Comp_Index);
+
+                              Len := Len + Word_Type'(1);
+                              pragma Assert (Len = Word_Type (Comp_Index));
+                           end;
+                        end loop;
+                        Elems_Were_Saved := True;
+                     end if;
                      Result := Create_Basic_Array_Obj
                        (Array_Type_Desc => Non_Map_Type_Desc,
                         Array_Len => Integer (Len),
@@ -1571,16 +1632,31 @@ package body PSC.Interpreter.IO is
                              Word_To_Word_Ptr (Result + Offset);
                         begin
                            --  Read each component
-                           Read_Obj_From_Stream
-                             (Context,
-                              Obj_Stream,
-                              Comp_Value_Ptr,
-                              Comp_Type,
-                              Is_Optional => True,  --  TBD
-                              Use_Default => False);
+                           if Elems_Were_Saved then
+                              --  Get Ith saved element
+                              Comp_Value_Ptr.all :=
+                                Nth_Element
+                                  (Saved_Elements,
+                                   Vec_Of_Words.Elem_Index (I));
+                           else
+                              --  Read in Ith element
+                              Read_Obj_From_Stream
+                                (Context,
+                                 Obj_Stream,
+                                 Comp_Value_Ptr,
+                                 Comp_Type,
+                                 Is_Optional => True,  --  TBD
+                                 Use_Default => False);
+                           end if;
                         end;
                      end loop;
 
+                     if Elems_Were_Saved then
+                        --  Recover storage used for saving elements
+                        Set_Empty (Saved_Elements);
+                     end if;
+
+                     --  Final operation is End_Seq
                      Op_Index := End_Seq_Op_Index;
 
                   end;
@@ -1640,6 +1716,8 @@ package body PSC.Interpreter.IO is
                   end loop;
 
                   Op_Index := End_Obj_Op_Index;
+                  --  No other parameters
+                  Param_Arr (0) := Val_Stream_Obj;
 
                end if;  --  Whether is Basic_Array
 
