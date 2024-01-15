@@ -418,13 +418,18 @@ abstract ref interface PSL::Core::Input_Value_Stream<> is
 
    func More_Seq_Elements (var Input_Value_Stream) -> Boolean;
    func Read_End_Seq (var Input_Value_Stream;
-      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
+   //  Absorb end-of-seq indicator and return actual length of sequence.
+   //  Return -1 if length not known.
+   //  Return null if end-of-seq indicator is missing.
 
    func Read_Begin_Map (var Input_Value_Stream);
    func Read_Begin_Optional_Map (var Input_Value_Stream) -> Is_Null : Boolean;
 
    func More_Map_Elements (var Input_Value_Stream) -> Boolean;
-   func Read_End_Map (var Input_Value_Stream);
+   func Read_End_Map (var Input_Value_Stream) -> Syntax_OK : Boolean;
+   //  Absorb end-of-map indicator.
+   //  Return #false if end-of-map indicator is missing.
 
    func Read_Begin_Poly (var Input_Value_Stream)
      -> Type_Name : Univ_String;
@@ -476,14 +481,19 @@ interface PSL::Core::Binary_Input_Value_Stream<>
 
    func More_Seq_Elements (var Binary_Input_Value_Stream) -> Boolean;
    func Read_End_Seq (var Binary_Input_Value_Stream;
-      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
+   //  Absorb end-of-seq indicator and return actual length of sequence.
+   //  Return -1 if length not known.
+   //  Return null if end-of-seq indicator is missing.
 
    func Read_Begin_Map (var Binary_Input_Value_Stream);
    func Read_Begin_Optional_Map (var Binary_Input_Value_Stream)
      -> Is_Null : Boolean;
 
    func More_Map_Elements (var Binary_Input_Value_Stream) -> Boolean;
-   func Read_End_Map (var Binary_Input_Value_Stream);
+   func Read_End_Map (var Binary_Input_Value_Stream) -> Syntax_OK : Boolean;
+   //  Absorb end-of-map indicator.
+   //  Return #false if end-of-map indicator is missing.
 
    func Read_Begin_Poly (var Binary_Input_Value_Stream)
      -> Type_Name : Univ_String;
@@ -767,8 +777,8 @@ class PSL::Core::Binary_Input_Value_Stream is
    func More_Seq_Elements (var Binary_Input_Value_Stream) -> Boolean
       is (#false);  --  TBD
    func Read_End_Seq (var Binary_Input_Value_Stream;
-      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer
-      is (0);  --  TBD
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer
+      is (-1);  --  TBD
 
    func Read_Begin_Map (var Binary_Input_Value_Stream)
       is (null);  --  TBD
@@ -778,8 +788,10 @@ class PSL::Core::Binary_Input_Value_Stream is
 
    func More_Map_Elements (var Binary_Input_Value_Stream) -> Boolean
       is (#false);  --  TBD
-   func Read_End_Map (var Binary_Input_Value_Stream)
-      is (null);  --  TBD
+   func Read_End_Map (var Binary_Input_Value_Stream) -> Syntax_OK : Boolean
+   //  Absorb end-of-map indicator.
+   //  Return #false if end-of-map indicator is missing.
+      is (#true);  --  TBD
 
    func Read_Begin_Poly (var Binary_Input_Value_Stream)
      -> Type_Name : Univ_String

@@ -8,13 +8,126 @@
 //
 //  See value_stream.psl for the general interface for a Value
 //  stream, and an implementation of a binary value stream.
+
+interface PSL::Core::JSON_Value<> is
+   //  A ParaSail object that can be used to represent a single
+   //  JSON value, or the content of a complete JSON file
+   //  (which is defined to be a single JSON value).
+   type JSON_Value_Kind is Enum
+     <[#Object_Value,
+       #Array_Value,
+       #String_Value,
+       #Number_Value,
+       #Boolean_Value,
+       #Null_Value]>;
+
+   func Create (Kind : JSON_Value_Kind) -> JSON_Value+;
+   //  Create a JSON Value of the given kind
+
+   abstract func Kind (Value : JSON_Value) -> JSON_Value_Kind;
+
+end interface PSL::Core::JSON_Value;
+
+interface PSL::Core::JSON_Object_Value<> extends JSON_Value is
+   var Value : Ordered_Map<Univ_String, JSON_Value+> := [];
+
+   func Create (Value : Ordered_Map <Univ_String, JSON_Value+> := [])
+     -> JSON_Object_Value is ((Value => Value));
+
+   func Kind (Value : JSON_Object_Value) -> JSON_Value_Kind
+     is (#Object_Value);
+end interface PSL::Core::JSON_Object_Value;
+
+interface PSL::Core::JSON_Array_Value<> extends JSON_Value is
+   var Value : Vector<JSON_Value+> := [];
+
+   func Create (Value : Vector <JSON_Value+> := [])
+     -> JSON_Array_Value is ((Value => Value));
+
+   func Kind (Value : JSON_Array_Value) -> JSON_Value_Kind
+     is (#Array_Value);
+end interface PSL::Core::JSON_Array_Value;
+
+interface PSL::Core::JSON_String_Value<> extends JSON_Value is
+   const Value : Univ_String;
+
+   func Create (Value : Univ_String := "")
+     -> JSON_String_Value is ((Value => Value));
+
+   func Kind (Value : JSON_String_Value) -> JSON_Value_Kind
+     is (#String_Value);
+end interface PSL::Core::JSON_String_Value;
+
+interface PSL::Core::JSON_Number_Value<> extends JSON_Value is
+   const Value : Rational;
+
+   func Is_Integer (Number : JSON_Number_Value) -> Boolean
+     is (Number.Value.Den() == 1);
+
+   func Create (Value : Rational := 0.0)
+     -> JSON_Number_Value is ((Value => Value));
+
+   func Create (Value : Univ_Integer)
+     -> JSON_Number_Value is ((Value => Int_To_Rational (Value)));
+
+   func Kind (Value : JSON_Number_Value) -> JSON_Value_Kind
+     is (#Number_Value);
+end interface PSL::Core::JSON_Number_Value;
+
+interface PSL::Core::JSON_Boolean_Value<> extends JSON_Value is
+   const Value : Boolean;
+
+   func Create (Value : Boolean := #false)
+     -> JSON_Boolean_Value is ((Value => Value));
+
+   func Kind (Value : JSON_Boolean_Value) -> JSON_Value_Kind
+     is (#Boolean_Value);
+end interface PSL::Core::JSON_Boolean_Value;
+
+interface PSL::Core::JSON_Null_Value<> extends JSON_Value is
+   type Unit is Enum<[#Null_Value]>;
+   const Value : Unit;
+
+   func Create ()
+     -> JSON_Null_Value is (JSON_Null_Value::(Value => #Null_Value))
+
+   func Kind (Value : JSON_Null_Value) -> JSON_Value_Kind
+     is (#Null_Value);
+end interface PSL::Core::JSON_Null_Value;
+
+class PSL::Core::JSON_Value is
+
+ exports
+
+   func Create (Kind : JSON_Value_Kind) -> JSON_Value+ is
+   //  Create a JSON Value of the given kind
+      case Kind of
+       [#Object_Value] =>
+         return JSON_Object_Value::Create();
+       [#Array_Value] =>
+         return JSON_Array_Value::Create();
+       [#String_Value] =>
+         return JSON_String_Value::Create();
+       [#Number_Value] =>
+         return JSON_Number_Value::Create();
+       [#Boolean_Value] =>
+         return JSON_Boolean_Value::Create();
+       [#Null_Value] =>
+         return JSON_Null_Value::Create();
+      end case;
+   end func Create;
+end class PSL::Core::JSON_Value;
+
 interface PSL::Core::JSON_Output_Value_Stream<>
   extends PSL::Core::Output_Value_Stream<> is
+   //  This kind of value stream is used for output of ParaSail values
+   //  in JSON format, given a byte stream of some sort.
 
    func Create(ref var Output_Byte_Stream+) -> JSON_Output_Value_Stream;
 
    func Is_Self_Describing (JSON_Output_Value_Stream) -> Boolean;
-     //  If #false, then Begin_Obj/End_Obj are no-ops
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
 
    func Reached_End(JSON_Output_Value_Stream) -> Boolean;
 
@@ -28,6 +141,12 @@ interface PSL::Core::JSON_Output_Value_Stream<>
       Digits : Univ_Integer);
    func Write_Optional_Float
      (var JSON_Output_Value_Stream; Val : optional Univ_Float;
+      Digits : Univ_Integer);
+
+   func Write_Rational (var JSON_Output_Value_Stream; Val : Rational;
+      Digits : Univ_Integer);
+   func Write_Optional_Rational
+     (var JSON_Output_Value_Stream; Val : optional Rational;
       Digits : Univ_Integer);
 
    func Write_String (var JSON_Output_Value_Stream; Val : Univ_String;
@@ -61,6 +180,10 @@ interface PSL::Core::JSON_Output_Value_Stream<>
    func Write_Begin_Optional_Obj (var JSON_Output_Value_Stream;
       Is_Null : Boolean);
    func Write_End_Obj (var JSON_Output_Value_Stream);
+
+   func Write_JSON_Value (var JSON_Output_Value_Stream; Value : JSON_Value+);
+   //  Write a JSON value to the stream
+
 end interface PSL::Core::JSON_Output_Value_Stream;
 
 class PSL::Core::JSON_Output_Value_Stream is
@@ -188,7 +311,8 @@ class PSL::Core::JSON_Output_Value_Stream is
 
    func Is_Self_Describing (JSON_Output_Value_Stream) -> Boolean is
      (#true);
-     //  If #false, then Begin_Obj/End_Obj are no-ops
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
 
    func Reached_End(JSON_Output_Value_Stream) -> Boolean is
      (JSON_Output_Value_Stream.End_Reached);
@@ -230,13 +354,34 @@ class PSL::Core::JSON_Output_Value_Stream is
 
       if Debug then
          Println
-           ("JSON Write_Optional_Float, Difits = `(Digits)" |
+           ("JSON Write_Optional_Float, Digits = `(Digits)" |
             ", Val = `(Val)");
       end if;
 
       const Str := (if Val is null then "null" else To_String (Val));
       Write_UTF8 (OVS, Str);
    end func Write_Optional_Float;
+
+   func Write_Rational (var OVS : JSON_Output_Value_Stream; Val : Rational;
+      Digits : Univ_Integer) is
+      Write_Optional_Rational (OVS, Val, Digits);
+   end func Write_Rational;
+
+   func Write_Optional_Rational
+     (var OVS : JSON_Output_Value_Stream; Val : optional Rational;
+      Digits : Univ_Integer) is
+
+      Start_Item(OVS);
+
+      if Debug then
+         Println
+           ("JSON Write_Optional_Rational, Digits = `(Digits)" |
+            ", Val = `(Val)");
+      end if;
+
+      const Str := (if Val is null then "null" else To_String (Val));
+      Write_UTF8 (OVS, Str);
+   end func Write_Optional_Rational;
 
    func Write_String (var OVS : JSON_Output_Value_Stream; Val : Univ_String;
       Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer) is
@@ -380,14 +525,60 @@ class PSL::Core::JSON_Output_Value_Stream is
 
       Write_End_JSON_Array (OVS);
    end func Write_End_Obj;
+
+   func Write_JSON_Value
+     (var OVS : JSON_Output_Value_Stream; Value : JSON_Value+) is
+   //  Write a JSON value to the stream
+      {Value not null}
+      case Value of
+       [Obj : JSON_Object_Value] =>
+         Write_Begin_Map (OVS);
+         for each [Key => Val] of Obj.Value forward loop
+            Write_String (OVS, Key, Univ_Character::Last(),
+              Min_Len => 0, Max_Len => |Key|);
+            Write_JSON_Value (OVS, Val);
+         end loop;
+         Write_End_Map (OVS);
+
+       [Arr : JSON_Array_Value] =>
+         Write_Begin_Seq (OVS,
+           Min_Len => 0, Max_Len => |Arr.Value|, Actual_Len => |Arr.Value|);
+         for each Elem of Arr.Value forward loop
+            Write_JSON_Value (OVS, Elem);
+         end loop;
+         Write_End_Seq (OVS,
+           Min_Len => 0, Max_Len => |Arr.Value|, Actual_Len => |Arr.Value|);
+
+       [Str : JSON_String_Value] =>
+         Write_String (OVS, Str.Value, Univ_Character::Last(),
+           Min_Len => 0, Max_Len => |Str.Value|);
+
+       [Num : JSON_Number_Value] =>
+         Write_Rational (OVS, Num.Value, Digits => 1000);
+
+       [Bool : JSON_Boolean_Value] =>
+         Start_Item (OVS);
+         Write_UTF8 (OVS, (if Bool.Value then "true" else "false"));
+
+       [JSON_Null : JSON_Null_Value] =>
+         Start_Item (OVS);
+         Write_UTF8 (OVS, "null");
+      end case;
+
+   end func Write_JSON_Value;
+
 end class PSL::Core::JSON_Output_Value_Stream;
 
 interface PSL::Core::JSON_Input_Value_Stream<>
   extends PSL::Core::Input_Value_Stream<> is
+   //  This kind of value stream is used for reading a ParaSail value
+   //  from a byte stream in JSON format.
 
    func Create(ref var Input_Byte_Stream+) -> JSON_Input_Value_Stream;
 
    func Is_Self_Describing (JSON_Input_Value_Stream) -> Boolean;
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
 
    func Reached_End(JSON_Input_Value_Stream) -> Boolean;
 
@@ -405,6 +596,12 @@ interface PSL::Core::JSON_Input_Value_Stream<>
      (var JSON_Input_Value_Stream;
       Digits : Univ_Integer) -> optional Univ_Float;
 
+   func Read_Rational (var JSON_Input_Value_Stream;
+      Digits : Univ_Integer := -1) -> Rational;
+   func Read_Optional_Rational
+     (var JSON_Input_Value_Stream;
+      Digits : Univ_Integer := -1) -> optional Rational;
+
    func Read_String (var JSON_Input_Value_Stream;
       Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
      -> Univ_String;
@@ -419,15 +616,31 @@ interface PSL::Core::JSON_Input_Value_Stream<>
       Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
 
    func More_Seq_Elements (var JSON_Input_Value_Stream) -> Boolean;
+   //  Return #true if there are more sequence elements, and
+   //  absorb the comma separator (except for first elemnt which
+   //  isn't preceded by one.
+
    func Read_End_Seq (var JSON_Input_Value_Stream;
-      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
+   //  Absorb end-of-seq indicator and return actual length of sequence.
+   //  Return -1 if length not known.
+   //  Return null if end-of-seq indicator is missing.
 
    func Read_Begin_Map (var JSON_Input_Value_Stream);
    func Read_Begin_Optional_Map (var JSON_Input_Value_Stream)
      -> Is_Null : Boolean;
 
    func More_Map_Elements (var JSON_Input_Value_Stream) -> Boolean;
-   func Read_End_Map (var JSON_Input_Value_Stream);
+   //  Return #true if there are more map elements, and
+   //  absorb the comma separator (except for first element which
+   //  isn't preceded by one).
+
+   func Read_Key_Value_Separator (var JSON_Input_Value_Stream);
+   //  Skip over the ':' in a Key/Value pair of a map
+
+   func Read_End_Map (var JSON_Input_Value_Stream) -> Syntax_OK : Boolean;
+   //  Absorb end-of-map indicator.
+   //  Return #false if end-of-map indicator is missing.
 
    func Read_Begin_Poly (var JSON_Input_Value_Stream)
      -> Type_Name : Univ_String;
@@ -440,27 +653,52 @@ interface PSL::Core::JSON_Input_Value_Stream<>
      -> Is_Null : Boolean;
 
    func Read_End_Obj (var JSON_Input_Value_Stream);
+
+   func Read_JSON_Value
+     (var IVS : JSON_Input_Value_Stream)
+     -> optional JSON_Value+;
+   //  Read one JSON value from the JSON-formatted byte stream.
+   //  Return null if not good JSON syntax.
+
+   func JSON_Syntax_Error
+     (IVS : JSON_Input_Value_Stream; Err : Univ_String := "JSON syntax error");
+   //  Give an error message, and indicate line and character
 end interface PSL::Core::JSON_Input_Value_Stream;
 
 class PSL::Core::JSON_Input_Value_Stream is
    ref var Byte_Str : Input_Byte_Stream+;
    var Peek_Char : optional Univ_Character := null;
    var End_Reached : Boolean := #false;
+   var Source_Line : Integer<0 .. 100_000> := 1;
+   var Source_Char : Integer<0 .. 10_000> := 1;
 
    const Debug : Boolean := #false;
 
-   func Scan_JSON_Token (var IVS : JSON_Input_Value_Stream;
-                         Ignore_Comma : Boolean := #false) -> Univ_String is
+   func Next (var IVS : JSON_Input_Value_Stream) is
+      //  Get next decoded character from byte stream
+      //  Keep track of line and char within line
+      IVS.Peek_Char := UTF::Input::Decode_Char (IVS.Byte_Str);
+
+      if IVS.Peek_Char is null then
+         //  Reached end of file
+         null;
+      elsif IVS.Peek_Char == '\n' then
+         IVS.Source_Line += 1;
+         IVS.Source_Char := 0;
+      else
+         IVS.Source_Char += 1;
+      end if;
+   end func Next;
+
+   func Scan_JSON_Token
+     (var IVS : JSON_Input_Value_Stream; Ignore_Comma : Boolean := #false)
+     -> optional Univ_String is
       //  Read in one token from input stream, decoding it into a Univ_String
       //  Ignore white space.
       //  IVS.Peek_Char provides a one-character peek-ahead when non-null.
+      //  Return null at end of stream
 
       ref Peek => IVS.Peek_Char;
-
-      func Next() -> Univ_Character is
-         //  Get next decoded character from byte stream
-         return UTF::Input::Decode_Char (IVS.Byte_Str);
-      end func Next;
 
       func Decode_Hex_Digit (X : optional Univ_Character)
         -> optional Univ_Integer is
@@ -492,17 +730,19 @@ class PSL::Core::JSON_Input_Value_Stream is
          //  Presume IVS.Peek is initialized to first char of number
          //  or null.  Return #true if OK syntax, #false if not
             if Peek is null then
-               Peek := Next();
+               IVS.Next();
                if Peek is null then
-                  return null;
+                  IVS.JSON_Syntax_Error ("EOF while reading an integer");
+                  return #false;
                end if;
             end if;
             if Peek not in '0' .. '9' then
-               return null;
+               IVS.JSON_Syntax_Error ("Expecting a digit");
+               return #false;
             end if;
             while Peek in '0' .. '9' loop
                Result_Vec |= Peek;
-               Peek := Next();
+               IVS.Next();
             end loop;
             // Syntax OK!
             return #true;
@@ -511,7 +751,7 @@ class PSL::Core::JSON_Input_Value_Stream is
          if Peek == '-' then
             //  Negative number
             Result_Vec |= Peek;
-            Peek := Next();
+            IVS.Next();
          end if;
 
          if not Scan_Int () then
@@ -532,16 +772,18 @@ class PSL::Core::JSON_Input_Value_Stream is
          if Peek not null and then Peek in 'e' | 'E' then
             //  Exponent part [E|e][+|-|]<int>
             Result_Vec |= Peek;
-            Peek := Next();
+            IVS.Next();
             if Peek is null then
                //  Syntax error
+               IVS.JSON_Syntax_Error ("EOF while reading an exponent");
                return null;
             end if;
             if Peek in '+' | '-' then
                Result_Vec |= Peek;
-               Peek := Next();
+               IVS.Next();
                if Peek is null then
                   //  Syntax error
+                  IVS.JSON_Syntax_Error ("EOF while reading an exponent");
                   return null;
                end if;
             end if;
@@ -559,15 +801,17 @@ class PSL::Core::JSON_Input_Value_Stream is
          var Result_Vec : Vector<Univ_Character> := [Peek];
 
          loop
-            Peek := Next();
+            IVS.Next();
             if Peek is null then
                //  Syntax error
+               IVS.JSON_Syntax_Error ("EOF while reading a string");
                return null;
             elsif Peek == '\n' then
                //  Syntax error
+               IVS.JSON_Syntax_Error ("Unterminated string");
                return null;
             elsif Peek == '\\' then
-               Peek := Next();
+               IVS.Next();
                case Peek of
                 ['r'] =>
                   Peek := '\r';
@@ -584,8 +828,8 @@ class PSL::Core::JSON_Input_Value_Stream is
                   var U_Val := 0;
 
                   for I in 1 .. 4 loop
-                     const Dig := Decode_Hex_Digit
-                               (Next());
+                     IVS.Next();
+                     const Dig := Decode_Hex_Digit (Peek);
                      if Dig is null then
                         return null;
                      end if;
@@ -622,7 +866,7 @@ class PSL::Core::JSON_Input_Value_Stream is
             if Peek is null or else Peek != C then
                return null;
             end if;
-            Peek := Next();
+            IVS.Next();
          end loop;
 
          //  Syntax OK (TBD: should we require a separator after a keyword?)
@@ -632,7 +876,7 @@ class PSL::Core::JSON_Input_Value_Stream is
       //////
 
       if Peek is null then
-         Peek := Next();
+         IVS.Next();
       end if;
 
       while Peek not null loop
@@ -649,7 +893,7 @@ class PSL::Core::JSON_Input_Value_Stream is
             //  A JSON string
             return Scan_String ();
 
-          ['[' | ']' | '{' | '}' | ','] =>
+          ['[' | ']' | '{' | '}' | ':' | ','] =>
             //  A separator
             const Result := Peek | "";
             //  No peak-ahead after a separator which means it can
@@ -669,12 +913,14 @@ class PSL::Core::JSON_Input_Value_Stream is
             return Scan_Keyword ("null");
 
           [..] =>
-            //  Syntax error
+            IVS.JSON_Syntax_Error ("Invalid JSON token");
+            //  Skip over bad character
+            IVS.Next();
             return null;
          end case;
 
          //  Advance to next character
-         Peek := Next();
+         IVS.Next();
       end loop;
    end func Scan_JSON_Token;
 
@@ -684,7 +930,8 @@ class PSL::Core::JSON_Input_Value_Stream is
      ((Byte_Str => Input_Byte_Stream));
 
    func Is_Self_Describing (JSON_Input_Value_Stream) -> Boolean is (#true);
-     //  If #false, then Begin_Obj/End_Obj are no-ops
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
 
    func Reached_End(JSON_Input_Value_Stream) -> Boolean
      is (JSON_Input_Value_Stream.End_Reached);
@@ -702,9 +949,9 @@ class PSL::Core::JSON_Input_Value_Stream is
 
       const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
 
-      if Token is null or Token == "" then
+      if Token is null or else Token == "" then
          //  Syntax error
-         {#false}
+         IVS.JSON_Syntax_Error ("Expecting an integer");
          return null;
       end if;
 
@@ -717,9 +964,8 @@ class PSL::Core::JSON_Input_Value_Stream is
          return From_String (Token);
        [..] =>
          //  Syntax error
-         Println ("Syntax error, expecting '-' or a digit," |
+         IVS.JSON_Syntax_Error ("Expecting '-' or a digit," |
                   " found \"`(Token)\"");
-         {#false}
          return null;
       end case;
    end func Read_Optional_Int;
@@ -734,9 +980,9 @@ class PSL::Core::JSON_Input_Value_Stream is
 
       const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
 
-      if Token is null or Token == "" then
+      if Token is null or else Token == "" then
          //  Syntax error
-         {#false}
+         IVS.JSON_Syntax_Error ("Expecting a floating-point number");
          return null;
       end if;
 
@@ -745,14 +991,44 @@ class PSL::Core::JSON_Input_Value_Stream is
          //  "null"
          return null;
        ['0' .. '9' | '-'] =>
-         //  From_String will return null if not good integer syntax
+         //  From_String will return null if not good numerical syntax
          return From_String (Token);
        [..] =>
          //  Syntax error
-         {#false}
+         IVS.JSON_Syntax_Error ("Expecting a floating-point number");
          return null;
       end case;
    end func Read_Optional_Float;
+
+   func Read_Rational (var IVS : JSON_Input_Value_Stream;
+      Digits : Univ_Integer := -1) -> Rational
+     is (Read_Optional_Rational (IVS, Digits));
+
+   func Read_Optional_Rational
+     (var IVS : JSON_Input_Value_Stream;
+      Digits : Univ_Integer := -1) -> optional Rational is
+
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null or else Token == "" then
+         //  Syntax error
+         IVS.JSON_Syntax_Error ("Expecting a JSON number");
+         return null;
+      end if;
+
+      case Token[1] of
+       ['n'] =>
+         //  "null"
+         return null;
+       ['0' .. '9' | '-'] =>
+         //  From_String will return null if not good numerical syntax
+         return From_String (Token);
+       [..] =>
+         //  Syntax error
+         IVS.JSON_Syntax_Error ("Expecting a JSON number");
+         return null;
+      end case;
+   end func Read_Optional_Rational;
 
    func Read_String (var IVS : JSON_Input_Value_Stream;
       Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
@@ -767,9 +1043,9 @@ class PSL::Core::JSON_Input_Value_Stream is
       
       const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
 
-      if Token is null or Token == "" then
+      if Token is null or else Token == "" then
          //  Syntax error
-         {#false}
+         IVS.JSON_Syntax_Error ("Expecting a JSON string");
          return null;
       end if;
 
@@ -784,7 +1060,7 @@ class PSL::Core::JSON_Input_Value_Stream is
 
        [..] =>
          //  Syntax error
-         {#false}
+         IVS.JSON_Syntax_Error ("Expecting a JSON string");
          return null;
       end case;
    end func Read_Optional_String;
@@ -807,7 +1083,7 @@ class PSL::Core::JSON_Input_Value_Stream is
       const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
 
       if Token is null then
-         {#false}
+         IVS.JSON_Syntax_Error ("Expecting a JSON array");
          return 0;
       elsif Token == "null" then
          return null;
@@ -815,48 +1091,130 @@ class PSL::Core::JSON_Input_Value_Stream is
          //  Always variable length
          return -1;
       else
-         {#false}
+         IVS.JSON_Syntax_Error ("Expecting a JSON array");
          return 0;
       end if;
    end func Read_Begin_Optional_Seq;
 
    func More_Seq_Elements (var IVS : JSON_Input_Value_Stream) -> Boolean is
-      loop
-         if IVS.Peek_Char not null then
-            case IVS.Peek_Char of
-             [' ' | '\t' | '\n' | '\r'] =>
-               //  Ignore white space; stay in loop
-               null;
-             [']'] =>
-               //  End of sequence
-               return #false;
-             [..] =>
-               //  Anything might come immediately after a '['
-               return #true;
-            end case;
-         end if;
+      if IVS.Peek_Char is null then
+         //  Peek ahead
+         IVS.Next();
+      end if;
+
+      while IVS.Peek_Char not null loop
+         case IVS.Peek_Char of
+          [' ' | '\t' | '\n' | '\r'] =>
+            //  Ignore white space; stay in loop
+            null;
+          [']'] =>
+            //  End of sequence
+            return #false;
+          [','] =>
+            //  Absorb the comma and return #true.
+            IVS.Peek_Char := null;
+            return #true;
+          [..] =>
+            //  Anything might come immediately after a '['
+            return #true;
+         end case;
          //  Get next character
-         IVS.Peek_Char := UTF::Input::Decode_Char (IVS.Byte_Str);
+         IVS.Next();
       end loop;
+      //  End of stream
+      return #false;
    end func More_Seq_Elements;
 
    func Read_End_Seq (var IVS : JSON_Input_Value_Stream;
-      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer is
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer is
+   //  Absorb end-of-seq indicator and return actual length of sequence.
+   //  Return -1 if length not known.
+   //  Return null if end-of-seq indicator is missing.
       const Token := Scan_JSON_Token (IVS);
-      {Token not null and then Token == "]"}
-      return -1;
+      if Token not null and then Token == "]" then
+         return -1;
+      else
+         IVS.JSON_Syntax_Error ("Missing final ']' for JSON array");
+         return null;
+      end if;
    end func Read_End_Seq;
 
-   func Read_Begin_Map (var JSON_Input_Value_Stream)
-      is (null);  --  TBD
-   func Read_Begin_Optional_Map (var JSON_Input_Value_Stream)
-     -> Is_Null : Boolean
-      is (#false);  --  TBD
+   func Read_Begin_Map (var IVS : JSON_Input_Value_Stream) is
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
 
-   func More_Map_Elements (var JSON_Input_Value_Stream) -> Boolean
-      is (#false);  --  TBD
-   func Read_End_Map (var JSON_Input_Value_Stream)
-      is (null);  --  TBD
+      if Token is null or else Token != "{" then
+         IVS.JSON_Syntax_Error ("Expecting JSON Object");
+      end if;
+   end func Read_Begin_Map;
+
+   func Read_Begin_Optional_Map (var IVS : JSON_Input_Value_Stream)
+     -> Is_Null : Boolean is
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null then
+         IVS.JSON_Syntax_Error ("Expecting JSON Object");
+         return #true;
+      elsif Token == "null" then
+         return #true;
+      elsif Token == "{" then
+         return #false;
+      else
+         IVS.JSON_Syntax_Error ("Expecting JSON Object");
+         return #true;
+      end if;
+   end func Read_Begin_Optional_Map;
+
+   func More_Map_Elements (var IVS : JSON_Input_Value_Stream) -> Boolean is
+      if IVS.Peek_Char is null then
+         //  Peek ahead
+         IVS.Next();
+      end if;
+
+      while IVS.Peek_Char not null loop
+         case IVS.Peek_Char of
+          [' ' | '\t' | '\n' | '\r'] =>
+            //  Ignore white space; stay in loop
+            null;
+          ['}'] =>
+            //  End of object
+            return #false;
+          [','] =>
+            //  Absorb the comma and return #true.
+            IVS.Peek_Char := null;
+            return #true;
+          [..] =>
+            //  Anything might come immediately after a '{'
+            return #true;
+         end case;
+         //  Get next character
+         IVS.Next();
+      end loop;
+      //  End of stream
+      return #false;
+   end func More_Map_Elements;
+
+   func Read_Key_Value_Separator (var IVS : JSON_Input_Value_Stream) is
+   //  Skip over the ':' in a Key/Value pair of a map
+      const Token := Scan_JSON_Token (IVS);
+      if Token is null or else Token != ":" then
+         IVS.JSON_Syntax_Error ("Expecting ':'");
+      end if;
+   end func Read_Key_Value_Separator;
+
+   func Read_End_Map (var IVS : JSON_Input_Value_Stream)
+     -> Syntax_OK : Boolean is
+   //  Absorb end-of-map indicator.
+   //  Return #false if end-of-map indicator is missing.
+      const Token := Scan_JSON_Token (IVS);
+
+      if Token not null and then Token == "}" then
+         Syntax_OK := #true;
+      else
+         //  Syntax error
+         IVS.JSON_Syntax_Error ("Expecting '}'");
+         Syntax_OK := #false;
+      end if;
+   end func Read_End_Map;
 
    func Read_Begin_Poly (var JSON_Input_Value_Stream)
      -> Type_Name : Univ_String
@@ -905,6 +1263,172 @@ class PSL::Core::JSON_Input_Value_Stream is
       const Token := Scan_JSON_Token (IVS);
       {Token not null and then Token == "]"}
    end func Read_End_Obj;
+
+   func Read_JSON_Value
+     (var IVS : JSON_Input_Value_Stream)
+     -> Result : optional JSON_Value+ is
+   //  Read one JSON value from the JSON-formatted byte stream.
+   //  Return null if not good JSON syntax.
+      if IVS.Peek_Char is null then
+         //  Peek ahead
+         IVS.Next();
+      end if;
+
+      while IVS.Peek_Char not null loop
+         case IVS.Peek_Char of
+          [' ' | '\t' | '\n' | '\r'] =>
+            //  Ignore white space; stay in loop
+            null;
+
+          ['{'] =>
+            //  JSON Object
+            if Debug then
+               Println("Reading a JSON object");
+            end if;
+            var Obj : JSON_Object_Value for Result := Create();
+
+            Read_Begin_Map (IVS);
+            while More_Map_Elements (IVS) loop
+               const Key :=
+                 Read_Optional_String (IVS, Univ_Character::Last(),
+                   Min_Len => 0, Max_Len => 10_000);
+
+               if Key is null then
+                  IVS.JSON_Syntax_Error ("Expecting JSON string for Key");
+                  return null;
+               end if;
+
+               Read_Key_Value_Separator (IVS);
+
+               Obj.Value[Key] := Read_JSON_Value (IVS);
+            end loop;
+            if Debug then
+               Println("JSON Map is `(|Obj.Value|) in length");
+            end if;
+            if Read_End_Map (IVS) then
+               return Obj;
+            else
+               //  Syntax error
+               return null;
+            end if;
+
+          ['['] =>
+            //  JSON Array
+            if Debug then
+               Println("Reading a JSON array");
+            end if;
+            var Arr : JSON_Array_Value for Result := Create();
+
+            const Ignore_Len :=
+              Read_Begin_Seq (IVS, Min_Len => 0, Max_Len => 2**15);
+            while More_Seq_Elements (IVS) loop
+               var Val for Arr := Read_JSON_Value (IVS);
+               Arr.Value <|= Val;
+            end loop;
+
+            const Act_Len :=
+              Read_End_Seq (IVS, Min_Len => 0, Max_Len => 2**15);
+
+            if Debug then
+               Println("JSON array is `(|Arr.Value|) in length");
+            end if;
+
+            if Act_Len < 0 or else Act_Len == |Arr.Value| then
+               return Arr;
+            else
+               //  Syntax error
+               IVS.JSON_Syntax_Error ("Syntax error in JSON array");
+               return null;
+            end if;
+
+          ['"'] =>
+            //  JSON String
+            if Debug then
+               Println("Reading a JSON string");
+            end if;
+            const Str := Read_Optional_String
+              (IVS, Univ_Character::Last(), Min_Len => 0, Max_Len => 10_000);
+               //  Will return "null" on a syntax error
+
+            if Str not null then
+               return JSON_String_Value::Create (Str);
+            else
+               return null;
+            end if;
+
+          ['0' .. '9' | '-'] =>
+            //  JSON number
+            if Debug then
+               Println("Reading a JSON number");
+            end if;
+            const Num := Read_Optional_Rational (IVS);
+               //  Will return "null" on a syntax error
+
+            if Num not null then
+               return JSON_Number_Value::Create (Num);
+            else
+               return null;
+            end if;
+
+          ['t' | 'f'] =>
+            //  JSON Boolean value
+            if Debug then
+               Println("Reading a JSON bool");
+            end if;
+            const Token := Scan_JSON_Token (IVS);
+            
+            if Debug then
+               Println("bool token is `(Token)");
+            end if;
+            if Token not null then
+               if Token == "true" then
+                  return JSON_Boolean_Value::Create(#true);
+               elsif Token == "false" then
+                  return JSON_Boolean_Value::Create(#false);
+               end if;
+            end if;
+            //  Syntax error
+            IVS.JSON_Syntax_Error ("Expecting 'true' or 'false'");
+            return null;
+
+          ['n'] =>
+            //  JSON Null value
+            if Debug then
+               Println("Reading a JSON null");
+            end if;
+            const Token := Scan_JSON_Token (IVS);
+            
+            if Token not null and then Token == "null" then
+               return JSON_Value::Create(#Null_Value);
+            else
+               //  Syntax error
+               IVS.JSON_Syntax_Error ("Expecting 'null'");
+               return null;
+            end if;
+
+          [..] =>
+            //  Anything else is unexpected
+            //  Read and discard the token
+            const Token := Scan_JSON_Token (IVS);
+
+            IVS.JSON_Syntax_Error
+              ("Unexpected token in JSON stream: \"`(Token)\"");
+            return null;
+         end case;
+         //  Get next character
+         IVS.Next();
+      end loop;
+      //  End of stream
+      return null;
+   end func Read_JSON_Value;
+
+   func JSON_Syntax_Error
+     (IVS : JSON_Input_Value_Stream; Err : Univ_String := "JSON syntax error")
+   //  Give an error message, and indicate line and character
+   is
+      Println ("`(IVS.Source_Line):`(IVS.Source_Char): `(Err)");
+   end func JSON_Syntax_Error;
+
 end class PSL::Core::JSON_Input_Value_Stream;
 
 func PSL::Test::Test_JSON_Stream() is
@@ -1020,5 +1544,48 @@ func PSL::Test::Test_JSON_Stream() is
       // Println
       //   ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
    end loop;
+
+   I_File.Close();
    Println ("All done");
 end func PSL::Test::Test_JSON_Stream;
+
+func PSL::Test::Test_JSON_Value_IO (From, To : Univ_String) is
+   
+   var IO := IO::Get_IO();
+
+   var I_File : Byte_Stream_Input_File := IO.Open (From);
+
+   if I_File is null then
+      Println("Cannot open `(From)");
+      return;
+   end if;
+
+   ref var IVS : JSON_Input_Value_Stream => Create(I_File);
+
+   Println ("About to read JSON file \"`(From)\"");
+   const JSON_Val := Read_JSON_Value (IVS);
+
+   Println ("Done reading in JSON file");
+
+   if JSON_Val is null then
+      IVS.JSON_Syntax_Error ("JSON File `(From) has a syntax error");
+      I_File.Close();
+      return;
+   end if;
+
+   I_File.Close();
+
+   Println ("About to write value back out to file \"`(To)\"");
+   var O_File : Byte_Stream_Output_File := IO.Create (To);
+   if O_File is null then
+      Println("Cannot create file `(To)");
+      return;
+   end if;
+
+   ref var OVS : JSON_Output_Value_Stream => Create(O_File);
+
+   Write_JSON_Value (OVS, JSON_Val);
+   Println ("Done writing to JSON file");
+   O_File.Close();
+
+end func PSL::Test::Test_JSON_Value_IO;
