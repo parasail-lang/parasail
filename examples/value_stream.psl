@@ -12,7 +12,13 @@ abstract ref interface PSL::Core::Output_Value_Stream<> is
    type Univ_Float is Univ_Real;
 
    func Is_Self_Describing (Output_Value_Stream) -> Boolean;
-     //  If #false, then Begin_Obj/End_Obj are no-ops
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+     //  If true, it also requires that the Key of each Key/Value
+     //  pair of a Map is required to be a string, and written/read using
+     //  {Write,Read}_String.  The actual key could be of any type with
+     //  appropriate {To,From}_String routines, but those conversions
+     //  must be performed in the higher level code.
 
    func Reached_End(Output_Value_Stream) -> Boolean;
 
@@ -48,12 +54,25 @@ abstract ref interface PSL::Core::Output_Value_Stream<> is
    func Write_Begin_Map (var Output_Value_Stream);
    func Write_Begin_Optional_Map (var Output_Value_Stream;
       Is_Null : Boolean);
+   //  A "Map" in a value stream is represented as a set of key/value
+   //  pairs.  If the value stream is "self describing" then
+   //  the keys are required to be strings.  The higher-level code is free
+   //  to use To_String/From_String to support maps with non-string keys.
+   //  In general the order of the order of the key/value pairs is *not*
+   //  significant, and reading a Map in from a stream and then writing
+   //  it back out is *not* guaranteed to produce the same order
+   //  of Key/Value pairs.
 
    func Write_End_Map (var Output_Value_Stream);
 
    func Write_Begin_Poly (var Output_Value_Stream; Type_Name : Univ_String);
    func Write_Begin_Optional_Poly (var Output_Value_Stream;
       Type_Name : optional Univ_String);
+   //  A polymorphic object in a value stream is represented by
+   //  a type name as a string, followed by the value produces by
+   //  the appropriate Write_* routine.
+   //  On input, the Type_Name should be used to decide what kind of
+   //  value to expect, and call the corresponding Read_* routine.
    func Write_End_Poly (var Output_Value_Stream);
 
    func Write_Begin_Obj (var Output_Value_Stream);
@@ -68,7 +87,13 @@ interface PSL::Core::Binary_Output_Value_Stream<>
    func Create(ref var Output_Byte_Stream+) -> Binary_Output_Value_Stream;
 
    func Is_Self_Describing (Binary_Output_Value_Stream) -> Boolean;
-     //  If #false, then Begin_Obj/End_Obj are no-ops
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+     //  If true, it also requires that the Key of each Key/Value
+     //  pair of a Map is required to be a string, and written/read using
+     //  {Write,Read}_String.  The actual key could be of any type with
+     //  appropriate {To,From}_String routines, but those conversions
+     //  must be performed in the higher level code.
 
    func Reached_End(Binary_Output_Value_Stream) -> Boolean;
 
@@ -160,10 +185,10 @@ class PSL::Core::Binary_Output_Value_Stream is
          //  where the sign of the count is the sign of the value.
          Write_Int (OVS,
                     (if Val_To_Use < 0 then -Num_To_Write else Num_To_Write),
-                    -2**15, 2**15-1);
+                    Low => -2**15, High => 2**15-1);
          //  Now write out little-endian
          for V := abs Val_To_Use then V/2**32 while V != 0 loop
-            Write_Int (OVS, V mod 2**32, 0, 2**32-1);
+            Write_Int (OVS, V mod 2**32, Low => 0, High => 2**32-1);
          end loop;
       elsif Val_To_Use is null then
          {Num_Bytes == 8}
@@ -206,7 +231,13 @@ class PSL::Core::Binary_Output_Value_Stream is
 
    func Is_Self_Describing (Binary_Output_Value_Stream) -> Boolean is
      (#false);
-     //  If #false, then Begin_Obj/End_Obj are no-ops
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+     //  If true, it also requires that the Key of each Key/Value
+     //  pair of a Map is required to be a string, and written/read using
+     //  {Write,Read}_String.  The actual key could be of any type with
+     //  appropriate {To,From}_String routines, but those conversions
+     //  must be performed in the higher level code.
 
    func Reached_End(Binary_Output_Value_Stream) -> Boolean is
      (Binary_Output_Value_Stream.End_Reached);
@@ -263,16 +294,16 @@ class PSL::Core::Binary_Output_Value_Stream is
 
       if Use_Len then
          const Len := |Val|;
-         Write_Int (OVS, Len, 0, Max_Len);
+         Write_Int (OVS, Len, Low => 0, High => Max_Len);
          if Len == 0 then
             //  An empty string is [0, 0]
-            Write_Int (OVS, 0, 0, 0xFF);
+            Write_Int (OVS, 0, Low => 0, High => 0xFF);
             return;
          end if;
       elsif Val[1] == Nul_Ch then
          //  When not using a length, we always "double" an initial zero
          //  to distinguish it from a null value, which is a 0,0x7F
-         Write_Int (OVS, 0, 0, 0xFF);
+         Write_Int (OVS, 0, Low => 0, High => 0xFF);
       end if;
       
       for each C of Val forward loop
@@ -359,19 +390,32 @@ class PSL::Core::Binary_Output_Value_Stream is
    func Write_End_Seq (var Binary_Output_Value_Stream;
       Min_Len, Max_Len, Actual_Len : Univ_Integer) is (null);
 
-   func Write_Begin_Map (var Binary_Output_Value_Stream) is (null); -- TBD
-   func Write_Begin_Optional_Map (var Binary_Output_Value_Stream;
-      Is_Null : Boolean) is (null); -- TBD
+   func Write_Begin_Map (var OVS : Binary_Output_Value_Stream)
+     is (Write_Begin_Optional_Map (OVS, Is_Null => #false));
 
-   func Write_End_Map (var Binary_Output_Value_Stream) is (null); -- TBD
+   func Write_Begin_Optional_Map (var OVS : Binary_Output_Value_Stream;
+      Is_Null : Boolean) is
+      Write_Int (OVS, (if Is_Null then 1 else 0), Low => 0, High => 1);
+   end func Write_Begin_Optional_Map;
 
-   func Write_Begin_Poly (var Binary_Output_Value_Stream; Type_Name : Univ_String)
-      is (null); -- TBD
-   func Write_Begin_Optional_Poly (var Binary_Output_Value_Stream;
-      Type_Name : optional Univ_String) is (null); -- TBD
-   func Write_End_Poly (var Binary_Output_Value_Stream) is (null); -- TBD
+   func Write_End_Map (var OVS : Binary_Output_Value_Stream) is
+      (Write_Optional_String (OVS, null,
+                              Max_Char => Univ_Character::Last(),
+                              Min_Len => 1, Max_Len => 100_000));
 
-   func Write_Begin_Obj (var Binary_Output_Value_Stream) is (null);
+   func Write_Begin_Poly
+     (var OVS : Binary_Output_Value_Stream; Type_Name : Univ_String)
+      is (Write_String (OVS, Type_Name,
+                        Max_Char => Univ_Character::Last(),
+                        Min_Len => 1, Max_Len => 100_000));
+   func Write_Begin_Optional_Poly (var OVS : Binary_Output_Value_Stream;
+      Type_Name : optional Univ_String)
+      is (Write_Optional_String (OVS, Type_Name,
+                                 Max_Char => Univ_Character::Last(),
+                                 Min_Len => 1, Max_Len => 100_000));
+   func Write_End_Poly (var Binary_Output_Value_Stream) is (null);
+
+   func Write_Begin_Obj (var OVS : Binary_Output_Value_Stream) is (null);
    func Write_Begin_Optional_Obj (var OVS : Binary_Output_Value_Stream;
       Is_Null : Boolean) is
       Write_Int (OVS, (if Is_Null then 1 else 0), Low => 0, High => 1);
@@ -384,6 +428,13 @@ abstract ref interface PSL::Core::Input_Value_Stream<> is
    type Univ_Float is Univ_Real;
 
    func Is_Self_Describing (Input_Value_Stream) -> Boolean;
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+     //  If true, it also requires that the Key of each Key/Value
+     //  pair of a Map is required to be a string, and written/read using
+     //  {Write,Read}_String.  The actual key could be of any type with
+     //  appropriate {To,From}_String routines, but those conversions
+     //  must be performed in the higher level code.
 
    func Reached_End(Input_Value_Stream) -> Boolean;
 
@@ -449,6 +500,13 @@ interface PSL::Core::Binary_Input_Value_Stream<>
    func Create(ref var Input_Byte_Stream+) -> Binary_Input_Value_Stream;
 
    func Is_Self_Describing (Binary_Input_Value_Stream) -> Boolean;
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+     //  If true, it also requires that the Key of each Key/Value
+     //  pair of a Map is required to be a string, and written/read using
+     //  {Write,Read}_String.  The actual key could be of any type with
+     //  appropriate {To,From}_String routines, but those conversions
+     //  must be performed in the higher level code.
 
    func Reached_End(Binary_Input_Value_Stream) -> Boolean;
 
@@ -594,7 +652,13 @@ class PSL::Core::Binary_Input_Value_Stream is
      ((Byte_Str => Input_Byte_Stream));
 
    func Is_Self_Describing (Binary_Input_Value_Stream) -> Boolean is (#false);
-     //  If #false, then Begin_Obj/End_Obj are no-ops
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+     //  If true, it also requires that the Key of each Key/Value
+     //  pair of a Map is required to be a string, and written/read using
+     //  {Write,Read}_String.  The actual key could be of any type with
+     //  appropriate {To,From}_String routines, but those conversions
+     //  must be performed in the higher level code.
 
    func Reached_End(Binary_Input_Value_Stream) -> Boolean
      is (Binary_Input_Value_Stream.End_Reached);

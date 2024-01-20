@@ -29,6 +29,9 @@ interface PSL::Core::JSON_Value<> is
 end interface PSL::Core::JSON_Value;
 
 interface PSL::Core::JSON_Object_Value<> extends JSON_Value is
+   //  A JSON_Object_Value can be used to represent a "JSON Object"
+   //  which in ParaSail parlance is a Map with Keys that are Strings,
+   //  and Values that are JSON Values.
    var Value : Ordered_Map<Univ_String, JSON_Value+> := [];
 
    func Create (Value : Ordered_Map <Univ_String, JSON_Value+> := [])
@@ -39,6 +42,8 @@ interface PSL::Core::JSON_Object_Value<> extends JSON_Value is
 end interface PSL::Core::JSON_Object_Value;
 
 interface PSL::Core::JSON_Array_Value<> extends JSON_Value is
+   //  A JSON_Array_Value can be used to represent a "JSON Array"
+   //  which in ParaSail parlance is a Vector of JSON Values.
    var Value : Vector<JSON_Value+> := [];
 
    func Create (Value : Vector <JSON_Value+> := [])
@@ -49,6 +54,8 @@ interface PSL::Core::JSON_Array_Value<> extends JSON_Value is
 end interface PSL::Core::JSON_Array_Value;
 
 interface PSL::Core::JSON_String_Value<> extends JSON_Value is
+   //  A JSON_String_Value can be used to represent a "JSON String"
+   //  which is equivalent to the ParaSail Univ_String.
    const Value : Univ_String;
 
    func Create (Value : Univ_String := "")
@@ -59,6 +66,8 @@ interface PSL::Core::JSON_String_Value<> extends JSON_Value is
 end interface PSL::Core::JSON_String_Value;
 
 interface PSL::Core::JSON_Number_Value<> extends JSON_Value is
+   //  A JSON_Number_Value can be used to represent a "JSON Number"
+   //  which is equivalent to the ParaSail big-number Rational.
    const Value : Rational;
 
    func Is_Integer (Number : JSON_Number_Value) -> Boolean
@@ -75,6 +84,8 @@ interface PSL::Core::JSON_Number_Value<> extends JSON_Value is
 end interface PSL::Core::JSON_Number_Value;
 
 interface PSL::Core::JSON_Boolean_Value<> extends JSON_Value is
+   //  A JSON_Boolean_Value can be used to represent a "JSON Boolean"
+   //  which is equivalent to the ParaSail type Boolean.
    const Value : Boolean;
 
    func Create (Value : Boolean := #false)
@@ -85,6 +96,10 @@ interface PSL::Core::JSON_Boolean_Value<> extends JSON_Value is
 end interface PSL::Core::JSON_Boolean_Value;
 
 interface PSL::Core::JSON_Null_Value<> extends JSON_Value is
+   //  A JSON_Null_Value can be used to represent a "JSON null"
+   //  which is a type that has only one value, namely "null".
+   //  It is usually combined with other JSON types as one
+   //  alternative to indicate a lack of data.
    type Unit is Enum<[#Null_Value]>;
    const Value : Unit;
 
@@ -304,6 +319,70 @@ class PSL::Core::JSON_Output_Value_Stream is
       end case;
    end func Write_End_JSON_Array;
 
+   func Escape_Chars_In_Str (Str : Univ_String) -> Univ_String is
+   //  Prefix any special characters that appear in Str so they are acceptable
+   //  as a JSON string.
+      var Escaped_Part : Vector<Univ_Character> := [];
+      var Unescaped := 0;
+
+      for I in 1 .. |Str| forward loop
+         const C := Str[I];
+         const Code := C - UTF::Nul_Ch;
+
+         case (Code) of
+          [0 .. 0x20 | 0x102000 .. (UTF::Last_Ch - UTF::Nul_Ch)] =>
+            //  Figure out the letter to use with '\'
+            var Letter : optional Univ_Character := null;
+
+            case C of
+             ['\b'] => Letter := 'b';
+             ['\f'] => Letter := 'f';
+             ['\n'] => Letter := 'n';
+             ['\r'] => Letter := 'r';
+             ['\t'] => Letter := 't';
+             [..]   => Letter := 'u';
+            end case;
+
+            Escaped_Part |= '\\';
+            Escaped_Part |= Letter;
+            if Letter == 'u' then
+               //  4 hex-digit unicode
+               for Divisor := 16**3 then Divisor / 16 while Divisor > 0 loop
+                  const Digit := (Code / Divisor) mod 16;
+
+                  //  Append the correct hex digit
+                  if Digit < 10 then
+                     Escaped_Part |= Digit + '0';
+                  else
+                     Escaped_Part |= (Digit - 10) + 'A';
+                  end if;
+               end loop;
+            end if;
+
+          ['"' - UTF::Nul_Ch | '\\' - UTF::Nul_Ch] =>
+             //  A simple escape
+             Escaped_Part |= '\\';
+             Escaped_Part |= C;
+
+          [..] =>
+            //  No escape
+            if |Escaped_Part| > 0 then
+               Escaped_Part |= C;
+            else
+               //  Have not seen a character needing an escape
+               Unescaped := I;
+            end if;
+         end case;
+      end loop;
+      if |Escaped_Part| == 0 then
+         //  Nothing needed escaping
+         return Str;
+      else
+         //  Combine unescaped part with escaped part
+         return Str[1 .. Unescaped] | From_Vector (Escaped_Part);
+      end if;
+   end func Escape_Chars_In_Str;
+
  exports
 
    func Create(ref var Output_Byte_Stream+) -> JSON_Output_Value_Stream is
@@ -395,16 +474,13 @@ class PSL::Core::JSON_Output_Value_Stream is
    func Write_Optional_String
      (var OVS : JSON_Output_Value_Stream; Val : optional Univ_String;
       Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer) is
-     //  A null-valued string (as opposed to the empty string)
-     //  is represented by a length of zero followed a 0x7F.
-     //  An empty string is represented by a length of zero followed by a zero.
-     //  A fixed-length string that starts with a 0x7F has an extra
-     //  0x7F tagged on the front.
+      //  Write a string surrounded by double quotes, or just the word null.
 
       Start_Item (OVS);
 
-      const Str := (if Val is null then "null" else '"' | Val | '"');
-         //  TBD: Need to escape characters not allowed in a JSON string
+      const Str :=
+        (if Val is null then "null"
+         else '"' | Escape_Chars_In_Str (Val) | '"');
 
       Write_UTF8 (OVS, Str);
    end func Write_Optional_String;

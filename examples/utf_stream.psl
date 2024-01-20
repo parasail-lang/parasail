@@ -1,5 +1,6 @@
 interface PSL::Core::UTF<> is
    const Nul_Ch : Univ_Character := Univ_Character::First();
+   const Last_Ch : Univ_Character := Univ_Character::Last();
 end interface PSL::Core::UTF;
 
 interface PSL::Core::UTF::Output<> is
