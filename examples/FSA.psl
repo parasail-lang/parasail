@@ -1,6 +1,6 @@
 // Example ParaSail program -- Finite State Automaton module
 
-// Copyright (C) 2023, AdaCore, New York, NY
+// Copyright (C) 2023-2024, AdaCore, New York, NY
 // This program is provided "as is" with no warranty.
 // Report errors: http://groups.google.com/group/parasail-programming-language
 
