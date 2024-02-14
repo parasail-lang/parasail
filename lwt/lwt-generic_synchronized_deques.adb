@@ -23,7 +23,7 @@ pragma Ada_2022;
 
 with Ada.Unchecked_Deallocation;
 with System;
-with System.Atomic_Operations.Exchange;  --  TBD: System.Atomic_Operations...
+with System.Atomic_Operations.Exchange;
 package body LWT.Generic_Synchronized_Deques is
    --  Provide a double-ended queue that is
    --  synchronized to allow use in a work-stealing
