@@ -242,7 +242,252 @@ func PSL::Test::Test_Boolean(UX, UY : Univ_Enumeration) is
     XX xor= Y
     Println(X | " xor= " | Y | " = " | XX)
 end func PSL::Test::Test_Boolean
-interface PSL::Containers::Set<Element_Type is Hashable<>> is
+
+//  Streaming in ParaSail is a three layer cake:
+//    Byte Stream is the lowest layer
+//    Value Stream is the middle layer
+//    Object Stream is the top layer
+//
+//  This is the Value stream layer.
+//  A value stream abstracts away the byte representation of any given
+//  value, where a value could be a number or a string, possibly optional,
+//  and possibly surrounded by syntax to indicate that the value is part of
+//  a larger composite object, such as a sequence or a map, or
+//  an object of some user-defined type.
+//
+//  A value stream could be in binary, or in some textual form such as
+//  JSON or XML.  A binary value stream generally has no need for extra
+//  indicators of the start or finish of, for example, a sequence or a
+//  map.  A textual form generally will need some sort of extra
+//  syntax.  Each kind of value stream provides its own way of indicating
+//  the begin or end of a sequence, a map (i.e. a dictionary), an object,
+//  or a "polymorphic" object, where the type itself is encoded within
+//  the value stream.  The operations which emit this syntax (if any)
+//  are Begin/End_Seq, Begin/End_Map, Begin/End_Object, and Begin/End_Poly.
+//
+abstract ref interface PSL::Core::Output_Value_Stream<> is
+   //  A stream for emitting values, typically built on top of an
+   //  output byte stream.
+   type Univ_Float is Univ_Real;
+
+   func Is_Self_Describing (Output_Value_Stream) -> Boolean;
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+     //  If true, it also requires that the Key of each Key/Value
+     //  pair of a Map is required to be a string, and written/read using
+     //  {Write,Read}_String.  The actual key could be of any type with
+     //  appropriate {To,From}_String routines, but those conversions
+     //  must be performed in the higher level code.
+
+   func Reached_End(Output_Value_Stream) -> Boolean;
+
+   func Write_Int (var Output_Value_Stream; Val : Univ_Integer;
+      Low, High : Univ_Integer) {Val in Low .. High};
+   func Write_Optional_Int
+     (var Output_Value_Stream; Val : optional Univ_Integer;
+      Low, High : Univ_Integer);
+
+   func Write_Float (var Output_Value_Stream; Val : Univ_Float;
+      Digits : Univ_Integer);
+   func Write_Optional_Float
+     (var Output_Value_Stream; Val : optional Univ_Float;
+      Digits : Univ_Integer);
+
+   func Write_String (var Output_Value_Stream; Val : Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+      {Min_Len >= 0 and then |Val| in Min_Len .. Max_Len};
+   func Write_Optional_String
+     (var Output_Value_Stream; Val : optional Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer);
+
+   const Unknown_Actual_Len : Univ_Integer := -1;
+
+   func Write_Begin_Seq (var Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer);
+   func Write_Begin_Optional_Seq (var Output_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer; Actual_Len : optional Univ_Integer);
+
+   func Write_End_Seq (var Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer);
+
+   func Write_Begin_Map (var Output_Value_Stream);
+   func Write_Begin_Optional_Map (var Output_Value_Stream;
+      Is_Null : Boolean);
+   //  A "Map" in a value stream is represented as a set of key/value
+   //  pairs.  If the value stream is "self describing" then
+   //  the keys are required to be strings.  The higher-level code is free
+   //  to use To_String/From_String to support maps with non-string keys.
+   //  In general the order of the key/value pairs is *not*
+   //  significant, and reading a Map in from a stream and then writing
+   //  it back out is *not* guaranteed to produce the same order
+   //  of Key/Value pairs.
+
+   func Write_End_Map (var Output_Value_Stream);
+
+   func Write_Begin_Poly (var Output_Value_Stream; Type_Name : Univ_String);
+   func Write_Begin_Optional_Poly (var Output_Value_Stream;
+      Type_Name : optional Univ_String);
+   //  A polymorphic object in a value stream is represented by
+   //  a type name as a string, followed by the value produced by
+   //  the appropriate Write_* routine.
+   //  On input, the Type_Name should be used to decide what kind of
+   //  value to expect, and call the corresponding Read_* routine.
+   func Write_End_Poly (var Output_Value_Stream);
+
+   func Write_Begin_Obj (var Output_Value_Stream);
+   func Write_Begin_Optional_Obj (var Output_Value_Stream;
+      Is_Null : Boolean);
+   func Write_End_Obj (var Output_Value_Stream);
+end interface PSL::Core::Output_Value_Stream;
+
+abstract ref interface PSL::Core::Input_Value_Stream<> is
+   //  A stream for reading in values, typically on top of
+   //  a input byte stream.
+   type Univ_Float is Univ_Real;
+
+   func Is_Self_Describing (Input_Value_Stream) -> Boolean;
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+     //  If true, it also requires that the Key of each Key/Value
+     //  pair of a Map is required to be a string, and written/read using
+     //  {Write,Read}_String.  The actual key could be of any type with
+     //  appropriate {To,From}_String routines, but those conversions
+     //  must be performed in the higher level code.
+
+   func Reached_End(Input_Value_Stream) -> Boolean;
+
+   func Read_Int (var IVS : Input_Value_Stream;
+      Low, High : Univ_Integer) -> Val : Univ_Integer
+      {Val in Low .. High};
+
+   func Read_Optional_Int
+     (var Input_Value_Stream;
+      Low, High : Univ_Integer) -> optional Univ_Integer;
+
+   func Read_Float (var Input_Value_Stream;
+      Digits : Univ_Integer) -> Univ_Float;
+   func Read_Optional_Float
+     (var Input_Value_Stream;
+      Digits : Univ_Integer) -> optional Univ_Float;
+
+   func Read_String (var Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> Univ_String;
+   func Read_Optional_String
+     (var Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> optional Univ_String;
+
+   const Unknown_Actual_Len : Univ_Integer := -1;
+
+   func Read_Begin_Seq (var Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer;
+   func Read_Begin_Optional_Seq (var Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
+
+   func More_Seq_Elements (var Input_Value_Stream) -> Boolean;
+   func Read_End_Seq (var Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
+   //  Absorb end-of-seq indicator and return actual length of sequence.
+   //  Return -1 if length not known.
+   //  Return null if end-of-seq indicator is missing.
+
+   func Read_Begin_Map (var Input_Value_Stream);
+   func Read_Begin_Optional_Map (var Input_Value_Stream) -> Is_Null : Boolean;
+
+   func More_Map_Elements (var Input_Value_Stream) -> Boolean;
+   func Read_End_Map (var Input_Value_Stream) -> Syntax_OK : Boolean;
+   //  Absorb end-of-map indicator.
+   //  Return #false if end-of-map indicator is missing.
+
+   func Read_Begin_Poly (var Input_Value_Stream)
+     -> Type_Name : Univ_String;
+   func Read_Begin_Optional_Poly (var Input_Value_Stream)
+     -> Type_Name : optional Univ_String;
+   func Read_End_Poly (var Input_Value_Stream);
+
+   func Read_Begin_Obj (var Input_Value_Stream);
+   func Read_Begin_Optional_Obj (var Input_Value_Stream) -> Is_Null : Boolean;
+
+   func Read_End_Obj (var Input_Value_Stream);
+end interface PSL::Core::Input_Value_Stream;
+
+//  Streaming in ParaSail is a three layer cake:
+//    Byte Stream is the lowest layer
+//    Value Stream is the middle layer
+//    Object Stream is the top layer
+//
+//  This is the Object stream layer.
+//  An object stream abstracts away the set of values and other syntax
+//  that are used to represent a high-level object.
+//  The ParaSail run-time library provides a default representation of
+//  any ParaSail object.  The user can also define a "custom" representation
+//  for a given type of object.  The implementation of the "custom" streaming
+//  operations ("read" and "write") can use the "default" streaming operations
+//  (Write_Default, Read_Default) as a fall-back, perhaps preceded or followed
+//  by additional values or other syntax.
+interface PSL::Core::Output_Object_Stream<> is
+   ref var Val_Str : Output_Value_Stream+;
+
+   func Create(ref var Output_Value_Stream+) -> Output_Object_Stream is
+     ((Val_Str => Output_Value_Stream));
+
+   func Reached_End(Output_Object_Stream) -> Boolean is
+     ((Output_Object_Stream.Val_Str.Reached_End()));
+
+   func Write_Obj (var Output_Object_Stream; Obj : Obj_Type is Assignable<>)
+     is import (#write_obj);
+   func Write_Optional_Obj
+      (var Output_Object_Stream; Obj : optional Obj_Type is Assignable<>)
+     is import (#write_optional_obj);
+
+   func Write_Default
+      (var Output_Object_Stream; Obj : Obj_Type is Assignable<>)
+     is import (#write_default);
+   func Write_Optional_Default
+      (var Output_Object_Stream; Obj : optional Obj_Type is Assignable<>)
+     is import (#write_optional_default);
+
+end interface PSL::Core::Output_Object_Stream;
+
+interface PSL::Core::Input_Object_Stream<> is
+
+   ref var Val_Str : Input_Value_Stream+;
+
+   func Create(ref var Input_Value_Stream+) -> Input_Object_Stream is
+     ((Val_Str => Input_Value_Stream));
+
+   func Reached_End(Input_Object_Stream) -> Boolean is
+     ((Input_Object_Stream.Val_Str.Reached_End()));
+
+   func Read_Obj (var Input_Object_Stream; var Obj : Obj_Type is Assignable<>)
+     is import (#read_obj);
+   func Read_Optional_Obj
+      (var Input_Object_Stream; var Obj : optional Obj_Type is Assignable<>)
+     is import (#read_optional_obj);
+
+   func Read_Default
+      (var Input_Object_Stream; var Obj : Obj_Type is Assignable<>)
+     is import (#read_default);
+   func Read_Optional_Default
+      (var Input_Object_Stream; var Obj : optional Obj_Type is Assignable<>)
+     is import (#read_optional_default);
+
+end interface PSL::Core::Input_Object_Stream;
+
+abstract interface PSL::Core::Custom_Streaming<> is
+   //  Implement this interface to provide type-specific
+   //  streaming operations.
+   op "write" (var Output_Object_Stream;
+               Obj : optional Custom_Streaming;
+               Is_Optional : Boolean);
+   op "read"  (var Input_Object_Stream;
+               var Obj : optional Custom_Streaming;
+               Is_Optional : Boolean);
+end interface PSL::Core::Custom_Streaming;
+
+interface PSL::Containers::Set<Element_Type is Hashable<>>
+  implements Custom_Streaming<> is
   // A hashed-set module
     op "[]"() -> Set
 
@@ -308,6 +553,15 @@ interface PSL::Containers::Set<Element_Type is Hashable<>> is
     func Any_Element(S : Set) -> optional Element_Type
       // Return an arbitrary element of the Set S;
       // return null if S is empty.
+
+    //  Provide custom streaming operations
+    op "write" (var Output_Object_Stream;
+                Obj : optional Set;
+                Is_Optional : Boolean);
+
+    op "read"  (var Input_Object_Stream;
+                var Obj : optional Set;
+                Is_Optional : Boolean);
 
     optional func Dump_Statistics(S : Set)
       // A debugging routine to show bucket sizes of Set
@@ -1007,6 +1261,7 @@ class PSL::Core::Univ_Character is
         return '\0' + 2**31-1
     end func Last
 end class PSL::Core::Univ_Character
+
 abstract interface PSL::Core::Imageable<> is
     func To_String(Val : Imageable) -> Univ_String<>
 
@@ -4543,6 +4798,19 @@ class PSL::Containers::Set is
         end if
     end func Any_Element
 
+    //  Provide custom streaming operations
+    op "write" (var Output_Object_Stream;
+                Obj : optional Set;
+                Is_Optional : Boolean) is
+       Write_Optional_Default (Output_Object_Stream, Obj);
+    end op "write";
+
+    op "read"  (var Input_Object_Stream;
+                var Obj : optional Set;
+                Is_Optional : Boolean) is
+       Read_Optional_Default (Input_Object_Stream, Obj);
+    end op "read";
+
     optional func Dump_Statistics(S : Set) is
       // A debugging routine to show bucket sizes of Set
         Dump_Statistics(S.Data)
@@ -7410,7 +7678,9 @@ func Test_Enum() is
     PSL::Test::Test_Enum()
 end func Test_Enum
 interface PSL::Containers::Map
-  <Key_Type is Hashable<>; Value_Type is Assignable<>> is
+  <Key_Type is Hashable<>; Value_Type is Assignable<>> 
+  implements Custom_Streaming<>
+is
   // A hashed-map module
     type Pair is Key_Value<Key_Type, Value_Type>
 
@@ -7462,6 +7732,15 @@ interface PSL::Containers::Map
 
     func Is_Empty(M : Map) -> Boolean
         // Return True if no mappings in the table
+
+    //  Provide custom streaming operations
+    op "write" (var Output_Object_Stream;
+                Obj : optional Map;
+                Is_Optional : Boolean);
+
+    op "read"  (var Input_Object_Stream;
+                var Obj : optional Map;
+                Is_Optional : Boolean);
 
     func Dump_Statistics(M : Map)
       // A debugging routine to show bucket sizes of Map
@@ -7550,6 +7829,19 @@ class PSL::Containers::Map is
     func Remove_Any(var M : Map) -> Result : optional Pair is
         return Remove_Any(M.Data)
     end func Remove_Any
+
+    //  Provide custom streaming operations
+    op "write" (var Output_Object_Stream;
+                Obj : optional Map;
+                Is_Optional : Boolean) is
+       Write_Optional_Default (Output_Object_Stream, Obj);
+    end op "write";
+
+    op "read"  (var Input_Object_Stream;
+                var Obj : optional Map;
+                Is_Optional : Boolean) is
+       Read_Optional_Default (Input_Object_Stream, Obj);
+    end op "read";
 
     func Dump_Statistics(M : Map) is
       // A debugging routine to show bucket sizes of Map
@@ -11631,3 +11923,3276 @@ func PSL::Test::Test_Node_Tree() is
       Println("  " | C)
    end loop
 end func PSL::Test::Test_Node_Tree
+
+//  Byte stream used for (de)serializing values/objects
+//
+//  Streaming in ParaSail is a three layer cake:
+//    Byte Stream is the lowest layer
+//    Value Stream is the middle layer
+//    Object Stream is the top layer
+//
+//  A byte stream abstracts away the actual file, network, or internal buffer
+//  that holds the bytes of the stream.
+//  The minimal operations for a byte stream are:
+//    For input:
+//      func Read
+//        (var Input_Byte_Stream;
+//         var Data : Stream_Element_Array)
+//        -> Bytes_Read : Stream_Count;
+//    For output: 
+//      func Write
+//        (var Output_Byte_Stream;
+//         Data : Stream_Element_Array)
+//        -> Bytes_Written : Stream_Count;
+//  Other operations depend on the kind of the byte stream.
+//  For example, for a file byte stream, there are operations to
+//  create and/or open the file.
+//
+//  A value stream abstracts away the byte representation of any given
+//  value, where a value could be a number or a string, possibly optional,
+//  and possibly surrounded by syntax to indicate that the value is part of
+//  a larger composite object, such as a sequence or a dictionary, or
+//  an object of some user-defined type.
+//
+//  An object stream abstracts away the set of values and other syntax
+//  that are used to represent a high-level object.
+
+interface PSL::Core::Byte_Stream<> is
+   const Stream_Elem_Size := 8;
+
+   type Stream_Element is Modular<2**Stream_Elem_Size>;
+   type Stream_Index is Integer<0 .. Integer_64::Last()>;
+   type Stream_Count is Stream_Index;
+
+   type Stream_Element_Array is Packed_Array<Stream_Element, Stream_Index>;
+
+   func Num_Bytes_For_Int
+     (Low, High : Univ_Integer {Low <= High}; Is_Optional : Boolean)
+      -> Num_Bytes : Univ_Integer;
+     //  Determine representation to use for integers
+     //  based on low and high bound.
+
+   func Null_To_Use
+     (Low, High : Univ_Integer {Low <= High})
+      -> optional Univ_Integer;
+     //  Determine value to use to represent "null" given non-null value range.
+
+   const Null_8_Byte_Arr : Stream_Element_Array := [0, 0, 0, 0, 0, 0, 0, 0x80];
+   //  Representation of "null" in stream when Null_To_Use returns null
+
+end interface PSL::Core::Byte_Stream;
+
+class PSL::Core::Byte_Stream is
+
+ exports
+
+   func Num_Bytes_For_Int
+     (Low, High : Univ_Integer {Low <= High}; Is_Optional : Boolean)
+      -> Num_Bytes : Univ_Integer is
+     //  Determine representation to use for integers
+     //  based on low and high bound.
+     //  If Low >= 0 will presume an unsigned representation.
+      const Room_For_Null := (if Is_Optional then 1 else 0);
+
+      if Low >= 0 then
+         --  Can use unsigned
+
+         if High <= 2**8 - 1 - Room_For_Null then
+            Num_Bytes := 1;
+         elsif High <= 2**16 - 1 - Room_For_Null then
+            Num_Bytes := 2;
+         elsif High <= 2**24 - 1 - Room_For_Null then
+            Num_Bytes := 3;
+         elsif High <= 2**32 - 1 - Room_For_Null then
+            Num_Bytes := 4;
+         elsif High <= 2**64 - 1 - Room_For_Null then
+            Num_Bytes := 8;
+         else
+            --  Use variable length
+            Num_Bytes := -1;
+         end if;
+      else
+         --  Use signed
+
+         if High <= 2**7-1 and then Low >= -2**7 + Room_For_Null then
+            --  Use 8-bit elements
+            Num_Bytes := 1;
+         elsif High <= 2**15-1 and then Low >= -2**15 + Room_For_Null then
+            --  Use 16-bit elements
+            Num_Bytes := 2;
+         elsif High <= 2**31-1 and then Low >= -2**31 + Room_For_Null then
+            --  Use 32-bit elements
+            Num_Bytes := 4;
+         elsif High <= 2**63-1 and then Low >= -2**63 + Room_For_Null then
+            --  Use 64-bit elements
+            Num_Bytes := 8;
+         else
+            --  Use variable length
+            Num_Bytes := -1;
+         end if;
+      end if;
+   end func Num_Bytes_For_Int;
+
+   func Null_To_Use
+     (Low, High : Univ_Integer {Low <= High})
+      -> optional Univ_Integer is
+     //  Determine value to use to represent "null" given non-null value range.
+      const Num_Bytes :=
+        Num_Bytes_For_Int (Low, High, Is_Optional => #true);
+
+      if Low < 0 then
+         //  Use most-negative value that fits in num bytes
+         if Num_Bytes < 0 then
+            //  Just below "Low" -- TBD: round down to power of 2
+            return Low-1;
+         elsif Num_Bytes == 8 then
+            --  Use "regular" null
+            return null;
+         else
+            //  Use most-negative value that fits
+            return -2**(Num_Bytes * 8 - 1);
+         end if;
+      else
+         //  Unsigned value.
+         //  Use most-positive value that fits in num bytes
+         if Num_Bytes < 0 then
+            //  Just above "High"  --  TBD: round up to power of 2
+            return High+1;
+         elsif Num_Bytes == 8
+           and then High <= 2**63-1
+         then
+            //  Use regular null
+            return null;
+         else
+            //  Use most-positive value that fits
+            return 2**(Num_Bytes * 8) - 1;
+         end if;
+      end if;
+   end func Null_To_Use;
+end class PSL::Core::Byte_Stream;
+
+abstract interface PSL::Core::Input_Byte_Stream<>
+  extends Byte_Stream<> is
+   func Read  (var Input_Byte_Stream;
+     var Data : Stream_Element_Array) -> Bytes_Read : Stream_Count;
+end interface PSL::Core::Input_Byte_Stream;
+
+abstract interface PSL::Core::Output_Byte_Stream<>
+  extends Byte_Stream<> is
+   func Write (var Output_Byte_Stream;
+     Data : Stream_Element_Array) -> Bytes_Written : Stream_Count;
+end interface PSL::Core::Output_Byte_Stream;
+
+interface PSL::Core::Byte_Stream_Buffer<>
+  extends Byte_Stream<> implements Input_Byte_Stream, Output_Byte_Stream is
+
+   func Create (Size : Stream_Count) -> Byte_Stream_Buffer;
+
+   func Create (Initial_Content : Stream_Element_Array) -> Byte_Stream_Buffer;
+   //  Create a new buffer from a stream-element array
+
+   func Write (var BSB : Byte_Stream_Buffer;
+     Data : Stream_Element_Array) -> Bytes_Written : Stream_Count;
+
+   func Read  (var BSB : Byte_Stream_Buffer;
+     var Data : Stream_Element_Array) -> Bytes_Read : Stream_Count;
+
+   func Bytes_To_Read (BSB : Byte_Stream_Buffer) -> Univ_Integer;
+
+   func Bytes_To_Write (BSB : Byte_Stream_Buffer) -> Univ_Integer;
+
+end interface PSL::Core::Byte_Stream_Buffer;
+
+interface PSL::Core::Byte_Stream_Output_File<>
+  extends Output_Byte_Stream<> is
+
+   func Create (var IO; Name : Univ_String)
+     -> optional Byte_Stream_Output_File
+      is import(#create_output_file)
+
+   func Append (var IO; Name : Univ_String)
+     -> optional Byte_Stream_Output_File
+      is import(#append_output_file)
+
+   func Flush(var Byte_Stream_Output_File)
+      is import(#flush_output_file)
+
+   func Close(var optional Byte_Stream_Output_File)
+      is import(#close_output_file)
+
+   func Delete(var optional Byte_Stream_Output_File)
+      is import(#delete_output_file)
+
+   func Write (var Byte_Stream_Output_File;
+     Data : Stream_Element_Array) -> Bytes_Written : Stream_Count
+       is import(#write_bytes_to_file)
+
+end interface PSL::Core::Byte_Stream_Output_File;
+
+interface PSL::Core::Byte_Stream_Input_File<>
+  extends Input_Byte_Stream<> is
+   func Open (var IO; Name : Univ_String) -> optional Byte_Stream_Input_File
+      is import(#open_input_file)
+
+   func Close(var optional Byte_Stream_Input_File)
+      is import(#close_input_file)
+
+   func Read  (var Byte_Stream_Input_File;
+     var Data : Stream_Element_Array) -> Bytes_Read : Stream_Count
+       is import(#read_bytes_from_file)
+
+end interface PSL::Core::Byte_Stream_Input_File;
+
+class PSL::Core::Byte_Stream_Buffer is
+
+   var Buf : Stream_Element_Array;
+   var Write_Index : Byte_Stream::Stream_Index := 0;
+   var Read_Index : Byte_Stream::Stream_Index := 0;
+   const Debug : Boolean := #true;
+ exports
+   func Create (Size : Stream_Count) -> Result : Byte_Stream_Buffer is
+
+      Result := (Buf => Create (0 ..< Size, 0));
+
+   end func Create;
+
+   func Create (Initial_Content : Stream_Element_Array)
+     -> Byte_Stream_Buffer is
+      //  Create a new buffer from a stream-element array
+      return (Buf => Initial_Content, Write_Index => |Initial_Content|);
+   end func Create;
+
+   func Write (var BSB : Byte_Stream_Buffer;
+     Data : Stream_Element_Array) -> Bytes_Written : Stream_Count is
+      Bytes_Written := Min (|Data|, |BSB.Buf| - BSB.Write_Index);
+
+      for (Left in BSB.Write_Index .. BSB.Buf.Last();
+           Right in Data.Bounds()) forward loop
+         BSB.Buf [Left] := Data [Right];
+         // Println("write BSB.Buf[`(Left)] = `(BSB.Buf[Left])");
+      end loop;
+
+      if Debug and then Bytes_Written != |Data| then
+         Println("|Data| = `(|Data|) but Bytes_Written = `(Bytes_Written)");
+      end if;
+
+      BSB.Write_Index += Bytes_Written;
+   end func Write;
+
+   func Read  (var BSB : Byte_Stream_Buffer;
+     var Data : Stream_Element_Array) -> Bytes_Read : Stream_Count is
+      Bytes_Read := Min (|Data|, BSB.Write_Index - BSB.Read_Index);
+
+      for (Left in Data.Bounds();
+           Right in BSB.Read_Index ..< BSB.Write_Index) forward loop
+         // Println("read BSB.Buf[`(Right)] = `(BSB.Buf[Right])");
+         Data [Left] := BSB.Buf [Right];
+      end loop;
+      BSB.Read_Index += Bytes_Read;
+
+      if BSB.Read_Index == BSB.Write_Index then
+         --  Buffer is empty, so reset indices
+         BSB.Read_Index := 0;
+         BSB.Write_Index := 0;
+      end if;
+   end func Read;
+
+   func Bytes_To_Read (BSB : Byte_Stream_Buffer) -> Univ_Integer is
+     (BSB.Write_Index - BSB.Read_Index);
+
+   func Bytes_To_Write (BSB : Byte_Stream_Buffer) -> Univ_Integer is
+     (BSB.Buf.Last() - BSB.Write_Index + 1);
+end class PSL::Core::Byte_Stream_Buffer;
+
+class PSL::Core::Byte_Stream_Output_File is
+    const Name : Univ_String
+    const Index : Univ_Integer
+  exports
+end class PSL::Core::Byte_Stream_Output_File;
+
+class PSL::Core::Byte_Stream_Input_File is
+    const Name : Univ_String
+    const Index : Univ_Integer
+  exports
+end class PSL::Core::Byte_Stream_Input_File;
+
+func PSL::Test::Test_Byte_Stream() is
+   var Buf : Byte_Stream_Buffer := Create (Size => 100);
+
+   for I in 1 .. 7 forward loop
+      const Arr : Byte_Stream::Stream_Element_Array := Create(1 .. 15, I);
+      const Written := Buf.Write(Arr)
+      if Written != 15 then
+         Println ("Tried to write 15 bytes, but only `(Written) were written");
+      else
+         Println ("Bytes_To_Write = `(Buf.Bytes_To_Write())");
+      end if;
+   end loop;
+
+   var Arr : Byte_Stream::Stream_Element_Array := Create(1 .. 15, 0);
+
+   for I in 1 .. 7 forward loop
+      Println ("Bytes_To_Read = `(Buf.Bytes_To_Read())");
+      const Bytes_Read := Buf.Read(Arr)
+      Println ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
+      if Bytes_Read != 15 then
+         Println ("Tried to read 15 bytes, but only `(Bytes_Read) were read");
+      else
+         for Z in 1 .. 10 loop
+            if Arr[Z] != I then
+               Println ("Expected `(I) in Arr[`(Z)] but found `(Arr[Z])");
+            end if;
+         end loop;
+      end if;
+   end loop;
+   
+   Println (" Now using zero-based array");
+
+   for I in 1 .. 7 forward loop
+      const ZB_Arr : Byte_Stream::Stream_Element_Array := Create(0 ..< 15, I);
+      const Written := Buf.Write(ZB_Arr)
+      if Written != 15 then
+         Println ("Tried to write 15 bytes, but only `(Written) were written");
+      else
+         Println ("Bytes_To_Write = `(Buf.Bytes_To_Write())");
+      end if;
+   end loop;
+
+   var ZB_Arr : Byte_Stream::Stream_Element_Array := Create(0 ..< 15, 0);
+
+   for I in 1 .. 7 forward loop
+      Println ("Bytes_To_Read = `(Buf.Bytes_To_Read())");
+      const Bytes_Read := Buf.Read(ZB_Arr)
+      Println ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
+      if Bytes_Read != 15 then
+         Println ("Tried to read 15 bytes, but only `(Bytes_Read) were read");
+      else
+         for Z in ZB_Arr.Bounds() loop
+            if ZB_Arr[Z] != I then
+               Println
+                 ("Expected `(I) in ZB_Arr[`(Z)] but found `(ZB_Arr[Z])");
+            end if;
+         end loop;
+      end if;
+   end loop;
+   
+   Println ("All done");
+end func PSL::Test::Test_Byte_Stream;
+
+func PSL::Test::Test_File_Stream() is
+   var IO := IO::Get_IO()
+
+   var Out_File : Byte_Stream_Output_File := IO.Create ("test_file");
+
+   for I in 1 .. 7 forward loop
+      const Arr : Byte_Stream::Stream_Element_Array :=
+         Create(1 .. (I == 7? 10: 15), I);
+      const Written := Out_File.Write(Arr)
+      if Written != 15 then
+         Println ("Tried to write 15 bytes, but only `(Written) were written");
+      end if;
+   end loop;
+
+   Out_File.Close();
+
+   var In_File : Byte_Stream_Input_File := IO.Open ("test_file");
+
+   var Arr : Byte_Stream::Stream_Element_Array := Create(1 .. 15, 0);
+
+   for I in 1 .. 7 forward loop
+      const Bytes_Read := In_File.Read(Arr)
+      if Bytes_Read != 15 then
+         Println ("Tried to read 15 bytes, but only `(Bytes_Read) were read");
+      else
+         for Z in 1 .. 10 loop
+            if Arr[Z] != I then
+               Println ("Expected `(I) in Arr[`(Z)] but found `(Arr[Z])");
+            end if;
+         end loop;
+      end if;
+   end loop;
+
+   In_File.Close();
+   
+   Println ("All done");
+end func PSL::Test::Test_File_Stream;
+
+interface PSL::Core::Binary_Output_Value_Stream<>
+  extends PSL::Core::Output_Value_Stream<> is
+
+   func Create(ref var Output_Byte_Stream+) -> Binary_Output_Value_Stream;
+
+   func Is_Self_Describing (Binary_Output_Value_Stream) -> Boolean;
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+     //  If true, it also requires that the Key of each Key/Value
+     //  pair of a Map is required to be a string, and written/read using
+     //  {Write,Read}_String.  The actual key could be of any type with
+     //  appropriate {To,From}_String routines, but those conversions
+     //  must be performed in the higher level code.
+
+   func Reached_End(Binary_Output_Value_Stream) -> Boolean;
+
+   func Write_Int (var Binary_Output_Value_Stream; Val : Univ_Integer;
+      Low, High : Univ_Integer) {Val in Low .. High};
+   func Write_Optional_Int
+     (var Binary_Output_Value_Stream; Val : optional Univ_Integer;
+      Low, High : Univ_Integer);
+
+   func Write_Float (var Binary_Output_Value_Stream; Val : Univ_Float;
+      Digits : Univ_Integer);
+   func Write_Optional_Float
+     (var Binary_Output_Value_Stream; Val : optional Univ_Float;
+      Digits : Univ_Integer);
+
+   func Write_String (var Binary_Output_Value_Stream; Val : Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+      {Min_Len >= 0 and then |Val| in Min_Len .. Max_Len};
+   func Write_Optional_String
+     (var Binary_Output_Value_Stream; Val : optional Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer);
+
+   func Write_Begin_Seq (var Binary_Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer);
+   func Write_Begin_Optional_Seq (var Binary_Output_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer; Actual_Len : optional Univ_Integer);
+
+   func Write_End_Seq (var Binary_Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer);
+
+   func Write_Begin_Map (var Binary_Output_Value_Stream);
+   func Write_Begin_Optional_Map (var Binary_Output_Value_Stream;
+      Is_Null : Boolean);
+
+   func Write_End_Map (var Binary_Output_Value_Stream);
+
+   func Write_Begin_Poly (var Binary_Output_Value_Stream; Type_Name : Univ_String);
+   func Write_Begin_Optional_Poly (var Binary_Output_Value_Stream;
+      Type_Name : optional Univ_String);
+   func Write_End_Poly (var Binary_Output_Value_Stream);
+
+   func Write_Begin_Obj (var Binary_Output_Value_Stream);
+   func Write_Begin_Optional_Obj (var Binary_Output_Value_Stream;
+      Is_Null : Boolean);
+   func Write_End_Obj (var Binary_Output_Value_Stream);
+end interface PSL::Core::Binary_Output_Value_Stream;
+
+class PSL::Core::Binary_Output_Value_Stream is
+   ref var Byte_Str : Output_Byte_Stream+;
+   var End_Reached : Boolean := #false;
+   var Arr_Len_Left : Univ_Integer := -1;
+   const Debug : Boolean := #true;
+
+   func Float_To_Unsigned_64 (Val : optional Univ_Float) -> Unsigned_64
+     is import(#identity);
+
+   func Write_Int_Shared
+     (var OVS: Binary_Output_Value_Stream;
+      Val : optional Univ_Integer;
+      Low, High : Univ_Integer;
+      Is_Optional : Boolean) is
+
+      const Num_Bytes :=
+        Byte_Stream::Num_Bytes_For_Int (Low, High, Is_Optional);
+
+      if Debug then
+         Println
+           ("Write_Int_Shared, Num_Bytes(`(Low),`(High)) = `(Num_Bytes)");
+      end if;
+
+      //  Replace null with value to use in stream
+      const Val_To_Use := Val is null?
+                            Byte_Stream::Null_To_Use (Low, High): Val;
+
+      if Debug and then Val is null then
+         Println("Val is null, Val_To_Use = `(Val_To_Use)");
+      end if;
+
+      if Num_Bytes < 0 then
+         //  Use variable-length representation
+         var Num_To_Write := 0;
+
+         for V := abs Val_To_Use then V/2**32 while V != 0 loop
+            Num_To_Write += 1;
+         end loop;
+         {Num_To_Write <= 2**15-1}
+
+         //  Write out count of 32-bit digits as a signed 16-bit number
+         //  where the sign of the count is the sign of the value.
+         Write_Int (OVS,
+                    (if Val_To_Use < 0 then -Num_To_Write else Num_To_Write),
+                    Low => -2**15, High => 2**15-1);
+         //  Now write out little-endian
+         for V := abs Val_To_Use then V/2**32 while V != 0 loop
+            Write_Int (OVS, V mod 2**32, Low => 0, High => 2**32-1);
+         end loop;
+      elsif Val_To_Use is null then
+         {Num_Bytes == 8}
+         const Written := Write (OVS.Byte_Str, Byte_Stream::Null_8_Byte_Arr);
+         if Written != Num_Bytes then
+            if Debug then
+               Println("End Reached: Num_Bytes = `(Num_Bytes), " |
+                       "Written = `(Written)");
+            end if;
+            OVS.End_Reached := #true;
+         end if;
+      else
+         --  Use fixed-length representation (either signed or unsigned)
+         var Buf : Byte_Stream::Stream_Element_Array :=
+           Create(0 ..< Num_Bytes, 0);
+
+         for (I in Buf.Bounds(); V := Val_To_Use then V/2**8) forward loop
+            const Byte := V mod 2**8;
+              //  Do as a separate step so done using univ int arith
+
+            Buf [I] := Byte;
+         end loop
+
+         const Written := Write (OVS.Byte_Str, Buf);
+
+         if Written != Num_Bytes then
+            if Debug then
+               Println("End Reached: Num_Bytes = `(Num_Bytes), " |
+                       "Written = `(Written)");
+            end if;
+            OVS.End_Reached := #true;
+         end if;
+      end if;
+   end func Write_Int_Shared;
+
+ exports
+
+   func Create(ref var Output_Byte_Stream+) -> Binary_Output_Value_Stream is
+     ((Byte_Str => Output_Byte_Stream));
+
+   func Is_Self_Describing (Binary_Output_Value_Stream) -> Boolean is
+     (#false);
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+     //  If true, it also requires that the Key of each Key/Value
+     //  pair of a Map is required to be a string, and written/read using
+     //  {Write,Read}_String.  The actual key could be of any type with
+     //  appropriate {To,From}_String routines, but those conversions
+     //  must be performed in the higher level code.
+
+   func Reached_End(Binary_Output_Value_Stream) -> Boolean is
+     (Binary_Output_Value_Stream.End_Reached);
+
+   func Write_Int (var OVS: Binary_Output_Value_Stream; Val : Univ_Integer;
+      Low, High : Univ_Integer) is
+
+      Write_Int_Shared (OVS, Val, Low, High, Is_Optional => #false);
+   end func Write_Int;
+
+   func Write_Optional_Int
+     (var OVS : Binary_Output_Value_Stream; Val : optional Univ_Integer;
+      Low, High : Univ_Integer) is
+
+      Write_Int_Shared (OVS, Val, Low, High, Is_Optional => #true);
+   end func Write_Optional_Int;
+
+   func Write_Float (var Binary_Output_Value_Stream; Val : Univ_Float;
+      Digits : Univ_Integer) is
+      //  Just pass the buck to the optional one
+      Write_Optional_Float (Binary_Output_Value_Stream, Val, Digits);
+   end func Write_Float;
+
+   func Write_Optional_Float
+     (var Binary_Output_Value_Stream; Val : optional Univ_Float;
+      Digits : Univ_Integer) is
+      const Equiv_Uns_Val : Unsigned_64 := Float_To_Unsigned_64(Val);
+      var Arr : Byte_Stream::Stream_Element_Array := Create(1 .. 8, 0);
+
+      for (I in Arr.Bounds(); V := Equiv_Uns_Val then V >> 8) forward loop
+         Arr[I] := [[V and 0xFF]];
+         //  Println("Arr[`(I)] = `(Arr[I]), V = `(V)");
+      end loop;
+
+      const Bytes_Written := Write (Binary_Output_Value_Stream.Byte_Str, Arr);
+      if Bytes_Written != 8 then
+         //  Information was lost
+         if Debug then
+            Println("End Reached: Bytes_Written = `(Bytes_Written) != 8");
+         end if;
+         Binary_Output_Value_Stream.End_Reached := #true;
+      end if;
+   end func Write_Optional_Float;
+
+   func Write_String (var OVS : Binary_Output_Value_Stream; Val : Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer) is
+     //  Use UTF-8 unless Max_Char's code is in range 0x80 to 0xFF
+     //  in which case we will use a simple sequence of 8-bit characters.
+     //  Emit a length first if Min_Len != Max_Len or Max_Len = 0.
+     //  An empty string is represented by a length of zero followed by a zero.
+      const Nul_Ch : Univ_Character := Univ_Character::First();
+      const Use_UTF_8 : Boolean := Max_Char - Nul_Ch not in 0x80 .. 0xFF;
+      const Use_Len : Boolean := Min_Len != Max_Len or else Max_Len == 0;
+
+      if Use_Len then
+         const Len := |Val|;
+         Write_Int (OVS, Len, Low => 0, High => Max_Len);
+         if Len == 0 then
+            //  An empty string is [0, 0]
+            Write_Int (OVS, 0, Low => 0, High => 0xFF);
+            return;
+         end if;
+      elsif Val[1] == Nul_Ch then
+         //  When not using a length, we always "double" an initial zero
+         //  to distinguish it from a null value, which is a 0,0x7F
+         Write_Int (OVS, 0, Low => 0, High => 0xFF);
+      end if;
+      
+      for each C of Val forward loop
+         {C <= Max_Char}
+         const Code : Univ_Integer := C - Nul_Ch;
+         var Arr : Byte_Stream::Stream_Element_Array;
+
+         if Use_UTF_8 then
+            case Code of
+               [0 .. 0x7F] => 
+                  Arr := [Code];
+               [0x80 .. 0x7FF] =>
+                  Arr := [0xC0 + (Code >> 6), 0x80 + (Code and 0x3F)];
+               [0x800 .. 0xFFFF] =>
+                  Arr := [0xE0 + (Code >> 12), 0x80 + (Code >> 6 and 0x3F),
+                          0x80 + (Code and 0x3F)];
+               [0x1_0000 .. 0x1F_FFFF] =>
+                  Arr :=
+                   [0xF0 + (Code >> 18), 0x80 + (Code >> 12 and 0x3F),
+                    0x80 + (Code >> 6 and 0x3F), 0x80 + (Code and 0x3F)];
+               [..] => //  Nonstandard
+                  Arr :=
+                   [0xF8 + (Code >> 24), 0x80 + (Code >> 18 and 0x3F),
+                    0x80 + (Code >> 12 and 0x3F), 0x80 + (Code >> 6 and 0x3F),
+                    0x80 + (Code and 0x3F)];
+            end case;
+         else
+            //  Just give one octet to each character
+            Arr := [Code and 0xFF];
+         end if;
+
+         if Debug then
+            Print("C = \"`(C)\", Code = 0x`(Hex_Image(Code)), ");
+            for (each A of Arr; Sep := "Arr = [" then ", ") forward loop
+               Print(Sep | "0x" | Hex_Image(A));
+            end loop;
+            Println("]");
+         end if;
+
+         const Bytes_Written := Write (OVS.Byte_Str, Arr);
+
+         if Bytes_Written != |Arr| then
+            if Debug then
+               Println("End Reached: |Arr| = `(|Arr|), " |
+                       "Bytes_Written = `(Bytes_Written)");
+            end if;
+            OVS.End_Reached := #true;
+         end if;
+      end loop
+   end func Write_String;
+
+   func Write_Optional_String
+     (var OVS : Binary_Output_Value_Stream; Val : optional Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer) is
+     //  A null-valued string (as opposed to the empty string)
+     //  is represented by a length of zero followed a 0x7F.
+     //  An empty string is represented by a length of zero followed by a zero.
+     //  A fixed-length string that starts with a 0x7F has an extra
+     //  0x7F tagged on the front.
+
+      if Val is null then
+         //  Null
+         const Bytes_Written := Write(OVS.Byte_Str, [0, 0x7F]);
+         if Bytes_Written != 2 then
+            OVS.End_Reached := #true;
+         end if;
+      else
+         //  Pass the buck
+         Write_String (OVS, Val, Max_Char, Min_Len, Max_Len);
+      end if;
+   end func Write_Optional_String;
+
+   func Write_Begin_Seq (var OVS : Binary_Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer) is
+      Write_Int (OVS, Actual_Len, Low => Min_Len, High => Max_Len);
+   end func Write_Begin_Seq;
+    
+   func Write_Begin_Optional_Seq (var OVS : Binary_Output_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer; Actual_Len : optional Univ_Integer) is
+      Write_Optional_Int
+        (OVS, Actual_Len, Low => Min_Len, High => Max_Len);
+   end func Write_Begin_Optional_Seq;
+
+   func Write_End_Seq (var Binary_Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer) is (null);
+
+   func Write_Begin_Map (var OVS : Binary_Output_Value_Stream)
+     is (Write_Begin_Optional_Map (OVS, Is_Null => #false));
+
+   func Write_Begin_Optional_Map (var OVS : Binary_Output_Value_Stream;
+      Is_Null : Boolean) is
+      Write_Int (OVS, (if Is_Null then 1 else 0), Low => 0, High => 1);
+   end func Write_Begin_Optional_Map;
+
+   func Write_End_Map (var OVS : Binary_Output_Value_Stream) is
+      (Write_Optional_String (OVS, null,
+                              Max_Char => Univ_Character::Last(),
+                              Min_Len => 1, Max_Len => 100_000));
+
+   func Write_Begin_Poly
+     (var OVS : Binary_Output_Value_Stream; Type_Name : Univ_String)
+      is (Write_String (OVS, Type_Name,
+                        Max_Char => Univ_Character::Last(),
+                        Min_Len => 1, Max_Len => 100_000));
+   func Write_Begin_Optional_Poly (var OVS : Binary_Output_Value_Stream;
+      Type_Name : optional Univ_String)
+      is (Write_Optional_String (OVS, Type_Name,
+                                 Max_Char => Univ_Character::Last(),
+                                 Min_Len => 1, Max_Len => 100_000));
+   func Write_End_Poly (var Binary_Output_Value_Stream) is (null);
+
+   func Write_Begin_Obj (var OVS : Binary_Output_Value_Stream) is (null);
+   func Write_Begin_Optional_Obj (var OVS : Binary_Output_Value_Stream;
+      Is_Null : Boolean) is
+      Write_Int (OVS, (if Is_Null then 1 else 0), Low => 0, High => 1);
+   end func Write_Begin_Optional_Obj;
+
+   func Write_End_Obj (var Binary_Output_Value_Stream) is (null);
+end class PSL::Core::Binary_Output_Value_Stream;
+
+interface PSL::Core::Binary_Input_Value_Stream<>
+  extends PSL::Core::Input_Value_Stream<> is
+
+   func Create(ref var Input_Byte_Stream+) -> Binary_Input_Value_Stream;
+
+   func Is_Self_Describing (Binary_Input_Value_Stream) -> Boolean;
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+     //  If true, it also requires that the Key of each Key/Value
+     //  pair of a Map is required to be a string, and written/read using
+     //  {Write,Read}_String.  The actual key could be of any type with
+     //  appropriate {To,From}_String routines, but those conversions
+     //  must be performed in the higher level code.
+
+   func Reached_End(Binary_Input_Value_Stream) -> Boolean;
+
+   func Read_Int (var IVS : Binary_Input_Value_Stream;
+      Low, High : Univ_Integer) -> Val : Univ_Integer
+      {Val in Low .. High};
+
+   func Read_Optional_Int
+     (var Binary_Input_Value_Stream;
+      Low, High : Univ_Integer) -> optional Univ_Integer;
+
+   func Read_Float (var Binary_Input_Value_Stream;
+      Digits : Univ_Integer) -> Univ_Float;
+   func Read_Optional_Float
+     (var Binary_Input_Value_Stream;
+      Digits : Univ_Integer) -> optional Univ_Float;
+
+   func Read_String (var Binary_Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> Univ_String;
+   func Read_Optional_String
+     (var Binary_Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> optional Univ_String;
+
+   func Read_Begin_Seq (var Binary_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer;
+   func Read_Begin_Optional_Seq (var Binary_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
+
+   func More_Seq_Elements (var Binary_Input_Value_Stream) -> Boolean;
+   func Read_End_Seq (var Binary_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
+   //  Absorb end-of-seq indicator and return actual length of sequence.
+   //  Return -1 if length not known.
+   //  Return null if end-of-seq indicator is missing.
+
+   func Read_Begin_Map (var Binary_Input_Value_Stream);
+   func Read_Begin_Optional_Map (var Binary_Input_Value_Stream)
+     -> Is_Null : Boolean;
+
+   func More_Map_Elements (var Binary_Input_Value_Stream) -> Boolean;
+   func Read_End_Map (var Binary_Input_Value_Stream) -> Syntax_OK : Boolean;
+   //  Absorb end-of-map indicator.
+   //  Return #false if end-of-map indicator is missing.
+
+   func Read_Begin_Poly (var Binary_Input_Value_Stream)
+     -> Type_Name : Univ_String;
+   func Read_Begin_Optional_Poly (var Binary_Input_Value_Stream)
+     -> Type_Name : optional Univ_String;
+   func Read_End_Poly (var Binary_Input_Value_Stream);
+
+   func Read_Begin_Obj (var Binary_Input_Value_Stream);
+   func Read_Begin_Optional_Obj (var Binary_Input_Value_Stream)
+     -> Is_Null : Boolean;
+
+   func Read_End_Obj (var Binary_Input_Value_Stream);
+end interface PSL::Core::Binary_Input_Value_Stream;
+
+class PSL::Core::Binary_Input_Value_Stream is
+   ref var Byte_Str : Input_Byte_Stream+;
+   var End_Reached : Boolean := #false;
+   var Arr_Len_Left : Univ_Integer := -1;
+
+   const Debug : Boolean := #true;
+
+   func Unsigned_64_To_Float (Val : Unsigned_64) -> optional Univ_Float
+     is import(#identity);
+
+   func Read_Int_Shared (var IVS : Binary_Input_Value_Stream;
+      Low, High : Univ_Integer;
+      Is_Optional : Boolean) -> Val : optional Univ_Integer is
+
+      const Num_Bytes :=
+        Byte_Stream::Num_Bytes_For_Int (Low, High, Is_Optional);
+
+      const Null_Val := Is_Optional?
+                          Byte_Stream::Null_To_Use (Low, High): null;
+
+      if Num_Bytes < 0 then
+         //  Use variable-length representation
+
+         //  Read in count of 32-bit digits as a signed 16-bit number
+         //  where the sign of the count is the sign of the value.
+         const Num_To_Read := Read_Int (IVS, -2**15, 2**15-1);
+
+         //  Now read in little-endian
+         Val := 0;
+
+         for (I in 1 .. abs Num_To_Read;
+              Mult := 1 then Mult * 2**32) forward loop
+            Val += Val + Read_Int (IVS, 0, 2**32-1) * Mult;
+         end loop;
+
+         if Num_To_Read < 0 then
+            Val := -Val;
+         end if;
+      else
+         //  Use fixed-length representation (either signed or unsigned)
+         var Buf : Byte_Stream::Stream_Element_Array :=
+           Create(0 ..< Num_Bytes, 0);
+         const Bytes_Read := Read (IVS.Byte_Str, Buf);
+         if Bytes_Read != Num_Bytes then
+            IVS.End_Reached := #true;
+         end if;
+
+         if Is_Optional
+           and then Null_Val is null
+           and then (for all I in Buf.Bounds() =>
+                      Buf[I] == Byte_Stream::Null_8_Byte_Arr[I])
+         then
+            //  Special case of 8-byte null
+            return null;
+         end if;
+
+         Val := 0;
+         for each B of Buf reverse loop
+            Val := Val * 2**8 + [[B]];
+         end loop;
+
+         if Low < 0 then
+            //  Signed value may need to be adjusted
+            const Max := 2 ** (8 * Num_Bytes - 1);
+
+            if Val > Max then
+               //  Value over Max for signed, so represents a negative value
+               Val -= 2*Max;
+            end if;
+         end if;
+      end if;
+
+      if Is_Optional
+        and then Null_Val not null
+        and then Val == Null_Val
+      then
+         return null;
+      end if;
+   end func Read_Int_Shared;
+
+ exports
+
+   func Create(ref var Input_Byte_Stream+) -> Binary_Input_Value_Stream is
+     ((Byte_Str => Input_Byte_Stream));
+
+   func Is_Self_Describing (Binary_Input_Value_Stream) -> Boolean is (#false);
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+     //  If true, it also requires that the Key of each Key/Value
+     //  pair of a Map is required to be a string, and written/read using
+     //  {Write,Read}_String.  The actual key could be of any type with
+     //  appropriate {To,From}_String routines, but those conversions
+     //  must be performed in the higher level code.
+
+   func Reached_End(Binary_Input_Value_Stream) -> Boolean
+     is (Binary_Input_Value_Stream.End_Reached);
+
+   func Read_Int (var IVS : Binary_Input_Value_Stream;
+      Low, High : Univ_Integer) -> Val : Univ_Integer is
+
+      return Read_Int_Shared (IVS, Low, High, Is_Optional => #false);
+   end func Read_Int;
+
+   func Read_Optional_Int
+     (var IVS : Binary_Input_Value_Stream;
+      Low, High : Univ_Integer) -> optional Univ_Integer is
+
+      return Read_Int_Shared (IVS, Low, High, Is_Optional => #true);
+   end func Read_Optional_Int;
+
+   func Read_Float (var Binary_Input_Value_Stream;
+      Digits : Univ_Integer) -> Univ_Float is
+      (Read_Optional_Float (Binary_Input_Value_Stream, Digits));
+
+   func Read_Optional_Float
+     (var Binary_Input_Value_Stream;
+      Digits : Univ_Integer) -> Result : optional Univ_Float is
+
+      var Arr : Byte_Stream::Stream_Element_Array := Create(1 .. 8, 0);
+
+      const Bytes_Read := Read (Binary_Input_Value_Stream.Byte_Str, Arr);
+      if Bytes_Read != 8 then
+         //  Information was lost
+         Binary_Input_Value_Stream.End_Reached := #true;
+      end if;
+
+      var Uns_Val : Unsigned_64 := 0;
+      for each A of Arr reverse loop
+         Uns_Val := (Uns_Val << 8) + [[A]];
+         //  Println("A = `(A), Uns_Val = `(Uns_Val)");
+      end loop;
+
+      return Unsigned_64_To_Float (Uns_Val);
+   end func Read_Optional_Float;
+
+   func Read_String (var IVS : Binary_Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> Univ_String is
+      return Read_Optional_String (IVS, Max_Char, Min_Len, Max_Len);
+   end func Read_String;
+      
+   func Read_Optional_String
+     (var IVS : Binary_Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> optional Univ_String is
+      const Nul_Ch : Univ_Character := Univ_Character::First();
+      const Use_UTF_8 : Boolean := Max_Char - Nul_Ch not in 0x80 .. 0xFF;
+      const Use_Len : Boolean := Min_Len != Max_Len or else Max_Len == 0;
+      var Len : Univ_Integer := Min_Len;
+      var Arr : Byte_Stream::Stream_Element_Array := Create(1 .. 1, 0);
+      var Arr2 : Byte_Stream::Stream_Element_Array := Create(1 .. 2, 0);
+      var Arr3 : Byte_Stream::Stream_Element_Array := Create(1 .. 3, 0);
+      var Arr4 : Byte_Stream::Stream_Element_Array := Create(1 .. 4, 0);
+
+      if Use_Len then
+         Len := Read_Int(IVS, 0, Max_Len);
+
+         if Len == 0 then
+            //  Either an empty string or a null value
+            const Indicator := Read_Int (IVS, 0, 0x7F);
+            //  An empty string is [0, 0]
+            if Indicator == 0 then
+               return "";
+            else
+               {Indicator == 0x7F}
+               return null;
+            end if;
+         end if;
+      end if;
+      
+      var Vec : Vector<Univ_Character> := [];
+
+      for I in 1 .. Len forward loop
+         const Bytes_Read := Read(IVS.Byte_Str, Arr);
+         var Code : Byte_Stream::Stream_Element := 0;
+         var C : Univ_Integer := 0;
+
+         if Bytes_Read != 1 then
+            IVS.End_Reached := #true;
+         else
+            Code := Arr[1];
+         end if;
+
+         if Code == 0 and then not Use_Len and then I == 1 then
+            //  Read another byte since initial zeroes are doubled when
+            //  we aren't using a length.
+            Code := Read_Int(IVS, 0, 0xFF);
+         end if;
+
+         if Use_UTF_8 then
+            case Code of
+               [0 .. 0x7F] => 
+                  C := Code;
+
+               [0xC0 .. 0xDF] =>
+                  const Code2 : Byte_Stream::Stream_Element :=
+                    Read_Int(IVS, 0, 0xFF);
+                  C := ([[Code and 0x1F]] << 6) + [[Code2 and 0x3F]];
+
+               [0xE0 .. 0xEF] =>
+                  const More_Read := Read(IVS.Byte_Str, Arr2);
+                  if More_Read != 2 then
+                     IVS.End_Reached := #true;
+                  end if;
+                  C :=
+                     ([[Code and 0xF]] << 12) +
+                     ([[Arr2[1] and 0x3F]] << 6) +
+                      [[Arr2[2] and 0x3F]];
+
+               [0xF0 .. 0xF7] =>
+                  const More_Read := Read(IVS.Byte_Str, Arr3);
+                  if More_Read != 3 then
+                     IVS.End_Reached := #true;
+                  end if;
+                  C :=
+                     ([[Code and 0x7]] << 18) +
+                     ([[Arr3[1] and 0x3F]] << 12) +
+                     ([[Arr3[2] and 0x3F]] << 6) +
+                      [[Arr3[3] and 0x3F]]
+
+                  if Debug then
+                     Print
+                       ("C = \"`(Nul_Ch + C)\", " |
+                        "Code = 0x`(Hex_Image(C)), " |
+                        "Arr = [0x`(Hex_Image(Code)), ");
+                     for (each A of Arr3; Sep := "" then ", ")
+                      forward loop
+                        Print(Sep | "0x" | Hex_Image(A));
+                     end loop;
+                     Println("]");
+                  end if;
+
+               [0xF8 .. 0xFB] => // Non standard
+                  const More_Read := Read(IVS.Byte_Str, Arr4);
+                  if More_Read != 4 then
+                     IVS.End_Reached := #true;
+                  end if;
+                  C :=
+                     ([[Code and 0x3]] << 24) +
+                     ([[Arr4[1] and 0x3F]] << 18) +
+                     ([[Arr4[2] and 0x3F]] << 12) +
+                     ([[Arr4[3] and 0x3F]] << 6) +
+                      [[Arr4[4] and 0x3F]]
+
+               [..] => //  Not UTF-8
+                  IVS.End_Reached := #true;
+            end case;
+         else
+            //  Just give one octet to each character
+            C := Code;
+         end if;
+
+         const Chr : Univ_Character := Nul_Ch + C;
+
+         {Chr < Max_Char}
+
+         Vec |= Chr;
+      end loop
+
+      return From_Vector(Vec);
+   end func Read_Optional_String;
+
+   func Read_Begin_Seq (var IVS : Binary_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer is
+      return Read_Int (IVS, Min_Len, Max_Len);
+   end func Read_Begin_Seq;
+
+   func Read_Begin_Optional_Seq (var IVS : Binary_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer is
+      return Read_Optional_Int (IVS, Min_Len, Max_Len);
+   end func Read_Begin_Optional_Seq;
+
+   func More_Seq_Elements (var Binary_Input_Value_Stream) -> Boolean
+      is (#false);  --  TBD
+   func Read_End_Seq (var Binary_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer
+      is (-1);  --  TBD
+
+   func Read_Begin_Map (var Binary_Input_Value_Stream)
+      is (null);  --  TBD
+   func Read_Begin_Optional_Map (var Binary_Input_Value_Stream)
+     -> Is_Null : Boolean
+      is (#false);  --  TBD
+
+   func More_Map_Elements (var Binary_Input_Value_Stream) -> Boolean
+      is (#false);  --  TBD
+   func Read_End_Map (var Binary_Input_Value_Stream) -> Syntax_OK : Boolean
+   //  Absorb end-of-map indicator.
+   //  Return #false if end-of-map indicator is missing.
+      is (#true);  --  TBD
+
+   func Read_Begin_Poly (var Binary_Input_Value_Stream)
+     -> Type_Name : Univ_String
+      is ("");  --  TBD
+   func Read_Begin_Optional_Poly (var Binary_Input_Value_Stream)
+     -> Type_Name : optional Univ_String
+      is (null);  --  TBD
+   func Read_End_Poly (var Binary_Input_Value_Stream)
+      is (null);  --  TBD
+
+   func Read_Begin_Obj (var Binary_Input_Value_Stream)
+      is (null);
+   func Read_Begin_Optional_Obj (var IVS : Binary_Input_Value_Stream)
+     -> Is_Null : Boolean is
+      return Read_Int (IVS, Low => 0, High => 1) != 0;
+   end func Read_Begin_Optional_Obj;
+
+   func Read_End_Obj (var Binary_Input_Value_Stream)
+      is (null);
+end class PSL::Core::Binary_Input_Value_Stream;
+
+func PSL::Test::Test_Float_Stream() is
+   var Buf : Byte_Stream_Buffer := Create (Size => 50);
+   ref var OVS : Binary_Output_Value_Stream => Create(Buf);
+   ref var IVS : Binary_Input_Value_Stream => Create(Buf);
+
+   Println ("Testing Read/Write_Optional_Float");
+
+   for I in 1 .. 7 forward loop
+      if I == 3 then
+         Write_Optional_Float (OVS, null, Digits => 10);
+      else
+         Write_Optional_Float (OVS, I*1.5, Digits => 10);
+      end if;
+        
+      Println ("Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+
+   for I in 1 .. 7 forward loop
+      Println ("Bytes_To_Read = `(Buf.Bytes_To_Read())");
+      const Z := Read_Optional_Float (IVS, Digits => 10);
+      if I == 3 then
+         if Z not null then
+            Println ("Expected null but found `(Z)");
+         end if;
+      else
+         if Z != I*1.5 then
+            Println ("Expected `(I*1.5) but found `(Z)");
+         end if;
+      end if;
+      Println
+        ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+   
+   Println ("All done");
+end func PSL::Test::Test_Float_Stream;
+
+func PSL::Test::Test_String_Stream() is
+   var Buf : Byte_Stream_Buffer := Create (Size => 80);
+   ref var OVS : Binary_Output_Value_Stream => Create(Buf);
+   ref var IVS : Binary_Input_Value_Stream => Create(Buf);
+
+   const Test_Chr : Univ_Character := '\#1_F7E9#';
+     //  A green square
+
+   Println ("Testing Read/Write_Optional_String");
+
+   for I in 1 .. 7 forward loop
+      if I == 3 then
+         Write_Optional_String
+           (OVS, null, Max_Char => Test_Chr + 2, Min_Len => 0,
+            Max_Len => 10);
+      elsif I == 5 then
+         Println("I = 5 so writing " | From_Vector([Test_Chr]));
+         Write_Optional_String
+           (OVS, From_Vector([Test_Chr]),
+            Max_Char => Test_Chr + 2, Min_Len => 0,
+            Max_Len => 10);
+      else
+         Write_Optional_String
+           (OVS, To_String(I**3),
+            Max_Char => Test_Chr + 2, Min_Len => 0,
+            Max_Len => 10);
+      end if;
+        
+      Println ("Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+
+   for I in 1 .. 7 forward loop
+      Println ("Bytes_To_Read = `(Buf.Bytes_To_Read())");
+      const Z := Read_Optional_String (IVS,
+            Max_Char => Test_Chr + 2, Min_Len => 0,
+            Max_Len => 10);
+
+      if I == 3 then
+         if Z not null then
+            Println ("Expected null but found `(Z)");
+         end if;
+      elsif I == 5 then
+         if |Z| != 1 or else
+           Z[1] != Test_Chr
+         then
+            Println ("Expected \"`(Test_Chr)\" but found `(Z)");
+         end if;
+      else
+         if Z != To_String(I**3) then
+            Println ("Expected `(I**3) but found `(Z)");
+         end if;
+      end if;
+      Println
+        ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+   
+   Println ("All done");
+end func PSL::Test::Test_String_Stream;
+
+import PSL::Test::Test_Float_Stream, PSL::Test::Test_String_Stream;
+func PSL::Test::Test_Value_Stream() is
+   var Buf : Byte_Stream_Buffer := Create (Size => 13);
+   ref var Buf_For_Output : Output_Byte_Stream+ => Buf;
+   ref var Buf_For_Input : Input_Byte_Stream+ => Buf;
+   ref var OVS : Binary_Output_Value_Stream => Create(Buf);
+   ref var IVS : Binary_Input_Value_Stream => Create(Buf);
+
+   Println ("Testing Read/Write_Int");
+
+   for I in 1 .. 7 forward loop
+      Write_Int (OVS, I**3, Low => 0, High => 1000);
+      Println ("Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+
+   for I in 1 .. 7 forward loop
+      Println ("Bytes_To_Read = `(Buf.Bytes_To_Read())");
+      const Z := Read_Int (IVS, 0, 1000);
+      if Z != I**3 then
+         Println ("Expected `(I**3) but found `(Z)");
+      end if;
+      Println
+        ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+   
+   Println ("Testing Read/Write_Optional_Int");
+
+   for I in 1 .. 7 forward loop
+      if I == 3 then
+         Write_Optional_Int (OVS, null, Low => 0, High => 1000);
+      else
+         Write_Optional_Int (OVS, I**3, Low => 0, High => 1000);
+      end if;
+        
+      Println ("Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+
+   for I in 1 .. 7 forward loop
+      Println ("Bytes_To_Read = `(Buf.Bytes_To_Read())");
+      const Z := Read_Optional_Int (IVS, 0, 1000);
+      if I == 3 then
+         if Z not null then
+            Println ("Expected null but found `(Z)");
+         end if;
+      else
+         if Z != I**3 then
+            Println ("Expected `(I**3) but found `(Z)");
+         end if;
+      end if;
+      Println
+        ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+   
+   Test_Float_Stream();
+
+   Test_String_Stream();
+   
+end func PSL::Test::Test_Value_Stream;
+func PSL::Test::Test_Object_Stream() is
+
+   var Buf : Byte_Stream_Buffer := Create (Size => 10000);
+
+   ref var OVS : Binary_Output_Value_Stream => Create(Buf);
+   ref var IVS : Binary_Input_Value_Stream => Create(Buf);
+
+   ref var OOS : Output_Object_Stream => Create(OVS);
+   ref var IOS : Input_Object_Stream => Create(IVS);
+
+   Println ("Testing Read/Write_Optional_Object");
+
+   
+   for I in 1 .. 7 forward loop
+      if I == 3 then
+         Write_Optional_Obj (OOS, Univ_Integer::(null));
+      else
+         Write_Optional_Obj (OOS, I**3);
+      end if;
+        
+      Println ("Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+
+   for I in 1 .. 7 forward loop
+      Println ("Bytes_To_Read = `(Buf.Bytes_To_Read())");
+      var Z : Univ_Integer;
+      Read_Optional_Obj (IOS, Z);
+      if I == 3 then
+         if Z not null then
+            Println ("Expected null but found `(Z)");
+         end if;
+      else
+         if Z != I**3 then
+            Println ("Expected `(I**3) but found `(Z)");
+         end if;
+      end if;
+      Println
+        ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+   
+   Println ("Testing write sets rather than integers");
+
+   type Int_Set is Set<Integer>;
+
+   func Img(II : Int_Set) -> Univ_String is
+      return "[" | (for (I : Integer in II; Sep := "" then ",") =>
+                 <""> | Sep | To_String (I)) | "]";
+   end func Img;
+
+   for I in 1 .. 7 forward loop
+      if I == 3 then
+         Write_Optional_Obj (OOS, Int_Set::(null));
+      else
+         var Test_Set : Int_Set := [for J in 1 .. I => J];
+
+         Write_Optional_Obj (OOS, Test_Set);
+      end if;
+        
+      Println ("Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+
+   for I in 1 .. 7 forward loop
+      Println ("Bytes_To_Read = `(Buf.Bytes_To_Read())");
+      var Z : Int_Set;
+      Read_Optional_Obj (IOS, Z);
+      if I == 3 then
+         if Z not null then
+            Println ("Expected null but found `(Img(Z))");
+         end if;
+      else
+         const Expected : Int_Set := [for J in 1 .. I => J];
+
+         if Z != Expected then
+            Println ("Expected `(Img(Expected)) but found `(Img(Z))");
+         end if;
+      end if;
+      Println
+        ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+   Println ("All done");
+end func PSL::Test::Test_Object_Stream;
+
+interface PSL::Core::UTF<> is
+   const Nul_Ch : Univ_Character := Univ_Character::First();
+   const Last_Ch : Univ_Character := Univ_Character::Last();
+end interface PSL::Core::UTF;
+
+interface PSL::Core::UTF::Output<> is
+
+   func To_UTF8_Stream (Str : Univ_String)
+     -> Byte_Stream::Stream_Element_Array;
+   //  Build up UTF8 representation as a vector of stream elements
+   //  and then convert to a packed representation.
+
+   func Encode_Str (var OBS : Output_Byte_Stream+; Str : Univ_String)
+     -> End_Reached : Boolean;
+   //  Write UTF-8 encoding of Str to byte stream.
+   //  Return #true if we reach end of stream.
+
+end interface PSL::Core::UTF::Output;
+
+interface PSL::Core::UTF::Input<> is
+
+   func From_UTF8_Stream (Stream : Byte_Stream::Stream_Element_Array)
+     -> Univ_String;
+   //  Convert UTF-8-encoded Stream into a Univ_String
+
+   func Decode_Char (var IBS : Input_Byte_Stream+)
+     -> optional Univ_Character;
+   //  Read UTF-8-encoded character from IBS.
+   //  Return null if not a valid UTF-8 character or reach end of stream.
+end interface PSL::Core::UTF::Input;
+
+class PSL::Core::UTF::Output is
+   const Debug := #false;
+  exports
+
+   func To_UTF8_Stream (Str : Univ_String)
+     -> Result : Byte_Stream::Stream_Element_Array is
+
+      //  Build up UTF8 representation as a vector of stream elements
+      //  and then convert to a packed representation.
+      var UTF8_Bytes : Vector<Byte_Stream::Stream_Element> := [];
+
+      for each C of Str forward loop
+         const Code : Univ_Integer := C - Nul_Ch;
+
+         case Code of
+            [0 .. 0x7F] => 
+               UTF8_Bytes |= Code;
+            [0x80 .. 0x7FF] =>
+               UTF8_Bytes |= 0xC0 + (Code >> 6);
+               UTF8_Bytes |= 0x80 + (Code and 0x3F);
+            [0x800 .. 0xFFFF] =>
+               UTF8_Bytes |= 0xE0 + (Code >> 12);
+               UTF8_Bytes |= 0x80 + (Code >> 6 and 0x3F);
+               UTF8_Bytes |= 0x80 + (Code and 0x3F);
+            [0x1_0000 .. 0x1F_FFFF] =>
+               UTF8_Bytes |= 0xF0 + (Code >> 18);
+               UTF8_Bytes |= 0x80 + (Code >> 12 and 0x3F);
+               UTF8_Bytes |= 0x80 + (Code >> 6 and 0x3F);
+               UTF8_Bytes |= 0x80 + (Code and 0x3F);
+            [..] => //  Nonstandard
+               UTF8_Bytes |= 0xF8 + (Code >> 24)
+               UTF8_Bytes |= 0x80 + (Code >> 18 and 0x3F)
+               UTF8_Bytes |= 0x80 + (Code >> 12 and 0x3F)
+               UTF8_Bytes |= 0x80 + (Code >> 6 and 0x3F)
+               UTF8_Bytes |= 0x80 + (Code and 0x3F);
+         end case;
+
+      end loop
+
+      if Debug then
+         Print("Str = \"`(Str)\", ");
+         for (each B of UTF8_Bytes;
+              Sep := "UTF8 = [" then ", ") forward loop
+            Print(Sep | "0x" | Hex_Image(B));
+         end loop;
+         Println("]");
+      end if;
+
+      --  Pack vector into Result
+      Result :=
+        Create (UTF8_Bytes.Bounds().First .. UTF8_Bytes.Bounds().Last, 0);
+      for I in UTF8_Bytes.Bounds() loop
+         Set (Result, I, UTF8_Bytes[I]);
+      end loop;
+
+   end func To_UTF8_Stream;
+
+   func Encode_Str (var OBS : Output_Byte_Stream+; Str : Univ_String)
+     -> End_Reached : Boolean is
+
+      const Arr := To_UTF8_Stream (Str);
+
+      const Bytes_Written := Write (OBS, Arr);
+
+      if Bytes_Written != |Arr| then
+         if Debug then
+            Println("End Reached: |Arr| = `(|Arr|), " |
+                    "Bytes_Written = `(Bytes_Written)");
+         end if;
+         return #true;
+      else
+         return #false;
+      end if;
+   end func Encode_Str;
+end class PSL::Core::UTF::Output;
+
+class PSL::Core::UTF::Input is
+   const Debug := #false;
+  exports
+   func From_UTF8_Stream (Stream : Byte_Stream::Stream_Element_Array)
+     -> Univ_String is
+      //  Convert UTF-8-encoded Stream into a Univ_String
+      var Buf : Byte_Stream_Buffer := Create (Stream);
+      var Decoded_Vec : Vector<Univ_Character> := [];
+
+      while Buf.Bytes_To_Read() > 0 loop
+         const Ch := Decode_Char (Buf);
+
+         if Ch is null then
+            //  Not a valid UTF8 character
+            {#false}
+            exit loop;
+         end if;
+
+         Decoded_Vec |= Ch;
+      end loop;
+
+      //  Convert vector into Univ_String and return it
+      return From_Vector (Decoded_Vec);
+   end func From_UTF8_Stream;
+
+   func Decode_Char (var IBS : Input_Byte_Stream+)
+     -> optional Univ_Character is
+      var Arr : Byte_Stream::Stream_Element_Array := Create(1 .. 1, 0);
+
+      const Bytes_Read := Read(IBS, Arr);
+      if Bytes_Read != 1 then
+         return null;
+      end if;
+
+      var C : Univ_Integer;
+
+      const Code := Arr[1];
+
+      case Code of
+         [0 .. 0x7F] => 
+            C := Code;
+
+         [0xC0 .. 0xDF] =>
+            const More_Read := Read(IBS, Arr);
+            if More_Read != 1 then
+               return null;
+            end if;
+
+            const Code2 := Arr[1];
+            C := ([[Code and 0x1F]] << 6) + [[Code2 and 0x3F]];
+
+         [0xE0 .. 0xEF] =>
+            var Arr2 : Byte_Stream::Stream_Element_Array := Create(1 .. 2, 0);
+            const More_Read := Read(IBS, Arr2);
+            if More_Read != 2 then
+               return null;
+            end if;
+            C :=
+               ([[Code and 0xF]] << 12) +
+               ([[Arr2[1] and 0x3F]] << 6) +
+                [[Arr2[2] and 0x3F]];
+
+         [0xF0 .. 0xF7] =>
+            var Arr3 : Byte_Stream::Stream_Element_Array := Create(1 .. 3, 0);
+            const More_Read := Read(IBS, Arr3);
+            if More_Read != 3 then
+               return null;
+            end if;
+            C :=
+               ([[Code and 0x7]] << 18) +
+               ([[Arr3[1] and 0x3F]] << 12) +
+               ([[Arr3[2] and 0x3F]] << 6) +
+                [[Arr3[3] and 0x3F]]
+
+            if Debug then
+               Print
+                 ("C = \"`(Nul_Ch + C)\", " |
+                  "Code = 0x`(Hex_Image(C)), " |
+                  "Arr = [0x`(Hex_Image(Code)), ");
+               for (each A of Arr3; Sep := "" then ", ")
+                forward loop
+                  Print(Sep | "0x" | Hex_Image(A));
+               end loop;
+               Println("]");
+            end if;
+
+         [0xF8 .. 0xFB] => // Non standard
+            var Arr4 : Byte_Stream::Stream_Element_Array := Create(1 .. 4, 0);
+            const More_Read := Read(IBS, Arr4);
+            if More_Read != 4 then
+               return null;
+            end if;
+            C :=
+               ([[Code and 0x3]] << 24) +
+               ([[Arr4[1] and 0x3F]] << 18) +
+               ([[Arr4[2] and 0x3F]] << 12) +
+               ([[Arr4[3] and 0x3F]] << 6) +
+                [[Arr4[4] and 0x3F]]
+
+         [..] => //  Not UTF-8
+            return null;
+      end case;
+      return Nul_Ch + C;
+   end func Decode_Char;
+end class PSL::Core::UTF::Input;
+
+func PSL::Test::Test_UTF_Stream() is
+   var IO := IO::Get_IO()
+
+   var Out_File : Byte_Stream_Output_File := IO.Create ("test_file");
+
+   Println ("Writing to test_file");
+
+   if UTF::Output::Encode_Str
+     (Out_File, "This is a green box: \#1_F7_E9#\n")
+   then
+      Println ("End reached putting green box");
+   elsif UTF::Output::Encode_Str
+      (Out_File, "This is a grey box: \#2B_1C#\n")
+   then
+      Println ("End reached putting grey box");
+   elsif UTF::Output::Encode_Str
+      (Out_File, "This is a yellow box: \#1_F7_E8#\n")
+   then
+      Println ("End reached putting yellow box");
+   end if;
+
+   Out_File.Close();
+
+   var In_File : Byte_Stream_Input_File := IO.Open ("test_file");
+
+   Println ("Reading from test_file");
+   loop
+      const C := UTF::Input::Decode_Char(In_File);
+      if C is null then
+         exit loop;
+      end if;
+      Print(C);
+   end loop;
+   In_File.Close();
+   
+   Println ("All done");
+end func PSL::Test::Test_UTF_Stream;
+
+//  Streaming in ParaSail is a three layer cake:
+//    Byte Stream is the lowest layer
+//    Value Stream is the middle layer
+//    Object Stream is the top layer
+//
+//  This is a JSON-specific Value stream layer.  See *_Value_Stream above
+//  for an overview of the purpose of the value stream layer.
+//
+//  See value_stream.psl for the general interface for a Value
+//  stream, and an implementation of a binary value stream.
+
+interface PSL::Core::JSON_Value<> is
+   //  A ParaSail object that can be used to represent a single
+   //  JSON value, or the content of a complete JSON file
+   //  (which is defined to be a single JSON value).
+   type JSON_Value_Kind is Enum
+     <[#Object_Value,
+       #Array_Value,
+       #String_Value,
+       #Number_Value,
+       #Boolean_Value,
+       #Null_Value]>;
+
+   func Create (Kind : JSON_Value_Kind) -> JSON_Value+;
+   //  Create a JSON Value of the given kind
+
+   abstract func Kind (Value : JSON_Value) -> JSON_Value_Kind;
+
+end interface PSL::Core::JSON_Value;
+
+interface PSL::Core::JSON_Object_Value<> extends JSON_Value is
+   //  A JSON_Object_Value can be used to represent a "JSON Object"
+   //  which in ParaSail parlance is a Map with Keys that are Strings,
+   //  and Values that are JSON Values.
+   var Value : Ordered_Map<Univ_String, JSON_Value+> := [];
+
+   func Create (Value : Ordered_Map <Univ_String, JSON_Value+> := [])
+     -> JSON_Object_Value is ((Value => Value));
+
+   func Kind (Value : JSON_Object_Value) -> JSON_Value_Kind
+     is (#Object_Value);
+end interface PSL::Core::JSON_Object_Value;
+
+interface PSL::Core::JSON_Array_Value<> extends JSON_Value is
+   //  A JSON_Array_Value can be used to represent a "JSON Array"
+   //  which in ParaSail parlance is a Vector of JSON Values.
+   var Value : Vector<JSON_Value+> := [];
+
+   func Create (Value : Vector <JSON_Value+> := [])
+     -> JSON_Array_Value is ((Value => Value));
+
+   func Kind (Value : JSON_Array_Value) -> JSON_Value_Kind
+     is (#Array_Value);
+end interface PSL::Core::JSON_Array_Value;
+
+interface PSL::Core::JSON_String_Value<> extends JSON_Value is
+   //  A JSON_String_Value can be used to represent a "JSON String"
+   //  which is equivalent to the ParaSail Univ_String.
+   const Value : Univ_String;
+
+   func Create (Value : Univ_String := "")
+     -> JSON_String_Value is ((Value => Value));
+
+   func Kind (Value : JSON_String_Value) -> JSON_Value_Kind
+     is (#String_Value);
+end interface PSL::Core::JSON_String_Value;
+
+interface PSL::Core::JSON_Number_Value<> extends JSON_Value is
+   //  A JSON_Number_Value can be used to represent a "JSON Number"
+   //  which is equivalent to the ParaSail big-number Rational.
+   const Value : Rational;
+
+   func Is_Integer (Number : JSON_Number_Value) -> Boolean
+     is (Number.Value.Den() == 1);
+
+   func Create (Value : Rational := 0.0)
+     -> JSON_Number_Value is ((Value => Value));
+
+   func Create (Value : Univ_Integer)
+     -> JSON_Number_Value is ((Value => Int_To_Rational (Value)));
+
+   func Kind (Value : JSON_Number_Value) -> JSON_Value_Kind
+     is (#Number_Value);
+end interface PSL::Core::JSON_Number_Value;
+
+interface PSL::Core::JSON_Boolean_Value<> extends JSON_Value is
+   //  A JSON_Boolean_Value can be used to represent a "JSON Boolean"
+   //  which is equivalent to the ParaSail type Boolean.
+   const Value : Boolean;
+
+   func Create (Value : Boolean := #false)
+     -> JSON_Boolean_Value is ((Value => Value));
+
+   func Kind (Value : JSON_Boolean_Value) -> JSON_Value_Kind
+     is (#Boolean_Value);
+end interface PSL::Core::JSON_Boolean_Value;
+
+interface PSL::Core::JSON_Null_Value<> extends JSON_Value is
+   //  A JSON_Null_Value can be used to represent a "JSON null"
+   //  which is a type that has only one value, namely "null".
+   //  It is usually combined with other JSON types as one
+   //  alternative to indicate a lack of data.
+   type Unit is Enum<[#Null_Value]>;
+   const Value : Unit;
+
+   func Create ()
+     -> JSON_Null_Value is (JSON_Null_Value::(Value => #Null_Value))
+
+   func Kind (Value : JSON_Null_Value) -> JSON_Value_Kind
+     is (#Null_Value);
+end interface PSL::Core::JSON_Null_Value;
+
+class PSL::Core::JSON_Value is
+
+ exports
+
+   func Create (Kind : JSON_Value_Kind) -> JSON_Value+ is
+   //  Create a JSON Value of the given kind
+      case Kind of
+       [#Object_Value] =>
+         return JSON_Object_Value::Create();
+       [#Array_Value] =>
+         return JSON_Array_Value::Create();
+       [#String_Value] =>
+         return JSON_String_Value::Create();
+       [#Number_Value] =>
+         return JSON_Number_Value::Create();
+       [#Boolean_Value] =>
+         return JSON_Boolean_Value::Create();
+       [#Null_Value] =>
+         return JSON_Null_Value::Create();
+      end case;
+   end func Create;
+end class PSL::Core::JSON_Value;
+
+interface PSL::Core::JSON_Output_Value_Stream<>
+  extends PSL::Core::Output_Value_Stream<> is
+   //  This kind of value stream is used for output of ParaSail values
+   //  in JSON format, given a byte stream of some sort.
+
+   func Create(ref var Output_Byte_Stream+) -> JSON_Output_Value_Stream;
+
+   func Is_Self_Describing (JSON_Output_Value_Stream) -> Boolean;
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+
+   func Reached_End(JSON_Output_Value_Stream) -> Boolean;
+
+   func Write_Int (var JSON_Output_Value_Stream; Val : Univ_Integer;
+      Low, High : Univ_Integer) {Val in Low .. High};
+   func Write_Optional_Int
+     (var JSON_Output_Value_Stream; Val : optional Univ_Integer;
+      Low, High : Univ_Integer);
+
+   func Write_Float (var JSON_Output_Value_Stream; Val : Univ_Float;
+      Digits : Univ_Integer);
+   func Write_Optional_Float
+     (var JSON_Output_Value_Stream; Val : optional Univ_Float;
+      Digits : Univ_Integer);
+
+   func Write_Rational (var JSON_Output_Value_Stream; Val : Rational;
+      Digits : Univ_Integer);
+   func Write_Optional_Rational
+     (var JSON_Output_Value_Stream; Val : optional Rational;
+      Digits : Univ_Integer);
+
+   func Write_String (var JSON_Output_Value_Stream; Val : Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+      {Min_Len >= 0 and then |Val| in Min_Len .. Max_Len};
+   func Write_Optional_String
+     (var JSON_Output_Value_Stream; Val : optional Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer);
+
+   func Write_Begin_Seq (var JSON_Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer);
+   func Write_Begin_Optional_Seq (var JSON_Output_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer; Actual_Len : optional Univ_Integer);
+
+   func Write_End_Seq (var JSON_Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer);
+
+   func Write_Begin_Map (var JSON_Output_Value_Stream);
+   func Write_Begin_Optional_Map (var JSON_Output_Value_Stream;
+      Is_Null : Boolean);
+
+   func Write_End_Map (var JSON_Output_Value_Stream);
+
+   func Write_Begin_Poly
+     (var JSON_Output_Value_Stream; Type_Name : Univ_String);
+   func Write_Begin_Optional_Poly (var JSON_Output_Value_Stream;
+      Type_Name : optional Univ_String);
+   func Write_End_Poly (var JSON_Output_Value_Stream);
+
+   func Write_Begin_Obj (var JSON_Output_Value_Stream);
+   func Write_Begin_Optional_Obj (var JSON_Output_Value_Stream;
+      Is_Null : Boolean);
+   func Write_End_Obj (var JSON_Output_Value_Stream);
+
+   func Write_JSON_Value (var JSON_Output_Value_Stream; Value : JSON_Value+);
+   //  Write a JSON value to the stream
+
+end interface PSL::Core::JSON_Output_Value_Stream;
+
+class PSL::Core::JSON_Output_Value_Stream is
+   ref var Byte_Str : Output_Byte_Stream+;
+   var End_Reached : Boolean := #false;
+   type JSON_Output_State is Enum
+     <[#Initial, #Expecting_First_Seq_Elem, #Expecting_Seq_Elem,
+       #Expecting_First_Map_Key, #Expecting_Map_Key, #Expecting_Map_Value]>;
+   var State_Stack : Stack<JSON_Output_State> := [#Initial];
+   var Indent := 0;
+   const Indent_Inc := 2;  --  Indent by 2 each level of nesting
+
+   const Debug : Boolean := #false;
+
+   func Write_UTF8 (var OVS : JSON_Output_Value_Stream; Str : Univ_String) is
+      //  Convert Univ_String to UTF8 and then write to OVS.
+      //  Set OVS.End_Reached as appropriate.
+      const End_Reached := UTF::Output::Encode_Str (OVS.Byte_Str, Str);
+
+      if End_Reached then
+         if Debug then
+            Println("End Reached while UTF-8 encoding `(Str)");
+         end if;
+         OVS.End_Reached := #true;
+      end if;
+   end func Write_UTF8;
+
+   func Start_Item (var OVS : JSON_Output_Value_Stream) is
+      //  Emit extra JSON syntax according to current state
+      case OVS.State_Stack.Top() of
+       [#Initial] =>
+         //  Should probably only start an object in this state.
+         Write_UTF8 (OVS, "\n");
+
+       [#Expecting_First_Seq_Elem] =>
+         //  We have seen a Begin_Seq and have emitted a '['
+         //  Start a new line at the appropriate indent.
+         Write_UTF8 (OVS, "\n");
+         Write_UTF8 (OVS, OVS.Indent * ' ');
+
+         //  Switch into a state where we should emit a comma before the
+         //  emitting the newline.
+         OVS.State_Stack.Top() := #Expecting_Seq_Elem;
+
+       [#Expecting_Seq_Elem] =>
+         //  We have emitted at least one element of a sequence.
+         //  Emit a comma and then start a new line at the correct indent.
+         Write_UTF8 (OVS, ",\n");
+         Write_UTF8 (OVS, OVS.Indent * ' ');
+
+       [#Expecting_First_Map_Key] =>
+         //  We have seen a Begin_Map and have emitted a '{'
+         Write_UTF8 (OVS, "\n");
+         Write_UTF8 (OVS, OVS.Indent * ' ');
+
+         //  Switch into a state where we should emit a colon before the
+         //  value
+         OVS.State_Stack.Top() := #Expecting_Map_Value;
+
+       [#Expecting_Map_Key] =>
+         //  We have seen a map value, so this must be a key;
+         //  emit a ',' a newline, and an indent
+         Write_UTF8 (OVS, ",\n");
+         Write_UTF8 (OVS, OVS.Indent * ' ');
+
+         //  Switch back into Expecting_Map_Value,
+         //  since we are expecting a value
+         OVS.State_Stack.Top() := #Expecting_Map_Value;
+
+       [#Expecting_Map_Value] =>
+         //  We have seen a map key, emit a ':' and a space
+         Write_UTF8 (OVS, ": ");
+
+         //  Switch into a state where we should emit a comma and a newline
+         //  before the next key/value pair.
+         OVS.State_Stack.Top() := #Expecting_Map_Key;
+
+      end case;
+   end func Start_Item;
+
+   func Write_Begin_JSON_Array (var OVS: JSON_Output_Value_Stream) is
+      OVS.Indent += Indent_Inc;
+      Push (OVS.State_Stack, #Expecting_First_Seq_Elem);
+
+      Write_UTF8 (OVS, "[");
+   end func Write_Begin_JSON_Array;
+
+   func Write_End_JSON_Array (var OVS: JSON_Output_Value_Stream) is
+      OVS.Indent -= Indent_Inc;
+
+      //  Pop the state stack
+      const Old_State : JSON_Output_State := OVS.State_Stack.Pop();
+
+      case Old_State of
+       [#Expecting_First_Seq_Elem] =>
+         //  We have seen a Begin_JSON_Array and have emitted a '['
+         //  This must be an empty array.
+         Write_UTF8 (OVS, "]");
+
+       [#Expecting_Seq_Elem] =>
+         //  We have emitted at least one element of a sequence.
+         //  Start a new line and write the closing ']' with indent.
+         Write_UTF8 (OVS, "\n");
+         Write_UTF8 (OVS, OVS.Indent * ' ');
+         Write_UTF8 (OVS, "]");
+
+       [#Initial |
+        #Expecting_First_Map_Key |
+        #Expecting_Map_Key |
+        #Expecting_Map_Value] =>
+         //  Not expected!
+         if Debug then
+            Println ("Expected state of #Expecting_First_Seq_Elem or " |
+                     "#Expecting_Seq_Elem, found `(Old_State)");
+         end if;
+
+         {#false}
+      end case;
+   end func Write_End_JSON_Array;
+
+   func Escape_Chars_In_Str (Str : Univ_String) -> Univ_String is
+   //  Prefix any special characters that appear in Str so they are acceptable
+   //  as a JSON string.
+      var Escaped_Part : Vector<Univ_Character> := [];
+      var Unescaped := 0;
+
+      for I in 1 .. |Str| forward loop
+         const C := Str[I];
+         const Code := C - UTF::Nul_Ch;
+
+         case (Code) of
+          [0 .. 0x20 | 0x102000 .. (UTF::Last_Ch - UTF::Nul_Ch)] =>
+            //  Figure out the letter to use with '\'
+            var Letter : optional Univ_Character := null;
+
+            case C of
+             ['\b'] => Letter := 'b';
+             ['\f'] => Letter := 'f';
+             ['\n'] => Letter := 'n';
+             ['\r'] => Letter := 'r';
+             ['\t'] => Letter := 't';
+             [..]   => Letter := 'u';
+            end case;
+
+            Escaped_Part |= '\\';
+            Escaped_Part |= Letter;
+            if Letter == 'u' then
+               //  4 hex-digit unicode
+               for Divisor := 16**3 then Divisor / 16 while Divisor > 0 loop
+                  const Digit := (Code / Divisor) mod 16;
+
+                  //  Append the correct hex digit
+                  if Digit < 10 then
+                     Escaped_Part |= Digit + '0';
+                  else
+                     Escaped_Part |= (Digit - 10) + 'A';
+                  end if;
+               end loop;
+            end if;
+
+          ['"' - UTF::Nul_Ch | '\\' - UTF::Nul_Ch] =>
+             //  A simple escape
+             Escaped_Part |= '\\';
+             Escaped_Part |= C;
+
+          [..] =>
+            //  No escape
+            if |Escaped_Part| > 0 then
+               Escaped_Part |= C;
+            else
+               //  Have not seen a character needing an escape
+               Unescaped := I;
+            end if;
+         end case;
+      end loop;
+      if |Escaped_Part| == 0 then
+         //  Nothing needed escaping
+         return Str;
+      else
+         //  Combine unescaped part with escaped part
+         return Str[1 .. Unescaped] | From_Vector (Escaped_Part);
+      end if;
+   end func Escape_Chars_In_Str;
+
+ exports
+
+   func Create(ref var Output_Byte_Stream+) -> JSON_Output_Value_Stream is
+     ((Byte_Str => Output_Byte_Stream));
+
+   func Is_Self_Describing (JSON_Output_Value_Stream) -> Boolean is
+     (#true);
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+
+   func Reached_End(JSON_Output_Value_Stream) -> Boolean is
+     (JSON_Output_Value_Stream.End_Reached);
+
+   func Write_Int (var OVS: JSON_Output_Value_Stream; Val : Univ_Integer;
+      Low, High : Univ_Integer) is
+
+      {Val not null}
+      Write_Optional_Int (OVS, Val, Low, High);
+   end func Write_Int;
+
+   func Write_Optional_Int
+     (var OVS : JSON_Output_Value_Stream; Val : optional Univ_Integer;
+      Low, High : Univ_Integer) is
+
+      Start_Item (OVS);
+
+      if Debug then
+         Println
+           ("JSON Write_(Optional_)Int, Low = `(Low), High = `(High)" |
+            ", Val = `(Val)");
+      end if;
+
+      const Str := (if Val is null then "null" else To_String (Val));
+      Write_UTF8 (OVS, Str);
+   end func Write_Optional_Int;
+
+   func Write_Float (var OVS: JSON_Output_Value_Stream; Val : Univ_Float;
+      Digits : Univ_Integer) is
+      //  Just pass the buck to the optional one
+      Write_Optional_Float (OVS, Val, Digits);
+   end func Write_Float;
+
+   func Write_Optional_Float
+     (var OVS : JSON_Output_Value_Stream; Val : optional Univ_Float;
+      Digits : Univ_Integer) is
+
+      Start_Item(OVS);
+
+      if Debug then
+         Println
+           ("JSON Write_Optional_Float, Digits = `(Digits)" |
+            ", Val = `(Val)");
+      end if;
+
+      const Str := (if Val is null then "null" else To_String (Val));
+      Write_UTF8 (OVS, Str);
+   end func Write_Optional_Float;
+
+   func Write_Rational (var OVS : JSON_Output_Value_Stream; Val : Rational;
+      Digits : Univ_Integer) is
+      Write_Optional_Rational (OVS, Val, Digits);
+   end func Write_Rational;
+
+   func Write_Optional_Rational
+     (var OVS : JSON_Output_Value_Stream; Val : optional Rational;
+      Digits : Univ_Integer) is
+
+      Start_Item(OVS);
+
+      if Debug then
+         Println
+           ("JSON Write_Optional_Rational, Digits = `(Digits)" |
+            ", Val = `(Val)");
+      end if;
+
+      const Str := (if Val is null then "null" else To_String (Val));
+      Write_UTF8 (OVS, Str);
+   end func Write_Optional_Rational;
+
+   func Write_String (var OVS : JSON_Output_Value_Stream; Val : Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer) is
+      //  Use UTF-8
+      
+      {Val not null}
+      //  Pass the buck
+      Write_Optional_String (OVS, Val, Max_Char, Min_Len, Max_Len);
+   end func Write_String;
+
+   func Write_Optional_String
+     (var OVS : JSON_Output_Value_Stream; Val : optional Univ_String;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer) is
+      //  Write a string surrounded by double quotes, or just the word null.
+
+      Start_Item (OVS);
+
+      const Str :=
+        (if Val is null then "null"
+         else '"' | Escape_Chars_In_Str (Val) | '"');
+
+      Write_UTF8 (OVS, Str);
+   end func Write_Optional_String;
+
+   func Write_Begin_Seq (var OVS : JSON_Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer) is
+
+      {Actual_Len not null}
+      //  Just pass the buck to the "optional" version
+      Write_Begin_Optional_Seq (OVS, Min_Len, Max_Len, Actual_Len);
+   end func Write_Begin_Seq;
+    
+   func Write_Begin_Optional_Seq (var OVS : JSON_Output_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer; Actual_Len : optional Univ_Integer) is
+
+      Start_Item (OVS);
+
+      if Actual_Len is null then
+         Write_UTF8 (OVS, "null");
+      else
+         Write_Begin_JSON_Array (OVS);
+      end if;
+   end func Write_Begin_Optional_Seq;
+
+   func Write_End_Seq (var OVS : JSON_Output_Value_Stream;
+      Min_Len, Max_Len, Actual_Len : Univ_Integer) is
+      //  Emit "]" optionally preceded by a newline
+      //  Pop the state stack and reduce the indent
+
+      Write_End_JSON_Array (OVS);
+   end func Write_End_Seq;
+
+   func Write_Begin_Map (var OVS : JSON_Output_Value_Stream) is
+      //  Just pass the buck to the "optional" version
+      Write_Begin_Optional_Map (OVS, Is_Null => #false);
+   end func Write_Begin_Map;
+
+   func Write_Begin_Optional_Map (var OVS : JSON_Output_Value_Stream;
+      Is_Null : Boolean) is
+
+      Start_Item (OVS);
+
+      if Is_Null then
+         Write_UTF8 (OVS, "null");
+      else
+         OVS.Indent += Indent_Inc;
+         Push (OVS.State_Stack, #Expecting_First_Map_Key);
+
+         Write_UTF8 (OVS, "{");
+      end if;
+   end func Write_Begin_Optional_Map;
+
+   func Write_End_Map (var OVS : JSON_Output_Value_Stream) is
+      //  Emit "}" optionally preceded by a newline
+      //  Pop the state stack and reduce the indent
+
+      OVS.Indent -= Indent_Inc;
+
+      //  Pop the state stack
+      const Old_State : JSON_Output_State := OVS.State_Stack.Pop();
+
+      case Old_State of
+       [#Expecting_First_Map_Key] =>
+         //  We have seen a Begin_Map and have emitted a '{'
+         //  This must be an empty object.
+         Write_UTF8 (OVS, "}");
+
+       [#Expecting_Map_Key] =>
+         //  We have emitted at least one key/value pair.
+         //  Start a new line and write the closing '}' with indent.
+         Write_UTF8 (OVS, "\n");
+         Write_UTF8 (OVS, OVS.Indent * ' ');
+         Write_UTF8 (OVS, "}");
+
+       [#Initial |
+        #Expecting_First_Seq_Elem |
+        #Expecting_Seq_Elem |
+        #Expecting_Map_Value] =>
+         //  Not expected!
+         if Debug then
+            Println ("Expected state of #Expecting_First_Map_Key or " |
+                     "#Expecting_Map_Key, found `(Old_State)");
+         end if;
+
+         {#false}
+      end case;
+   end func Write_End_Map;
+
+   func Write_Begin_Poly
+     (var JSON_Output_Value_Stream; Type_Name : Univ_String)
+      is (null); -- TBD
+   func Write_Begin_Optional_Poly (var JSON_Output_Value_Stream;
+      Type_Name : optional Univ_String) is (null); -- TBD
+   func Write_End_Poly (var JSON_Output_Value_Stream) is (null); -- TBD
+
+   func Write_Begin_Obj (var OVS : JSON_Output_Value_Stream) is
+      //  Just pass the buck to the "optional" version
+      Write_Begin_Optional_Obj (OVS, Is_Null => #false);
+   end func Write_Begin_Obj;
+
+   func Write_Begin_Optional_Obj (var OVS : JSON_Output_Value_Stream;
+      Is_Null : Boolean) is
+      //  Treat an "object" as a sequence of components
+      //  Preferred would be a set of key/value pairs
+
+      Start_Item (OVS);
+
+      if Is_Null then
+         Write_UTF8 (OVS, "null");
+      else
+         Write_Begin_JSON_Array (OVS);
+      end if;
+   end func Write_Begin_Optional_Obj;
+
+   func Write_End_Obj (var OVS : JSON_Output_Value_Stream) is
+      //  Emit "]" optionally preceded by a newline
+      //  Pop the state stack and reduce the indent
+
+      Write_End_JSON_Array (OVS);
+   end func Write_End_Obj;
+
+   func Write_JSON_Value
+     (var OVS : JSON_Output_Value_Stream; Value : JSON_Value+) is
+   //  Write a JSON value to the stream
+      {Value not null}
+      case Value of
+       [Obj : JSON_Object_Value] =>
+         Write_Begin_Map (OVS);
+         for each [Key => Val] of Obj.Value forward loop
+            Write_String (OVS, Key, Univ_Character::Last(),
+              Min_Len => 0, Max_Len => |Key|);
+            Write_JSON_Value (OVS, Val);
+         end loop;
+         Write_End_Map (OVS);
+
+       [Arr : JSON_Array_Value] =>
+         Write_Begin_Seq (OVS,
+           Min_Len => 0, Max_Len => |Arr.Value|, Actual_Len => |Arr.Value|);
+         for each Elem of Arr.Value forward loop
+            Write_JSON_Value (OVS, Elem);
+         end loop;
+         Write_End_Seq (OVS,
+           Min_Len => 0, Max_Len => |Arr.Value|, Actual_Len => |Arr.Value|);
+
+       [Str : JSON_String_Value] =>
+         Write_String (OVS, Str.Value, Univ_Character::Last(),
+           Min_Len => 0, Max_Len => |Str.Value|);
+
+       [Num : JSON_Number_Value] =>
+         Write_Rational (OVS, Num.Value, Digits => 1000);
+
+       [Bool : JSON_Boolean_Value] =>
+         Start_Item (OVS);
+         Write_UTF8 (OVS, (if Bool.Value then "true" else "false"));
+
+       [JSON_Null : JSON_Null_Value] =>
+         Start_Item (OVS);
+         Write_UTF8 (OVS, "null");
+      end case;
+
+   end func Write_JSON_Value;
+
+end class PSL::Core::JSON_Output_Value_Stream;
+
+interface PSL::Core::JSON_Input_Value_Stream<>
+  extends PSL::Core::Input_Value_Stream<> is
+   //  This kind of value stream is used for reading a ParaSail value
+   //  from a byte stream in JSON format.
+
+   func Create(ref var Input_Byte_Stream+) -> JSON_Input_Value_Stream;
+
+   func Is_Self_Describing (JSON_Input_Value_Stream) -> Boolean;
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+
+   func Reached_End(JSON_Input_Value_Stream) -> Boolean;
+
+   func Read_Int (var IVS : JSON_Input_Value_Stream;
+      Low, High : Univ_Integer) -> Val : Univ_Integer
+      {Val in Low .. High};
+
+   func Read_Optional_Int
+     (var JSON_Input_Value_Stream;
+      Low, High : Univ_Integer) -> optional Univ_Integer;
+
+   func Read_Float (var JSON_Input_Value_Stream;
+      Digits : Univ_Integer) -> Univ_Float;
+   func Read_Optional_Float
+     (var JSON_Input_Value_Stream;
+      Digits : Univ_Integer) -> optional Univ_Float;
+
+   func Read_Rational (var JSON_Input_Value_Stream;
+      Digits : Univ_Integer := -1) -> Rational;
+   func Read_Optional_Rational
+     (var JSON_Input_Value_Stream;
+      Digits : Univ_Integer := -1) -> optional Rational;
+
+   func Read_String (var JSON_Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> Univ_String;
+   func Read_Optional_String
+     (var JSON_Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> optional Univ_String;
+
+   func Read_Begin_Seq (var JSON_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer;
+   func Read_Begin_Optional_Seq (var JSON_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
+
+   func More_Seq_Elements (var JSON_Input_Value_Stream) -> Boolean;
+   //  Return #true if there are more sequence elements, and
+   //  absorb the comma separator (except for first element which
+   //  isn't preceded by one.
+
+   func Read_End_Seq (var JSON_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
+   //  Absorb end-of-seq indicator and return actual length of sequence.
+   //  Return -1 if length not known.
+   //  Return null if end-of-seq indicator is missing.
+
+   func Read_Begin_Map (var JSON_Input_Value_Stream);
+   func Read_Begin_Optional_Map (var JSON_Input_Value_Stream)
+     -> Is_Null : Boolean;
+
+   func More_Map_Elements (var JSON_Input_Value_Stream) -> Boolean;
+   //  Return #true if there are more map elements, and
+   //  absorb the comma separator (except for first element which
+   //  isn't preceded by one).
+
+   func Read_Key_Value_Separator (var JSON_Input_Value_Stream);
+   //  Skip over the ':' in a Key/Value pair of a map
+
+   func Read_End_Map (var JSON_Input_Value_Stream) -> Syntax_OK : Boolean;
+   //  Absorb end-of-map indicator.
+   //  Return #false if end-of-map indicator is missing.
+
+   func Read_Begin_Poly (var JSON_Input_Value_Stream)
+     -> Type_Name : Univ_String;
+   func Read_Begin_Optional_Poly (var JSON_Input_Value_Stream)
+     -> Type_Name : optional Univ_String;
+   func Read_End_Poly (var JSON_Input_Value_Stream);
+
+   func Read_Begin_Obj (var JSON_Input_Value_Stream);
+   func Read_Begin_Optional_Obj (var JSON_Input_Value_Stream)
+     -> Is_Null : Boolean;
+
+   func Read_End_Obj (var JSON_Input_Value_Stream);
+
+   func Read_JSON_Value
+     (var IVS : JSON_Input_Value_Stream)
+     -> optional JSON_Value+;
+   //  Read one JSON value from the JSON-formatted byte stream.
+   //  Return null if not good JSON syntax.
+
+   func JSON_Syntax_Error
+     (IVS : JSON_Input_Value_Stream; Err : Univ_String := "JSON syntax error");
+   //  Give an error message, and indicate line and character
+end interface PSL::Core::JSON_Input_Value_Stream;
+
+class PSL::Core::JSON_Input_Value_Stream is
+   ref var Byte_Str : Input_Byte_Stream+;
+   var Peek_Char : optional Univ_Character := null;
+   var End_Reached : Boolean := #false;
+   var Source_Line : Integer<0 .. 100_000> := 1;
+   var Source_Char : Integer<0 .. 10_000> := 1;
+
+   const Debug : Boolean := #false;
+
+   func Next (var IVS : JSON_Input_Value_Stream) is
+      //  Get next decoded character from byte stream
+      //  Keep track of line and char within line
+      IVS.Peek_Char := UTF::Input::Decode_Char (IVS.Byte_Str);
+
+      if IVS.Peek_Char is null then
+         //  Reached end of file
+         null;
+      elsif IVS.Peek_Char == '\n' then
+         IVS.Source_Line += 1;
+         IVS.Source_Char := 0;
+      else
+         IVS.Source_Char += 1;
+      end if;
+   end func Next;
+
+   func Scan_JSON_Token
+     (var IVS : JSON_Input_Value_Stream; Ignore_Comma : Boolean := #false)
+     -> optional Univ_String is
+      //  Read in one token from input stream, decoding it into a Univ_String
+      //  Ignore white space.
+      //  IVS.Peek_Char provides a one-character peek-ahead when non-null.
+      //  Return null at end of stream
+
+      ref Peek => IVS.Peek_Char;
+
+      func Decode_Hex_Digit (X : optional Univ_Character)
+        -> optional Univ_Integer is
+         //  Return value in range 0..15 or null, based on hex digit
+         if X is null then
+            return null;
+         end if;
+         case X of
+          ['0'..'9'] =>
+            return X - '0';
+          ['a'..'f'] =>
+            return X - 'a' + 10;
+          ['A'..'F'] =>
+            return X - 'A' + 10;
+          [..] =>
+            return null;
+         end case;
+      end func Decode_Hex_Digit;
+
+      func Scan_Number () -> optional Univ_String is
+      //  Scan a number, append to Result_Vec
+      //  Presume IVS.Peek is initialized to first char of number
+      //  (either '0'..'9' or '-').
+         
+         var Result_Vec : Vector<Univ_Character> := [];
+
+         func Scan_Int () -> Boolean is
+         //  Scan an integer, append to Result_Vec
+         //  Presume IVS.Peek is initialized to first char of number
+         //  or null.  Return #true if OK syntax, #false if not
+            if Peek is null then
+               IVS.Next();
+               if Peek is null then
+                  IVS.JSON_Syntax_Error ("EOF while reading an integer");
+                  return #false;
+               end if;
+            end if;
+            if Peek not in '0' .. '9' then
+               IVS.JSON_Syntax_Error ("Expecting a digit");
+               return #false;
+            end if;
+            while Peek in '0' .. '9' loop
+               Result_Vec |= Peek;
+               IVS.Next();
+            end loop;
+            // Syntax OK!
+            return #true;
+         end func Scan_Int;
+
+         if Peek == '-' then
+            //  Negative number
+            Result_Vec |= Peek;
+            IVS.Next();
+         end if;
+
+         if not Scan_Int () then
+            //  Syntax error
+            return null;
+         end if;
+
+         if Peek not null and then Peek == '.' then
+            //  Fraction part
+            Result_Vec |= Peek;
+            Peek := null;
+            if not Scan_Int () then
+               //  Syntax error
+               return null;
+            end if;
+         end if;
+
+         if Peek not null and then Peek in 'e' | 'E' then
+            //  Exponent part [E|e][+|-|]<int>
+            Result_Vec |= Peek;
+            IVS.Next();
+            if Peek is null then
+               //  Syntax error
+               IVS.JSON_Syntax_Error ("EOF while reading an exponent");
+               return null;
+            end if;
+            if Peek in '+' | '-' then
+               Result_Vec |= Peek;
+               IVS.Next();
+               if Peek is null then
+                  //  Syntax error
+                  IVS.JSON_Syntax_Error ("EOF while reading an exponent");
+                  return null;
+               end if;
+            end if;
+            if not Scan_Int () then
+               //  Syntax error
+               return null;
+            end if;
+         end if;
+
+         return From_Vector (Result_Vec);
+      end func Scan_Number;
+
+      func Scan_String () -> optional Univ_String is
+         //  Read in a JSON string
+         var Result_Vec : Vector<Univ_Character> := [Peek];
+
+         loop
+            IVS.Next();
+            if Peek is null then
+               //  Syntax error
+               IVS.JSON_Syntax_Error ("EOF while reading a string");
+               return null;
+            elsif Peek == '\n' then
+               //  Syntax error
+               IVS.JSON_Syntax_Error ("Unterminated string");
+               return null;
+            elsif Peek == '\\' then
+               IVS.Next();
+               case Peek of
+                ['r'] =>
+                  Peek := '\r';
+                ['n'] =>
+                  Peek := '\n';
+                ['t'] =>
+                  Peek := '\t';
+                ['f'] =>
+                  Peek := '\f';
+                ['b'] =>
+                  Peek := '\b';
+                ['u'] =>
+                  //  Unicode using 4 hex digits 
+                  var U_Val := 0;
+
+                  for I in 1 .. 4 loop
+                     IVS.Next();
+                     const Dig := Decode_Hex_Digit (Peek);
+                     if Dig is null then
+                        return null;
+                     end if;
+                     U_Val := U_Val * 16 + Dig;
+                  end loop;
+                  Peek := UTF::Nul_Ch + U_Val;
+
+                [..] =>
+                  //  Peek not changed
+                  null;
+               end case;
+               Result_Vec |= Peek;
+            else
+               Result_Vec |= Peek;
+               if Peek == '"' then
+                  exit loop;
+               end if;
+            end if;
+         end loop;
+
+         if Peek is null then
+            //  Bad string
+            return null;
+         else
+            //  Good string.  No peek-ahead left.
+            Peek := null;
+            return From_Vector (Result_Vec);
+         end if;
+      end func Scan_String;
+
+      func Scan_Keyword (Keyword : Univ_String)
+         -> optional Univ_String is
+         for each C of Keyword forward loop
+            if Peek is null or else Peek != C then
+               return null;
+            end if;
+            IVS.Next();
+         end loop;
+
+         //  Syntax OK (TBD: should we require a separator after a keyword?)
+         return Keyword;
+      end func Scan_Keyword;
+
+      //////
+
+      if Peek is null then
+         IVS.Next();
+      end if;
+
+      while Peek not null loop
+         case Peek of
+          [' ' | '\t' | '\n' | '\r'] =>
+            //  Ignore white space; stay in loop
+            null;
+
+          ['0'..'9' | '-'] =>
+            //  A JSON number
+            return Scan_Number ();
+
+          ['"'] =>
+            //  A JSON string
+            return Scan_String ();
+
+          ['[' | ']' | '{' | '}' | ':' | ','] =>
+            //  A separator
+            const Result := Peek | "";
+            //  No peak-ahead after a separator which means it can
+            //  be "pushed back"
+            Peek := null;
+            if not Ignore_Comma or else Result != "," then
+               return Result;
+            end if;
+
+          ['t'] =>
+            return Scan_Keyword ("true");
+
+          ['f'] =>
+            return Scan_Keyword ("false");
+
+          ['n'] =>
+            return Scan_Keyword ("null");
+
+          [..] =>
+            IVS.JSON_Syntax_Error ("Invalid JSON token");
+            //  Skip over bad character
+            IVS.Next();
+            return null;
+         end case;
+
+         //  Advance to next character
+         IVS.Next();
+      end loop;
+   end func Scan_JSON_Token;
+
+ exports
+
+   func Create(ref var Input_Byte_Stream+) -> JSON_Input_Value_Stream is
+     ((Byte_Str => Input_Byte_Stream));
+
+   func Is_Self_Describing (JSON_Input_Value_Stream) -> Boolean is (#true);
+     //  This means that you can tell what sort of object you
+     //  are reading by looking at the content of the byte stream.
+
+   func Reached_End(JSON_Input_Value_Stream) -> Boolean
+     is (JSON_Input_Value_Stream.End_Reached);
+
+   func Read_Int (var IVS : JSON_Input_Value_Stream;
+      Low, High : Univ_Integer) -> Val : Univ_Integer is
+
+      Val := Read_Optional_Int (IVS, Low, High);
+      {Val not null}
+   end func Read_Int;
+
+   func Read_Optional_Int
+     (var IVS : JSON_Input_Value_Stream;
+      Low, High : Univ_Integer) -> optional Univ_Integer is
+
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null or else Token == "" then
+         //  Syntax error
+         IVS.JSON_Syntax_Error ("Expecting an integer");
+         return null;
+      end if;
+
+      case Token[1] of
+       ['n'] =>
+         //  "null"
+         return null;
+       ['0' .. '9' | '-'] =>
+         //  From_String will return null if not good integer syntax
+         return From_String (Token);
+       [..] =>
+         //  Syntax error
+         IVS.JSON_Syntax_Error ("Expecting '-' or a digit," |
+                  " found \"`(Token)\"");
+         return null;
+      end case;
+   end func Read_Optional_Int;
+
+   func Read_Float (var JSON_Input_Value_Stream;
+      Digits : Univ_Integer) -> Univ_Float is
+      (Read_Optional_Float (JSON_Input_Value_Stream, Digits));
+
+   func Read_Optional_Float
+     (var IVS : JSON_Input_Value_Stream;
+      Digits : Univ_Integer) -> Result : optional Univ_Float is
+
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null or else Token == "" then
+         //  Syntax error
+         IVS.JSON_Syntax_Error ("Expecting a floating-point number");
+         return null;
+      end if;
+
+      case Token[1] of
+       ['n'] =>
+         //  "null"
+         return null;
+       ['0' .. '9' | '-'] =>
+         //  From_String will return null if not good numerical syntax
+         return From_String (Token);
+       [..] =>
+         //  Syntax error
+         IVS.JSON_Syntax_Error ("Expecting a floating-point number");
+         return null;
+      end case;
+   end func Read_Optional_Float;
+
+   func Read_Rational (var IVS : JSON_Input_Value_Stream;
+      Digits : Univ_Integer := -1) -> Rational
+     is (Read_Optional_Rational (IVS, Digits));
+
+   func Read_Optional_Rational
+     (var IVS : JSON_Input_Value_Stream;
+      Digits : Univ_Integer := -1) -> optional Rational is
+
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null or else Token == "" then
+         //  Syntax error
+         IVS.JSON_Syntax_Error ("Expecting a JSON number");
+         return null;
+      end if;
+
+      case Token[1] of
+       ['n'] =>
+         //  "null"
+         return null;
+       ['0' .. '9' | '-'] =>
+         //  From_String will return null if not good numerical syntax
+         return From_String (Token);
+       [..] =>
+         //  Syntax error
+         IVS.JSON_Syntax_Error ("Expecting a JSON number");
+         return null;
+      end case;
+   end func Read_Optional_Rational;
+
+   func Read_String (var IVS : JSON_Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> Univ_String is
+      return Read_Optional_String (IVS, Max_Char, Min_Len, Max_Len);
+   end func Read_String;
+      
+   func Read_Optional_String
+     (var IVS : JSON_Input_Value_Stream;
+      Max_Char : Univ_Character; Min_Len, Max_Len : Univ_Integer)
+     -> optional Univ_String is
+      
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null or else Token == "" then
+         //  Syntax error
+         IVS.JSON_Syntax_Error ("Expecting a JSON string");
+         return null;
+      end if;
+
+      case Token[1] of
+       ['"'] =>
+         //  Strip off the double quotes
+         return Token[2 .. |Token|-1];
+
+       ['n'] =>
+         //  "null"
+         return null;
+
+       [..] =>
+         //  Syntax error
+         IVS.JSON_Syntax_Error ("Expecting a JSON string");
+         return null;
+      end case;
+   end func Read_Optional_String;
+
+   func Read_Begin_Seq (var IVS : JSON_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer is
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null or else Token != "[" then
+         {#false}
+         return 0;
+      end if;
+
+      //  Always variable length
+      return -1;
+   end func Read_Begin_Seq;
+
+   func Read_Begin_Optional_Seq (var IVS : JSON_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer is
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null then
+         IVS.JSON_Syntax_Error ("Expecting a JSON array");
+         return 0;
+      elsif Token == "null" then
+         return null;
+      elsif Token == "[" then
+         //  Always variable length
+         return -1;
+      else
+         IVS.JSON_Syntax_Error ("Expecting a JSON array");
+         return 0;
+      end if;
+   end func Read_Begin_Optional_Seq;
+
+   func More_Seq_Elements (var IVS : JSON_Input_Value_Stream) -> Boolean is
+      if IVS.Peek_Char is null then
+         //  Peek ahead
+         IVS.Next();
+      end if;
+
+      while IVS.Peek_Char not null loop
+         case IVS.Peek_Char of
+          [' ' | '\t' | '\n' | '\r'] =>
+            //  Ignore white space; stay in loop
+            null;
+          [']'] =>
+            //  End of sequence
+            return #false;
+          [','] =>
+            //  Absorb the comma and return #true.
+            IVS.Peek_Char := null;
+            return #true;
+          [..] =>
+            //  Anything might come immediately after a '['
+            return #true;
+         end case;
+         //  Get next character
+         IVS.Next();
+      end loop;
+      //  End of stream
+      return #false;
+   end func More_Seq_Elements;
+
+   func Read_End_Seq (var IVS : JSON_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer is
+   //  Absorb end-of-seq indicator and return actual length of sequence.
+   //  Return -1 if length not known.
+   //  Return null if end-of-seq indicator is missing.
+      const Token := Scan_JSON_Token (IVS);
+      if Token not null and then Token == "]" then
+         return -1;
+      else
+         IVS.JSON_Syntax_Error ("Missing final ']' for JSON array");
+         return null;
+      end if;
+   end func Read_End_Seq;
+
+   func Read_Begin_Map (var IVS : JSON_Input_Value_Stream) is
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null or else Token != "{" then
+         IVS.JSON_Syntax_Error ("Expecting JSON Object");
+      end if;
+   end func Read_Begin_Map;
+
+   func Read_Begin_Optional_Map (var IVS : JSON_Input_Value_Stream)
+     -> Is_Null : Boolean is
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null then
+         IVS.JSON_Syntax_Error ("Expecting JSON Object");
+         return #true;
+      elsif Token == "null" then
+         return #true;
+      elsif Token == "{" then
+         return #false;
+      else
+         IVS.JSON_Syntax_Error ("Expecting JSON Object");
+         return #true;
+      end if;
+   end func Read_Begin_Optional_Map;
+
+   func More_Map_Elements (var IVS : JSON_Input_Value_Stream) -> Boolean is
+      if IVS.Peek_Char is null then
+         //  Peek ahead
+         IVS.Next();
+      end if;
+
+      while IVS.Peek_Char not null loop
+         case IVS.Peek_Char of
+          [' ' | '\t' | '\n' | '\r'] =>
+            //  Ignore white space; stay in loop
+            null;
+          ['}'] =>
+            //  End of object
+            return #false;
+          [','] =>
+            //  Absorb the comma and return #true.
+            IVS.Peek_Char := null;
+            return #true;
+          [..] =>
+            //  Anything might come immediately after a '{'
+            return #true;
+         end case;
+         //  Get next character
+         IVS.Next();
+      end loop;
+      //  End of stream
+      return #false;
+   end func More_Map_Elements;
+
+   func Read_Key_Value_Separator (var IVS : JSON_Input_Value_Stream) is
+   //  Skip over the ':' in a Key/Value pair of a map
+      const Token := Scan_JSON_Token (IVS);
+      if Token is null or else Token != ":" then
+         IVS.JSON_Syntax_Error ("Expecting ':'");
+      end if;
+   end func Read_Key_Value_Separator;
+
+   func Read_End_Map (var IVS : JSON_Input_Value_Stream)
+     -> Syntax_OK : Boolean is
+   //  Absorb end-of-map indicator.
+   //  Return #false if end-of-map indicator is missing.
+      const Token := Scan_JSON_Token (IVS);
+
+      if Token not null and then Token == "}" then
+         Syntax_OK := #true;
+      else
+         //  Syntax error
+         IVS.JSON_Syntax_Error ("Expecting '}'");
+         Syntax_OK := #false;
+      end if;
+   end func Read_End_Map;
+
+   func Read_Begin_Poly (var JSON_Input_Value_Stream)
+     -> Type_Name : Univ_String
+      is ("");  --  TBD
+   func Read_Begin_Optional_Poly (var JSON_Input_Value_Stream)
+     -> Type_Name : optional Univ_String
+      is (null);  --  TBD
+   func Read_End_Poly (var JSON_Input_Value_Stream)
+      is (null);  --  TBD
+
+   func Read_Begin_Obj (var IVS : JSON_Input_Value_Stream) is
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null or else Token != "[" then
+         {#false}
+         return;
+      end if;
+   end func Read_Begin_Obj;
+
+   func Read_Begin_Optional_Obj (var IVS : JSON_Input_Value_Stream)
+     -> Is_Null : Boolean is
+
+      const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
+
+      if Token is null then
+         {#false}
+         return #true;
+
+      elsif Token == "null" then
+         return #true;
+
+      elsif Token == "[" then
+         return #false;
+
+      else
+         if Debug then
+            Println("Expecting '[' or 'null' but found '`(Token)'");
+         end if;
+         {#false}
+         return #true;
+      end if;
+      
+   end func Read_Begin_Optional_Obj;
+
+   func Read_End_Obj (var IVS : JSON_Input_Value_Stream) is 
+      const Token := Scan_JSON_Token (IVS);
+      {Token not null and then Token == "]"}
+   end func Read_End_Obj;
+
+   func Read_JSON_Value
+     (var IVS : JSON_Input_Value_Stream)
+     -> Result : optional JSON_Value+ is
+   //  Read one JSON value from the JSON-formatted byte stream.
+   //  Return null if not good JSON syntax.
+      if IVS.Peek_Char is null then
+         //  Peek ahead
+         IVS.Next();
+      end if;
+
+      while IVS.Peek_Char not null loop
+         case IVS.Peek_Char of
+          [' ' | '\t' | '\n' | '\r'] =>
+            //  Ignore white space; stay in loop
+            null;
+
+          ['{'] =>
+            //  JSON Object
+            if Debug then
+               Println("Reading a JSON object");
+            end if;
+            var Obj : JSON_Object_Value for Result := Create();
+
+            Read_Begin_Map (IVS);
+            while More_Map_Elements (IVS) loop
+               const Key :=
+                 Read_Optional_String (IVS, Univ_Character::Last(),
+                   Min_Len => 0, Max_Len => 10_000);
+
+               if Key is null then
+                  IVS.JSON_Syntax_Error ("Expecting JSON string for Key");
+                  return null;
+               end if;
+
+               Read_Key_Value_Separator (IVS);
+
+               Obj.Value[Key] := Read_JSON_Value (IVS);
+            end loop;
+            if Debug then
+               Println("JSON Map is `(|Obj.Value|) in length");
+            end if;
+            if Read_End_Map (IVS) then
+               return Obj;
+            else
+               //  Syntax error
+               return null;
+            end if;
+
+          ['['] =>
+            //  JSON Array
+            if Debug then
+               Println("Reading a JSON array");
+            end if;
+            var Arr : JSON_Array_Value for Result := Create();
+
+            const Ignore_Len :=
+              Read_Begin_Seq (IVS, Min_Len => 0, Max_Len => 2**15);
+            while More_Seq_Elements (IVS) loop
+               var Val for Arr := Read_JSON_Value (IVS);
+               Arr.Value <|= Val;
+            end loop;
+
+            const Act_Len :=
+              Read_End_Seq (IVS, Min_Len => 0, Max_Len => 2**15);
+
+            if Debug then
+               Println("JSON array is `(|Arr.Value|) in length");
+            end if;
+
+            if Act_Len < 0 or else Act_Len == |Arr.Value| then
+               return Arr;
+            else
+               //  Syntax error
+               IVS.JSON_Syntax_Error ("Syntax error in JSON array");
+               return null;
+            end if;
+
+          ['"'] =>
+            //  JSON String
+            if Debug then
+               Println("Reading a JSON string");
+            end if;
+            const Str := Read_Optional_String
+              (IVS, Univ_Character::Last(), Min_Len => 0, Max_Len => 10_000);
+               //  Will return "null" on a syntax error
+
+            if Str not null then
+               return JSON_String_Value::Create (Str);
+            else
+               return null;
+            end if;
+
+          ['0' .. '9' | '-'] =>
+            //  JSON number
+            if Debug then
+               Println("Reading a JSON number");
+            end if;
+            const Num := Read_Optional_Rational (IVS);
+               //  Will return "null" on a syntax error
+
+            if Num not null then
+               return JSON_Number_Value::Create (Num);
+            else
+               return null;
+            end if;
+
+          ['t' | 'f'] =>
+            //  JSON Boolean value
+            if Debug then
+               Println("Reading a JSON bool");
+            end if;
+            const Token := Scan_JSON_Token (IVS);
+            
+            if Debug then
+               Println("bool token is `(Token)");
+            end if;
+            if Token not null then
+               if Token == "true" then
+                  return JSON_Boolean_Value::Create(#true);
+               elsif Token == "false" then
+                  return JSON_Boolean_Value::Create(#false);
+               end if;
+            end if;
+            //  Syntax error
+            IVS.JSON_Syntax_Error ("Expecting 'true' or 'false'");
+            return null;
+
+          ['n'] =>
+            //  JSON Null value
+            if Debug then
+               Println("Reading a JSON null");
+            end if;
+            const Token := Scan_JSON_Token (IVS);
+            
+            if Token not null and then Token == "null" then
+               return JSON_Value::Create(#Null_Value);
+            else
+               //  Syntax error
+               IVS.JSON_Syntax_Error ("Expecting 'null'");
+               return null;
+            end if;
+
+          [..] =>
+            //  Anything else is unexpected
+            //  Read and discard the token
+            const Token := Scan_JSON_Token (IVS);
+
+            IVS.JSON_Syntax_Error
+              ("Unexpected token in JSON stream: \"`(Token)\"");
+            return null;
+         end case;
+         //  Get next character
+         IVS.Next();
+      end loop;
+      //  End of stream
+      return null;
+   end func Read_JSON_Value;
+
+   func JSON_Syntax_Error
+     (IVS : JSON_Input_Value_Stream; Err : Univ_String := "JSON syntax error")
+   //  Give an error message, and indicate line and character
+   is
+      Println ("`(IVS.Source_Line):`(IVS.Source_Char): `(Err)");
+   end func JSON_Syntax_Error;
+
+end class PSL::Core::JSON_Input_Value_Stream;
+
+func PSL::Test::Test_JSON_Stream() is
+
+   var IO := IO::Get_IO();
+   var B_File : Byte_Stream_Output_File := IO.Create ("json_test.json");
+
+   ref var OVS : JSON_Output_Value_Stream => Create(B_File);
+
+   ref var OOS : Output_Object_Stream => Create(OVS);
+
+   var Next_Val_Out := 1111;
+   var Next_Val_In := 1111;
+
+   func Next_Out() -> Univ_Integer is
+   //  Return a unique value
+      Next_Val_Out := Next_Val_Out + 123;
+      return Next_Val_Out;
+   end func Next_Out;
+
+   func Next_In() -> Univ_Integer is
+   //  Return a unique value
+      Next_Val_In := Next_Val_In + 123;
+      return Next_Val_In;
+   end func Next_In;
+
+   Println ("Testing Read/Write_Optional_Object with a JSON value stream");
+   Println (" output in json_test.json");
+
+   for I in 1 .. 7 forward loop
+      if I == 3 then
+         Write_Optional_Obj (OOS, Univ_Integer::(null));
+      else
+         Write_Optional_Obj (OOS, I**3);
+      end if;
+        
+   end loop;
+
+   Println ("Testing write sets rather than integers");
+
+   type Int_Set is Set<Integer>;
+
+   func Img(II : Int_Set) -> Univ_String is
+      return "[" | (for (I : Integer in II; Sep := "" then ",") =>
+                 <""> | Sep | To_String (I)) | "]";
+   end func Img;
+
+   for I in 1 .. 7 forward loop
+      if I == 3 then
+         Write_Optional_Obj (OOS, Int_Set::(null));
+      else
+         var Test_Set : Int_Set := [for J in 1 .. I => Next_Out()];
+
+         Write_Optional_Obj (OOS, Test_Set);
+      end if;
+        
+   end loop;
+
+   B_File.Close();
+
+   //  Read back in
+
+   var I_File : Byte_Stream_Input_File := IO.Open ("json_test.json");
+   ref var IVS : JSON_Input_Value_Stream => Create(I_File);
+   ref var IOS : Input_Object_Stream => Create(IVS);
+
+   Println ("About to read in 7 (optional) Integers");
+
+   for I in 1 .. 7 forward loop
+      var Z : Univ_Integer;
+      // Read_Optional_Obj (IOS, Z);
+      Z := Read_Optional_Int (IVS, 0, High => 7**3);
+      if I == 3 then
+         if Z not null then
+            Println ("Expected null but found `(Z)");
+         end if;
+      else
+         if Z != I**3 then
+            Println ("Expected `(I**3) but found `(Z)");
+         end if;
+      end if;
+      // Println
+      //   ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+
+   Println ("Successful read of 7 optional integers");
+   
+   Println ("About to read in 7 (optional) Integer sets");
+   for I in 1 .. 7 forward loop
+      // Println ("Bytes_To_Read = `(Buf.Bytes_To_Read())");
+      Println ("Reading set `(I)");
+      const Expected : optional Int_Set :=
+        (if I == 3 then null else [for J in 1 .. I => Next_In()]);
+
+      if Expected is null then
+         Println ("Expecting null");
+      else
+
+         Println ("Expecting `(Img(Expected))");
+      end if;
+
+      var Z : Int_Set;
+      Read_Optional_Obj (IOS, Z);
+      if Expected is null then
+         if Z not null then
+            Println ("Expected null but found `(Img(Z))");
+         end if;
+      else
+         if Z != Expected then
+            Println ("Expected `(Img(Expected)) but found `(Img(Z))");
+         end if;
+      end if;
+      // Println
+      //   ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
+   end loop;
+
+   I_File.Close();
+   Println ("All done");
+end func PSL::Test::Test_JSON_Stream;
+
+func PSL::Test::Test_JSON_Value_IO (From, To : Univ_String) is
+   
+   var IO := IO::Get_IO();
+
+   var I_File : Byte_Stream_Input_File := IO.Open (From);
+
+   if I_File is null then
+      Println("Cannot open `(From)");
+      return;
+   end if;
+
+   ref var IVS : JSON_Input_Value_Stream => Create(I_File);
+
+   Println ("About to read JSON file \"`(From)\"");
+   const JSON_Val := Read_JSON_Value (IVS);
+
+   Println ("Done reading in JSON file");
+
+   if JSON_Val is null then
+      IVS.JSON_Syntax_Error ("JSON File `(From) has a syntax error");
+      I_File.Close();
+      return;
+   end if;
+
+   I_File.Close();
+
+   Println ("About to write value back out to file \"`(To)\"");
+   var O_File : Byte_Stream_Output_File := IO.Create (To);
+   if O_File is null then
+      Println("Cannot create file `(To)");
+      return;
+   end if;
+
+   ref var OVS : JSON_Output_Value_Stream => Create(O_File);
+
+   Write_JSON_Value (OVS, JSON_Val);
+   Println ("Done writing to JSON file");
+   O_File.Close();
+
+end func PSL::Test::Test_JSON_Value_IO;

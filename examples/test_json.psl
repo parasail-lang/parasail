@@ -1,0 +1,7 @@
+func Test_JSON_Stream() is
+   PSL::Test::Test_JSON_Stream();
+end func Test_JSON_Stream;
+
+func Test_JSON_Value_IO (From, To : Univ_String) is
+   PSL::Test::Test_JSON_Value_IO (From, To);
+end func Test_JSON_Value_IO;
