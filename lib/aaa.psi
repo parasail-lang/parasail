@@ -261,7 +261,7 @@ end func PSL::Test::Test_Boolean
 //  map.  A textual form generally will need some sort of extra
 //  syntax.  Each kind of value stream provides its own way of indicating
 //  the begin or end of a sequence, a map (i.e. a dictionary), an object,
-//  or a "polymorphic" object, where the type itself is encoded within
+//  or a "polymorphic" object, where the type name itself is encoded within
 //  the value stream.  The operations which emit this syntax (if any)
 //  are Begin/End_Seq, Begin/End_Map, Begin/End_Object, and Begin/End_Poly.
 //
@@ -11643,7 +11643,7 @@ interface PSL::Containers::Stack<Element_Type is Assignable<>>
     op "|="(var S : Stack; Elem : Element_Type) is Push
     op "<|="(var S : Stack; var Elem : optional Element_Type)
     func Pop(var S : Stack) -> Element_Type
-    func Pop(var S : Stack)  //  Ignore result of pop
+    func Discard(var S : Stack)  //  Ignore result of pop
     func Top(ref S : Stack) -> ref Element_Type is (S[0])
     func Depth(S : Stack) -> Univ_Integer
     func Is_Empty(S : Stack) -> Boolean
@@ -11690,12 +11690,12 @@ class PSL::Containers::Stack is
        S.Depth -= 1
     end func Pop
 
-    func Pop(var S : Stack) is //  Ignore result of pop
+    func Discard(var S : Stack) is //  Ignore result of pop
       //  Just pop the stack, but don't return the element there.
        {S.Depth > 0}
        S.Data[S.Depth] := null
        S.Depth -= 1
-    end func Pop
+    end func Discard
 
     func Is_Empty(S : Stack) -> Boolean is (S.Depth == 0)
 
@@ -11724,7 +11724,7 @@ func PSL::Test::Test_Stack(Args : Basic_Array<Univ_String>) is
 
     Println("Pushing and then popping \"hi there\"");
     S.Push("hi there");
-    S.Pop();
+    S.Discard();
     Println("Stack depth now " | S.Depth())
 end func PSL::Test::Test_Stack
 interface PSL::Containers::Node_Tree<Key_Type is Hashable<>> is
@@ -12735,7 +12735,12 @@ end interface PSL::Core::Binary_Input_Value_Stream;
 class PSL::Core::Binary_Input_Value_Stream is
    ref var Byte_Str : Input_Byte_Stream+;
    var End_Reached : Boolean := #false;
-   var Arr_Len_Left : Univ_Integer := -1;
+   interface Seq_State<> is
+      const Actual_Len : Univ_Integer;
+      var Num_Read : Univ_Integer := 0;
+   end interface Seq_State;
+
+   var Seq_State_Stack : Stack <Seq_State> := [];
 
    const Debug : Boolean := #true;
 
@@ -12996,19 +13001,28 @@ class PSL::Core::Binary_Input_Value_Stream is
 
    func Read_Begin_Seq (var IVS : Binary_Input_Value_Stream;
       Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer is
-      return Read_Int (IVS, Min_Len, Max_Len);
+      Actual_Len := Read_Int (IVS, Min_Len, Max_Len);
+      Push (IVS.Seq_State_Stack, (Actual_Len => Actual_Len));
    end func Read_Begin_Seq;
 
    func Read_Begin_Optional_Seq (var IVS : Binary_Input_Value_Stream;
       Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer is
-      return Read_Optional_Int (IVS, Min_Len, Max_Len);
+      Actual_Len := Read_Optional_Int (IVS, Min_Len, Max_Len);
+      Push (IVS.Seq_State_Stack,
+            (Actual_Len => (if Actual_Len is null then -1 else Actual_Len)));
    end func Read_Begin_Optional_Seq;
 
-   func More_Seq_Elements (var Binary_Input_Value_Stream) -> Boolean
-      is (#false);  --  TBD
-   func Read_End_Seq (var Binary_Input_Value_Stream;
-      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer
-      is (-1);  --  TBD
+   func More_Seq_Elements (var IVS : Binary_Input_Value_Stream) -> Boolean is
+      ref State => Top (IVS.Seq_State_Stack);
+      return State.Num_Read <= State.Actual_Len;
+   end func More_Seq_Elements;
+
+   func Read_End_Seq (var IVS : Binary_Input_Value_Stream;
+      Min_Len, Max_Len : Univ_Integer)
+     -> Actual_Len : optional Univ_Integer is
+      const State := Pop (IVS.Seq_State_Stack);
+      return State.Num_Read;
+   end func Read_End_Seq;
 
    func Read_Begin_Map (var Binary_Input_Value_Stream)
       is (null);  --  TBD
@@ -13023,14 +13037,17 @@ class PSL::Core::Binary_Input_Value_Stream is
    //  Return #false if end-of-map indicator is missing.
       is (#true);  --  TBD
 
-   func Read_Begin_Poly (var Binary_Input_Value_Stream)
+   func Read_Begin_Poly (var IVS : Binary_Input_Value_Stream)
      -> Type_Name : Univ_String
-      is ("");  --  TBD
-   func Read_Begin_Optional_Poly (var Binary_Input_Value_Stream)
+      is (Read_Begin_Optional_Poly (IVS));
+   func Read_Begin_Optional_Poly (var IVS : Binary_Input_Value_Stream)
      -> Type_Name : optional Univ_String
-      is (null);  --  TBD
+      is (Read_Optional_String (IVS,
+            Max_Char => Univ_Character::Last(),
+            Min_Len => 1, Max_Len => 100_000));
+
    func Read_End_Poly (var Binary_Input_Value_Stream)
-      is (null);  --  TBD
+      is (null);
 
    func Read_Begin_Obj (var Binary_Input_Value_Stream)
       is (null);
@@ -13537,8 +13554,9 @@ end func PSL::Test::Test_UTF_Stream;
 //  This is a JSON-specific Value stream layer.  See *_Value_Stream above
 //  for an overview of the purpose of the value stream layer.
 //
-//  See value_stream.psl for the general interface for a Value
-//  stream, and an implementation of a binary value stream.
+//  See Input_Value_Stream and Output_Value_Stream for the general interface
+//  for a Value stream.  See Binary_{Input,Output}_Value_Stream for an
+//  implementation of a binary value stream.
 
 interface PSL::Core::JSON_Value<> is
    //  A ParaSail object that can be used to represent a single
@@ -14101,11 +14119,21 @@ class PSL::Core::JSON_Output_Value_Stream is
    end func Write_End_Map;
 
    func Write_Begin_Poly
-     (var JSON_Output_Value_Stream; Type_Name : Univ_String)
-      is (null); -- TBD
-   func Write_Begin_Optional_Poly (var JSON_Output_Value_Stream;
-      Type_Name : optional Univ_String) is (null); -- TBD
-   func Write_End_Poly (var JSON_Output_Value_Stream) is (null); -- TBD
+     (var OVS : JSON_Output_Value_Stream; Type_Name : Univ_String)
+      is (Write_Begin_Optional_Poly (OVS, Type_Name));
+
+   func Write_Begin_Optional_Poly (var OVS : JSON_Output_Value_Stream;
+      Type_Name : optional Univ_String) is
+      Write_Begin_Optional_Map (OVS, Is_Null => Type_Name is null);
+      if Type_Name not null then
+         Write_String (OVS, Type_Name,
+                       Max_Char => Univ_Character::Last(),
+                       Min_Len => 1, Max_Len => 100_000);
+      end if;
+   end func Write_Begin_Optional_Poly;
+
+   func Write_End_Poly (var OVS : JSON_Output_Value_Stream)
+     is (Write_End_Map (OVS));
 
    func Write_Begin_Obj (var OVS : JSON_Output_Value_Stream) is
       //  Just pass the buck to the "optional" version
@@ -14823,14 +14851,25 @@ class PSL::Core::JSON_Input_Value_Stream is
       end if;
    end func Read_End_Map;
 
-   func Read_Begin_Poly (var JSON_Input_Value_Stream)
+   func Read_Begin_Poly (var IVS : JSON_Input_Value_Stream)
      -> Type_Name : Univ_String
-      is ("");  --  TBD
-   func Read_Begin_Optional_Poly (var JSON_Input_Value_Stream)
-     -> Type_Name : optional Univ_String
-      is (null);  --  TBD
-   func Read_End_Poly (var JSON_Input_Value_Stream)
-      is (null);  --  TBD
+     is (Read_Begin_Optional_Poly (IVS));
+
+   func Read_Begin_Optional_Poly (var IVS : JSON_Input_Value_Stream)
+     -> Type_Name : optional Univ_String is
+      if (Read_Begin_Optional_Map (IVS)) then
+         return null;
+      else
+         return Read_String (IVS,
+                             Max_Char => Univ_Character::Last(),
+                             Min_Len => 1, Max_Len => 100_000);
+      end if;
+   end func Read_Begin_Optional_Poly;
+
+   func Read_End_Poly (var IVS : JSON_Input_Value_Stream) is
+      const OK := Read_End_Map (IVS);
+      {OK}
+   end func Read_End_Poly;
 
    func Read_Begin_Obj (var IVS : JSON_Input_Value_Stream) is
       const Token := Scan_JSON_Token (IVS, Ignore_Comma => #true);
