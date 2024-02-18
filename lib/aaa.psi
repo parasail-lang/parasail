@@ -306,9 +306,19 @@ abstract ref interface PSL::Core::Output_Value_Stream<> is
       Min_Len, Max_Len, Actual_Len : Univ_Integer);
    func Write_Begin_Optional_Seq (var Output_Value_Stream;
       Min_Len, Max_Len : Univ_Integer; Actual_Len : optional Univ_Integer);
+   //  A "Seq" in a value stream is represented by a sequences of values.
+   //  If the value stream is "self describing" then the actual length
+   //  need not be specified, and may be -1, indicating an unknown length.
+   //  If the value stream is *not* self describing, then the length
+   //  must be given in the Begin_Seq, or a special end-seq indicator
+   //  must be written by End_Seq so that More_Seq_Elements can indicate
+   //  whether or not there are more elements.
+   //  A sequence that is a "null" value (not the same thing as a
+   //  zero-length sequence) is produced by calling Write_Begin_Optional_Seq
+   //  with the Actual_Len parameter being null.
 
-   func Write_End_Seq (var Output_Value_Stream;
-      Min_Len, Max_Len, Actual_Len : Univ_Integer);
+   func Write_End_Seq (var Output_Value_Stream);
+   //  Write out the end-seq indicator (if any).
 
    func Write_Begin_Map (var Output_Value_Stream);
    func Write_Begin_Optional_Map (var Output_Value_Stream;
@@ -329,7 +339,8 @@ abstract ref interface PSL::Core::Output_Value_Stream<> is
       Type_Name : optional Univ_String);
    //  A polymorphic object in a value stream is represented by
    //  a type name as a string, followed by the value produced by
-   //  the appropriate Write_* routine.
+   //  the appropriate Write_* routine.  If the Type_Name is null, the
+   //  object is presumed to be the null value.
    //  On input, the Type_Name should be used to decide what kind of
    //  value to expect, and call the corresponding Read_* routine.
    func Write_End_Poly (var Output_Value_Stream);
@@ -337,7 +348,12 @@ abstract ref interface PSL::Core::Output_Value_Stream<> is
    func Write_Begin_Obj (var Output_Value_Stream);
    func Write_Begin_Optional_Obj (var Output_Value_Stream;
       Is_Null : Boolean);
+   //  An arbitrary (non-polymorphic) ParaSail object is represented
+   //  in the value stream by its components, followed by an end-of-obj
+   //  indicator.
+
    func Write_End_Obj (var Output_Value_Stream);
+   //  Write an end-of-obj indicator.
 end interface PSL::Core::Output_Value_Stream;
 
 abstract ref interface PSL::Core::Input_Value_Stream<> is
@@ -384,18 +400,27 @@ abstract ref interface PSL::Core::Input_Value_Stream<> is
       Min_Len, Max_Len : Univ_Integer) -> Actual_Len : Univ_Integer;
    func Read_Begin_Optional_Seq (var Input_Value_Stream;
       Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
+   //  Absorb begin-of-seq indicator and return actual length of sequence
+   //  if known, or -1 if unknown, or null if the sequence is a null value.
+   //  Only "self describing" value streams permit an unknown length.
 
    func More_Seq_Elements (var Input_Value_Stream) -> Boolean;
-   func Read_End_Seq (var Input_Value_Stream;
-      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
-   //  Absorb end-of-seq indicator and return actual length of sequence.
-   //  Return -1 if length not known.
-   //  Return null if end-of-seq indicator is missing.
+   //  Return #true if more sequence elements are expected.
+   //  If the value stream is "self describing" then this function
+   //  may "peek" ahead to determine whether more elements are present.
+
+   func Read_End_Seq (var Input_Value_Stream);
+   //  Absorb end-of-seq indicator.
 
    func Read_Begin_Map (var Input_Value_Stream);
    func Read_Begin_Optional_Map (var Input_Value_Stream) -> Is_Null : Boolean;
 
    func More_Map_Elements (var Input_Value_Stream) -> Boolean;
+   //  Return #true if there are more key/value pairs in the map.
+
+   func Read_Key_Value_Separator (var Input_Value_Stream);
+   //  Skip over the separator, if any, in a Key/Value pair of a map
+
    func Read_End_Map (var Input_Value_Stream) -> Syntax_OK : Boolean;
    //  Absorb end-of-map indicator.
    //  Return #false if end-of-map indicator is missing.
@@ -404,12 +429,19 @@ abstract ref interface PSL::Core::Input_Value_Stream<> is
      -> Type_Name : Univ_String;
    func Read_Begin_Optional_Poly (var Input_Value_Stream)
      -> Type_Name : optional Univ_String;
+   //  Read the type name for a polymorphic object.
+   //  The caller may use the type name to determine which Read_* routine(s)
+   //  to use.
+
    func Read_End_Poly (var Input_Value_Stream);
 
    func Read_Begin_Obj (var Input_Value_Stream);
    func Read_Begin_Optional_Obj (var Input_Value_Stream) -> Is_Null : Boolean;
+   //  Begin reading an arbitrary (non-polymorphic) ParaSail object.
 
    func Read_End_Obj (var Input_Value_Stream);
+   //  Absorb the end-of-obj indicator.
+
 end interface PSL::Core::Input_Value_Stream;
 
 //  Streaming in ParaSail is a three layer cake:
@@ -12357,8 +12389,7 @@ interface PSL::Core::Binary_Output_Value_Stream<>
    func Write_Begin_Optional_Seq (var Binary_Output_Value_Stream;
       Min_Len, Max_Len : Univ_Integer; Actual_Len : optional Univ_Integer);
 
-   func Write_End_Seq (var Binary_Output_Value_Stream;
-      Min_Len, Max_Len, Actual_Len : Univ_Integer);
+   func Write_End_Seq (var Binary_Output_Value_Stream);
 
    func Write_Begin_Map (var Binary_Output_Value_Stream);
    func Write_Begin_Optional_Map (var Binary_Output_Value_Stream;
@@ -12623,8 +12654,7 @@ class PSL::Core::Binary_Output_Value_Stream is
         (OVS, Actual_Len, Low => Min_Len, High => Max_Len);
    end func Write_Begin_Optional_Seq;
 
-   func Write_End_Seq (var Binary_Output_Value_Stream;
-      Min_Len, Max_Len, Actual_Len : Univ_Integer) is (null);
+   func Write_End_Seq (var Binary_Output_Value_Stream) is (null);
 
    func Write_Begin_Map (var OVS : Binary_Output_Value_Stream)
      is (Write_Begin_Optional_Map (OVS, Is_Null => #false));
@@ -12651,7 +12681,8 @@ class PSL::Core::Binary_Output_Value_Stream is
                                  Min_Len => 1, Max_Len => 100_000));
    func Write_End_Poly (var Binary_Output_Value_Stream) is (null);
 
-   func Write_Begin_Obj (var OVS : Binary_Output_Value_Stream) is (null);
+   func Write_Begin_Obj (var OVS : Binary_Output_Value_Stream)
+     is (Write_Begin_Optional_Obj (OVS, Is_Null => #false));
    func Write_Begin_Optional_Obj (var OVS : Binary_Output_Value_Stream;
       Is_Null : Boolean) is
       Write_Int (OVS, (if Is_Null then 1 else 0), Low => 0, High => 1);
@@ -12704,17 +12735,15 @@ interface PSL::Core::Binary_Input_Value_Stream<>
       Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
 
    func More_Seq_Elements (var Binary_Input_Value_Stream) -> Boolean;
-   func Read_End_Seq (var Binary_Input_Value_Stream;
-      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
-   //  Absorb end-of-seq indicator and return actual length of sequence.
-   //  Return -1 if length not known.
-   //  Return null if end-of-seq indicator is missing.
+   func Read_End_Seq (var Binary_Input_Value_Stream);
+   //  Absorb end-of-seq indicator.
 
    func Read_Begin_Map (var Binary_Input_Value_Stream);
    func Read_Begin_Optional_Map (var Binary_Input_Value_Stream)
      -> Is_Null : Boolean;
 
    func More_Map_Elements (var Binary_Input_Value_Stream) -> Boolean;
+   func Read_Key_Value_Separator (var Binary_Input_Value_Stream);
    func Read_End_Map (var Binary_Input_Value_Stream) -> Syntax_OK : Boolean;
    //  Absorb end-of-map indicator.
    //  Return #false if end-of-map indicator is missing.
@@ -13017,11 +13046,8 @@ class PSL::Core::Binary_Input_Value_Stream is
       return State.Num_Read <= State.Actual_Len;
    end func More_Seq_Elements;
 
-   func Read_End_Seq (var IVS : Binary_Input_Value_Stream;
-      Min_Len, Max_Len : Univ_Integer)
-     -> Actual_Len : optional Univ_Integer is
-      const State := Pop (IVS.Seq_State_Stack);
-      return State.Num_Read;
+   func Read_End_Seq (var IVS : Binary_Input_Value_Stream) is
+      Discard (IVS.Seq_State_Stack);
    end func Read_End_Seq;
 
    func Read_Begin_Map (var Binary_Input_Value_Stream)
@@ -13032,6 +13058,7 @@ class PSL::Core::Binary_Input_Value_Stream is
 
    func More_Map_Elements (var Binary_Input_Value_Stream) -> Boolean
       is (#false);  --  TBD
+   func Read_Key_Value_Separator (var Binary_Input_Value_Stream) is (null);
    func Read_End_Map (var Binary_Input_Value_Stream) -> Syntax_OK : Boolean
    //  Absorb end-of-map indicator.
    //  Return #false if end-of-map indicator is missing.
@@ -13049,8 +13076,11 @@ class PSL::Core::Binary_Input_Value_Stream is
    func Read_End_Poly (var Binary_Input_Value_Stream)
       is (null);
 
-   func Read_Begin_Obj (var Binary_Input_Value_Stream)
-      is (null);
+   func Read_Begin_Obj (var IVS : Binary_Input_Value_Stream) is
+      const Is_Null := Read_Begin_Optional_Obj (IVS);
+      {not Is_Null};
+   end func Read_Begin_Obj;
+
    func Read_Begin_Optional_Obj (var IVS : Binary_Input_Value_Stream)
      -> Is_Null : Boolean is
       return Read_Int (IVS, Low => 0, High => 1) != 0;
@@ -13725,8 +13755,7 @@ interface PSL::Core::JSON_Output_Value_Stream<>
    func Write_Begin_Optional_Seq (var JSON_Output_Value_Stream;
       Min_Len, Max_Len : Univ_Integer; Actual_Len : optional Univ_Integer);
 
-   func Write_End_Seq (var JSON_Output_Value_Stream;
-      Min_Len, Max_Len, Actual_Len : Univ_Integer);
+   func Write_End_Seq (var JSON_Output_Value_Stream);
 
    func Write_Begin_Map (var JSON_Output_Value_Stream);
    func Write_Begin_Optional_Map (var JSON_Output_Value_Stream;
@@ -14054,8 +14083,7 @@ class PSL::Core::JSON_Output_Value_Stream is
       end if;
    end func Write_Begin_Optional_Seq;
 
-   func Write_End_Seq (var OVS : JSON_Output_Value_Stream;
-      Min_Len, Max_Len, Actual_Len : Univ_Integer) is
+   func Write_End_Seq (var OVS : JSON_Output_Value_Stream) is
       //  Emit "]" optionally preceded by a newline
       //  Pop the state stack and reduce the indent
 
@@ -14181,8 +14209,7 @@ class PSL::Core::JSON_Output_Value_Stream is
          for each Elem of Arr.Value forward loop
             Write_JSON_Value (OVS, Elem);
          end loop;
-         Write_End_Seq (OVS,
-           Min_Len => 0, Max_Len => |Arr.Value|, Actual_Len => |Arr.Value|);
+         Write_End_Seq (OVS);
 
        [Str : JSON_String_Value] =>
          Write_String (OVS, Str.Value, Univ_Character::Last(),
@@ -14255,11 +14282,8 @@ interface PSL::Core::JSON_Input_Value_Stream<>
    //  absorb the comma separator (except for first element which
    //  isn't preceded by one.
 
-   func Read_End_Seq (var JSON_Input_Value_Stream;
-      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer;
-   //  Absorb end-of-seq indicator and return actual length of sequence.
-   //  Return -1 if length not known.
-   //  Return null if end-of-seq indicator is missing.
+   func Read_End_Seq (var JSON_Input_Value_Stream);
+   //  Absorb end-of-seq indicator.
 
    func Read_Begin_Map (var JSON_Input_Value_Stream);
    func Read_Begin_Optional_Map (var JSON_Input_Value_Stream)
@@ -14760,17 +14784,14 @@ class PSL::Core::JSON_Input_Value_Stream is
       return #false;
    end func More_Seq_Elements;
 
-   func Read_End_Seq (var IVS : JSON_Input_Value_Stream;
-      Min_Len, Max_Len : Univ_Integer) -> Actual_Len : optional Univ_Integer is
-   //  Absorb end-of-seq indicator and return actual length of sequence.
-   //  Return -1 if length not known.
-   //  Return null if end-of-seq indicator is missing.
+   func Read_End_Seq (var IVS : JSON_Input_Value_Stream) is
+   //  Absorb end-of-seq indicator.
       const Token := Scan_JSON_Token (IVS);
       if Token not null and then Token == "]" then
-         return -1;
+         return;
       else
          IVS.JSON_Syntax_Error ("Missing final ']' for JSON array");
-         return null;
+         return;
       end if;
    end func Read_End_Seq;
 
@@ -14972,20 +14993,13 @@ class PSL::Core::JSON_Input_Value_Stream is
                Arr.Value <|= Val;
             end loop;
 
-            const Act_Len :=
-              Read_End_Seq (IVS, Min_Len => 0, Max_Len => 2**15);
+            Read_End_Seq (IVS);
 
             if Debug then
                Println("JSON array is `(|Arr.Value|) in length");
             end if;
 
-            if Act_Len < 0 or else Act_Len == |Arr.Value| then
-               return Arr;
-            else
-               //  Syntax error
-               IVS.JSON_Syntax_Error ("Syntax error in JSON array");
-               return null;
-            end if;
+            return Arr;
 
           ['"'] =>
             //  JSON String

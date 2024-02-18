@@ -980,8 +980,7 @@ package body PSC.Interpreter.IO is
          --         Actual_Len : optional Univ_Integer);
 
          End_Seq_Op_Index : constant Operation_Index := 11;
-         --  func Write_End_Seq (var Output_Value_Stream;
-         --       Min_Len, Max_Len, Actual_Len : Univ_Integer);
+         --  func Write_End_Seq (var Output_Value_Stream);
 
          Begin_Obj_Op_Index : constant Operation_Index := 19;
          --  func Write_Begin_Optional_Obj
@@ -1419,13 +1418,12 @@ package body PSC.Interpreter.IO is
          --  func More_Seq_Elements (var Input_Value_Stream) -> Boolean;
 
          End_Seq_Op_Index : constant Operation_Index := 12;
-         --  func Read_End_Seq (var Input_Value_Stream;
-         --       Min_Len, Max_Len) -> Actual_Len : Univ_Integer;
+         --  func Read_End_Seq (var Input_Value_Stream);
 
-         Begin_Obj_Op_Index : constant Operation_Index := 21;
+         Begin_Obj_Op_Index : constant Operation_Index := 22;
          --  func Read_Begin_Optional_Obj
          --         (var Input_Value_Stream) -> Boolean;
-         End_Obj_Op_Index : constant Operation_Index := 22;
+         End_Obj_Op_Index : constant Operation_Index := 23;
          --  func Read_End_Obj (var Input_Value_Stream);
 
          Param_Arr : array (0 .. 4) of aliased Word_Type;
@@ -1657,6 +1655,7 @@ package body PSC.Interpreter.IO is
                      end if;
 
                      --  Final operation is End_Seq
+                     Param_Arr (0) := Val_Stream_Obj;
                      Op_Index := End_Seq_Op_Index;
 
                   end;
