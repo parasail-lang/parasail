@@ -13605,6 +13605,26 @@ interface PSL::Core::JSON_Value<> is
 
    abstract func Kind (Value : JSON_Value) -> JSON_Value_Kind;
 
+   op "from_univ"(Lit : Univ_String) -> JSON_Value+
+     is (JSON_String_Value::Create(Lit));
+
+   op "[]"() -> JSON_Value+
+     is (JSON_Object_Value::Create ());
+
+   op "var_indexing" (ref var Val : JSON_Value+; Key : Univ_String) ->
+     ref var JSON_Value+;
+
+   func jarray (Val : Vector<JSON_Value+>) -> JSON_Value+
+    is (JSON_Array_Value::Create(Val));
+
+   func jnull() -> JSON_Value+
+     is (JSON_Null_Value::Create());
+
+   op "from_univ"(Lit : Univ_Real) -> JSON_Value+
+    is (JSON_Number_Value::Create(Rational::(Lit)));
+
+   op "from_univ"(Lit : Univ_Integer) -> JSON_Value+
+    is (JSON_Number_Value::Create(Lit));
 end interface PSL::Core::JSON_Value;
 
 interface PSL::Core::JSON_Object_Value<> extends JSON_Value is
@@ -13642,6 +13662,9 @@ interface PSL::Core::JSON_String_Value<> extends JSON_Value is
 
    func Kind (Value : JSON_String_Value) -> JSON_Value_Kind
      is (#String_Value);
+
+   op "from_univ"(Lit : Univ_String) -> JSON_String_Value
+     is ((Value => Lit));
 end interface PSL::Core::JSON_String_Value;
 
 interface PSL::Core::JSON_Number_Value<> extends JSON_Value is
@@ -13660,6 +13683,12 @@ interface PSL::Core::JSON_Number_Value<> extends JSON_Value is
 
    func Kind (Value : JSON_Number_Value) -> JSON_Value_Kind
      is (#Number_Value);
+
+   op "from_univ"(Lit : Univ_Integer) -> JSON_Number_Value
+     is (Create (Lit));
+
+   op "from_univ"(Lit : Univ_Real) -> JSON_Number_Value
+     is ((Value => Rational::(Lit)));
 end interface PSL::Core::JSON_Number_Value;
 
 interface PSL::Core::JSON_Boolean_Value<> extends JSON_Value is
@@ -13672,6 +13701,12 @@ interface PSL::Core::JSON_Boolean_Value<> extends JSON_Value is
 
    func Kind (Value : JSON_Boolean_Value) -> JSON_Value_Kind
      is (#Boolean_Value);
+
+   func false () -> JSON_Boolean_Value
+     is ((Value => #false));
+
+   func true () -> JSON_Boolean_Value
+     is ((Value => #true));
 end interface PSL::Core::JSON_Boolean_Value;
 
 interface PSL::Core::JSON_Null_Value<> extends JSON_Value is
@@ -13710,6 +13745,17 @@ class PSL::Core::JSON_Value is
          return JSON_Null_Value::Create();
       end case;
    end func Create;
+
+   op "var_indexing" (ref var Val : JSON_Value+; Key : Univ_String) ->
+     ref var JSON_Value+ is
+      case Val of
+       [Obj : JSON_Object_Value] =>
+         return Obj.Value[Key];
+       [X : JSON_Value+] =>
+         {#false}
+      end case;
+   end op "var_indexing";
+
 end class PSL::Core::JSON_Value;
 
 interface PSL::Core::JSON_Output_Value_Stream<>
@@ -13908,7 +13954,7 @@ class PSL::Core::JSON_Output_Value_Stream is
          const Code := C - UTF::Nul_Ch;
 
          case (Code) of
-          [0 .. 0x20 | 0x102000 .. (UTF::Last_Ch - UTF::Nul_Ch)] =>
+          [0 .. 0x1F | 0x102000 .. (UTF::Last_Ch - UTF::Nul_Ch)] =>
             //  Figure out the letter to use with '\'
             var Letter : optional Univ_Character := null;
 
