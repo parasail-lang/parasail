@@ -6680,6 +6680,21 @@ package body PSC.Trees.Semantics.Static is
       return Operation_Sem_Ptr renames Find_Combine_Move_Op_Inst;
    --  Find "<|=" operation for elements, not whole containers
 
+   function Find_Combine_Move_Op_Inst_Fallback is new Find_Op_For (
+      Combine_Move_Op_Str,
+      Num_Inputs => 2,
+      Num_Outputs => 0,
+      Has_Desired_Signature => First_Input_Is_Operand_Type);
+   --  Find fallback "<|=" operation, for those types like JSON_Value
+   --  where the components of the array are themselves JSON_Values
+
+   function Find_Combine_Move_Op_Fallback
+     (Operand_Type : Type_Sem_Ptr;
+      Op_Name : Strings.U_String := Combine_Move_Op_Str)
+      return Operation_Sem_Ptr renames Find_Combine_Move_Op_Inst_Fallback;
+   --  Find fallback "<|=" operation, for those types like JSON_Value
+   --  where the components of the array are themselves JSON_Values
+
    procedure Set_Type_Sem_Info
      (T : in out Invocation.Tree;
       Module_Sem : Module_Sem_Ptr;
@@ -11193,6 +11208,24 @@ package body PSC.Trees.Semantics.Static is
       end if;
    end Module_Formal_Index;
 
+   function Nth_Operation_Input_Type
+     (Op_Sem : Operation_Sem_Ptr;
+      N : Positive;
+      Type_Region : Type_Region_Ptr)
+      return Type_Sem_Ptr is
+   --  Return Type_Sem_Ptr for Nth Operation Input for given operation.
+   begin
+      return
+         Substitute_Actuals
+            (Resolved_Type
+               (Lists.Nth_Element
+                   (Operation.Tree (Tree_Ptr_Of
+                     (Op_Sem.Definition).all).
+                       Operation_Inputs,
+                    N)),
+             Type_Region);
+   end Nth_Operation_Input_Type;
+
    function Formal_Type_Index (Formal_Type : Type_Sem_Ptr) return Natural is
    --  Return index for formal type, or 0 if none
       Formal_Base : Type_Sem_Ptr := Formal_Type.U_Base_Type;
@@ -14816,7 +14849,7 @@ package body PSC.Trees.Semantics.Static is
             Seen_Positional_Operand : Boolean := False;
             Var_Indexing_Op : constant Operation_Sem_Ptr :=
               Find_Var_Indexing_Op_For (Target_Type);
-            Combiner_Op : constant Operation_Sem_Ptr :=
+            Combiner_Op : Operation_Sem_Ptr :=
               Find_Combine_Move_Op_For (Target_Type);
             Index_Type : Type_Sem_Ptr := null;
             Element_Type : Type_Sem_Ptr := null;
@@ -14835,14 +14868,8 @@ package body PSC.Trees.Semantics.Static is
             if Var_Indexing_Op /= null then
                --  Get Index_Type and Element_Type from Indexing op
                Index_Type :=
-                  Substitute_Actuals
-                    (Resolved_Type
-                        (Lists.Nth_Element
-                            (Operation.Tree (Tree_Ptr_Of
-                              (Var_Indexing_Op.Definition).all).
-                                Operation_Inputs,
-                             2)),
-                     U_Base_Type_Region (Target_Type));
+                  Nth_Operation_Input_Type
+                    (Var_Indexing_Op, 2, U_Base_Type_Region (Target_Type));
                Element_Type := Get_Func_Output_Type (Var_Indexing_Op,
                  U_Base_Type_Region (Target_Type));
                if Element_Type /= null
@@ -14854,16 +14881,18 @@ package body PSC.Trees.Semantics.Static is
                   Element_Type := Get_Ref_Func_Output_Type (Element_Type);
                end if;
             end if;
+
+            if Combiner_Op = null then
+               --  Look for fallback combiner, for cases like JSON_Value
+               --  where the component type matches the result type.
+               Combiner_Op := Find_Combine_Move_Op_Fallback (Target_Type);
+            end if;
+
             if Combiner_Op /= null then
                --  No Index_Type.  Just get Element_Type from combiner
                Combiner_Element_Type :=
-                  Substitute_Actuals
-                    (Resolved_Type
-                        (Lists.Nth_Element
-                            (Operation.Tree (Tree_Ptr_Of
-                               (Combiner_Op.Definition).all).Operation_Inputs,
-                             2)),
-                     U_Base_Type_Region (Target_Type));
+                  Nth_Operation_Input_Type
+                     (Combiner_Op, 2, U_Base_Type_Region (Target_Type));
             end if;
             if Element_Type = null and then Combiner_Element_Type = null then
                if Debug_Second_Pass then
@@ -24839,10 +24868,8 @@ package body PSC.Trees.Semantics.Static is
                               Operation.Tree (Tree_Ptr_Of
                                  (Indexing_Op.Definition).all);
                            Index_Type : constant Type_Sem_Ptr :=
-                             Substitute_Actuals
-                                (Resolved_Type
-                                    (Lists.Nth_Element
-                                      (Indexing_Op_Tree.Operation_Inputs, 2)),
+                             Nth_Operation_Input_Type
+                                (Indexing_Op, 2,
                                  U_Base_Type_Region
                                     (Iterator_Sem.Iteration_Type));
                            Output_Param : constant Optional_Tree :=

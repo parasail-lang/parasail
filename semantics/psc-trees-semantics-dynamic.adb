@@ -11140,7 +11140,7 @@ package body PSC.Trees.Semantics.Dynamic is
       Operand : Optional_Tree) is
    --  Emit positional element of container aggregate.
 
-      Combiner_Op_Sem : constant Operation_Sem_Ptr :=
+      Combiner_Op_Sem : Operation_Sem_Ptr :=
         Static.Find_Combine_Move_Op_For (Agg_Sem.Resolved_Type);
 
       Enc_Module : constant Module_Sem_Ptr :=
@@ -11169,11 +11169,20 @@ package body PSC.Trees.Semantics.Dynamic is
 
       --  Turn into Container <|= Value;
       if Combiner_Op_Sem = null then
-         Sem_Error
-           (Operand,
-            Strings.To_String (Static.Combine_Move_Op_Str) &
-            " positional aggregate not supported by type");
-         return;
+         --  No <|= operator with second param *not* same as first
+         --  Look for a fallback where they are the same, to handle
+         --  types like JSON_Value where array and component types
+         --  are the same.
+         Combiner_Op_Sem :=
+           Static.Find_Combine_Move_Op_Fallback (Agg_Sem.Resolved_Type);
+
+         if Combiner_Op_Sem = null then
+            Sem_Error
+              (Operand,
+               Strings.To_String (Static.Combine_Move_Op_Str) &
+               " positional aggregate not supported by type");
+            return;
+         end if;
       end if;
 
       --  Evaluate operand into temp for "<|=" operation with
@@ -11188,7 +11197,7 @@ package body PSC.Trees.Semantics.Dynamic is
           Is_By_Ref => False,
           Is_Var => True,
           Declare_Type_Info => Run_Time_Type_Info
-                              (Resolved_Type (Operand),
+                              (Agg_Sem.Element_Type,
                                Referring_Module => Enc_Module)));
 
       Visitor.Target_Object := Container_Agg_Loc;

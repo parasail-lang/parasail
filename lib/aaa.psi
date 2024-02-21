@@ -12180,7 +12180,7 @@ class PSL::Core::Byte_Stream_Buffer is
    var Buf : Stream_Element_Array;
    var Write_Index : Byte_Stream::Stream_Index := 0;
    var Read_Index : Byte_Stream::Stream_Index := 0;
-   const Debug : Boolean := #true;
+   const Debug : Boolean := #false;
  exports
    func Create (Size : Stream_Count) -> Result : Byte_Stream_Buffer is
 
@@ -12412,7 +12412,7 @@ class PSL::Core::Binary_Output_Value_Stream is
    ref var Byte_Str : Output_Byte_Stream+;
    var End_Reached : Boolean := #false;
    var Arr_Len_Left : Univ_Integer := -1;
-   const Debug : Boolean := #true;
+   const Debug : Boolean := #false;
 
    func Float_To_Unsigned_64 (Val : optional Univ_Float) -> Unsigned_64
      is import(#identity);
@@ -12771,7 +12771,7 @@ class PSL::Core::Binary_Input_Value_Stream is
 
    var Seq_State_Stack : Stack <Seq_State> := [];
 
-   const Debug : Boolean := #true;
+   const Debug : Boolean := #false;
 
    func Unsigned_64_To_Float (Val : Unsigned_64) -> optional Univ_Float
      is import(#identity);
@@ -13605,26 +13605,33 @@ interface PSL::Core::JSON_Value<> is
 
    abstract func Kind (Value : JSON_Value) -> JSON_Value_Kind;
 
+   //  Allow a string literal to produce a JSON String
    op "from_univ"(Lit : Univ_String) -> JSON_Value+
      is (JSON_String_Value::Create(Lit));
 
-   op "[]"() -> JSON_Value+
-     is (JSON_Object_Value::Create ());
-
-   op "var_indexing" (ref var Val : JSON_Value+; Key : Univ_String) ->
-     ref var JSON_Value+;
-
-   func jarray (Val : Vector<JSON_Value+>) -> JSON_Value+
-    is (JSON_Array_Value::Create(Val));
-
-   func jnull() -> JSON_Value+
-     is (JSON_Null_Value::Create());
-
+   //  Allow a real literal to produce a JSON Number
    op "from_univ"(Lit : Univ_Real) -> JSON_Value+
     is (JSON_Number_Value::Create(Rational::(Lit)));
 
+   //  Allow an int literal to produce a JSON Number
    op "from_univ"(Lit : Univ_Integer) -> JSON_Value+
     is (JSON_Number_Value::Create(Lit));
+
+   //  Use jnull() to produce a JSON null
+   func jnull() -> JSON_Value+
+     is (JSON_Null_Value::Create());
+
+   //  Allow an array or map aggregate to produce a JSON_Value
+   //  ("[]" by itself is interpreted as an empty JSON array).
+   op "[]"() -> JSON_Value+;
+
+   //  Allow a [key => value, ...] aggregate to produce a JSON Object
+   op "var_indexing" (ref var Val : JSON_Value+; Key : Univ_String) ->
+     ref var JSON_Value+;
+
+   //  Allow a [val, val, ...] aggregate to produce a JSON Array
+   op "<|=" (var Val : JSON_Value+; var Elem : optional JSON_Value+);
+
 end interface PSL::Core::JSON_Value;
 
 interface PSL::Core::JSON_Object_Value<> extends JSON_Value is
@@ -13726,6 +13733,8 @@ end interface PSL::Core::JSON_Null_Value;
 
 class PSL::Core::JSON_Value is
 
+   const Debug : Boolean := #false;
+
  exports
 
    func Create (Kind : JSON_Value_Kind) -> JSON_Value+ is
@@ -13746,15 +13755,60 @@ class PSL::Core::JSON_Value is
       end case;
    end func Create;
 
+   //  Allow an array or map aggregate to produce a JSON_Value
+   //  ("[]" by itself is interpreted as an empty JSON array).
+   op "[]"() -> JSON_Value+
+     is (JSON_Array_Value::Create());
+
+   //  Allow a [key => value, ...] aggregate to produce a JSON Object
    op "var_indexing" (ref var Val : JSON_Value+; Key : Univ_String) ->
      ref var JSON_Value+ is
-      case Val of
-       [Obj : JSON_Object_Value] =>
-         return Obj.Value[Key];
-       [X : JSON_Value+] =>
-         {#false}
-      end case;
+      loop
+         case Val of
+          [Obj : JSON_Object_Value] =>
+            //  Val is already a JSON Object
+            if Debug then
+               Println("Adding \"`(Key)\" to JSON Object");
+            end if;
+               
+            return Obj.Value[Key];
+
+          [Arr : JSON_Array_Value] =>
+            //  Convert (empty) JSON Array into JSON Object
+            {|Arr.Value| == 0}
+
+            if Debug then
+               Println("Converting from empty JSON array to JSON object");
+            end if;
+               
+            Val := JSON_Object_Value::Create();
+
+            //  Now re-do the case statement
+            continue loop;
+
+          [X : JSON_Value+] =>
+            //  Must be either a JSON Array or Object when called
+            {#false}
+            exit loop;
+         end case;
+      end loop;
    end op "var_indexing";
+
+   //  Allow a [val, val, ...] aggregate to produce a JSON Array
+   op "<|=" (var Val : JSON_Value+; var Elem : optional JSON_Value+) is
+      case Val of
+       [Arr : JSON_Array_Value] =>
+         if Debug then
+            Println("Adding element to JSON Array of length `(|Arr.Value|)");
+         end if;
+         Arr.Value <|= Elem;
+
+       [X : JSON_Value+] =>
+         //  Must be a JSON Array
+         {#false}
+         null;
+      end case;
+   end op "<|=";
 
 end class PSL::Core::JSON_Value;
 
@@ -13823,6 +13877,8 @@ interface PSL::Core::JSON_Output_Value_Stream<>
    func Write_JSON_Value (var JSON_Output_Value_Stream; Value : JSON_Value+);
    //  Write a JSON value to the stream
 
+   func Write_Newline (var JSON_Output_Value_Stream);
+   //  Write out a newline to the stream
 end interface PSL::Core::JSON_Output_Value_Stream;
 
 class PSL::Core::JSON_Output_Value_Stream is
@@ -14275,6 +14331,10 @@ class PSL::Core::JSON_Output_Value_Stream is
 
    end func Write_JSON_Value;
 
+   func Write_Newline (var OVS : JSON_Output_Value_Stream) is
+   //  Write out a newline to the stream
+      Write_UTF8 (OVS, "\n");
+   end func Write_Newline;
 end class PSL::Core::JSON_Output_Value_Stream;
 
 interface PSL::Core::JSON_Input_Value_Stream<>

@@ -4,17 +4,21 @@ func Create_JSON(File_Name : Univ_String) is
    var B_File : Byte_Stream_Output_File := IO.Create(File_Name);
    ref var Strm : JSON_Output_Value_Stream => Create(B_File);
 
-   const X : JSON_Value+ :=
+   var X : JSON_Value+ :=
             ["first_name" => "Tucker",
               "last_name" => "Taft",
               "address" => "14 Moon Hill Rd",
               "city" => "Lexington",
               "state" => "MA",
+              "stuff" => [],
               "zip" => "02421",
               "age" => 70,
               "height" => 5.8,
               "nothing" => jnull(),
-              "kids" => jarray(["Maia","Becca"])];
+              "kids" => ["Maia","Becca"]
+             ];
+   X["stuff"] := [42, 99];
    Strm.Write_JSON_Value(X);
+   Strm.Write_Newline();
    B_File.Close();
 end func Create_JSON;

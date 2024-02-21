@@ -174,6 +174,13 @@ private package PSC.Trees.Semantics.Static is
       return Natural;
    --  Return index for formal of module, based on its Symbol index
 
+   function Nth_Operation_Input_Type
+     (Op_Sem : Operation_Sem_Ptr;
+      N : Positive;
+      Type_Region : Type_Region_Ptr)
+      return Type_Sem_Ptr;
+   --  Return Type_Sem_Ptr for Nth Operation Input for given operation.
+
    --------------- Routines to look for special operations -------------
 
    Combine_Move_Op_Str : constant Strings.U_String :=
@@ -307,6 +314,13 @@ private package PSC.Trees.Semantics.Static is
       Op_Name : Strings.U_String := Combine_Move_Op_Str)
       return Operation_Sem_Ptr;
    --  Find "<|=" operation for elements, not whole containers
+
+   function Find_Combine_Move_Op_Fallback
+     (Operand_Type : Type_Sem_Ptr;
+      Op_Name : Strings.U_String := Combine_Move_Op_Str)
+      return Operation_Sem_Ptr;
+   --  Find fallback "<|=" operation, for those types like JSON_Value
+   --  where the components of the array are themselves JSON_Values
 
    function Get_Remove_Func
      (Set_Type : Type_Sem_Ptr;
