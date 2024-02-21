@@ -1534,6 +1534,7 @@ interface PSL::Containers::Packed_Array
     op "<|="(var Left : Packed_Array; var Right : Elem_Type)
     op "|"(Left : Packed_Array; Right : Key_Value<Indexed_By, Elem_Type>)
       -> Packed_Array
+    op "|"(Left, Right : Packed_Array) -> Packed_Array;
     op "[]"() -> Packed_Array
     func Dump()
 end interface PSL::Containers::Packed_Array
@@ -1745,6 +1746,29 @@ class PSL::Containers::Packed_Array is
       -> Result : Packed_Array is
         Result := Left
         Set (Result, Right.Key, Right.Value)
+    end op "|"
+
+    op "|"(Left, Right : Packed_Array) -> Result : Packed_Array is
+        const Left_Len := Length(Left)
+
+        if Left_Len == 0 then
+            return Right
+        end if
+
+        Result :=
+          Create (Left.Bounds.First .. Left.Bounds.Last + Length(Right),
+                  Elem_Type::First())
+
+        // Copy the Left elements
+        for I in Left.Bounds loop
+            Set (Result, I, Left[I]);
+        end loop
+
+        // Copy the Right elements
+        
+        for J in Right.Bounds loop
+            Set (Result, Left_Len + J, Right[J]);
+        end loop
     end op "|"
 
     op "[]"() -> Result : Packed_Array is
@@ -6640,13 +6664,13 @@ class PSL::Containers::Basic_Array is
         Result := Create(Left_Len + Length(Right), null)
 
         // Copy the Left elements
-        for I in 1..Left_Len concurrent loop
+        for I in 1..Left_Len loop
             Result[I] := Left[I]
         end loop
 
         // Copy the Right elements
         
-        for J in 1..Length(Right) concurrent loop
+        for J in 1..Length(Right) loop
             Result[Left_Len + J] := Right[J]
         end loop
     end op "|"
@@ -6659,7 +6683,7 @@ class PSL::Containers::Basic_Array is
         const Left_Len := |Left|
         var Result : Basic_Array for Left := Create(Left_Len+1, null)
 
-        for I in 1 .. Left_Len concurrent loop
+        for I in 1 .. Left_Len loop
             Result[I] <== Left[I]
         end loop
 
@@ -7072,7 +7096,7 @@ func PSL::Test::Test_Vector() is
 
     func Equal(Left, Right : Vector<Univ_Integer>) -> Boolean is
         if |Left| == |Right| then
-            for each [I => L] of Left concurrent loop
+            for each [I => L] of Left loop
                 if L != Right[I] then
                     return #false;
                 end if;
@@ -8435,6 +8459,7 @@ interface PSL::Containers::Array
     op "index_set"(Arr : Array) -> Countable_Range<Indexed_By> is Bounds
     op "<|="(var Left : Array; var Right : optional Elem_Type)
     op "|"(Left : Array; Right : Key_Value<Indexed_By, Elem_Type>) -> Array
+    op "|"(Left, Right : Array) -> Array;
     op "[]"() -> Array
 end interface PSL::Containers::Array
 
@@ -8499,6 +8524,28 @@ class PSL::Containers::Array is
       -> Result : Array is
         Result := Left
         Result[Right.Key] := Right.Value
+    end op "|"
+
+    op "|"(Left, Right : Array) -> Result : Array is
+        const Left_Len := Length(Left)
+
+        if Left_Len == 0 then
+            return Right
+        end if
+
+        Result :=
+          Create(Left.Bounds.First .. Left.Bounds.Last + Length(Right), null)
+
+        // Copy the Left elements
+        for I in Left.Bounds loop
+            Result[I] := Left[I]
+        end loop
+
+        // Copy the Right elements
+        
+        for J in Right.Bounds loop
+            Result[Left_Len + J] := Right[J]
+        end loop
     end op "|"
 
     op "[]"() -> Result : Array is
@@ -11522,6 +11569,7 @@ interface PSL::Containers::Big_Array
     op "index_set"(Arr : Big_Array) -> Countable_Range<Indexed_By> is Bounds
     op "<|="(var Left : Big_Array; var Right : optional Elem_Type)
     op "|"(Left : Big_Array; Right : Key_Value<Indexed_By, Elem_Type>) -> Big_Array
+    op "|"(Left, Right : Big_Array) -> Big_Array;
     op "[]"() -> Big_Array
 end interface PSL::Containers::Big_Array
 
@@ -11631,6 +11679,28 @@ class PSL::Containers::Big_Array is
       -> Result : Big_Array is
         Result := Left
         Result[Right.Key] := Right.Value
+    end op "|"
+
+    op "|"(Left, Right : Big_Array) -> Result : Big_Array is
+        const Left_Len := Length(Left)
+
+        if Left_Len == 0 then
+            return Right
+        end if
+
+        Result :=
+          Create(Left.Bounds.First .. Left.Bounds.Last + Length(Right), null)
+
+        // Copy the Left elements
+        for I in Left.Bounds loop
+            Result[I] := Left[I]
+        end loop
+
+        // Copy the Right elements
+        
+        for J in Right.Bounds loop
+            Result[Left_Len + J] := Right[J]
+        end loop
     end op "|"
 
     op "[]"() -> Result : Big_Array is
@@ -12118,10 +12188,15 @@ end interface PSL::Core::Output_Byte_Stream;
 interface PSL::Core::Byte_Stream_Buffer<>
   extends Byte_Stream<> implements Input_Byte_Stream, Output_Byte_Stream is
 
-   func Create (Size : Stream_Count) -> Byte_Stream_Buffer;
+   func Create (Initial_Size : Stream_Count := 100;
+                Allow_Growth : Boolean := #true)
+     -> Byte_Stream_Buffer;
+   //  Will automatically grow if Allow_Growth #true and reaches Initial_Size
 
-   func Create (Initial_Content : Stream_Element_Array) -> Byte_Stream_Buffer;
-   //  Create a new buffer from a stream-element array
+   func Create (Initial_Content : Stream_Element_Array;
+                Allow_Growth : Boolean := #true) -> Byte_Stream_Buffer;
+   //  Create a new buffer from a stream-element array.
+   //  Will allow growth if Allow_Growth #true.
 
    func Write (var BSB : Byte_Stream_Buffer;
      Data : Stream_Element_Array) -> Bytes_Written : Stream_Count;
@@ -12132,6 +12207,11 @@ interface PSL::Core::Byte_Stream_Buffer<>
    func Bytes_To_Read (BSB : Byte_Stream_Buffer) -> Univ_Integer;
 
    func Bytes_To_Write (BSB : Byte_Stream_Buffer) -> Univ_Integer;
+   //  Returns current grown increment if Allow_Growth is #true,
+   //  otherwise returns amount left.
+
+   func Read_Remainder (var BSB : Byte_Stream_Buffer) -> Stream_Element_Array;
+   //  Return everything left in stream as a single array.
 
 end interface PSL::Core::Byte_Stream_Buffer;
 
@@ -12177,26 +12257,44 @@ end interface PSL::Core::Byte_Stream_Input_File;
 
 class PSL::Core::Byte_Stream_Buffer is
 
+   const Allow_Growth : Boolean;
    var Buf : Stream_Element_Array;
    var Write_Index : Byte_Stream::Stream_Index := 0;
    var Read_Index : Byte_Stream::Stream_Index := 0;
    const Debug : Boolean := #false;
  exports
-   func Create (Size : Stream_Count) -> Result : Byte_Stream_Buffer is
-
-      Result := (Buf => Create (0 ..< Size, 0));
-
+   func Create (Initial_Size : Stream_Count := 100;
+                Allow_Growth : Boolean := #true)
+     -> Byte_Stream_Buffer is
+   //  Will automatically grow if Allow_Growth #true and reaches Initial_Size
+      return (Allow_Growth => Allow_Growth,
+              Buf => Create (0 ..< Initial_Size, 0));
    end func Create;
 
-   func Create (Initial_Content : Stream_Element_Array)
-     -> Byte_Stream_Buffer is
-      //  Create a new buffer from a stream-element array
-      return (Buf => Initial_Content, Write_Index => |Initial_Content|);
+   func Create (Initial_Content : Stream_Element_Array;
+                Allow_Growth : Boolean := #true) -> Byte_Stream_Buffer is
+   //  Create a new buffer from a stream-element array.
+   //  Will allow growth if Allow_Growth #true.
+      return (Allow_Growth => Allow_Growth,
+              Buf => Initial_Content,
+              Write_Index => |Initial_Content|);
    end func Create;
 
    func Write (var BSB : Byte_Stream_Buffer;
      Data : Stream_Element_Array) -> Bytes_Written : Stream_Count is
-      Bytes_Written := Min (|Data|, |BSB.Buf| - BSB.Write_Index);
+
+      const Amt_Left := |BSB.Buf| - BSB.Write_Index;
+
+      if BSB.Allow_Growth then
+         if |Data| > Amt_Left then
+            //  At least double the size of the buffer
+            const Extra_Space := Max (|BSB.Buf|, |Data| - Amt_Left);
+            BSB.Buf := BSB.Buf | Create (0 ..< Extra_Space, 0);
+         end if;
+         Bytes_Written := |Data|;
+      else
+         Bytes_Written := Min (|Data|, Amt_Left);
+      end if;
 
       for (Left in BSB.Write_Index .. BSB.Buf.Last();
            Right in Data.Bounds()) forward loop
@@ -12232,8 +12330,24 @@ class PSL::Core::Byte_Stream_Buffer is
    func Bytes_To_Read (BSB : Byte_Stream_Buffer) -> Univ_Integer is
      (BSB.Write_Index - BSB.Read_Index);
 
+   //  If Allow_Growth, return current buffer size
    func Bytes_To_Write (BSB : Byte_Stream_Buffer) -> Univ_Integer is
-     (BSB.Buf.Last() - BSB.Write_Index + 1);
+     ((if BSB.Allow_Growth then |BSB.Buf|
+       else BSB.Buf.Last() - BSB.Write_Index + 1));
+
+   func Read_Remainder
+     (var BSB : Byte_Stream_Buffer) -> Result : Stream_Element_Array is
+   //  Return everything left in stream as a single array.
+      
+      Result := Create(0 .. Bytes_To_Read (BSB), 0);
+      for (I in 0 .. Result.Bounds.Last;
+           J in BSB.Read_Index .. BSB.Write_Index - 1) forward loop
+         Result[I] := BSB.Buf[J];
+      end loop;
+      BSB.Read_Index := 0;
+      BSB.Write_Index := 0;
+   end func Read_Remainder;
+
 end class PSL::Core::Byte_Stream_Buffer;
 
 class PSL::Core::Byte_Stream_Output_File is
@@ -12249,7 +12363,7 @@ class PSL::Core::Byte_Stream_Input_File is
 end class PSL::Core::Byte_Stream_Input_File;
 
 func PSL::Test::Test_Byte_Stream() is
-   var Buf : Byte_Stream_Buffer := Create (Size => 100);
+   var Buf : Byte_Stream_Buffer := Create (Initial_Size => 100);
 
    for I in 1 .. 7 forward loop
       const Arr : Byte_Stream::Stream_Element_Array := Create(1 .. 15, I);
@@ -13091,7 +13205,7 @@ class PSL::Core::Binary_Input_Value_Stream is
 end class PSL::Core::Binary_Input_Value_Stream;
 
 func PSL::Test::Test_Float_Stream() is
-   var Buf : Byte_Stream_Buffer := Create (Size => 50);
+   var Buf : Byte_Stream_Buffer := Create (Initial_Size => 50);
    ref var OVS : Binary_Output_Value_Stream => Create(Buf);
    ref var IVS : Binary_Input_Value_Stream => Create(Buf);
 
@@ -13127,7 +13241,7 @@ func PSL::Test::Test_Float_Stream() is
 end func PSL::Test::Test_Float_Stream;
 
 func PSL::Test::Test_String_Stream() is
-   var Buf : Byte_Stream_Buffer := Create (Size => 80);
+   var Buf : Byte_Stream_Buffer := Create (Initial_Size => 80);
    ref var OVS : Binary_Output_Value_Stream => Create(Buf);
    ref var IVS : Binary_Input_Value_Stream => Create(Buf);
 
@@ -13187,7 +13301,7 @@ end func PSL::Test::Test_String_Stream;
 
 import PSL::Test::Test_Float_Stream, PSL::Test::Test_String_Stream;
 func PSL::Test::Test_Value_Stream() is
-   var Buf : Byte_Stream_Buffer := Create (Size => 13);
+   var Buf : Byte_Stream_Buffer := Create (Initial_Size => 13);
    ref var Buf_For_Output : Output_Byte_Stream+ => Buf;
    ref var Buf_For_Input : Input_Byte_Stream+ => Buf;
    ref var OVS : Binary_Output_Value_Stream => Create(Buf);
@@ -13245,7 +13359,7 @@ func PSL::Test::Test_Value_Stream() is
 end func PSL::Test::Test_Value_Stream;
 func PSL::Test::Test_Object_Stream() is
 
-   var Buf : Byte_Stream_Buffer := Create (Size => 10000);
+   var Buf : Byte_Stream_Buffer := Create (Initial_Size => 10000);
 
    ref var OVS : Binary_Output_Value_Stream => Create(Buf);
    ref var IVS : Binary_Input_Value_Stream => Create(Buf);
@@ -13632,6 +13746,23 @@ interface PSL::Core::JSON_Value<> is
    //  Allow a [val, val, ...] aggregate to produce a JSON Array
    op "<|=" (var Val : JSON_Value+; var Elem : optional JSON_Value+);
 
+   //  Allow indexing by a String key
+   op "indexing"(ref Val : JSON_Value+; Key : Univ_String)
+     -> ref JSON_Value+;
+
+   //  Produce set of keys (presuming is a JSON Object)
+   op "index_set"(Val : JSON_Value+) -> Ordered_Set<Univ_String>;
+
+   //  Allow indexing by an integer, presuming is a JSON Array
+   func Nth(ref Val : JSON_Value+; Key : Univ_Integer)
+     -> ref JSON_Value+;
+
+   //  Produce bounds of array (presuming is a JSON Array)
+   func Bounds(Val : JSON_Value+) -> Countable_Range<Univ_Integer>;
+
+   //  Provide general To/From_String operations
+   func To_String (Val : JSON_Value+) -> Univ_String;
+   func From_String (Str : Univ_String) -> JSON_Value+;
 end interface PSL::Core::JSON_Value;
 
 interface PSL::Core::JSON_Object_Value<> extends JSON_Value is
@@ -13810,6 +13941,66 @@ class PSL::Core::JSON_Value is
       end case;
    end op "<|=";
 
+   //  Allow indexing by a String key
+   op "indexing"(ref Val : JSON_Value+; Key : Univ_String)
+     -> ref JSON_Value+ is
+      case Val of
+       [Obj : JSON_Object_Value] =>
+         return Obj.Value[Key];
+       [X : JSON_Value+] =>
+         {#false}
+      end case;
+   end op "indexing";
+
+   //  Produce set of keys
+   op "index_set"(Val : JSON_Value+) -> Ordered_Set<Univ_String> is
+      case Val of
+       [Obj : JSON_Object_Value] =>
+         return Obj.Value.Keys();
+       [X : JSON_Value+] =>
+         return [];
+      end case;
+   end op "index_set";
+   
+   //  Allow indexing by an integer, presuming is a JSON Array
+   func Nth(ref Val : JSON_Value+; Key : Univ_Integer)
+     -> ref JSON_Value+ is
+      case Val of
+       [Arr : JSON_Array_Value] =>
+         return Arr.Value[Key];
+       [X : JSON_Value+] =>
+         {#false}
+      end case;
+   end func Nth;
+
+   //  Produce bounds of array
+   func Bounds(Val : JSON_Value+) -> Countable_Range<Univ_Integer> is
+      case Val of
+       [Arr : JSON_Array_Value] =>
+         return Arr.Value.Bounds();
+       [X : JSON_Value+] =>
+         return 1 .. 0;
+      end case;
+   end func Bounds;
+   
+   //  Provide general To_String operation
+   func To_String (Val : JSON_Value+) -> Univ_String is
+      var B_Strm : Byte_Stream_Buffer := Create();
+      ref var JVS : JSON_Output_Value_Stream => Create(B_Strm);
+
+      Write_JSON_Value (JVS, Val);
+
+      //  Read everything in the stream
+      return UTF::Input::From_UTF8_Stream (Read_Remainder(B_Strm));
+   end func To_String;
+
+   func From_String (Str : Univ_String) -> JSON_Value+ is
+      var B_Strm : Byte_Stream_Buffer :=
+         Create(UTF::Output::To_UTF8_Stream(Str));
+      ref var JVS : JSON_Input_Value_Stream => Create(B_Strm);
+
+      return Read_JSON_Value (JVS);
+   end func From_String;
 end class PSL::Core::JSON_Value;
 
 interface PSL::Core::JSON_Output_Value_Stream<>
@@ -13911,7 +14102,7 @@ class PSL::Core::JSON_Output_Value_Stream is
       case OVS.State_Stack.Top() of
        [#Initial] =>
          //  Should probably only start an object in this state.
-         Write_UTF8 (OVS, "\n");
+         null;
 
        [#Expecting_First_Seq_Elem] =>
          //  We have seen a Begin_Seq and have emitted a '['
@@ -13959,6 +14150,13 @@ class PSL::Core::JSON_Output_Value_Stream is
       end case;
    end func Start_Item;
 
+   func End_Item (var OVS : JSON_Output_Value_Stream) is
+      //  Emit new line if back to #Initial state
+      if OVS.State_Stack.Top() == #Initial then
+         Write_UTF8 (OVS, "\n");
+      end if;
+   end func End_Item;
+
    func Write_Begin_JSON_Array (var OVS: JSON_Output_Value_Stream) is
       OVS.Indent += Indent_Inc;
       Push (OVS.State_Stack, #Expecting_First_Seq_Elem);
@@ -13977,6 +14175,7 @@ class PSL::Core::JSON_Output_Value_Stream is
          //  We have seen a Begin_JSON_Array and have emitted a '['
          //  This must be an empty array.
          Write_UTF8 (OVS, "]");
+         End_Item (OVS);
 
        [#Expecting_Seq_Elem] =>
          //  We have emitted at least one element of a sequence.
@@ -13984,6 +14183,7 @@ class PSL::Core::JSON_Output_Value_Stream is
          Write_UTF8 (OVS, "\n");
          Write_UTF8 (OVS, OVS.Indent * ' ');
          Write_UTF8 (OVS, "]");
+         End_Item (OVS);
 
        [#Initial |
         #Expecting_First_Map_Key |
@@ -14097,6 +14297,7 @@ class PSL::Core::JSON_Output_Value_Stream is
 
       const Str := (if Val is null then "null" else To_String (Val));
       Write_UTF8 (OVS, Str);
+      End_Item (OVS);
    end func Write_Optional_Int;
 
    func Write_Float (var OVS: JSON_Output_Value_Stream; Val : Univ_Float;
@@ -14119,6 +14320,7 @@ class PSL::Core::JSON_Output_Value_Stream is
 
       const Str := (if Val is null then "null" else To_String (Val));
       Write_UTF8 (OVS, Str);
+      End_Item (OVS);
    end func Write_Optional_Float;
 
    func Write_Rational (var OVS : JSON_Output_Value_Stream; Val : Rational;
@@ -14140,6 +14342,7 @@ class PSL::Core::JSON_Output_Value_Stream is
 
       const Str := (if Val is null then "null" else To_String (Val));
       Write_UTF8 (OVS, Str);
+      End_Item (OVS);
    end func Write_Optional_Rational;
 
    func Write_String (var OVS : JSON_Output_Value_Stream; Val : Univ_String;
@@ -14163,6 +14366,7 @@ class PSL::Core::JSON_Output_Value_Stream is
          else '"' | Escape_Chars_In_Str (Val) | '"');
 
       Write_UTF8 (OVS, Str);
+      End_Item (OVS);
    end func Write_Optional_String;
 
    func Write_Begin_Seq (var OVS : JSON_Output_Value_Stream;
@@ -14323,10 +14527,12 @@ class PSL::Core::JSON_Output_Value_Stream is
        [Bool : JSON_Boolean_Value] =>
          Start_Item (OVS);
          Write_UTF8 (OVS, (if Bool.Value then "true" else "false"));
+         End_Item (OVS);
 
        [JSON_Null : JSON_Null_Value] =>
          Start_Item (OVS);
          Write_UTF8 (OVS, "null");
+         End_Item (OVS);
       end case;
 
    end func Write_JSON_Value;

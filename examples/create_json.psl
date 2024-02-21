@@ -4,21 +4,41 @@ func Create_JSON(File_Name : Univ_String) is
    var B_File : Byte_Stream_Output_File := IO.Create(File_Name);
    ref var Strm : JSON_Output_Value_Stream => Create(B_File);
 
+   //  Create a JSON object, using normal ParaSail
+   //  container aggregate notation.
    var X : JSON_Value+ :=
-            ["first_name" => "Tucker",
-              "last_name" => "Taft",
-              "address" => "14 Moon Hill Rd",
-              "city" => "Lexington",
-              "state" => "MA",
+            ["first_name" => "George",
+              "last_name" => "Washington",
+              "address" => "3200 Mount Vernon Memorial Hwy",
+              "city" => "Mt. Vernon",
+              "state" => "VA",
               "stuff" => [],
-              "zip" => "02421",
-              "age" => 70,
-              "height" => 5.8,
+              "zip" => "22121",
+              "age" => 57,
+              "height" => 6.2,
               "nothing" => jnull(),
-              "kids" => ["Maia","Becca"]
+              "kids" => ["John","Martha"]
              ];
-   X["stuff"] := [42, 99];
+
+   //  Alter one component of the JSON Object
+   X["stuff"] := [17, 76];
+
+   //  Write the JSON Value out to a stream, ended with a newline
    Strm.Write_JSON_Value(X);
    Strm.Write_Newline();
-   B_File.Close();
+
+   //  Flush the underlying stream to the file.
+   B_File.Flush();
+
+   Println ("Iterating over elements of object:");
+   for each [Name => Elem] of X forward loop
+      Print (" \"`(Name)\" => `(To_String(Elem))");
+   end loop;
+
+   Println ("Iterating over \"kids\" component:");
+   ref The_Kids => X["kids"];
+   for I in The_Kids.Bounds() forward loop
+      Print ("Child `(I) => `(To_String(Nth(The_Kids, I)))");
+   end loop;
+
 end func Create_JSON;
