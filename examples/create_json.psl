@@ -30,15 +30,17 @@ func Create_JSON(File_Name : Univ_String) is
    //  Flush the underlying stream to the file.
    B_File.Flush();
 
+   const Blah : Univ_String := "this is a test " | X;
+
    Println ("Iterating over elements of object:");
    for each [Name => Elem] of X forward loop
-      Print (" \"`(Name)\" => `(To_String(Elem))");
+      Print (" \"`(Name)\" => `(Elem)");
    end loop;
 
    Println ("Iterating over \"kids\" component:");
    ref The_Kids => X["kids"];
    for I in The_Kids.Bounds() forward loop
-      Print ("Child `(I) => `(To_String(Nth(The_Kids, I)))");
+      Print ("Child `(I) => `(Nth(The_Kids, I))");
    end loop;
 
 end func Create_JSON;

@@ -13762,7 +13762,16 @@ interface PSL::Core::JSON_Value<> is
 
    //  Provide general To/From_String operations
    func To_String (Val : JSON_Value+) -> Univ_String;
-   func From_String (Str : Univ_String) -> JSON_Value+;
+   func From_String (Str : Univ_String) -> optional JSON_Value+;
+
+   //  Other operations expected for Imageable
+   abstract op "=?"(Left, Right : JSON_Value) -> Ordering;
+   abstract func Hash(Val : JSON_Value) -> Unsigned_64;
+
+ implements for Imageable
+   abstract func To_String (Val : JSON_Value) -> Univ_String;
+   abstract func From_String (Val : Univ_String) -> optional JSON_Value;
+
 end interface PSL::Core::JSON_Value;
 
 interface PSL::Core::JSON_Object_Value<> extends JSON_Value is
@@ -13776,7 +13785,40 @@ interface PSL::Core::JSON_Object_Value<> extends JSON_Value is
 
    func Kind (Value : JSON_Object_Value) -> JSON_Value_Kind
      is (#Object_Value);
+
+   //  Other operations expected for Imageable
+   op "=?"(Left, Right : JSON_Object_Value) -> Ordering;
+   func Hash(Val : JSON_Object_Value) -> Result : Unsigned_64;
+
+ implements for Imageable
+
+   func To_String (Val : JSON_Object_Value) -> Univ_String
+     is (JSON_Value::To_String (Val));
 end interface PSL::Core::JSON_Object_Value;
+
+class PSL::Core::JSON_Object_Value is
+ exports
+   //  Other operations expected for Imageable
+   op "=?"(Left, Right : JSON_Object_Value) -> Ordering is
+      for (each [LKey => LElem] of Left.Value;
+           each [RKey => RElem] of Right.Value) forward loop
+         if LKey != RKey then
+            return LKey =? RKey;
+         elsif LElem != RElem then
+            return LElem =? RElem;
+         end if;
+      end loop;
+      //  Prefixes match, compare lengths
+      return |Left.Value| =? |Right.Value|;
+   end op "=?";
+
+   func Hash(Val : JSON_Object_Value) -> Result : Unsigned_64 is
+      Result := 1;
+      for each [Key => Elem] of Val.Value forward loop
+         Result := Result * 13 + 7 * Hash (Key) + Hash (Elem);
+      end loop;
+   end func Hash;
+end class PSL::Core::JSON_Object_Value;
 
 interface PSL::Core::JSON_Array_Value<> extends JSON_Value is
    //  A JSON_Array_Value can be used to represent a "JSON Array"
@@ -13788,7 +13830,38 @@ interface PSL::Core::JSON_Array_Value<> extends JSON_Value is
 
    func Kind (Value : JSON_Array_Value) -> JSON_Value_Kind
      is (#Array_Value);
+
+   //  Other operations expected for Imageable
+   op "=?"(Left, Right : JSON_Array_Value) -> Ordering;
+   func Hash(Val : JSON_Array_Value) -> Result : Unsigned_64;
+
+ implements for Imageable
+
+   func To_String (Val : JSON_Array_Value) -> Univ_String
+     is (JSON_Value::To_String (Val));
 end interface PSL::Core::JSON_Array_Value;
+
+class PSL::Core::JSON_Array_Value is
+ exports
+   //  Other operations expected for Imageable
+   op "=?"(Left, Right : JSON_Array_Value) -> Ordering is
+      for (each LElem of Left.Value;
+           each RElem of Right.Value) forward loop
+         if LElem != RElem then
+            return LElem =? RElem;
+         end if;
+      end loop;
+      //  Prefixes match, compare lengths
+      return |Left.Value| =? |Right.Value|;
+   end op "=?";
+
+   func Hash(Val : JSON_Array_Value) -> Result : Unsigned_64 is
+      Result := 1;
+      for each Elem of Val.Value forward loop
+         Result := Result * 13 + Hash (Elem);
+      end loop;
+   end func Hash;
+end class PSL::Core::JSON_Array_Value;
 
 interface PSL::Core::JSON_String_Value<> extends JSON_Value is
    //  A JSON_String_Value can be used to represent a "JSON String"
@@ -13803,6 +13876,19 @@ interface PSL::Core::JSON_String_Value<> extends JSON_Value is
 
    op "from_univ"(Lit : Univ_String) -> JSON_String_Value
      is ((Value => Lit));
+
+   //  Other operations expected for Imageable
+   op "=?"(Left, Right : JSON_String_Value) -> Ordering
+     is (Left.Value =? Right.Value);
+   func Hash(Val : JSON_String_Value) -> Result : Unsigned_64
+     is (Univ_String::Hash (Val.Value));
+
+ implements for Imageable
+
+   func To_String (Val : JSON_String_Value) -> Univ_String
+     is (JSON_Value::To_String (Val));
+   func From_String (Val : Univ_String) -> optional JSON_String_Value
+     is (null);
 end interface PSL::Core::JSON_String_Value;
 
 interface PSL::Core::JSON_Number_Value<> extends JSON_Value is
@@ -13827,6 +13913,19 @@ interface PSL::Core::JSON_Number_Value<> extends JSON_Value is
 
    op "from_univ"(Lit : Univ_Real) -> JSON_Number_Value
      is ((Value => Rational::(Lit)));
+
+   //  Other operations expected for Imageable
+   op "=?"(Left, Right : JSON_Number_Value) -> Ordering
+     is (Left.Value =? Right.Value);
+   func Hash(Val : JSON_Number_Value) -> Result : Unsigned_64
+     is (Hash (Val.Value));
+
+ implements for Imageable
+
+   func To_String (Val : JSON_Number_Value) -> Univ_String
+     is (JSON_Value::To_String (Val));
+   func From_String (Val : Univ_String) -> optional JSON_Number_Value
+     is (null);
 end interface PSL::Core::JSON_Number_Value;
 
 interface PSL::Core::JSON_Boolean_Value<> extends JSON_Value is
@@ -13845,6 +13944,19 @@ interface PSL::Core::JSON_Boolean_Value<> extends JSON_Value is
 
    func true () -> JSON_Boolean_Value
      is ((Value => #true));
+
+   //  Other operations expected for Imageable
+   op "=?"(Left, Right : JSON_Boolean_Value) -> Ordering
+     is (Left.Value =? Right.Value);
+   func Hash(Val : JSON_Boolean_Value) -> Result : Unsigned_64
+     is (Hash (Val.Value));
+
+ implements for Imageable
+
+   func To_String (Val : JSON_Boolean_Value) -> Univ_String
+     is (JSON_Value::To_String (Val));
+   func From_String (Val : Univ_String) -> optional JSON_Boolean_Value
+     is (null);
 end interface PSL::Core::JSON_Boolean_Value;
 
 interface PSL::Core::JSON_Null_Value<> extends JSON_Value is
@@ -13860,6 +13972,19 @@ interface PSL::Core::JSON_Null_Value<> extends JSON_Value is
 
    func Kind (Value : JSON_Null_Value) -> JSON_Value_Kind
      is (#Null_Value);
+
+   //  Other operations expected for Imageable
+   op "=?"(Left, Right : JSON_Null_Value) -> Ordering
+     is (#equal);
+   func Hash(Val : JSON_Null_Value) -> Result : Unsigned_64
+     is (0);
+
+ implements for Imageable
+
+   func To_String (Val : JSON_Null_Value) -> Univ_String
+     is (JSON_Value::To_String (Val));
+   func From_String (Val : Univ_String) -> optional JSON_Null_Value
+     is (null);
 end interface PSL::Core::JSON_Null_Value;
 
 class PSL::Core::JSON_Value is
@@ -13994,7 +14119,7 @@ class PSL::Core::JSON_Value is
       return UTF::Input::From_UTF8_Stream (Read_Remainder(B_Strm));
    end func To_String;
 
-   func From_String (Str : Univ_String) -> JSON_Value+ is
+   func From_String (Str : Univ_String) -> optional JSON_Value+ is
       var B_Strm : Byte_Stream_Buffer :=
          Create(UTF::Output::To_UTF8_Stream(Str));
       ref var JVS : JSON_Input_Value_Stream => Create(B_Strm);

@@ -1124,7 +1124,8 @@ package body PSC.Trees.Semantics.Info is
         and then Tree_Ptr_Of (Expr_Type.Definition).all in Type_Decl.Tree'
            Class
       then
-         if Type_Decl.Tree (Tree_Ptr_Of (Expr_Type.Definition).all).Is_New_Type
+         if Type_Decl.Tree
+                 (Tree_Ptr_Of (Expr_Type.Definition).all).Is_New_Type
            or else
              (Expr_Type.U_Type = null and then Expr_Type.U_Base_Type = null)
          then
@@ -1135,10 +1136,15 @@ package body PSC.Trees.Semantics.Info is
          elsif Expr_Type.U_Type /= Expr_Type then
             --  Type declaration, get underlying type
             return Type_Image (Expr_Type.U_Type, Use_Short_Form, Max_Chars);
-         else
+         elsif Expr_Type.U_Base_Type /= Expr_Type then
             --  Type declaration, get base type
             return
               Type_Image (Expr_Type.U_Base_Type, Use_Short_Form, Max_Chars);
+         else
+            --  U_Type and U_Base_Type same as type.
+            return Type_Prefix (Parens => True) &
+              Subtree_Image (Expr_Type.Definition, Use_Short_Form, Max_Chars) &
+              Type_Qualifier;
          end if;
       elsif Not_Null (Expr_Type.Definition)
         and then Tree_Ptr_Of (Expr_Type.Definition).all in Operation.Tree'Class
