@@ -184,13 +184,10 @@ package body Generic_Synchronized_Deques is
                       (To_Actual_Index (Index_Type (Top), Mod_Minus_One + 1));
 
          --  Add one, if Q.Top still equals Top
-         if not Index_Exchange.Atomic_Compare_And_Exchange
-           (Item => Q.Top,
-            Prior => Top,
-            Desired => Top + 1)
-         then
+         Steal_Failed := not Index_Exchange.Atomic_Compare_And_Exchange
+           (Item => Q.Top, Prior => Top, Desired => Top + 1);
+         if Steal_Failed then
             --  Return Empty if Steal_Failed
-            Steal_Failed := True;
             Element := Empty;
          end if;
       end if;
