@@ -15,7 +15,7 @@
 -- of the license.                                                          --
 ------------------------------------------------------------------------------
 
-pragma Ada_2020;
+pragma Ada_2022;
 
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Command_Line; use Ada.Command_Line;

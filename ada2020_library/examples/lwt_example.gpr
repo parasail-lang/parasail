@@ -4,18 +4,24 @@ project LWT_Example is
 
    for Object_Dir use "obj";
    for Exec_Dir use "bin";
-   for Source_Dirs use (".", "../work_stealing", "../work_in_progress",
-      "sort", "/homes/taft/_distrib/zyre-Ada/src",
-      "/homes/taft/_distrib/zyre-Ada/src/gen",
-      "/homes/taft/_distrib/include/zmq",
-      "/homes/taft/_distrib/zeromq-Ada/src/gen");
+   for Source_Dirs use (".", "sort");
+
    for Main use
      ("simple_par_loop.adb",
-      --  "simple_par_taskloop.adb",
+      "simple_par_taskloop.adb",
       "map_par_loop.adb",
-      "excep_loop.adb", "excep_seq_loop.adb"
-      --  "vector_par_loop.adb",
-      --  "cxai017_con_par.adb", "cxai017_con_seq.adb",
+      "excep_loop.adb", "excep_seq_loop.adb",
+      "vector_par_loop.adb",
+      "cxai017_con_par.adb", "cxai017_con_seq.adb",
+      "n_queens_ws.adb",
+      "cxai017_bitonic.adb",
+      "excep_ws_loop.adb",
+      "n_queens_omp.adb",
+      "n_queens_proc_iter.adb",
+      "n_queens_proc_iter_b.adb",
+      "simple_par_ws_loop.adb",
+      "test_deque.adb",
+      "test_par_qsort.adb"
      );
 
    package Builder is
@@ -24,8 +30,7 @@ project LWT_Example is
 
    package Compiler is
       for Switches ("Ada") use ("-g", "-gnata", "-gnatg", "-gnatyN",
-        "-gnat2020", "-I/homes/taft/_distrib/include/zmq",
-        "-I/homes/taft/_distrib/zeromq-Ada/src/gen");
+        "-gnat2020");
    end Compiler;
 
 end LWT_Example;

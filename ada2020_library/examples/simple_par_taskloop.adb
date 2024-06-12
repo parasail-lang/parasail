@@ -18,7 +18,7 @@
 
 --  Example using Prototype System.Parallelism package for Ada 202X
 
-pragma Ada_2020;
+pragma Ada_2022;
 
 with System.Parallelism; use System.Parallelism;
 with Interfaces.OpenMP; use Interfaces.OpenMP;

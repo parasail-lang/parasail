@@ -1,4 +1,4 @@
-pragma Ada_2020;
+pragma Ada_2022;
 
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Numerics.Float_Random; use Ada.Numerics.Float_Random;
