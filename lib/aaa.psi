@@ -1532,7 +1532,7 @@ interface PSL::Containers::Packed_Array
     op "index_set"(Arr : Packed_Array) -> Countable_Range<Indexed_By>
     func Set(var Arr : Packed_Array; Index : Indexed_By; New_Val : Elem_Type)
     op "<|="(var Left : Packed_Array; var Right : Elem_Type)
-    op "|"(Left : Packed_Array; Right : Key_Value<Indexed_By, Elem_Type>)
+    op "/"(Left : Packed_Array; Right : Key_Value<Indexed_By, Elem_Type>)
       -> Packed_Array
     op "|"(Left, Right : Packed_Array) -> Packed_Array;
     op "[]"() -> Packed_Array
@@ -1742,11 +1742,11 @@ class PSL::Containers::Packed_Array is
         end if
     end op "<|="
     
-    op "|"(Left : Packed_Array; Right : Key_Value<Indexed_By, Elem_Type>) 
+    op "/"(Left : Packed_Array; Right : Key_Value<Indexed_By, Elem_Type>) 
       -> Result : Packed_Array is
         Result := Left
         Set (Result, Right.Key, Right.Value)
-    end op "|"
+    end op "/"
 
     op "|"(Left, Right : Packed_Array) -> Result : Packed_Array is
         const Left_Len := Length(Left)
@@ -8458,7 +8458,7 @@ interface PSL::Containers::Array
       -> ref var Elem_Type
     op "index_set"(Arr : Array) -> Countable_Range<Indexed_By> is Bounds
     op "<|="(var Left : Array; var Right : optional Elem_Type)
-    op "|"(Left : Array; Right : Key_Value<Indexed_By, Elem_Type>) -> Array
+    op "/"(Left : Array; Right : Key_Value<Indexed_By, Elem_Type>) -> Array
     op "|"(Left, Right : Array) -> Array;
     op "[]"() -> Array
 end interface PSL::Containers::Array
@@ -8520,11 +8520,11 @@ class PSL::Containers::Array is
         end if
     end op "<|="
     
-    op "|"(Left : Array; Right : Key_Value<Indexed_By, Elem_Type>) 
+    op "/"(Left : Array; Right : Key_Value<Indexed_By, Elem_Type>) 
       -> Result : Array is
         Result := Left
         Result[Right.Key] := Right.Value
-    end op "|"
+    end op "/"
 
     op "|"(Left, Right : Array) -> Result : Array is
         const Left_Len := Length(Left)
@@ -11568,7 +11568,7 @@ interface PSL::Containers::Big_Array
       -> ref var Elem_Type
     op "index_set"(Arr : Big_Array) -> Countable_Range<Indexed_By> is Bounds
     op "<|="(var Left : Big_Array; var Right : optional Elem_Type)
-    op "|"(Left : Big_Array; Right : Key_Value<Indexed_By, Elem_Type>) -> Big_Array
+    op "/"(Left : Big_Array; Right : Key_Value<Indexed_By, Elem_Type>) -> Big_Array
     op "|"(Left, Right : Big_Array) -> Big_Array;
     op "[]"() -> Big_Array
 end interface PSL::Containers::Big_Array
@@ -11675,11 +11675,11 @@ class PSL::Containers::Big_Array is
         end if
     end op "<|="
     
-    op "|"(Left : Big_Array; Right : Key_Value<Indexed_By, Elem_Type>) 
+    op "/"(Left : Big_Array; Right : Key_Value<Indexed_By, Elem_Type>) 
       -> Result : Big_Array is
         Result := Left
         Result[Right.Key] := Right.Value
-    end op "|"
+    end op "/"
 
     op "|"(Left, Right : Big_Array) -> Result : Big_Array is
         const Left_Len := Length(Left)

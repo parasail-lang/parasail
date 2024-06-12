@@ -208,13 +208,13 @@ class N_Queens is
 
 	func Next_State(S : Solution_State; R : Row) -> Solution_State is
 	    return (C => S.C+1, 
-	      Trial     => S.Trial | [R => S.C],
+	      Trial     => S.Trial / [R => S.C],
 	      Diag_Sum  => S.Diag_Sum | (R+S.C),
 	      Diag_Diff => S.Diag_Diff | (R-S.C));
 	end func Next_State;
 
 	func Final_Solution(S : Solution_State; R : Row) -> Solution is
-	    return S.Trial | [R => S.C];
+	    return S.Trial / [R => S.C];
 	end func Final_Solution;
 
     end class Solution_State;
@@ -243,13 +243,13 @@ class N_Queens is
                       // Keep going since haven't reached Nth column.
                       continue loop Outer_Loop with Next_State(State, R);
 			-- (C => C+1, 
-                        -- Trial     => Trial | [R => C],
+                        -- Trial     => Trial / [R => C],
                         -- Diag_Sum  => Diag_Sum | (R+C),
                         -- Diag_Diff => Diag_Diff | (R-C));
                   else
                       // All done, remember trial result with last queen placed
                       Solutions |= Final_Solution(State, R); 
-			-- (Trial | [R => C]);
+			-- (Trial / [R => C]);
                   end if;
               end if;
           end loop;
