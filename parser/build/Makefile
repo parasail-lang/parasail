@@ -15,13 +15,15 @@ build: ayacc aflex parasail-parser
 ayacc:
 	@mkdir -p bin
 	@mkdir -p ayacc
-	cd ayacc; $(GNATMAKE) -I../../../aflex_ayacc/ayacc ../../../aflex_ayacc/ayacc/ayacc.adb -o ../bin/ayacc
+	cd ayacc; $(GNATMAKE) -I../../../aflex_ayacc/ayacc ../../../aflex_ayacc/ayacc/ayacc.adb -o ../bin/ayacc -largs
+#  some MacOS versions also need:   -Wl,-ld_classic
 
 aflex:
 	@mkdir -p bin
 	@mkdir -p aflex
 	cd aflex; $(GNATMAKE) -I../../../aflex_ayacc/aflex -I../../../aflex_ayacc/aflex/GEN ../../../aflex_ayacc/aflex/aflex.adb -o ../bin/aflex
-	
+#  some MacOS versions also need:   -Wl,-ld_classic
+
 parasail-parser: ../gen/parasail_tokens.ads
 
 ../gen/parasail_tokens.ads: ../parasail_lex.l ../parasail.y

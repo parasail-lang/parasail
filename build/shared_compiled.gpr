@@ -11,11 +11,15 @@ abstract project Shared_Compiled is
    package Compiler is
       for Default_Switches ("ada") use
            ("-gnatE", "-fstack-check",
-            "-O0", "-g", "-gnatU", "-gnatN"); -- "-gnat95" no longer supported
+            "-O0", "-g", "-gnatU", "-gnatN");
    end Compiler;
 
    package Linker is
-      for Default_Switches ("ada") use ("-O0", "-g", "-L/usr/lib", "-L.", "-ltermcap","-latomic");
+      for Default_Switches ("ada") use (
+        "-O0", "-g", "-L/usr/lib", "-L.", "-ltermcap",
+        --  "-Wl,-ld_classic",  -- for some MacOS versions
+        "-latomic"
+      );
    end Linker;
 
 end Shared_Compiled;

@@ -37,7 +37,6 @@ EXE=compiled_main.exe
 A2X_EXE=compiled_a2x_main.exe
 OMPLIB=-lgomp
 MATHLIB=-lm
-ATOMLIB=-latomic
 
 ifeq ($(OMP),on)
   EXTRALIBS=$(OMPLIB)
@@ -48,7 +47,7 @@ endif
 # EXTRALIBS can be extended with additional libraries (if required)
 
 COMPLIBS=$(MATHLIB)
-A2X_COMPLIBS=$(MATHLIB) $(ATOMLIB)
+A2X_COMPLIBS=$(MATHLIB)
 
 .DELETE_ON_ERROR:
 
@@ -136,7 +135,7 @@ sparkel: cleantestsuite
 
 ada202x: cleantestsuite
 	@mkdir -p build/bin build/obj build/slow_obj build/fast_obj
-	$(GPRBUILD) $(ADAFLAGS) -P build/ada202x -largs $(EXTRALIBS) $(ATOMLIB)
+	$(GPRBUILD) $(ADAFLAGS) -P build/ada202x -largs $(EXTRALIBS)
 
 javallel: cleantestsuite
 	@mkdir -p build/bin build/obj build/slow_obj build/fast_obj
