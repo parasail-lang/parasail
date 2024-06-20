@@ -16,7 +16,7 @@
 -- documentation/COPYING3 and documentation/GCC_RUNTIME3_1 for details.     --
 ------------------------------------------------------------------------------
 
-with Interfaces_Work_Stealing;  --  TBD: Interfaces.Work_Stealing
+with Interfaces.Work_Stealing;
 
 private with Ada.Task_Identification;
 
@@ -43,11 +43,11 @@ package System.LWT.Work_Stealing is
    --  plug-in per Ada task, or one per program partition.
 
    procedure Incr_WS_Parallel_Regions
-     (Obj : Interfaces_Work_Stealing.WS_Parallel;
+     (Obj : Interfaces.Work_Stealing.WS_Parallel;
       Team_Info : not null Server_Team_Ptr);
 
    procedure Decr_WS_Parallel_Regions
-     (Obj : Interfaces_Work_Stealing.WS_Parallel;
+     (Obj : Interfaces.Work_Stealing.WS_Parallel;
       Team_Info : not null Server_Team_Ptr);
 
 private
@@ -117,16 +117,17 @@ private
       Enclosing_Team_Info : Server_Team_Ptr := null;
       Enclosing_Team_Member : Team_Member_Index := Team_Member_Index'Last;
       Team_Array : Server_Index_Array_Ptr := null;
-      Team_Is_Shut_Down  : Boolean := False with Atomic;
+      Team_Is_Shut_Down  : Boolean := False
+        with Atomic;
       --  Set True when team's parallel region is ending.
 
       Associated_Ada_Task : aliased Ada.Task_Identification.Task_Id;
       --  Identify of Ada task from which team is spawned.
 
-      Num_LWTs_On_Team_Deques : aliased Atomic_LWT_Count;
+      Num_LWTs_On_Team_Deques : aliased Atomic_LWT_Count := 0;
       --  Number of LWTs on any team-member's deque.
 
-      Num_Members_Waiting_For_Work : aliased Atomic_LWT_Count;
+      Num_Members_Waiting_For_Work : aliased Atomic_LWT_Count := 0;
       --  Number of team members that are waiting on Wait_For_Work
 
       Manager : Team_Manager (Server_Team_Info'Access);

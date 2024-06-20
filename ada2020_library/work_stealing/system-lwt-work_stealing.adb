@@ -2196,7 +2196,7 @@ package body System.LWT.Work_Stealing is
    --  plug-in per Ada task, or one per program partition.
 
    procedure Incr_WS_Parallel_Regions
-     (Obj : Interfaces_Work_Stealing.WS_Parallel;
+     (Obj : Interfaces.Work_Stealing.WS_Parallel;
       Team_Info : not null Server_Team_Ptr) is
       use Int_Counters;
       Pre_Value : constant Atomic_Int :=
@@ -2278,7 +2278,7 @@ package body System.LWT.Work_Stealing is
    end Incr_WS_Parallel_Regions;
 
    procedure Decr_WS_Parallel_Regions
-     (Obj : Interfaces_Work_Stealing.WS_Parallel;
+     (Obj : Interfaces.Work_Stealing.WS_Parallel;
       Team_Info : not null Server_Team_Ptr) is
 
       pragma Unreferenced (Obj);

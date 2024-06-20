@@ -19,7 +19,7 @@
 with Ada.Unchecked_Deallocation;
 with System.LWT.Work_Stealing;  --  TBD: System.LWT.Work_Stealing
 
-package body Interfaces_Work_Stealing is  --  TBD: Interfaces.Work_Stealing
+package body Interfaces.Work_Stealing is  --  TBD: Interfaces.Work_Stealing
    use System.LWT.Work_Stealing;
 
    procedure Initialize (Obj : in out WS_Parallel) is
@@ -42,4 +42,4 @@ package body Interfaces_Work_Stealing is  --  TBD: Interfaces.Work_Stealing
       Free (Team);
    end Finalize;
 
-end Interfaces_Work_Stealing;
+end Interfaces.Work_Stealing;

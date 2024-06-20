@@ -19,6 +19,7 @@
 -- which was originally developed by S. Tucker Taft.                        --
 ------------------------------------------------------------------------------
 
+with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Unchecked_Deallocation;
 with System;
 with System.Atomic_Operations.Exchange;  --  TBD: System.Atomic_Operations...
@@ -41,10 +42,10 @@ package body Generic_Synchronized_Deques is
 
    --  Deque data structure:
 
-   --  type Element_Data (Modulo_Minus_One : Actual_Index_Type)
+   --  type Element_Data (Capacity_Minus_One : Actual_Index_Type)
    --   is record
    --     --  TBD: Recent_Top : Index_Type := 0;  --  no need to be atomic
-   --     Elements : Element_Array (0 .. Modulo_Minus_One);
+   --     Elements : Element_Array (0 .. Capacity_Minus_One);
    --  end record;
 
    --  type Deque is limited record
@@ -52,8 +53,24 @@ package body Generic_Synchronized_Deques is
    --     Bottom : Atomic_Index_Type := 0;          --  next to fill
    --        --  TBD: Move into Data to minimize cache conflicts?
    --     Data   : not null Element_Data_Ptr with atomic :=
-   --       new Element_Data (Modulo_Minus_One => Initial_Size - 1);
+   --       new Element_Data (Capacity_Minus_One => Initial_Capacity - 1);
    --  end record;
+
+   --  Example deque of Capacity 8 (cap-minus-one = 7), current Length 4:
+   --  Top (modulo Capacity) points at slot from which to steal.
+   --  Bottom (modulo Capacity) points at slot to push into, and one
+   --  below slot to pop from.
+   --
+   --  0
+   --  1
+   --  2   <--  Top (mod Capacity)     --  stealing from here
+   --  3
+   --  4
+   --  5
+   --  6   <--  Bottom (mod Capacity)  --  pushing here
+   --  7
+
+   Debug : constant Boolean := False;
 
    procedure Free is new Ada.Unchecked_Deallocation
                                (Element_Data, Element_Data_Ptr);
@@ -63,35 +80,71 @@ package body Generic_Synchronized_Deques is
 
    procedure Push (Q : in out Deque; Element : Element_Type) is
    --  Add the Element to the "LIFO" end of the Deque.
-      Bot : constant Index_Type := Q.Bottom;    --  TBD: or Q.Data.Bottom?
-      Top : constant Index_Type := Index_Type (Q.Top);
+      Prior_Bot : constant Index_Type := Q.Bottom;  --  TBD: or Q.Data.Bottom?
+      Bot : Index_Type := Prior_Bot;
+      Prior_Top : aliased Atomic_Index_Type := Q.Top;
                                                 --  TBD: or Q.Data.Recent_Top?
       --  TBD: Could copy Q.Top into Q.Data.Recent_Top whenever
       --       Bot is a multiple of, say, 8.
-      Length : constant Index_Type := Bot - Top;
+      Length : constant Index_Type := Prior_Bot - Index_Type (Prior_Top);
       Data   : not null Element_Data_Ptr := Q.Data;
-      Mod_Minus_One : Actual_Index_Type := Data.Modulo_Minus_One;
+      Capacity : Actual_Index_Type := Data.Capacity_Minus_One + 1;
    begin
-      if Actual_Index_Type (Length) = Mod_Minus_One then
+      if Actual_Index_Type (Length) + 1 >= Capacity then
          --  We need to expand
          declare
-            Old_Mod  : constant Actual_Index_Type := Mod_Minus_One + 1;
+            Old_Cap  : constant Actual_Index_Type := Capacity;
             Old_Data : constant not null Element_Data_Ptr := Data;
 
-            New_Mod  : constant Actual_Index_Type := Old_Mod * 2;
+            New_Cap  : constant Actual_Index_Type := Old_Cap * 2;
             New_Data : constant not null Element_Data_Ptr :=
-              new Element_Data (New_Mod - 1);
+              new Element_Data (New_Cap - 1);
          begin
+            if Debug then
+               Put_Line ("Expanding from capacity of" & Capacity'Image &
+                 " to" & New_Cap'Image);
+            end if;
+
             --  Copy relevant data, re-mod'ing the indices
-            for I in Top .. Bot - 1 loop
-               New_Data.Elements (To_Actual_Index (I, New_Mod)) :=
-                 Old_Data.Elements (To_Actual_Index (I, Old_Mod));
+            for I in Index_Type (Prior_Top) .. Prior_Bot - 1 loop
+               New_Data.Elements (To_Actual_Index (I, Modulo => New_Cap)) :=
+                 Old_Data.Elements (To_Actual_Index (I, Modulo => Old_Cap));
             end loop;
             --  TBD: New_Data.Recent_Top := Q.Top;
             Q.Data := New_Data;
-            Mod_Minus_One := New_Mod - 1;
+            Capacity := New_Cap;
 
-            --  Deallocate old data, and re-assign
+            --  Before we deallocate old Data array, we need to cause any
+            --  ongoing "steal"s to fail.  We do this by temporarily
+            --  "steal"ing all of the elements, and then pushing them
+            --  back onto the queue in a different place (but with
+            --  the same "actual" index into the (doubled) array so
+            --  we don't actually have to move them again).
+            --  This is done by adding (new) Capacity to Top, which steals
+            --  "Capacity" items, and then adding (new) Capacity to Bottom,
+            --  which ends up pushing them all back on the queue.
+
+            --  Keep trying to bump Top by the new Capacity
+            loop
+               exit when Index_Exchange.Atomic_Compare_And_Exchange
+                           (Item => Q.Top,
+                            Prior => Prior_Top,
+                            Desired => Atomic_Index_Type
+                             (Index_Type (Prior_Top) + Index_Type (Capacity)));
+            end loop;
+
+            if Debug then
+               Put_Line ("Have added" & Capacity'Image & " to Top of" &
+                 Prior_Top'Image & " but not bumped Bot yet");
+            end if;
+
+            --  Now bump Bottom by the same amount
+            Bot := Prior_Bot + Index_Type (Capacity);
+            Q.Bottom := Bot;
+
+            --  Now we can safely deallocate the old array
+            --  because any ongoing "steal" would have failed
+            --  due to our (big) change of Top.
             declare
                Temp : Element_Data_Ptr := Data;
             begin
@@ -100,11 +153,15 @@ package body Generic_Synchronized_Deques is
                Data := New_Data;
                Free (Temp);
             end;
+            if Debug then
+               Put_Line ("Finished expanding from capacity of" &
+                 Old_Cap'Image & " to" & New_Cap'Image);
+            end if;
          end;
       end if;
 
-      --  Store the new element at FIFO end
-      Data.Elements (To_Actual_Index (Bot, Mod_Minus_One + 1)) :=
+      --  Store the new element at FIFO end of (potentially expanded) deque
+      Data.Elements (To_Actual_Index (Bot, Modulo => Capacity)) :=
         Element;
       --  Bump the FIFO index
       Q.Bottom := Bot + 1;
@@ -114,43 +171,44 @@ package body Generic_Synchronized_Deques is
    --  Remove an Element from the "LIFO" end of the Deque.
    --  Element will come back as Empty if the Deque is empty.
       Data : constant Element_Data_Ptr := Q.Data;
-      Mod_Minus_One : constant Actual_Index_Type := Data.Modulo_Minus_One;
-      Bot : constant Index_Type := Q.Bottom;     --  TBD: or Data.Bottom?
+      Capacity : constant Actual_Index_Type := Data.Capacity_Minus_One + 1;
+      Prior_Bot : constant Index_Type := Q.Bottom;     --  TBD: or Data.Bottom?
    begin
-      --  Decrement Bottom now to prevent two "Steal"s causing trouble.
-      --  NOTE: Temporarily it is possible that Bottom = Top - 1.
-      Q.Bottom := Bot - 1;
+      --  Decrement Q.Bottom now to prevent two "Steal"s causing trouble.
+      --  NOTE: Temporarily it is possible that Q.Bottom = Top - 1.
+      Q.Bottom := Prior_Bot - 1;
 
       declare
          --  Now get Top, having decremented Bottom.
-         Top    : aliased Atomic_Index_Type := Q.Top;
-         Length : constant Index_Type := Bot - Index_Type (Top);
+         Prior_Top : aliased Atomic_Index_Type := Q.Top;
+         Length : constant Index_Type := Prior_Bot - Index_Type (Prior_Top);
       begin
          if Length = 0 then
             --  Queue was already empty
             Element := Empty;
             --  Restore Bottom
-            Q.Bottom := Bot;
+            Q.Bottom := Prior_Bot;
          else
             --  Queue not empty when we started, so fetch what was
             --  the bottom, but check whether it has been stolen
             --  in the mean time.
             Element :=
-              Data.Elements (To_Actual_Index (Bot - 1, Mod_Minus_One + 1));
+              Data.Elements
+                (To_Actual_Index (Prior_Bot - 1, Modulo => Capacity));
             if Length = 1 then
                --  We are competing with stealing,
                --  so we try to steal from ourself and then restore Bottom.
                if not Index_Exchange.Atomic_Compare_And_Exchange
                  (Item => Q.Top,
-                  Prior => Top,
-                  Desired => Top + 1)
+                  Prior => Prior_Top,
+                  Desired => Prior_Top + 1)
                then
                   --  If swap fails, then we just treat it as empty
                   Element := Empty;
                end if;
                --  Restore Bottom in any case, since we bumped Top
                --  if the Swap succeeded.
-               Q.Bottom := Bot;
+               Q.Bottom := Prior_Bot;
             --  else Length > 1, Element is correct, and Bottom already decr'd
             end if;
          end if;
@@ -164,28 +222,38 @@ package body Generic_Synchronized_Deques is
    --  Remove an Element from the "FIFO" end of the Deque.
    --  Element will come back as Empty if the Deque is empty.
    --  Steal_Failed will come back as True if the attempt to steal fails
-   --  due to a concurrent Steal or Pop.
-      Data   : constant Element_Data_Ptr := Q.Data;
+   --  due to a concurrent Steal or Pop or doubling in size.
+
+   --  Read "Top" first and then the Compare-And-Exchange will fail
+   --  if any change in Top occurs since this read.
+      Prior_Top : aliased Atomic_Index_Type := Q.Top;
+
       Bot    : constant Index_Type := Q.Bottom;    --  TBD: or Data.Bottom?
-      Top    : aliased Atomic_Index_Type := Q.Top;
-      Length : constant Index_Type := Bot - Index_Type (Top);
-      Mod_Minus_One : constant Actual_Index_Type := Data.Modulo_Minus_One;
+      Length : constant Index_Type := Bot - Index_Type (Prior_Top);
+      Data   : constant Element_Data_Ptr := Q.Data;
+      Capacity : constant Actual_Index_Type := Data.Capacity_Minus_One + 1;
+      Cap_Times_Two : constant Index_Type := Index_Type (Capacity * 2);
    begin
-      if Length + 1 <= 1 then
-         --  We have an empty deque.
-         --  NOTE: Temporarily Length can be -1 (modulo Index_Type'Modulus)
-         --        if we are in the middle of a concurrent "Pop".
+      if Length + Cap_Times_Two <= Cap_Times_Two then
+         --  We either have an empty queue, or we are in the
+         --  middle of an expansion.
          Element := Empty;
-         Steal_Failed := False;
+
+         --  If empty, Length will be 0 or -1 (modulo Index_Type'Modulus).
+         --  If in the middle of an expansion, Length will be
+         --  in the range -Capacity*2 .. -Capacity (mod Index_Type'Modulus)
+         --  and we want to handle it like a failed steal.
+         Steal_Failed := (Length + 1) not in 0 .. 1;
       else
          --  There is at least one element in the deque.
          --  Try to steal it.
-         Element := Data.Elements
-                      (To_Actual_Index (Index_Type (Top), Mod_Minus_One + 1));
+         Element :=
+           Data.Elements
+             (To_Actual_Index (Index_Type (Prior_Top), Modulo => Capacity));
 
-         --  Add one, if Q.Top still equals Top
+         --  Add one to Q.Top, if Q.Top still equals Prior_Top
          Steal_Failed := not Index_Exchange.Atomic_Compare_And_Exchange
-           (Item => Q.Top, Prior => Top, Desired => Top + 1);
+           (Item => Q.Top, Prior => Prior_Top, Desired => Prior_Top + 1);
          if Steal_Failed then
             --  Return Empty if Steal_Failed
             Element := Empty;
@@ -218,13 +286,13 @@ package body Generic_Synchronized_Deques is
    --  This should not be called while there are still threads running
    --  that might do a Push.
    begin
-      if Q.Data.Modulo_Minus_One > Initial_Size - 1 then
-         --  Data has been expanded, so restore it to its Initial_Size
+      if Q.Data.Capacity_Minus_One > Initial_Capacity - 1 then
+         --  Data has been expanded, so restore it to its Initial_Capacity
          --  and free old Data.
          declare
             Old_Data : Element_Data_Ptr := Q.Data;
          begin
-            Q.Data := new Element_Data (Initial_Size - 1);
+            Q.Data := new Element_Data (Initial_Capacity - 1);
             Free (Old_Data);
             --  NOTE: Cannot do a Free directly on Q.Data because Data
             --        is a "not null" field and Free would set it to null.
@@ -250,7 +318,8 @@ package body Generic_Synchronized_Deques is
             Index : Index_Type := Top;
          begin
             for E of Result loop
-               E := Elements (To_Actual_Index (Index, Elements'Length));
+               E := Elements
+                      (To_Actual_Index (Index, Modulo => Elements'Length));
                Index := Index + 1;
             end loop;
             return Result;

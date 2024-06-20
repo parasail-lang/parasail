@@ -19,7 +19,7 @@ with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Command_Line; use Ada.Command_Line;
 with Generic_Parallel_Work_Lists;
 with System.Parallelism; use System.Parallelism;
-with Interfaces_Work_Stealing; use Interfaces_Work_Stealing;
+with Interfaces.Work_Stealing; use Interfaces.Work_Stealing;
 procedure N_Queens_Proc_Iter is
 
    Debug : constant Boolean := False;

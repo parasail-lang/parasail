@@ -21,7 +21,7 @@ with Ada.Aspects;
 private with Ada.Finalization;
 limited private with System.LWT.Work_Stealing;  --  TBD: System.LWT...
 
-package Interfaces_Work_Stealing is  --  TBD: Interfaces.Work_Stealing
+package Interfaces.Work_Stealing is  --  TBD: Interfaces.Work_Stealing
    --  Types specific to the work-stealing-based LWT scheduler plug-in.
 
    type WS_Options is new Ada.Aspects.Root_Aspect with record
@@ -85,4 +85,4 @@ private
    procedure Initialize (Obj : in out WS_Parallel);
    procedure Finalize (Obj : in out WS_Parallel);
 
-end Interfaces_Work_Stealing;
+end Interfaces.Work_Stealing;

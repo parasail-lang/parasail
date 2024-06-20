@@ -18,7 +18,7 @@
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Command_Line; use Ada.Command_Line;
 with Generic_Parallel_Work_Lists;
-with Interfaces_Work_Stealing; use Interfaces_Work_Stealing;
+with Interfaces.Work_Stealing; use Interfaces.Work_Stealing;
 procedure N_Queens_WS is
 
    Num_Args : constant Natural := Argument_Count;

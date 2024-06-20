@@ -18,7 +18,7 @@
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Command_Line; use Ada.Command_Line;
 with Generic_Parallel_Work_Lists;
-with Interfaces_Work_Stealing; use Interfaces_Work_Stealing;
+with Interfaces.Work_Stealing; use Interfaces.Work_Stealing;
 procedure N_Queens_Proc_Iter_B is
 
    Control : WS_Parallel (Num_Servers => 6, Options => null);

@@ -19,7 +19,7 @@
 --  Example using Prototype System.Parallelism package for Ada 202X
 
 with System.Parallelism; use System.Parallelism;
-with Interfaces_Work_Stealing; use Interfaces_Work_Stealing;
+with Interfaces.Work_Stealing; use Interfaces.Work_Stealing;
 with Ada.Text_IO;
 procedure Simple_Par_WS_Loop is
    Num_Chunks : constant := 10;

@@ -3,7 +3,7 @@ pragma Ada_2022;
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Numerics.Float_Random; use Ada.Numerics.Float_Random;
 with Ada.Text_IO; use Ada.Text_IO;
-with Interfaces_Work_Stealing; use Interfaces_Work_Stealing;
+with Interfaces.Work_Stealing; use Interfaces.Work_Stealing;
 with Ada.Calendar;
 with Ada_Constrained_Sort;
 procedure Test_Par_QSort is

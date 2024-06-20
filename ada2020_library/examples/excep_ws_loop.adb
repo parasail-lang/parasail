@@ -21,7 +21,7 @@
 
 with System.Parallelism; use System.Parallelism;
 with System.LWT;
-with Interfaces_Work_Stealing; use Interfaces_Work_Stealing;
+with Interfaces.Work_Stealing; use Interfaces.Work_Stealing;
 with Ada.Task_Identification; use Ada.Task_Identification;
 with Ada.Exceptions;
 with Ada.Text_IO; use Ada.Text_IO;
