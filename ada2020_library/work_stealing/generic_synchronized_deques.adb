@@ -70,7 +70,7 @@ package body Generic_Synchronized_Deques is
    --  6   <--  Bottom (mod Capacity)  --  pushing here
    --  7
 
-   Debug : constant Boolean := False;
+   Debug_Deque : constant Boolean := True;
 
    procedure Free is new Ada.Unchecked_Deallocation
                                (Element_Data, Element_Data_Ptr);
@@ -100,7 +100,7 @@ package body Generic_Synchronized_Deques is
             New_Data : constant not null Element_Data_Ptr :=
               new Element_Data (New_Cap - 1);
          begin
-            if Debug then
+            if Debug_Deque then
                Put_Line ("Expanding from capacity of" & Capacity'Image &
                  " to" & New_Cap'Image);
             end if;
@@ -133,7 +133,7 @@ package body Generic_Synchronized_Deques is
                              (Index_Type (Prior_Top) + Index_Type (Capacity)));
             end loop;
 
-            if Debug then
+            if Debug_Deque then
                Put_Line ("Have added" & Capacity'Image & " to Top of" &
                  Prior_Top'Image & " but not bumped Bot yet");
             end if;
@@ -153,7 +153,7 @@ package body Generic_Synchronized_Deques is
                Data := New_Data;
                Free (Temp);
             end;
-            if Debug then
+            if Debug_Deque then
                Put_Line ("Finished expanding from capacity of" &
                  Old_Cap'Image & " to" & New_Cap'Image);
             end if;
@@ -258,6 +258,11 @@ package body Generic_Synchronized_Deques is
             --  Return Empty if Steal_Failed
             Element := Empty;
          end if;
+      end if;
+      if Debug_Deque and then Steal_Failed then
+         Put_Line ("Steal failed, Bot =" & Bot'Image &
+                     ", Prior_Top =" & Prior_Top'Image &
+                     ", Capacity =" & Capacity'Image);
       end if;
    end Steal;
 

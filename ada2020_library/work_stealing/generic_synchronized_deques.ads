@@ -72,7 +72,7 @@ package Generic_Synchronized_Deques is
 
 private
 
-   Initial_Capacity : constant := 16;
+   Initial_Capacity : constant := 64;
    --  Initial capacity of double-ended queue for a work-stealing server.
 
    type Index_Type is mod 2**32;

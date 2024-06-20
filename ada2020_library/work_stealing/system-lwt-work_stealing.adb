@@ -386,7 +386,8 @@ package body System.LWT.Work_Stealing is
       Num_LWT_Steals : Longest_Natural := 0;
       Max_Steal_Iteration_Count : Natural := 0;
       Steal_Iteration_Count_Summed : Longest_Natural := 0;
-      Num_Steal_Failures : Natural := 0;
+      Num_Steal_Collisions : Natural := 0;
+      Num_Steals_Finding_Nothing : Natural := 0;
 
       Num_Active_Summed_Over_Initiations : Longest_Natural := 0;
       Num_Waiting_Summed_Over_Initiations : Longest_Natural := 0;
@@ -996,6 +997,9 @@ package body System.LWT.Work_Stealing is
                   end if;
                   --  Remember whether some steal failed
                   Some_Steal_Failed := Some_Steal_Failed or Steal_Failed;
+                  if Debug_Statistics and then Steal_Failed then
+                     Num_Steal_Collisions := Num_Steal_Collisions + 1;
+                  end if;
                end;
             end if;
 
@@ -1041,7 +1045,7 @@ package body System.LWT.Work_Stealing is
 
       if Debug_Statistics then
          if Waiting_For_Group = null then
-            Num_Steal_Failures := Num_Steal_Failures + 1;
+            Num_Steals_Finding_Nothing := Num_Steals_Finding_Nothing + 1;
          end if;
       end if;
 
@@ -1882,7 +1886,9 @@ package body System.LWT.Work_Stealing is
              Num_LWT_Steals))
          & "%");
       Put_Line
-        (" Num_Steal_Failures :" & Num_Steal_Failures'Image);
+        (" Num_Steals_Finding_Nothing :" & Num_Steals_Finding_Nothing'Image);
+      Put_Line
+        (" Num_Steal_Collisions :" & Num_Steal_Collisions'Image);
 
       Put_Line
         (" Max_Active_Groups :" & Natural'Image (Max_Active_Groups));
