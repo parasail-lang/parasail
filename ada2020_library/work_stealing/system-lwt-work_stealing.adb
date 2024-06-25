@@ -203,6 +203,9 @@ package body System.LWT.Work_Stealing is
    --  A LW thread, while waiting to be selected for execution,
    --  is represented by a pointer to a WS_Data object.
 
+   procedure Free is new Ada.Unchecked_Deallocation (WS_Data'Class, LWT_Ptr);
+   --  Reclaim storage for a work-stealing TCB
+
    --  Instantiate to produce a synchronized deque for LWT ptrs
    package Sync_LWT_Deques is new Generic_Synchronized_Deques
      (LWT_Ptr, Empty => null);
@@ -251,8 +254,9 @@ package body System.LWT.Work_Stealing is
 
    procedure Finish_Sub_LWT
      (Server_Index : LWT_Server_Index;
-      Finished_Tcb : LWT_Ptr);
+      Finished_Tcb : in out LWT_Ptr);
    --  Indicate LWT is finished
+   --  Release storage for Finished_Tcb.
 
    --  Suppress warnings about not being a dispatching op
    pragma Warnings (Off, "not dispatching");
@@ -799,7 +803,7 @@ package body System.LWT.Work_Stealing is
 
    procedure Finish_Sub_LWT
      (Server_Index : LWT_Server_Index;
-      Finished_Tcb : LWT_Ptr)
+      Finished_Tcb : in out LWT_Ptr)
    is
       Group : constant WS_Group_Ptr := Finished_Tcb.Group;
       Info : Server_Info renames Server_Info_Array (Server_Index);
@@ -828,6 +832,8 @@ package body System.LWT.Work_Stealing is
             Info.Cur_Team.Num_LWTs_On_Team_Deques'Image);
          Flush;
       end if;
+
+      Free (Finished_Tcb);
    exception
       when Storage_Error =>
          --  Not much to do here
