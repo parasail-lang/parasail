@@ -72,13 +72,13 @@ package LWT.Generic_Synchronized_Deques is
 
 private
 
-   Initial_Size : constant := 2**8;
-   --  Initial size of double-ended queue for a work-stealing server.
+   Initial_Capacity : constant := 64;
+   --  Initial capacity of double-ended queue for a work-stealing server.
 
    type Index_Type is mod 2**32;
    --  This index type is allowed to wrap around
-   --  We get a Actual_Index_Type value by taking the Index_Type
-   --  modulo the size of the array.
+   --  We get an Actual_Index_Type value by taking the Index_Type
+   --  modulo the capacity of the array.
 
    type Atomic_Index_Type is new Index_Type with Atomic;
    --  Atomic index type used for compare-and-exchange.
@@ -93,9 +93,9 @@ private
 
    type Element_Array is array (Actual_Index_Type range <>) of Element_Type;
 
-   type Element_Data (Modulo_Minus_One : Actual_Index_Type) is record
+   type Element_Data (Capacity_Minus_One : Actual_Index_Type) is record
       --  TBD: Recent_Top : Index_Type := 0;  --  no need to be atomic
-      Elements : Element_Array (0 .. Modulo_Minus_One);
+      Elements : Element_Array (0 .. Capacity_Minus_One);
    end record;
 
    type Element_Data_Ptr is access Element_Data;
@@ -107,7 +107,7 @@ private
       Bottom : Index_Type := 0 with Atomic;     --  next to fill
          --  TBD: Move into Data to minimize cache conflicts?
       Data   : not null Element_Data_Ptr :=
-        new Element_Data (Modulo_Minus_One => Initial_Size - 1)
+        new Element_Data (Capacity_Minus_One => Initial_Capacity - 1)
         with Atomic;
       --  Normally Top is less than or equal to Bottom (yes, not intuitive!),
       --  with Bottom - Top being the number of items in the deque.

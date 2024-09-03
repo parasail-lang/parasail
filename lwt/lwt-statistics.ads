@@ -37,24 +37,28 @@ package LWT.Statistics is
       --  need for more LWTs on the deques, so we can bypass more
       --  initiations.
 
-   Max_Servers : Positive := 9;
-      --  Maximum number of servers for work stealing.
+   Max_Default_Servers : constant := 20;
+      --  Maximum number of server threads that will be used by default
+      --  for the scheduling of light-weight threads.
+      --  An explicit number of server threads larger than this may be
+      --  specified in the LWT Control object.
 
-   Num_LWTs_Needed_Per_Server : Positive := Max_Servers + 1;
+   Num_LWTs_Needed_Per_Server : Positive := 10;
       --  Number of LWTs needed per active server to allow
       --  work stealing to work efficiently.
 
-   Max_Steal_Iterations : Positive := Max_Servers;
+   Max_Steal_Iterations : Positive := Max_Default_Servers;
       --  Number of times we try to steal a LWT
 
    Min_LWTs_Before_Stealing : Positive := 1;
       --  A server should have at least this many LWTs before
       --  we steal from it
 
-   Enough_LWTs_Before_Stealing : Positive := Max_Servers;
-      --  A server that has this many LWTs is always OK to steal from.
+   Enough_LWTs_Before_Stealing : Positive := Num_LWTs_Needed_Per_Server - 1;
+      --  If a server has this many LWTs we will steal from it,
+      --  without looking for a server that has more on its queue.
 
-   Steal_Failure_Delay : constant := 0.01;
+   Steal_Failure_Delay : constant := 0.001;
       --  Amount to delay before trying to steal again
 
    Debug_Statistics : constant Boolean := True;

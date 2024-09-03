@@ -26,7 +26,6 @@ with Ada.Text_IO; use Ada.Text_IO;
 with Interfaces.C; use Interfaces;
 with LWT.OpenMP; use LWT.OpenMP;
 
-with System;
 with System.Atomic_Operations.Integer_Arithmetic;
 pragma Elaborate (System.Atomic_Operations.Integer_Arithmetic);
 with System.Atomic_Operations.Test_And_Set;
