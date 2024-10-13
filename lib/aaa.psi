@@ -14457,6 +14457,30 @@ class PSL::Core::JSON_Output_Value_Stream is
      (var OVS : JSON_Output_Value_Stream; Val : optional Rational;
       Digits : Univ_Integer) is
 
+      func Strip_Trailing_Zeroes (Str : Univ_String) -> Univ_String is
+         //  Remove trailing zeroes and "."
+         //  NOTE: This assumes there is a "." and some number of trailing
+         //        digits.  This does not make sense if there is no "."
+         //        since stripping trailing zeroes from an integer
+         //        is effectively dividing its value by some power of 10.
+         for I in Bounds (Str) reverse loop
+            if Str[I] == '.' then
+               //  Reached trailing '.'
+               //  Return slice of Str
+               return Str[1 .. I-1];
+            elsif Str[I] != '0' then
+               //  Return up through final non-zero digit
+               return Str[1..I];
+            end if;
+            //  else keep looking for non-zero digit or '.'
+         end loop;
+
+         {*"missing '.' in image of rational number"* #false}
+
+         //  Fall back to returning original string
+         return Str;
+      end func Strip_Trailing_Zeroes;
+
       Start_Item(OVS);
 
       if Debug then
@@ -14466,7 +14490,7 @@ class PSL::Core::JSON_Output_Value_Stream is
       end if;
 
       const Str := (if Val is null then "null" else To_String (Val));
-      Write_UTF8 (OVS, Str);
+      Write_UTF8 (OVS, Strip_Trailing_Zeroes (Str));
       End_Item (OVS);
    end func Write_Optional_Rational;
 
