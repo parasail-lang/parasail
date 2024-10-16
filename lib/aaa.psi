@@ -13429,7 +13429,9 @@ func PSL::Test::Test_Object_Stream() is
       else
          const Expected : Int_Set := [for J in 1 .. I => J];
 
-         if Z != Expected then
+         if Z is null then
+            Println ("Expected `(Img(Expected)) but found null");
+         elsif Z != Expected then
             Println ("Expected `(Img(Expected)) but found `(Img(Z))");
          end if;
       end if;
