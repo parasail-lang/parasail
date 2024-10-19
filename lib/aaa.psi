@@ -13778,12 +13778,17 @@ end interface PSL::Core::JSON_Value;
 
 interface PSL::Core::JSON_Object_Value<> extends JSON_Value is
    //  A JSON_Object_Value can be used to represent a "JSON Object"
-   //  which in ParaSail parlance is a Map with Keys that are Strings,
-   //  and Values that are JSON Values.
-   var Value : Ordered_Map<Univ_String, JSON_Value+> := [];
+   //  which in ParaSail parlance is a Vector of Key/Value pairs
+   //  where the Keys are Univ_Strings and the Values are JSON Values.
+   //  There is a separate Index which maps Keys to vector indices.
+   //  This way, order is preserved.
+   type JSON_KV_Type is Key_Value<Univ_String, JSON_Value+>;
+   type JSON_Obj_KV_Index is Integer<Range => 1..100_000>;
+   var Value : Vector<JSON_KV_Type> := [];
+   var Index : Ordered_Map <Univ_String, JSON_Obj_KV_Index> := [];
 
-   func Create (Value : Ordered_Map <Univ_String, JSON_Value+> := [])
-     -> JSON_Object_Value is ((Value => Value));
+   func Create (Value : Vector<JSON_KV_Type> := [])
+     -> JSON_Object_Value;
 
    func Kind (Value : JSON_Object_Value) -> JSON_Value_Kind
      is (#Object_Value);
@@ -13800,14 +13805,19 @@ end interface PSL::Core::JSON_Object_Value;
 
 class PSL::Core::JSON_Object_Value is
  exports
+   func Create (Value : Vector<JSON_KV_Type> := [])
+     -> Result : JSON_Object_Value is
+      (Value => Value,
+       Index => (for I in Value.Bounds() => <[]> | [Value[I].Key => I]));
+
    //  Other operations expected for Imageable
    op "=?"(Left, Right : JSON_Object_Value) -> Ordering is
-      for (each [LKey => LElem] of Left.Value;
-           each [RKey => RElem] of Right.Value) forward loop
+      for (each [LKey => LIndex] of Left.Index;
+           each [RKey => RIndex] of Right.Index) forward loop
          if LKey != RKey then
             return LKey =? RKey;
-         elsif LElem != RElem then
-            return LElem =? RElem;
+         elsif Left.Value[LIndex].Value != Right.Value[RIndex].Value then
+            return Left.Value[LIndex].Value =? Right.Value[RIndex].Value;
          end if;
       end loop;
       //  Prefixes match, compare lengths
@@ -13816,8 +13826,9 @@ class PSL::Core::JSON_Object_Value is
 
    func Hash(Val : JSON_Object_Value) -> Result : Unsigned_64 is
       Result := 1;
-      for each [Key => Elem] of Val.Value forward loop
-         Result := Result * 13 + 7 * Hash (Key) + Hash (Elem);
+      for each [Key => Index] of Val.Index forward loop
+         Result := Result * 13 +
+           7 * Hash (Key) + Hash (Val.Value[Index].Value);
       end loop;
    end func Hash;
 end class PSL::Core::JSON_Object_Value;
@@ -14029,7 +14040,14 @@ class PSL::Core::JSON_Value is
                Println("Adding \"`(Key)\" to JSON Object");
             end if;
                
-            return Obj.Value[Key];
+            if Key not in Obj.Index then
+               //  Add Key to end of vector with a null value
+               Obj.Value |= [Key => jnull()];
+               Obj.Index[Key] := |Obj.Value|;
+            end if;
+
+            //  Return reference to new slot
+            return Obj.Value[Obj.Index[Key]].Value;
 
           [Arr : JSON_Array_Value] =>
             //  Convert (empty) JSON Array into JSON Object
@@ -14073,7 +14091,7 @@ class PSL::Core::JSON_Value is
      -> ref JSON_Value+ is
       case Val of
        [Obj : JSON_Object_Value] =>
-         return Obj.Value[Key];
+         return Obj.Value[Obj.Index[Key]].Value;
        [X : JSON_Value+] =>
          {#false}
       end case;
@@ -14083,7 +14101,7 @@ class PSL::Core::JSON_Value is
    op "index_set"(Val : JSON_Value+) -> Ordered_Set<Univ_String> is
       case Val of
        [Obj : JSON_Object_Value] =>
-         return Obj.Value.Keys();
+         return Obj.Index.Keys();
        [X : JSON_Value+] =>
          return [];
       end case;
@@ -14653,10 +14671,10 @@ class PSL::Core::JSON_Output_Value_Stream is
       case Value of
        [Obj : JSON_Object_Value] =>
          Write_Begin_Map (OVS);
-         for each [Key => Val] of Obj.Value forward loop
-            Write_String (OVS, Key, Univ_Character::Last(),
-              Min_Len => 0, Max_Len => |Key|);
-            Write_JSON_Value (OVS, Val);
+         for each KV of Obj.Value forward loop
+            Write_String (OVS, KV.Key, Univ_Character::Last(),
+              Min_Len => 0, Max_Len => |KV.Key|);
+            Write_JSON_Value (OVS, KV.Value);
          end loop;
          Write_End_Map (OVS);
 
@@ -15430,7 +15448,8 @@ class PSL::Core::JSON_Input_Value_Stream is
 
                Read_Key_Value_Separator (IVS);
 
-               Obj.Value[Key] := Read_JSON_Value (IVS);
+               Obj.Value |= [Key => Read_JSON_Value (IVS)];
+               Obj.Index |= [Key => |Obj.Value|];
             end loop;
             if Debug then
                Println("JSON Map is `(|Obj.Value|) in length");
