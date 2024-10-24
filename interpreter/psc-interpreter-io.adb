@@ -182,59 +182,41 @@ package body PSC.Interpreter.IO is
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
-   --  Write_Obj (var Output_Object_Stream; Obj : Obj_Type is Assignable<>)
+   --  Write_Obj
+   --   (var Output_Object_Stream;
+   --    Obj : Obj_Type is Assignable<>,
+   --    Is_Optional : Boolean := #false)
    pragma Export (Ada, Write_Obj, "_psc_write_obj");
-   procedure Write_Optional_Obj
-     (Context : in out Exec_Context;
-      Params : Word_Ptr;
-      Static_Link : Non_Op_Map_Type_Ptr);
-   --  Write_Optional_Obj
-   --    (var Output_Object_Stream; Obj : optional Obj_Type is Assignable<>)
-   pragma Export (Ada, Write_Optional_Obj, "_psc_write_optional_obj");
 
    procedure Write_Default
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Write_Default
-   --    (var Output_Object_Stream; Obj : Obj_Type is Assignable<>)
+   --   (var Output_Object_Stream;
+   --    Obj : optional Obj_Type is Assignable<>,
+   --    Is_Optional : Boolean := #false)
    pragma Export (Ada, Write_Default, "_psc_write_default");
-   procedure Write_Optional_Default
-     (Context : in out Exec_Context;
-      Params : Word_Ptr;
-      Static_Link : Non_Op_Map_Type_Ptr);
-   --  Write_Optional_Default
-   --    (var Output_Object_Stream; Obj : optional Obj_Type is Assignable<>)
-   pragma Export (Ada, Write_Optional_Default, "_psc_write_optional_default");
 
    procedure Read_Obj
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
-   --  Read_Obj (var Input_Object_Stream; var Obj : Obj_Type is Assignable<>)
+   --  Read_Obj
+   --    (var Input_Object_Stream;
+   --     var Obj : optional Obj_Type is Assignable<>;
+   --     Is_Optional : Boolean := #false)
    pragma Export (Ada, Read_Obj, "_psc_read_obj");
-   procedure Read_Optional_Obj
-     (Context : in out Exec_Context;
-      Params : Word_Ptr;
-      Static_Link : Non_Op_Map_Type_Ptr);
-   --  Read_Optional_Obj
-   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Assignable<>)
-   pragma Export (Ada, Read_Optional_Obj, "_psc_read_optional_obj");
 
    procedure Read_Default
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    --  Read_Default
-   --    (var Input_Object_Stream; var Obj : Obj_Type is Assignable<>)
+   --    (var Input_Object_Stream;
+   --     var Obj : optional Obj_Type is Assignable<>;
+   --     Is_Optional : Boolean := #false)
    pragma Export (Ada, Read_Default, "_psc_read_default");
-   procedure Read_Optional_Default
-     (Context : in out Exec_Context;
-      Params : Word_Ptr;
-      Static_Link : Non_Op_Map_Type_Ptr);
-   --  Read_Optional_Default
-   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Assignable<>)
-   pragma Export (Ada, Read_Optional_Default, "_psc_read_optional_default");
 
    procedure Set_Exit_Status
      (Context : in out Exec_Context;
@@ -884,7 +866,7 @@ package body PSC.Interpreter.IO is
    end Write_Bytes_To_File;
 
    -----------------------------------------
-   -- Write_[Optional_]{Obj,Default} --
+   -- Write_{Obj,Default} --
    -----------------------------------------
 
    NYI : exception;
@@ -954,42 +936,45 @@ package body PSC.Interpreter.IO is
          Val_Stream_Obj : constant Word_Type :=
            Fetch_Word (Val_Stream_Poly_Obj, Large_Obj_Header_Size);
 
-         --  TBD: We could use non-optional ops if Is_Optional => False.
-
-         Write_Int_Op_Index : constant Operation_Index := 4;
-            --  func Write_Optional_Int
+         Write_Int_Op_Index : constant Operation_Index := 3;
+            --  func Write_Int
             --   (var Output_Value_Stream;
             --    Val : optional Univ_Integer;
-            --    Low, High : Univ_Integer);
+            --    Low, High : Univ_Integer;
+            --    Is_Optional : Boolean := #false);
 
-         Write_Float_Op_Index : constant Operation_Index := 6;
-            --  func Write_Optional_Float
+         Write_Float_Op_Index : constant Operation_Index := 4;
+            --  func Write_Float
             --   (var Output_Value_Stream; Val : optional Univ_Float;
-            --   Digits : Univ_Integer);
+            --   Digits : Univ_Integer;
+            --    Is_Optional : Boolean := #false);
 
-         Write_Str_Op_Index : constant Operation_Index := 8;
-            --  func Write_Optional_String
+         Write_Str_Op_Index : constant Operation_Index := 5;
+            --  func Write_String
             --   (var Output_Value_Stream; Val : optional Univ_String;
             --    Max_Char : Univ_Character;
-            --    Min_Len, Max_Len : Univ_Integer);
+            --    Min_Len, Max_Len : Univ_Integer;
+            --    Is_Optional : Boolean := #false);
 
-         Begin_Seq_Op_Index : constant Operation_Index := 10;
-         --  func Write_Begin_Optional_Seq
+         Begin_Seq_Op_Index : constant Operation_Index := 6;
+         --  func Write_Begin_Seq
          --        (var Output_Value_Stream;
          --         Min_Len, Max_Len : Univ_Integer;
-         --         Actual_Len : optional Univ_Integer);
+         --         Actual_Len : optional Univ_Integer;
+         --         Is_Optional : Boolean := #false);
 
-         End_Seq_Op_Index : constant Operation_Index := 11;
+         End_Seq_Op_Index : constant Operation_Index := 7;
          --  func Write_End_Seq (var Output_Value_Stream);
 
-         Begin_Obj_Op_Index : constant Operation_Index := 19;
-         --  func Write_Begin_Optional_Obj
+         Begin_Obj_Op_Index : constant Operation_Index := 12;
+         --  func Write_Begin_Obj
          --         (var Output_Value_Stream;
-         --          Is_Null : Boolean);
-         End_Obj_Op_Index : constant Operation_Index := 20;
+         --          Is_Null : Boolean;
+         --          Is_Optional : Boolean := #false);
+         End_Obj_Op_Index : constant Operation_Index := 13;
          --  func Write_End_Obj (var Output_Value_Stream);
 
-         Param_Arr : array (0 .. 4) of aliased Word_Type;
+         Param_Arr : array (0 .. 5) of aliased Word_Type;
 
          Op_Index : Operation_Index := 0;
 
@@ -1010,11 +995,12 @@ package body PSC.Interpreter.IO is
                  & '"');
             end if;
 
-            --  Init rest of params for Write_Optional_String
+            --  Init rest of params for Write_String
             Param_Arr (1) := Obj;
             Param_Arr (2) := 2**23 - 1;  --  Max_Char TBD
             Param_Arr (3) := 0;
             Param_Arr (4) := 2**16 - 1;  --  Max_Len TBD
+            Param_Arr (5) := 1;  --  Is_Optional TBD
             Op_Index := Write_Str_Op_Index;
 
          elsif Is_Small (Non_Map_Type_Desc) then
@@ -1047,15 +1033,17 @@ package body PSC.Interpreter.IO is
                --  These are all "integerish" types
                --  TBD -- need to convert to a real Univ_Integer
 
-               --  Init rest of params for Write_Optional_Integer
+               --  Init rest of params for Write_Integer
                --  TBD: Low and High could be much larger!
                Param_Arr (2) := Word_Type'First + Word_Type'(1);
                Param_Arr (3) := Word_Type'Last;
+               Param_Arr (4) := 1;  --  TBD Is_Optional
                Op_Index := Write_Int_Op_Index;
 
             when Univ_Real_Kind =>
-               --  Init rest of params for Write_Optional_Float
+               --  Init rest of params for Write_Float
                Param_Arr (2) := 15;  --  Digits
+               Param_Arr (3) := 1;  --  TBD Is_Optional
                Op_Index := Write_Float_Op_Index;
 
             when Univ_Enum_Kind =>
@@ -1075,6 +1063,7 @@ package body PSC.Interpreter.IO is
                Param_Arr (1) := 0;  --  Min_Len
                Param_Arr (2) := 2**31 - 1;  --  Max_Len
                Param_Arr (3) := Null_Value;  --  Actual_Len
+               Param_Arr (4) := 1;  --  TBD Is_Optional
                Op_Index := Begin_Seq_Op_Index;
             else
                if Debug then
@@ -1082,6 +1071,7 @@ package body PSC.Interpreter.IO is
                end if;
 
                Param_Arr (1) := 1;  -- Is_Null => #true
+               Param_Arr (2) := 1;  --  TBD Is_Optional
                Op_Index := Begin_Obj_Op_Index;
             end if;
 
@@ -1124,6 +1114,7 @@ package body PSC.Interpreter.IO is
                      Param_Arr (1) := 0;  --  Min_Len
                      Param_Arr (2) := 2**31 - 1;  --  Max_Len
                      Param_Arr (3) := Len;  --  Actual_Len
+                     Param_Arr (4) := 1;  --  TBD Is_Optional
                      Execute_Compiled_Nth_Op_Of_Type
                        (Context => Context,
                         Params => Param_Arr (0)'Unchecked_Access,
@@ -1132,7 +1123,7 @@ package body PSC.Interpreter.IO is
                         Op_Index => Begin_Seq_Op_Index);
 
                      if Debug then
-                        Put_Line (" Begin_Optional_Seq: Len = " & Len'Image);
+                        Put_Line (" Begin_Seq: Len = " & Len'Image);
                      end if;
 
                      for I in 1 .. Offset_Within_Area (Len) loop
@@ -1159,6 +1150,7 @@ package body PSC.Interpreter.IO is
                else
                   --  Not a "Basic_Array" so each component of a different type
                   Param_Arr (1) := 0;  --  Is_Null => #false
+                  Param_Arr (2) := 1;  --  TBD Is_Optional
                   Execute_Compiled_Nth_Op_Of_Type
                     (Context => Context,
                      Params => Param_Arr (0)'Unchecked_Access,
@@ -1218,7 +1210,11 @@ package body PSC.Interpreter.IO is
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
-   --  Write_Obj (var Output_Object_Stream; Obj : Obj_Type is Assignable<>)
+   --  Write_Obj
+   --    (var Output_Object_Stream;
+   --     Obj : optional Obj_Type is Assignable<>;
+   --     Is_Optional : Boolean := #false)
+
       Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
          --  Implicit module instance with one formal param
 
@@ -1228,42 +1224,22 @@ package body PSC.Interpreter.IO is
 
       Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
       Obj : constant Word_Type := Fetch_Word (Params, 1);
+      Is_Optional : constant Boolean := Boolean'Val (Fetch_Word (Params, 2));
 
    begin  --  Write_Obj
       --  Pass the buck to recursive version
       Write_Obj_To_Stream (Context, Obj_Stream, Obj, Obj_Type,
-        Is_Optional => False, Use_Default => False);
+        Is_Optional => Is_Optional, Use_Default => False);
    end Write_Obj;
-
-   procedure Write_Optional_Obj
-     (Context : in out Exec_Context;
-      Params : Word_Ptr;
-      Static_Link : Non_Op_Map_Type_Ptr) is
-   --  Write_Optional_Obj
-   --    (var Output_Object_Stream; Obj : optional Obj_Type is Assignable<>)
-
-      Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
-         --  Implicit module instance with one formal param
-
-      Obj_Type : constant Type_Descriptor_Ptr :=
-        Enclosing_Type.Parameters (1).Data.Type_Desc;
-         --  Type of object
-
-      Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
-      Obj : constant Word_Type := Fetch_Word (Params, 1);
-
-   begin  --  Write_Optional_Obj
-      --  Pass the buck to recursive version
-      Write_Obj_To_Stream (Context, Obj_Stream, Obj, Obj_Type,
-        Is_Optional => True, Use_Default => False);
-   end Write_Optional_Obj;
 
    procedure Write_Default
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Write_Default
-   --    (var Output_Object_Stream; Obj : Obj_Type is Assignable<>)
+   --    (var Output_Object_Stream;
+   --     Obj : optional Obj_Type is Assignable<>;
+   --     Is_Optional : Boolean := #false)
       Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
          --  Implicit module instance with one formal param
 
@@ -1273,37 +1249,16 @@ package body PSC.Interpreter.IO is
 
       Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
       Obj : constant Word_Type := Fetch_Word (Params, 1);
+      Is_Optional : constant Boolean := Boolean'Val (Fetch_Word (Params, 2));
 
    begin  --  Write_Default
       --  Pass the buck to recursive version
       Write_Obj_To_Stream (Context, Obj_Stream, Obj, Obj_Type,
-        Is_Optional => False, Use_Default => True);
+        Is_Optional => Is_Optional, Use_Default => True);
    end Write_Default;
 
-   procedure Write_Optional_Default
-     (Context : in out Exec_Context;
-      Params : Word_Ptr;
-      Static_Link : Non_Op_Map_Type_Ptr) is
-   --  Write_Optional_Default
-   --    (var Output_Object_Stream; Obj : optional Obj_Type is Assignable<>)
-      Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
-         --  Implicit module instance with one formal param
-
-      Obj_Type : constant Type_Descriptor_Ptr :=
-        Enclosing_Type.Parameters (1).Data.Type_Desc;
-         --  Type of object
-
-      Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
-      Obj : constant Word_Type := Fetch_Word (Params, 1);
-
-   begin  --  Write_Optional_Default
-      --  Pass the buck to recursive version
-      Write_Obj_To_Stream (Context, Obj_Stream, Obj, Obj_Type,
-        Is_Optional => True, Use_Default => True);
-   end Write_Optional_Default;
-
    ----------------------------------------
-   -- Read_[Optional_]{Obj,Default} --
+   -- Read_{Obj,Default} --
    ----------------------------------------
 
    procedure Read_Obj_From_Stream
@@ -1392,41 +1347,46 @@ package body PSC.Interpreter.IO is
 
          --  Define operation indices for Value_Stream operations.
 
-         Read_Int_Op_Index : constant Operation_Index := 4;
-            --  func Read_Optional_Int
+         Read_Int_Op_Index : constant Operation_Index := 3;
+            --  func Read_Int
             --   (var Input_Value_Stream;
-            --    Low, High : Univ_Integer) -> optional Univ_Integer;
+            --    Low, High : Univ_Integer;
+            --    Is_Optional : Boolean := #false) -> optional Univ_Integer;
 
-         Read_Float_Op_Index : constant Operation_Index := 6;
-            --  func Read_Optional_Float
+         Read_Float_Op_Index : constant Operation_Index := 4;
+            --  func Read_Float
             --   (var Input_Value_Stream;
-            --   Digits : Univ_Integer) -> optional Univ_Real;
+            --    Digits : Univ_Integer;
+            --    Is_Optional : Boolean := #false) -> optional Univ_Real;
 
-         Read_Str_Op_Index : constant Operation_Index := 8;
-            --  func Read_Optional_String
+         Read_Str_Op_Index : constant Operation_Index := 5;
+            --  func Read_String
             --   (var Input_Value_Stream;
             --    Max_Char : Univ_Character;
-            --    Min_Len, Max_Len : Univ_Integer) -> optional Univ_String;
+            --    Min_Len, Max_Len : Univ_Integer;
+            --    Is_Optional : Boolean := #false) -> optional Univ_String;
 
-         Begin_Seq_Op_Index : constant Operation_Index := 10;
-         --  func Read_Begin_Optional_Seq
+         Begin_Seq_Op_Index : constant Operation_Index := 6;
+         --  func Read_Begin_Seq
          --        (var Input_Value_Stream;
-         --         Min_Len, Max_Len : Univ_Integer)
+         --         Min_Len, Max_Len : Univ_Integer;
+         --         Is_Optional : Boolean := #false)
          --         -> Actual_Len : optional Univ_Integer;
 
-         More_Seq_Elements_Op_Index : constant Operation_Index := 11;
+         More_Seq_Elements_Op_Index : constant Operation_Index := 7;
          --  func More_Seq_Elements (var Input_Value_Stream) -> Boolean;
 
-         End_Seq_Op_Index : constant Operation_Index := 12;
+         End_Seq_Op_Index : constant Operation_Index := 8;
          --  func Read_End_Seq (var Input_Value_Stream);
 
-         Begin_Obj_Op_Index : constant Operation_Index := 22;
-         --  func Read_Begin_Optional_Obj
-         --         (var Input_Value_Stream) -> Boolean;
-         End_Obj_Op_Index : constant Operation_Index := 23;
+         Begin_Obj_Op_Index : constant Operation_Index := 15;
+         --  func Read_Begin_Obj
+         --         (var Input_Value_Stream;
+         --          Is_Optional : Boolean := #false) -> Boolean;
+         End_Obj_Op_Index : constant Operation_Index := 16;
          --  func Read_End_Obj (var Input_Value_Stream);
 
-         Param_Arr : array (0 .. 4) of aliased Word_Type;
+         Param_Arr : array (0 .. 5) of aliased Word_Type;
 
          Op_Index : Operation_Index := 0;
 
@@ -1438,10 +1398,11 @@ package body PSC.Interpreter.IO is
 
          if Obj_Type.Type_Kind = Univ_String_Kind then
             --  read a Univ_String
-            --  Init rest of params for Read_Optional_String
+            --  Init rest of params for Read_String
             Param_Arr (2) := 2**23 - 1;  --  Max_Char TBD
             Param_Arr (3) := 0;
             Param_Arr (4) := 2**16 - 1;  --  Max_Len TBD
+            Param_Arr (5) := 1;  --  TBD Is_Optional
             Op_Index := Read_Str_Op_Index;
 
          elsif Is_Small (Non_Map_Type_Desc) then
@@ -1461,7 +1422,7 @@ package body PSC.Interpreter.IO is
                --  These are all "integerish" types
                --  TBD -- need to convert to a real Univ_Integer
 
-               --  Init rest of params for Read_Optional_Integer
+               --  Init rest of params for Read_Integer
                --  TBD: Low and High could be much larger!
                --       These should ideally come from parameters to
                --       the module instance defining the type, which
@@ -1470,12 +1431,14 @@ package body PSC.Interpreter.IO is
                --       wrapper's type-descriptor.
                Param_Arr (2) := Word_Type'First + Word_Type'(1);
                Param_Arr (3) := Word_Type'Last;
+               Param_Arr (4) := 1;  --  TBD Is_Optional
                Op_Index := Read_Int_Op_Index;
 
             when Univ_Real_Kind =>
                --  TBD: Univ_Float_Kind once we make Univ_Real a rational type
-               --  Init rest of params for Read_Optional_Float
+               --  Init rest of params for Read_Float
                Param_Arr (2) := 15;  --  Digits
+               Param_Arr (3) := 1;  --  TBD Is_Optional
                --  TBD: As above, this should ideally come from a parameter
                --       to the module instance defining the type, which
                --       is probably a "wrapper", so we would need to
@@ -1550,6 +1513,7 @@ package body PSC.Interpreter.IO is
                      Param_Arr (0) := 0;  --  Output slot
                      Param_Arr (2) := 0;  --  Min_Len
                      Param_Arr (3) := Max_Len;
+                     Param_Arr (4) := 1;  --  TBD Is_Optional
                      Execute_Compiled_Nth_Op_Of_Type
                        (Context => Context,
                         Params => Param_Arr (0)'Unchecked_Access,
@@ -1560,7 +1524,7 @@ package body PSC.Interpreter.IO is
                      Len := Param_Arr (0);  --  Get Actual_Len
 
                      if Debug then
-                        Put_Line (" Begin_Optional_Seq, Len = " &
+                        Put_Line (" Begin_Seq, Len = " &
                           (if Len = Null_Value then "null" else Len'Image));
                      end if;
 
@@ -1662,6 +1626,7 @@ package body PSC.Interpreter.IO is
                else
                   --  Not a "Basic_Array" so each component of a different type
                   Param_Arr (0) := 0;  --  output slot tells if null
+                  Param_Arr (2) := 1;  --  TBD Is_Optional
                   Execute_Compiled_Nth_Op_Of_Type
                     (Context => Context,
                      Params => Param_Arr (0)'Unchecked_Access,
@@ -1670,7 +1635,7 @@ package body PSC.Interpreter.IO is
                      Op_Index => Begin_Obj_Op_Index);
 
                   if Debug then
-                     Put_Line (" Begin_Optional_Obj, Is_Null = " &
+                     Put_Line (" Begin_Obj, Is_Null = " &
                        Param_Arr (0)'Image);
                   end if;
 
@@ -1746,7 +1711,10 @@ package body PSC.Interpreter.IO is
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
-   --  Read_Obj (var Input_Object_Stream; var Obj : Obj_Type is Assignable<>)
+   --  Read_Obj
+   --    (var Input_Object_Stream;
+   --     var Obj : optional Obj_Type is Assignable<>;
+   --     Is_Optional : Boolean := #false)
       Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
          --  Implicit module instance with one formal param
 
@@ -1756,41 +1724,22 @@ package body PSC.Interpreter.IO is
 
       Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
       Obj_Ptr : constant Word_Ptr := Fetch_Word_Ptr (Params, 1);
+      Is_Optional : constant Boolean := Boolean'Val (Fetch_Word (Params, 2));
 
    begin  --  Read_Obj
       --  Pass the buck to recursive version
       Read_Obj_From_Stream (Context, Obj_Stream, Obj_Ptr, Obj_Type,
-        Is_Optional => False, Use_Default => False);
+        Is_Optional => Is_Optional, Use_Default => False);
    end Read_Obj;
-
-   procedure Read_Optional_Obj
-     (Context : in out Exec_Context;
-      Params : Word_Ptr;
-      Static_Link : Non_Op_Map_Type_Ptr) is
-   --  Read_Optional_Obj
-   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Assignable<>)
-      Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
-         --  Implicit module instance with one formal param
-
-      Obj_Type : constant Type_Descriptor_Ptr :=
-        Enclosing_Type.Parameters (1).Data.Type_Desc;
-         --  Type of object
-
-      Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
-      Obj_Ptr : constant Word_Ptr := Fetch_Word_Ptr (Params, 1);
-
-   begin  --  Read_Optional_Obj
-      --  Pass the buck to recursive version
-      Read_Obj_From_Stream (Context, Obj_Stream, Obj_Ptr, Obj_Type,
-        Is_Optional => True, Use_Default => False);
-   end Read_Optional_Obj;
 
    procedure Read_Default
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr) is
    --  Read_Default
-   --    (var Input_Object_Stream; var Obj : Obj_Type is Assignable<>)
+   --    (var Input_Object_Stream;
+   --     var Obj : optional Obj_Type is Assignable<>;
+   --     Is_Optional : Boolean := #false)
       Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
          --  Implicit module instance with one formal param
 
@@ -1800,34 +1749,13 @@ package body PSC.Interpreter.IO is
 
       Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
       Obj_Ptr : constant Word_Ptr := Fetch_Word_Ptr (Params, 1);
+      Is_Optional : constant Boolean := Boolean'Val (Fetch_Word (Params, 2));
 
    begin  --  Read_Default
       --  Pass the buck to recursive version
       Read_Obj_From_Stream (Context, Obj_Stream, Obj_Ptr, Obj_Type,
-        Is_Optional => False, Use_Default => True);
+        Is_Optional => Is_Optional, Use_Default => True);
    end Read_Default;
-
-   procedure Read_Optional_Default
-     (Context : in out Exec_Context;
-      Params : Word_Ptr;
-      Static_Link : Non_Op_Map_Type_Ptr) is
-   --  Read_Optional_Default
-   --    (var Input_Object_Stream; var Obj : optional Obj_Type is Assignable<>)
-      Enclosing_Type : constant Non_Op_Map_Type_Ptr := Static_Link;
-         --  Implicit module instance with one formal param
-
-      Obj_Type : constant Type_Descriptor_Ptr :=
-        Enclosing_Type.Parameters (1).Data.Type_Desc;
-         --  Type of object
-
-      Obj_Stream : constant Word_Type := Fetch_Word (Params, 0);
-      Obj_Ptr : constant Word_Ptr := Fetch_Word_Ptr (Params, 1);
-
-   begin  --  Read_Default
-      --  Pass the buck to recursive version
-      Read_Obj_From_Stream (Context, Obj_Stream, Obj_Ptr, Obj_Type,
-        Is_Optional => True, Use_Default => True);
-   end Read_Optional_Default;
 
    ----------------------
    --  Set_Exit_Status --
@@ -1902,32 +1830,16 @@ begin
       Write_Obj'Access);
 
    Register_Builtin
-     (String_Lookup ("#write_optional_obj"),
-      Write_Optional_Obj'Access);
-
-   Register_Builtin
      (String_Lookup ("#write_default"),
       Write_Default'Access);
-
-   Register_Builtin
-     (String_Lookup ("#write_optional_default"),
-      Write_Optional_Default'Access);
 
    Register_Builtin
      (String_Lookup ("#read_obj"),
       Read_Obj'Access);
 
    Register_Builtin
-     (String_Lookup ("#read_optional_obj"),
-      Read_Optional_Obj'Access);
-
-   Register_Builtin
      (String_Lookup ("#read_default"),
       Read_Default'Access);
-
-   Register_Builtin
-     (String_Lookup ("#read_optional_default"),
-      Read_Optional_Default'Access);
 
    Register_Builtin
      (String_Lookup ("#set_exit_status"),

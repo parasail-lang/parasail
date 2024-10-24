@@ -12199,7 +12199,7 @@ interface PSL::Core::Byte_Stream_Buffer<>
    func Bytes_To_Read (BSB : Byte_Stream_Buffer) -> Univ_Integer;
 
    func Bytes_To_Write (BSB : Byte_Stream_Buffer) -> Univ_Integer;
-   //  Returns current grown increment if Allow_Growth is #true,
+   //  Returns current growth increment if Allow_Growth is #true,
    //  otherwise returns amount left.
 
    func Read_Remainder (var BSB : Byte_Stream_Buffer) -> Stream_Element_Array;
@@ -13500,85 +13500,134 @@ func PSL::Test::Test_Value_Stream() is
 end func PSL::Test::Test_Value_Stream;
 func PSL::Test::Test_Object_Stream() is
 
-   var Buf : Byte_Stream_Buffer := Create (Initial_Size => 10000);
-
-   ref var OVS : Binary_Output_Value_Stream => Create(Buf);
-   ref var IVS : Binary_Input_Value_Stream => Create(Buf);
-
-   ref var OOS : Output_Object_Stream => Create(OVS);
-   ref var IOS : Input_Object_Stream => Create(IVS);
-
    Println ("Testing Read/Write_Object");
 
+   var IO := IO::Get_IO();
+
+   func Test_Ints() is
+      Println ("Testing write int objects using Binary Value stream");
+      var B_File : Byte_Stream_Output_File :=
+        IO.Create ("binary_int_stream.dat");
+
+      ref var OVS : Binary_Output_Value_Stream => Create(B_File);
+
+      ref var OOS : Output_Object_Stream => Create(OVS);
+
+      for I in 1 .. 7 forward loop
+         if I == 3 then
+            Write_Obj (OOS, Univ_Integer::(null), Is_Optional => #true);
+         else
+            Write_Obj (OOS, I**3, Is_Optional => #true);
+         end if;
+           
+      end loop;
+
+      B_File.Close();
+
+      var I_File : Byte_Stream_Input_File := IO.Open ("binary_int_stream.dat");
+      if I_File is null then
+         Println ("Cannot open binary_int_stream.dat");
+         return;
+      end if;
+
+      ref var IVS : Binary_Input_Value_Stream => Create(I_File);
+      ref var IOS : Input_Object_Stream => Create(IVS);
+      var All_OK : Boolean := #true;
+
+      for I in 1 .. 7 forward loop
+         var Z : Univ_Integer;
+         Read_Obj (IOS, Z, Is_Optional => #true);
+         if I == 3 then
+            if Z not null then
+               Println ("Expected null but found `(Z)");
+               All_OK := #false;
+            end if;
+         else
+            if Z is null then
+               Println ("Expected `(I**3) but found null");
+               All_OK := #false;
+            elsif Z != I**3 then
+               Println ("Expected `(I**3) but found `(Z)");
+               All_OK := #false;
+            end if;
+         end if;
+      end loop;
+      I_File.Close();
+      if All_OK then
+         Println("Read_Obj returned expected ints");
+      end if;
+   end func Test_Ints;
    
-   for I in 1 .. 7 forward loop
-      if I == 3 then
-         Write_Obj (OOS, Univ_Integer::(null), Is_Optional => #true);
-      else
-         Write_Obj (OOS, I**3, Is_Optional => #true);
-      end if;
-        
-      Println ("Bytes_To_Write = `(Buf.Bytes_To_Write())");
-   end loop;
+   func Test_Sets() is
+      Println ("Testing write sets rather than integers");
 
-   for I in 1 .. 7 forward loop
-      Println ("Bytes_To_Read = `(Buf.Bytes_To_Read())");
-      var Z : Univ_Integer;
-      Read_Obj (IOS, Z, Is_Optional => #true);
-      if I == 3 then
-         if Z not null then
-            Println ("Expected null but found `(Z)");
+      var B_File : Byte_Stream_Output_File :=
+        IO.Create ("binary_obj_stream.dat");
+
+      ref var OVS : Binary_Output_Value_Stream => Create(B_File);
+
+      ref var OOS : Output_Object_Stream => Create(OVS);
+
+      type Int_Set is Set<Integer>;
+
+      func Img(II : Int_Set) -> Univ_String is
+         return "[" | (for (I : Integer in II; Sep := "" then ",") =>
+                    <""> | Sep | To_String (I)) | "]";
+      end func Img;
+
+      for I in 1 .. 7 forward loop
+         if I == 3 then
+            Println ("About to write null set");
+            Write_Obj (OOS, Int_Set::(null), Is_Optional => #true);
+         else
+            var Test_Set : Int_Set := [for J in 1 .. I => J];
+
+            Println ("About to write int set: `(Img(Test_Set))")
+            Write_Obj (OOS, Test_Set, Is_Optional => #true);
          end if;
-      else
-         if Z != I**3 then
-            Println ("Expected `(I**3) but found `(Z)");
-         end if;
+           
+      end loop;
+
+      B_File.Close();
+
+      var I_File : Byte_Stream_Input_File := IO.Open ("binary_obj_stream.dat");
+      if I_File is null then
+         Println ("Cannot open binary_obj_stream.dat");
+         return;
       end if;
-      Println
-        ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
-   end loop;
-   
-   Println ("Testing write sets rather than integers");
 
-   type Int_Set is Set<Integer>;
+      ref var IVS : Binary_Input_Value_Stream => Create(I_File);
+      ref var IOS : Input_Object_Stream => Create(IVS);
+      var All_OK : Boolean := #true;
 
-   func Img(II : Int_Set) -> Univ_String is
-      return "[" | (for (I : Integer in II; Sep := "" then ",") =>
-                 <""> | Sep | To_String (I)) | "]";
-   end func Img;
+      for I in 1 .. 7 forward loop
+         var Z : Int_Set;
+         Read_Obj (IOS, Z, Is_Optional => #true);
+         if I == 3 then
+            if Z not null then
+               Println ("Expected null but found `(Img(Z))");
+               All_OK := #false;
+            end if;
+         else
+            const Expected : Int_Set := [for J in 1 .. I => J];
 
-   for I in 1 .. 7 forward loop
-      if I == 3 then
-         Write_Obj (OOS, Int_Set::(null), Is_Optional => #true);
-      else
-         var Test_Set : Int_Set := [for J in 1 .. I => J];
-
-         Write_Obj (OOS, Test_Set, Is_Optional => #true);
-      end if;
-        
-      Println ("Bytes_To_Write = `(Buf.Bytes_To_Write())");
-   end loop;
-
-   for I in 1 .. 7 forward loop
-      Println ("Bytes_To_Read = `(Buf.Bytes_To_Read())");
-      var Z : Int_Set;
-      Read_Obj (IOS, Z, Is_Optional => #true);
-      if I == 3 then
-         if Z not null then
-            Println ("Expected null but found `(Img(Z))");
+            if Z is null then
+               Println ("Expected `(Img(Expected)) but found null");
+               All_OK := #false;
+            elsif Z != Expected then
+               Println ("Expected `(Img(Expected)) but found `(Img(Z))");
+               All_OK := #false;
+            end if;
          end if;
-      else
-         const Expected : Int_Set := [for J in 1 .. I => J];
-
-         if Z is null then
-            Println ("Expected `(Img(Expected)) but found null");
-         elsif Z != Expected then
-            Println ("Expected `(Img(Expected)) but found `(Img(Z))");
-         end if;
+      end loop;
+      I_File.Close();
+      if All_OK then
+         Println ("Read_Object returned the expected sets");
       end if;
-      Println
-        ("after read, Bytes_To_Write = `(Buf.Bytes_To_Write())");
-   end loop;
+   end func Test_Sets;
+
+   Test_Ints();
+   Test_Sets();
    Println ("All done");
 end func PSL::Test::Test_Object_Stream;
 
@@ -15524,3 +15573,137 @@ func PSL::Test::Test_JSON_Value_IO (From, To : Univ_String) is
    O_File.Close();
 
 end func PSL::Test::Test_JSON_Value_IO;
+
+func PSL::Test::Test_JSON_Object_Stream() is
+
+   Println ("Testing Read/Write_Object");
+
+   var IO := IO::Get_IO();
+
+   func Test_Ints() is
+      Println ("Testing write int objects using JSON for Value stream");
+      var B_File : Byte_Stream_Output_File :=
+        IO.Create ("json_int_stream.json");
+
+      ref var OVS : JSON_Output_Value_Stream => Create(B_File);
+
+      ref var OOS : Output_Object_Stream => Create(OVS);
+
+      for I in 1 .. 7 forward loop
+         if I == 3 then
+            Write_Obj (OOS, Univ_Integer::(null), Is_Optional => #true);
+         else
+            Write_Obj (OOS, I**3, Is_Optional => #true);
+         end if;
+           
+      end loop;
+
+      B_File.Close();
+
+      var I_File : Byte_Stream_Input_File := IO.Open ("json_int_stream.json");
+      if I_File is null then
+         Println ("Cannot open json_int_stream.json");
+         return;
+      end if;
+
+      ref var IVS : JSON_Input_Value_Stream => Create(I_File);
+      ref var IOS : Input_Object_Stream => Create(IVS);
+      var All_OK : Boolean := #true;
+
+      for I in 1 .. 7 forward loop
+         var Z : Univ_Integer;
+         Read_Obj (IOS, Z, Is_Optional => #true);
+         if I == 3 then
+            if Z not null then
+               Println ("Expected null but found `(Z)");
+               All_OK := #false;
+            end if;
+         else
+            if Z is null then
+               Println ("Expected `(I**3) but found null");
+               All_OK := #false;
+            elsif Z != I**3 then
+               Println ("Expected `(I**3) but found `(Z)");
+               All_OK := #false;
+            end if;
+         end if;
+      end loop;
+      I_File.Close();
+      if All_OK then
+         Println("Read_Obj returned expected ints");
+      end if;
+   end func Test_Ints;
+   
+   func Test_Sets() is
+      Println ("Testing write sets rather than integers");
+
+      var B_File : Byte_Stream_Output_File :=
+        IO.Create ("json_obj_stream.json");
+
+      ref var OVS : JSON_Output_Value_Stream => Create(B_File);
+
+      ref var OOS : Output_Object_Stream => Create(OVS);
+
+      type Int_Set is Set<Integer>;
+
+      func Img(II : Int_Set) -> Univ_String is
+         return "[" | (for (I : Integer in II; Sep := "" then ",") =>
+                    <""> | Sep | To_String (I)) | "]";
+      end func Img;
+
+      for I in 1 .. 7 forward loop
+         if I == 3 then
+            Println ("About to write null set");
+            Write_Obj (OOS, Int_Set::(null), Is_Optional => #true);
+         else
+            var Test_Set : Int_Set := [for J in 1 .. I => J];
+
+            Println ("About to write int set: `(Img(Test_Set))")
+            Write_Obj (OOS, Test_Set, Is_Optional => #true);
+         end if;
+           
+      end loop;
+
+      B_File.Close();
+
+      var I_File : Byte_Stream_Input_File := IO.Open ("json_obj_stream.json");
+      if I_File is null then
+         Println ("Cannot open json_obj_stream.json");
+         return;
+      end if;
+
+      ref var IVS : JSON_Input_Value_Stream => Create(I_File);
+      ref var IOS : Input_Object_Stream => Create(IVS);
+      var All_OK : Boolean := #true;
+
+      for I in 1 .. 7 forward loop
+         var Z : Int_Set;
+         Read_Obj (IOS, Z, Is_Optional => #true);
+         if I == 3 then
+            if Z not null then
+               Println ("Expected null but found `(Img(Z))");
+               All_OK := #false;
+            end if;
+         else
+            const Expected : Int_Set := [for J in 1 .. I => J];
+
+            if Z is null then
+               Println ("Expected `(Img(Expected)) but found null");
+               All_OK := #false;
+            elsif Z != Expected then
+               Println ("Expected `(Img(Expected)) but found `(Img(Z))");
+               All_OK := #false;
+            end if;
+         end if;
+      end loop;
+      I_File.Close();
+      if All_OK then
+         Println ("Read_Object returned the expected sets");
+      end if;
+   end func Test_Sets;
+
+   Test_Ints();
+   Test_Sets();
+   Println ("All done");
+end func PSL::Test::Test_JSON_Object_Stream;
+
