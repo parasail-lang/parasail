@@ -12709,7 +12709,8 @@ end func PSL::Test::Test_UTF_Stream;
 interface PSL::Core::Binary_Output_Value_Stream<>
   extends PSL::Core::Output_Value_Stream<> is
 
-   func Create(ref var Output_Byte_Stream+) -> Binary_Output_Value_Stream;
+   func Create(ref var Output_Byte_Stream+ {Output_Byte_Stream not null})
+     -> Binary_Output_Value_Stream;
 
    func Is_Self_Describing (Binary_Output_Value_Stream) -> Boolean;
      //  This means that you can tell what sort of object you
@@ -12989,7 +12990,8 @@ end class PSL::Core::Binary_Output_Value_Stream;
 interface PSL::Core::Binary_Input_Value_Stream<>
   extends PSL::Core::Input_Value_Stream<> is
 
-   func Create(ref var Input_Byte_Stream+) -> Binary_Input_Value_Stream;
+   func Create(ref var Input_Byte_Stream+ {Input_Byte_Stream not null})
+     -> Binary_Input_Value_Stream;
 
    func Is_Self_Describing (Binary_Input_Value_Stream) -> Boolean;
      //  This means that you can tell what sort of object you
@@ -14092,7 +14094,8 @@ interface PSL::Core::JSON_Output_Value_Stream<>
    //  This kind of value stream is used for output of ParaSail values
    //  in JSON format, given a byte stream of some sort.
 
-   func Create(ref var Output_Byte_Stream+) -> JSON_Output_Value_Stream;
+   func Create(ref var Output_Byte_Stream+ {Output_Byte_Stream not null})
+     -> JSON_Output_Value_Stream;
 
    func Is_Self_Describing (JSON_Output_Value_Stream) -> Boolean;
      //  This means that you can tell what sort of object you
@@ -14609,7 +14612,8 @@ interface PSL::Core::JSON_Input_Value_Stream<>
    //  This kind of value stream is used for reading a ParaSail value
    //  from a byte stream in JSON format.
 
-   func Create(ref var Input_Byte_Stream+) -> JSON_Input_Value_Stream;
+   func Create(ref var Input_Byte_Stream+ {Input_Byte_Stream not null})
+     -> JSON_Input_Value_Stream;
 
    func Is_Self_Describing (JSON_Input_Value_Stream) -> Boolean;
      //  This means that you can tell what sort of object you

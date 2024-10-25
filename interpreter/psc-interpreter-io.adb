@@ -761,6 +761,9 @@ package body PSC.Interpreter.IO is
    --   -> Bytes_Read : Stream_Count;
       use Ada.Streams.Stream_IO;
 
+      Debug        : constant Boolean := False;
+      use Ada.Text_IO;
+
       File_Obj_Ref : constant Word_Ptr :=
                        Fetch_Word_Ptr (Params, 1);
       File_Obj     : constant Word_Type :=
@@ -804,6 +807,18 @@ package body PSC.Interpreter.IO is
       --  Read in the bytes
       Stream (Info_Ptr.File).Read (Stream_Elem_Arr, Last);
 
+      if Debug then
+         Put ("Read_Bytes: ");
+         for Elem of Stream_Elem_Arr (Arr_First .. Last) loop
+            if Elem in 0 .. 9 then
+               Put (Elem'Image);
+            else
+               Put (" 0x" & Hex_Image (Word_Type (Elem)));
+            end if;
+         end loop;
+         New_Line;
+      end if;
+
       --  Store the count of bytes read from the file
       Store_Word (Params, 0, Word_Type (Last - Arr_First + 1));
    end Read_Bytes_From_File;
@@ -820,6 +835,9 @@ package body PSC.Interpreter.IO is
    --  Write(var Output_Stream; Stream_Element_Array)
    --   -> Bytes_Written : Stream_Count;
       use Ada.Streams.Stream_IO;
+
+      Debug        : constant Boolean := False;
+      use Ada.Text_IO;
 
       File_Obj_Ref : constant Word_Ptr :=
                        Fetch_Word_Ptr (Params, 1);
@@ -858,6 +876,18 @@ package body PSC.Interpreter.IO is
 
       Last : Stream_Element_Offset := 0;
    begin
+      if Debug then
+         Put ("Write_Bytes: ");
+         for Elem of Stream_Elem_Arr loop
+            if Elem in 0 .. 9 then
+               Put (Elem'Image);
+            else
+               Put (" 0x" & Hex_Image (Word_Type (Elem)));
+            end if;
+         end loop;
+         New_Line;
+      end if;
+
       --  Write out the bytes
       Stream (Info_Ptr.File).Write (Stream_Elem_Arr);
 
@@ -978,6 +1008,9 @@ package body PSC.Interpreter.IO is
 
          Op_Index : Operation_Index := 0;
 
+         Max_Len : constant := Offset_Within_Area'Last;
+         --  Maximum length of a Basic_Array
+
       begin
 
          --  Initialize val-stream parameter
@@ -1061,7 +1094,7 @@ package body PSC.Interpreter.IO is
                end if;
 
                Param_Arr (1) := 0;  --  Min_Len
-               Param_Arr (2) := 2**31 - 1;  --  Max_Len
+               Param_Arr (2) := Max_Len;
                Param_Arr (3) := Null_Value;  --  Actual_Len
                Param_Arr (4) := 1;  --  TBD Is_Optional
                Op_Index := Begin_Seq_Op_Index;
@@ -1112,7 +1145,7 @@ package body PSC.Interpreter.IO is
 
                   begin
                      Param_Arr (1) := 0;  --  Min_Len
-                     Param_Arr (2) := 2**31 - 1;  --  Max_Len
+                     Param_Arr (2) := Max_Len;
                      Param_Arr (3) := Len;  --  Actual_Len
                      Param_Arr (4) := 1;  --  TBD Is_Optional
                      Execute_Compiled_Nth_Op_Of_Type
@@ -1508,6 +1541,7 @@ package body PSC.Interpreter.IO is
                      Elems_Were_Saved : Boolean := False;
 
                      Max_Len : constant := Offset_Within_Area'Last;
+                     --  Maximum length of a Basic_Array
                   begin
 
                      Param_Arr (0) := 0;  --  Output slot
