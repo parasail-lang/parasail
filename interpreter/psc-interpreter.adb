@@ -13216,7 +13216,11 @@ package body PSC.Interpreter is
             return;
          end if;
 
-         if Is_Large_Null (Value) then
+         if Value = Null_Value then
+            Put_Line
+              (Indent_Str &
+               "null (** small null but type is large**)");
+         elsif Is_Large_Null (Value) then
             Put_Line
               (Indent_Str &
                "null (large -- region" &
@@ -14560,7 +14564,12 @@ package body PSC.Interpreter is
          Put_Line
            (Indent & "Addr: " & Hex_Image (Data.Addr));
 
-         if Data.Value /= Null_Virtual_Address then
+         if Data.Value = Null_Virtual_Address
+           or else
+            Data.Value = Null_Value
+         then
+            Put_Line (Indent & "Value: " & Hex_Image (Data.Value));
+         else
             Put_Line (Indent & "Value:");
             Dump_Obj_With_Indent
               (Data.Value,
