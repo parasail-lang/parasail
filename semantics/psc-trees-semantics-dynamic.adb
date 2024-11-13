@@ -7150,12 +7150,25 @@ package body PSC.Trees.Semantics.Dynamic is
    procedure Finish_All_Type_Descriptors is
       --  Finish remaining not-completely-finished type descriptors.
       use type Interpreter.Type_Descriptor_Ptr;
+
+      Num_Type_Desc_Errors : Natural := Sem_Error_Count;
    begin
 
       while First_Unfinished_Type /= null loop
+         --  Zero out the global count so other operations
+         --  do not look like they failed.
+         Sem_Error_Count := 0;
+
          Finish_Type_Descriptor (First_Unfinished_Type);
-         exit when Sem_Error_Count > 0;
+
+         if Sem_Error_Count > 0 then
+            --  Keep track of full error count
+            Num_Type_Desc_Errors := Num_Type_Desc_Errors + Sem_Error_Count;
+         end if;
       end loop;
+
+      --  Restore the full Sem_Error_Count
+      Sem_Error_Count := Num_Type_Desc_Errors;
 
    end Finish_All_Type_Descriptors;
 
