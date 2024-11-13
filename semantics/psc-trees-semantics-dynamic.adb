@@ -4030,8 +4030,14 @@ package body PSC.Trees.Semantics.Dynamic is
 
       if Compute_Out_Of_Line then
          --  Create the out-of-line routine
+         if Debug_Code_Gen then
+            Put_Line ("Calling Create_Out_Of_Line_Computation");
+         end if;
          Computation := Create_Out_Of_Line_Computation
                    (Expr_To_Eval, Decl_Region, Enclosing_Type, Dest_Name);
+         if Debug_Code_Gen then
+            Put_Line ("Back from Create_Out_Of_Line_Computation");
+         end if;
       else
          --  We were able to evaluate without going out of line.
 
@@ -5776,7 +5782,8 @@ package body PSC.Trees.Semantics.Dynamic is
       if Obj_Type.All_Parameters_Known
         and then
           (Type_Desc.Num_Nested_Objs > 0
-            or else not Module_Code_Has_Been_Generated)
+            or else not Module_Code_Has_Been_Generated
+            or else Obj_Type.Generic_Param_Map /= null)
       then
          --  We defer doing Evaluate_Trees until all code
          --  is generated.
@@ -5861,6 +5868,46 @@ package body PSC.Trees.Semantics.Dynamic is
       return Interpreter.Type_Descriptor_Ops.To_Type_Desc
          (Interpreter.Type_Index (Obj_Type.Type_Descriptor_Location.Offset));
    end Get_Known_Type_Descriptor;
+
+   function Build_Parameter_Comparison
+     (Decl_Region : Symbols.Region_Ptr; Formal, Actual : Operand_Sem_Ptr)
+     return Optional_Tree is
+   --  Build and analyze tree representing "Formal == Actual"
+
+      Actual_Src_Pos : constant Source_Positions.Source_Position :=
+       Source_Pos (Actual.Definition);
+
+      Compare_Op_Tree : constant Optional_Tree :=
+        Identifier.Make (Static.Compare_Op_Str, Actual_Src_Pos);
+
+      Compare_Operands : constant Optional_Tree :=
+        Invocation.Make
+           (Kind => Invocation.Operation_Call,
+            Prefix => Compare_Op_Tree,
+            Operands => Lists.Make ((Formal.Definition, Actual.Definition)),
+            Source_Pos => Actual_Src_Pos);
+
+      Check_Equiv : constant Optional_Tree :=
+        Invocation.Make
+           (Kind => Invocation.Operation_Call,
+            Prefix =>
+               Identifier.Make
+                 (Static.To_Bool_Str,
+                  Actual_Src_Pos),
+            Operands =>
+               Lists.Make
+                 ((Compare_Operands,
+                   Identifier.Make
+                      (Static.Cond_Mask_Str (Binary.Equal_Op),
+                       Actual_Src_Pos))),
+           Source_Pos => Actual_Src_Pos);
+   begin
+      Static.First_Pass (Decl_Region, Check_Equiv);
+      Static.Second_Pass (Decl_Region, Check_Equiv,
+                          Context => Operand_Context,
+                          Resolve_Expr => True);
+      return Check_Equiv;
+   end Build_Parameter_Comparison;
 
    procedure Finish_Type_Descriptor
      (Type_Desc : Interpreter.Type_Descriptor_Ptr;
@@ -6080,6 +6127,92 @@ package body PSC.Trees.Semantics.Dynamic is
             end;
          end loop;
       end if;  --  Has at least one nested object
+
+      if Obj_Type.Generic_Param_Map /= null then
+         --  Need to check for full actual <-> formal match
+         --  for generic operation parameters.
+         declare
+            Param_Map_Ptr : Param_Mapping_Ptr :=
+              Obj_Type.Generic_Param_Map;
+         begin
+            while Param_Map_Ptr /= null loop
+               if Param_Map_Ptr.From.all in Type_Semantic_Info then
+                  --  if From is a type and has parameters, need to check
+                  declare
+                     From_Type_Sem : constant Type_Sem_Ptr :=
+                       Type_Sem_Ptr (Param_Map_Ptr.From);
+                     To_Type_Sem : constant Type_Sem_Ptr :=
+                       Type_Sem_Ptr (Param_Map_Ptr.To);
+                  begin
+                     if not All_Nulls (From_Type_Sem.Actual_Sem_Infos)
+                       and then
+                        not All_Nulls (To_Type_Sem.Actual_Sem_Infos)
+                     then
+                        if Debug_Code_Gen then
+                           Put_Line ("Check that " &
+                             Type_Image (From_Type_Sem) & " matches " &
+                             Type_Image (To_Type_Sem));
+                        end if;
+
+                        pragma Assert
+                          (From_Type_Sem.Actual_Sem_Infos'Length =
+                           To_Type_Sem.Actual_Sem_Infos'Length);
+
+                        for I in From_Type_Sem.Actual_Sem_Infos'Range loop
+                           if From_Type_Sem.Actual_Sem_Infos (I).all in
+                             Operand_Semantic_Info'Class
+                           then
+                              declare
+                                 Check_Equiv : constant Optional_Tree :=
+                                   Build_Parameter_Comparison
+                                     (Obj_Type.Generic_Param_Region,
+                                      Operand_Sem_Ptr
+                                        (From_Type_Sem.Actual_Sem_Infos (I)),
+                                      Operand_Sem_Ptr
+                                        (To_Type_Sem.Actual_Sem_Infos (I)));
+                                  use Interpreter;
+                                  Result : Word_Type;
+                                  Addr_Of_Result : Object_Virtual_Address;
+                                  Type_Of_Result : Type_Descriptor_Ptr;
+                              begin
+                                 if Debug_Code_Gen then
+                                    Put_Line ("About to call Evaluate_Tree");
+                                 end if;
+                                 Evaluate_Tree
+                                   (Check_Equiv,
+                                    Obj_Type.Generic_Param_Region,
+                                    Enclosing_Type => Type_Desc.Parent_Type,
+                                    Value => Result,
+                                    Addr => Addr_Of_Result,
+                                    Type_Desc => Type_Of_Result);
+
+                                 if Debug_Code_Gen then
+                                    Put_Line
+                                      ("Back from Evaluate_Tree, Result =" &
+                                       Result'Image);
+                                 end if;
+
+                                 if Result = 0 then
+                                    Sem_Error
+                                      (Type_Image (To_Type_Sem) &
+                                        " does not match " &
+                                       Type_Image (From_Type_Sem),
+                                       Src_Pos => Source_Pos
+                                         (To_Type_Sem.Definition));
+
+                                    exit;
+
+                                 end if;
+                              end;
+                           end if;
+                        end loop;
+                     end if;
+                  end;
+               end if;
+               Param_Map_Ptr := Param_Map_Ptr.Next;
+            end loop;
+         end;
+      end if;
 
       --  Mark as finished
       Type_Desc.Is_Finished := True;
@@ -9547,6 +9680,12 @@ package body PSC.Trees.Semantics.Dynamic is
                   Enclosing_Type => Type_Sem_Ptr (Call_Sem.Assoc_Type_Region),
                   Source_Pos => Find_Source_Pos (Call_Sem.Definition));
          begin
+            Implicit_Instance.Generic_Param_Map := Call_Sem.Generic_Param_Map;
+            Implicit_Instance.Generic_Param_Region := Visitor.Decl_Region;
+            --  Preserve generic_param_map in case mapping has two
+            --  types with different module params such as
+            --  Q<3+2> => Q<2> which need checking.
+
             if Debug_Code_Gen then
                Put_Line
                  (" Emit_Call with Generic_Param_Map = " &
@@ -9557,8 +9696,10 @@ package body PSC.Trees.Semantics.Dynamic is
                   " with " &
                   Type_Image (Implicit_Instance));
             end if;
+
             Call_Sem.Assoc_Type_Region :=
                U_Base_Type_Region (Implicit_Instance);
+
             Call_Sem.Generic_Param_Map := null;
             --  TBD: Need to change Op_Sem.Index??
          end;

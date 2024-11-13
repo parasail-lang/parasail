@@ -124,7 +124,8 @@ private package PSC.Trees.Semantics.Static is
       Formal_Prefix : Optional_Tree := Null_Optional_Tree;
       May_Override : Overriding_State := Unspecified;
       Mode : Analysis_Mode := Decls_And_Exprs;
-      Decl_For_Annotations : Optional_Tree := Null_Optional_Tree);
+      Decl_For_Annotations : Optional_Tree := Null_Optional_Tree;
+      Resolve_Expr : Boolean := False);
    --  Second pass for Decl
 
    procedure Second_Pass_List
@@ -221,6 +222,22 @@ private package PSC.Trees.Semantics.Static is
    Compare_Op_Str : constant Strings.U_String :=
      Binary.Binary_Operator_Designator (Binary.Compare_Op);
    --  Operator for comparing two values and returning an "ordering"
+
+   To_Bool_String : constant String := """to_bool""";
+
+   To_Bool_Str : constant Strings.U_String :=
+     Strings.String_Lookup (To_Bool_String);
+   --  Operator for converting Ordering to Boolean
+
+   Cond_Mask_Str : constant array (Binary.Relational_Ops) of Strings.U_String
+      :=
+     (Binary.Less_Op => Strings.String_Lookup ("2#0001#"),
+      Binary.LEQ_Op => Strings.String_Lookup ("2#0011#"),
+      Binary.Equal_Op => Strings.String_Lookup ("2#0010#"),
+      Binary.NEQ_Op => Strings.String_Lookup ("2#1101#"),
+      Binary.GEQ_Op => Strings.String_Lookup ("2#0110#"),
+      Binary.Greater_Op => Strings.String_Lookup ("2#0100#"));
+   --  Masks to use for various relational operators
 
    Ref_Op_Str : constant Strings.U_String :=
      Strings.String_Lookup ("""ref""");

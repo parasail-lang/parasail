@@ -175,6 +175,18 @@ private package PSC.Trees.Semantics.Info is
    --       where it is declared or used, including anonymous
    --       constants.
 
+   type Param_Mapping;
+   type Param_Mapping_Ptr is access all Param_Mapping;
+
+   type Param_Mapping is record
+   --  A mapping used when matching "generic" operations
+   --  to augment the mapping inherent in the type associated
+   --  with a call on an operation.
+      From : Sem_Ptr := null;
+      To : Sem_Ptr := null;
+      Next : Param_Mapping_Ptr := null;
+   end record;
+
    Compile_Time_Known_Const_Table : Sem_Info_Vector;
    --  Used to hold info on compile-time-known constants
    --  These are accessed using "(Const_Area, Index)"
@@ -461,6 +473,19 @@ private package PSC.Trees.Semantics.Info is
       --  Should be type-area-relative otherwise.
       --  If a formal type, then the op map is at Type_Descriptor_Location+1.
 
+      Generic_Param_Map : Param_Mapping_Ptr := null;
+      --  If this is an implicit instantiation of a generic-op module,
+      --  this is the map from generic formals to actual types,
+      --  and a check should be performed when the type descriptor
+      --  is created, that the "value" parameters of the actual type
+      --  match the "value" parameters of the formal type.
+      --  This is used, for example, for checking that there is
+      --  a match in the number of rows in a matrix multiply,
+      --  or more generally that "units" match properly in a multiply
+      --  or divide.
+
+      Generic_Param_Region : Symbols.Region_Ptr := null;
+
       Full_View : Type_Sem_Ptr := null;
       --  This points to "full" view of type, if this is a private type.
 
@@ -493,18 +518,6 @@ private package PSC.Trees.Semantics.Info is
       Use_Short_Form : Boolean := False)
       return String;
    --  Dispatching op to return image of type identified by semantic info
-
-   type Param_Mapping;
-   type Param_Mapping_Ptr is access all Param_Mapping;
-
-   type Param_Mapping is record
-   --  A mapping used when matching "generic" operations
-   --  to augment the mapping inherent in the type associated
-   --  with a call on an operation.
-      From : Sem_Ptr := null;
-      To : Sem_Ptr := null;
-      Next : Param_Mapping_Ptr := null;
-   end record;
 
    function Unique_Operation_Id return Natural;
    --  Return a unique operation id and announce it if debugging.

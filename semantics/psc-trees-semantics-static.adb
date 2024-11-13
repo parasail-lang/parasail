@@ -189,22 +189,6 @@ package body PSC.Trees.Semantics.Static is
          (Invocation.Container_Aggregate => Univ_Container_Op_Str,
           Invocation.Map_Set_Aggregate   => Univ_Map_Set_Op_Str);
 
-   To_Bool_String : constant String := """to_bool""";
-
-   To_Bool_Str : constant Strings.U_String :=
-     Strings.String_Lookup (To_Bool_String);
-   --  Operator for converting Ordering to Boolean
-
-   Cond_Mask_Str : constant array (Binary.Relational_Ops) of Strings.U_String
-      :=
-     (Binary.Less_Op => Strings.String_Lookup ("2#0001#"),
-      Binary.LEQ_Op => Strings.String_Lookup ("2#0011#"),
-      Binary.Equal_Op => Strings.String_Lookup ("2#0010#"),
-      Binary.NEQ_Op => Strings.String_Lookup ("2#1101#"),
-      Binary.GEQ_Op => Strings.String_Lookup ("2#0110#"),
-      Binary.Greater_Op => Strings.String_Lookup ("2#0100#"));
-   --  Masks to use for various relational operators
-
    Remove_First_Str : Strings.U_String;
    --  Operation for "forward" iteration through a set
 
@@ -3370,6 +3354,8 @@ package body PSC.Trees.Semantics.Static is
                Nested_Type_Index => 0,
                Op_Maps_Needed => Empty_Hash_Table,
                Type_Descriptor_Location => Interpreter.Null_Object_Locator,
+               Generic_Param_Map => null,
+               Generic_Param_Region => null,
                Full_View | External_View => null,
                U_Base_Type | U_Type | U_Base_Structure => null);
 
@@ -9384,13 +9370,17 @@ package body PSC.Trees.Semantics.Static is
             Formal_Type.Associated_Module
       then
          --  Correct module; OK so long as not [partially] abstract.
-         --  TBD: Check if there are further requirements buried in
-         --      actuals of formal type
+         if not Actual_Type_OK then
+            return False;
+         end if;
+
+         --  Check if there are further requirements buried in
+         --  actuals of the formal type
          if Debug_Second_Pass then
             Put_Line (" Actual and formal have same module," &
               " TBD: check formals");
          end if;
-         return Actual_Type_OK;
+         return True;
       elsif Actual_Type.Parent_Type /= null
         and then Type_Implements_Type
                     (Actual_Type => Actual_Type.Parent_Type,
@@ -9734,9 +9724,11 @@ package body PSC.Trees.Semantics.Static is
          New_Line;
       end if;
 
-      if Param_Type_Tree in Type_Decl.Tree
+      if All_Nulls (Generic_Param_Type.Actual_Sem_Infos)
+           and then
+       (Param_Type_Tree in Type_Decl.Tree
         or else Generic_Param_Type.Is_Formal_Type
-        or else Not_Null (Generic_Param_Type.Formal_Prefix)
+        or else Not_Null (Generic_Param_Type.Formal_Prefix))
       then
          --  We have found the "generic" part
          if Type_Implements_Type
@@ -22133,6 +22125,8 @@ package body PSC.Trees.Semantics.Static is
                   Nested_Type_Index => Def_Sem.Nested_Type_Index,
                   Op_Maps_Needed => Empty_Hash_Table,
                   Type_Descriptor_Location => Def_Sem.Type_Descriptor_Location,
+                  Generic_Param_Map => Def_Sem.Generic_Param_Map,
+                  Generic_Param_Region => Def_Sem.Generic_Param_Region,
                   Full_View => Type_Sem.Full_View,
                   External_View => Type_Sem.External_View,
                   U_Base_Type => Def_Sem.U_Base_Type,
@@ -25563,7 +25557,8 @@ package body PSC.Trees.Semantics.Static is
       Formal_Prefix : Optional_Tree := Null_Optional_Tree;
       May_Override : Overriding_State := Unspecified;
       Mode : Analysis_Mode := Decls_And_Exprs;
-      Decl_For_Annotations : Optional_Tree := Null_Optional_Tree) is
+      Decl_For_Annotations : Optional_Tree := Null_Optional_Tree;
+      Resolve_Expr : Boolean := False) is
       --  Second pass for Decl
       use Ada.Text_IO;
       use PSC.Strings;
@@ -25596,6 +25591,8 @@ package body PSC.Trees.Semantics.Static is
             if Context in Statement_Contexts then
                --  Complain if Resolved_Type is not null.
                Visit_And_Resolve_Stmt (Decl_Copy, Second_Pass_Visitor);
+            elsif Resolve_Expr then
+               Visit_And_Resolve_Expr (Decl_Copy, Second_Pass_Visitor);
             else
                Visit (Decl_Copy, Second_Pass_Visitor);
             end if;
