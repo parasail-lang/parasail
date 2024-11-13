@@ -9724,11 +9724,9 @@ package body PSC.Trees.Semantics.Static is
          New_Line;
       end if;
 
-      if All_Nulls (Generic_Param_Type.Actual_Sem_Infos)
-           and then
-       (Param_Type_Tree in Type_Decl.Tree
+      if Param_Type_Tree in Type_Decl.Tree
         or else Generic_Param_Type.Is_Formal_Type
-        or else Not_Null (Generic_Param_Type.Formal_Prefix))
+        or else Not_Null (Generic_Param_Type.Formal_Prefix)
       then
          --  We have found the "generic" part
          if Type_Implements_Type
