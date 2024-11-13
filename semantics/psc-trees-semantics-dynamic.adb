@@ -5875,7 +5875,7 @@ package body PSC.Trees.Semantics.Dynamic is
    --  Build and analyze tree representing "Formal == Actual"
 
       Actual_Src_Pos : constant Source_Positions.Source_Position :=
-       Source_Pos (Actual.Definition);
+       Find_Source_Pos (Actual.Definition);
 
       Compare_Op_Tree : constant Optional_Tree :=
         Identifier.Make (Static.Compare_Op_Str, Actual_Src_Pos);
@@ -6194,11 +6194,11 @@ package body PSC.Trees.Semantics.Dynamic is
 
                                  if Result = 0 then
                                     Sem_Error
-                                      (Type_Image (To_Type_Sem) &
+                                      (Type_Image (From_Type_Sem) &
                                         " does not match " &
-                                       Type_Image (From_Type_Sem),
-                                       Src_Pos => Source_Pos
-                                         (To_Type_Sem.Definition));
+                                       Type_Image (To_Type_Sem),
+                                       Src_Pos => Find_Source_Pos
+                                         (Obj_Type.Definition));
 
                                     exit;
 
