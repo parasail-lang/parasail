@@ -6144,7 +6144,11 @@ package body PSC.Trees.Semantics.Dynamic is
                      To_Type_Sem : constant Type_Sem_Ptr :=
                        Type_Sem_Ptr (Param_Map_Ptr.To);
                   begin
-                     if not All_Nulls (From_Type_Sem.Actual_Sem_Infos)
+                     if From_Type_Sem.Associated_Module =
+                          To_Type_Sem.Associated_Module
+                           --  TBD: Different checks needed when modules differ
+                       and then
+                        not All_Nulls (From_Type_Sem.Actual_Sem_Infos)
                        and then
                         not All_Nulls (To_Type_Sem.Actual_Sem_Infos)
                      then
