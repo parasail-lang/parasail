@@ -19,6 +19,8 @@ interface Matrix<Rows : Univ_Integer; Cols : Univ_Integer> is
         var R : Row;
         var C : Col;
 	op "=?"(Left, Right : Row_Col) -> Ordering;
+        func Strict_Compare(Left, Right : Row_Col) -> Ordered::Full_Ordering
+          is (Left =? Right);
 	func First() -> Row_Col;
 	func Last() -> Row_Col;
         func Min(Left, Right : optional Row_Col) -> optional Row_Col;
@@ -33,7 +35,7 @@ interface Matrix<Rows : Univ_Integer; Cols : Univ_Integer> is
 
 	op "[..]"() -> Countable_Range<Row_Col> is in Countable_Range<Row_Col>;
 
-	func Hash(Val : Row_Col) -> Univ_Integer;
+	func Hash(Val : Row_Col) -> Unsigned_64;
 
 	op ".."(Left, Right : Row_Col) -> Countable_Set<Row_Col>
 	  is in Countable_Set<Row_Col>;
@@ -101,7 +103,7 @@ interface Matrix<Rows : Univ_Integer; Cols : Univ_Integer> is
 
     // Imageable operations
     op "=?"(Left, Right : Matrix) -> Ordering;
-    func Hash(M : Matrix) -> Univ_Integer;
+    func Hash(M : Matrix) -> Unsigned_64;
     func To_String(M : Matrix) -> Univ_String;
     func From_String(Str : Univ_String) -> Matrix;
     
