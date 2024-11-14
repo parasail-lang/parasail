@@ -7159,7 +7159,19 @@ package body PSC.Trees.Semantics.Dynamic is
          --  do not look like they failed.
          Sem_Error_Count := 0;
 
-         Finish_Type_Descriptor (First_Unfinished_Type);
+         declare
+            Type_Desc : constant Interpreter.Type_Descriptor_Ptr :=
+              First_Unfinished_Type;
+         begin
+            Finish_Type_Descriptor (Type_Desc);
+         exception
+            when E : others =>
+               Sem_Error
+                 (Type_Desc.Type_Sem.Definition,
+                  "Internal: " &
+                  Ada.Exceptions.Exception_Name (E) &
+                  " raised in");
+         end;
 
          if Sem_Error_Count > 0 then
             --  Keep track of full error count
@@ -19573,8 +19585,17 @@ package body PSC.Trees.Semantics.Dynamic is
    --  Apply Code_Gen to each element in Decl_List using given visitor
    begin
       for I in 1 .. Lists.Length (Decl_List) loop
-         Code_Gen (Cg_Visitor, Lists.Nth_Element (Decl_List, I),
-                   Annotation_Mode);
+         begin
+            Code_Gen (Cg_Visitor, Lists.Nth_Element (Decl_List, I),
+                      Annotation_Mode);
+         exception
+            when E : others =>
+               Sem_Error
+                 (Lists.Nth_Element (Decl_List, I),
+                  "Internal: " &
+                  Ada.Exceptions.Exception_Name (E) &
+                  " raised in");
+         end;
       end loop;
    end Code_Gen_List;
 
