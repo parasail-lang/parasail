@@ -1,5 +1,15 @@
+--- units.psl ---
+
 L = S * T = 9.0 * 3.0 = 27.0
 V = g * T = 9.0 * 3.0 = 27.0, E = 0.5 * m * V**2 = 0.5 * 5.0 * 27.0**2 = 1822.5
 F = E / L = 1822.5 / 27.0 = 67.5
 F2 = 0.5 * m * V ** 2 / L = 1822.5 / 27.0 = 67.5
 Force_Diff = 0.5 * m * V ** 2 / L - m*g = 1822.5 / 27.0 - 5.0 * 9.0 = 22.5
+
+--- bad_units.psl ---
+
+bad_units.psl:15:12: Error: Units<"+"(["from_univ"(#seconds) => 1], ["from_univ"(#seconds) => 1])> does not match Units<Dimension => [#meters => 1]>
+bad_units.psl:23:27: Error: Units<"*"(["from_univ"(#meters) => 1, "from_univ"(#seconds) => "-"(1)], 2)> does not match Units<[#meters => 2, #kilos => 1, #seconds => -2]>
+ 2 errors found while finishing type descriptors.
+---- All done ----
+

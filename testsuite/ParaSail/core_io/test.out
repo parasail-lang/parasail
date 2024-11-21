@@ -1,6 +1,7 @@
 Pi = 3.14159265358979, True prints as #true
 X = "hello", Y = "there", Z = 42
-Give me somethin: You gave me: "ParaSail"
+Give me somethin: ParaSail
+You gave me: "ParaSail"
 This is going to standard output
 About to flush stderr and stdout
 About to print out imageable vector
