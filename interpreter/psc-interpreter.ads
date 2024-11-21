@@ -1941,7 +1941,6 @@ package PSC.Interpreter is
    type Parameter_Info is record
       Kind : Parameter_Kind_Enum := Formal_Type;
       Data : Element_Info;
-      --  Used if is a formal object or formal operation
    end record;
    type Parameter_Info_Array is array (Positive range <>) of Parameter_Info;
    type Parameter_Info_Array_Ptr is access all Parameter_Info_Array;
@@ -2022,7 +2021,7 @@ package PSC.Interpreter is
       --  Combination of a Const_Info and a parameterless routine
       --  that will compute the constant.
       Info : aliased Const_Info;
-      Computation : Routine_Index;
+      Computation : Routine_Index := 0;
    end record;
 
    type Computable_Const_Info_Ptr is access all Computable_Const_Info;

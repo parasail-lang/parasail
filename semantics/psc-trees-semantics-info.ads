@@ -166,10 +166,10 @@ private package PSC.Trees.Semantics.Info is
    --  Return True if Actual_Sem_Infos is null,
    --  or zero length, or some of its elements are null.
 
-   package Sem_Info_Vectors is new PSC.Vectors (Sem_Ptr);
-   type Sem_Info_Vector is new Sem_Info_Vectors.Vector;
-   subtype Sem_Info_Index is Sem_Info_Vectors.Elem_Index;
-   --  Used to represent the (global) constants nested within a module.
+   package Obj_Sem_Info_Vectors is new PSC.Vectors (Sem_Ptr);
+   type Obj_Sem_Info_Vector is new Obj_Sem_Info_Vectors.Vector;
+   subtype Obj_Sem_Info_Index is Obj_Sem_Info_Vectors.Elem_Index;
+   --  Used to represent the (global) constants/vars nested within a module.
    --  NOTE: These could be used for any constant whose value
    --       depends only on Module parameters, independent of
    --       where it is declared or used, including anonymous
@@ -187,8 +187,8 @@ private package PSC.Trees.Semantics.Info is
       Next : Param_Mapping_Ptr := null;
    end record;
 
-   Compile_Time_Known_Const_Table : Sem_Info_Vector;
-   --  Used to hold info on compile-time-known constants
+   Compile_Time_Known_Const_Table : Obj_Sem_Info_Vector;
+   --  Used to hold info on (global) compile-time-known constants
    --  These are accessed using "(Const_Area, Index)"
 
    type Operation_Semantic_Info;
@@ -362,9 +362,9 @@ private package PSC.Trees.Semantics.Info is
       --  Note that operations that do not have such an operand
       --  or result are not permitted to be abstract, as they are not
       --  provided by other modules implementing the interface.
-      Nested_Objects : Sem_Info_Vector;
-      --  Set of nested (large) constants defined within a module.
-      --  These are evaluated when the Type_Descriptor is created
+      Nested_Objects : Obj_Sem_Info_Vector;
+      --  Set of nested (large) constants (or vars) defined within a module.
+      --  These are initialized when the Type_Descriptor is created
       --  and referenced using offsets relative to the Type_Area
       --  in the range Type_Nested_Obj_Offsets'Range.
       U_Base_Types : U_Base_Type_Tables.Hash_Table;

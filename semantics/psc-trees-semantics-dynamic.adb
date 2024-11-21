@@ -25,6 +25,7 @@ with PSC.Interpreter;
 with PSC.Interpreter.Builtins;
 with PSC.Object_Access;
 with PSC.Languages;
+with PSC.Messages;
 with PSC.Strings;                     use type PSC.Strings.U_String;
 with PSC.Symbols;                     use PSC.Symbols;
 
@@ -61,6 +62,7 @@ with PSC.Trees.Semantics.Debug; use PSC.Trees.Semantics.Debug;
 with PSC.Trees.Semantics.Static;
 
 with PSC.Univ_Strings;
+with PSC.Vectors;
 
 pragma Elaborate (PSC.Strings);
 
@@ -144,7 +146,7 @@ package body PSC.Trees.Semantics.Dynamic is
         Param_Decl.Global_Var_Param => Object_Access.Update_Access);
 
    package Anon_Const_Tables is new PSC.Hash_Tables
-     (Element_Type => Sem_Info_Index,
+     (Element_Type => Obj_Sem_Info_Index,
       Key_Type => Optional_Tree,
       Equiv => Static.Equiv_Tree,
       Hash_Type => Hash_Type,
@@ -156,6 +158,23 @@ package body PSC.Trees.Semantics.Dynamic is
    --  Hash table used for keeping track of anonymous constants
    --  that will be pre-computed to avoid recomputing on every occurrence.
    --  Initially will only be used for constants of small and string types.
+
+   type CTK_Annotation_Info is record
+      --  Information kept for annotations that can be checked
+      --  at compile time, after global constants have been
+      --  evaluated.
+      CTK_Annotation : Optional_Tree;  --  Used to display message
+      CTK_Index : Obj_Sem_Info_Index;
+         --  Index into both Compile_Time_Known_Const_Table
+         --  and Interpreter.Compile_Time_Known_Consts.
+   end record;
+
+   package CTK_Annotation_Vectors is new PSC.Vectors (CTK_Annotation_Info);
+
+   type CTK_Annotation_Vector_Type is new CTK_Annotation_Vectors.Vector;
+
+   CTK_Annotation_Vector : CTK_Annotation_Vector_Type;
+   --  Vector of annotations to be checked at compile-time
 
    ------------- Pre codegen actions ------------
 
@@ -4428,7 +4447,7 @@ package body PSC.Trees.Semantics.Dynamic is
                   Const_Sem : constant Sem_Ptr :=
                     Nth_Element
                        (Compile_Time_Known_Const_Table,
-                        Sem_Info_Index (Locator.Offset));
+                        Obj_Sem_Info_Index (Locator.Offset));
                begin
                   if Const_Sem.all in Sym_Reference_Info'Class then
                      --  Give full name if a qualified name
@@ -4539,7 +4558,7 @@ package body PSC.Trees.Semantics.Dynamic is
             Const_Sem : constant Sem_Ptr :=
               Nth_Element
                  (Compile_Time_Known_Const_Table,
-                  Sem_Info_Index (I));
+                  Obj_Sem_Info_Index (I));
             New_CTK_Info : constant Computable_Const_Info_Ptr :=
               new Computable_Const_Info;
             New_CTK_Index : CTK_Info_Index;
@@ -4660,7 +4679,7 @@ package body PSC.Trees.Semantics.Dynamic is
             Const_Sem : constant Sem_Ptr :=
               Nth_Element
                  (Compile_Time_Known_Const_Table,
-                  Sem_Info_Index (I));
+                  Obj_Sem_Info_Index (I));
          begin
             if Const_Sem.all not in Sym_Reference_Info'Class then
                --  Compute constants that are needed and not yet computed.
@@ -4708,7 +4727,7 @@ package body PSC.Trees.Semantics.Dynamic is
             Const_Sem : constant Sem_Ptr :=
               Nth_Element
                  (Compile_Time_Known_Const_Table,
-                  Sem_Info_Index (I));
+                  Obj_Sem_Info_Index (I));
          begin
             if Const_Sem.all in Sym_Reference_Info'Class then
                --  This is a case where we want a copy of the
@@ -4745,6 +4764,42 @@ package body PSC.Trees.Semantics.Dynamic is
                      Strings.String_Lookup
                        (Subtree_Image (Const_Ref.Definition));
                end;
+            end if;
+         end;
+      end loop;
+
+      --  Check all compile-time-known annotations and complain if not true.
+      for Anx in 1 .. Num_Elements (CTK_Annotation_Vector) loop
+         declare
+            Annot_Info : constant CTK_Annotation_Info :=
+              Nth_Element (CTK_Annotation_Vector, Anx);
+            CTK_Info : constant Computable_Const_Info_Ptr :=
+              Nth_Element (Compile_Time_Known_Consts,
+                CTK_Info_Index (Annot_Info.CTK_Index));
+            CTK_Value : constant Word_Type :=
+              CTK_Info.Info.Data.Value;
+         begin
+            if CTK_Value = 0 then
+               --  Compile-time-known assertion will fail
+               Sem_Warning
+                 ("Assertion will fail:",
+                  Find_Source_Pos (Annot_Info.CTK_Annotation));
+               Messages.Put_Message
+                 ("  " &
+                  Subtree_Image (Annot_Info.CTK_Annotation,
+                                 Use_Short_Form => True),
+                  Find_Source_Pos (Annot_Info.CTK_Annotation),
+                  Message_Kind => "Info");
+
+            elsif Debug_Code_Gen then
+               --  Assertion will pass -- produce debugging message
+
+               Messages.Put_Message
+                 ("CTK assertion will succeed: " &
+                  Subtree_Image (Annot_Info.CTK_Annotation,
+                                 Use_Short_Form => True),
+                  Find_Source_Pos (Annot_Info.CTK_Annotation),
+                  Message_Kind => "Info");
             end if;
          end;
       end loop;
@@ -6048,7 +6103,7 @@ package body PSC.Trees.Semantics.Dynamic is
             declare
                Const_Sem : constant Sem_Ptr :=
                  Nth_Element
-                    (Assoc_Module.Nested_Objects, Sem_Info_Index (I));
+                    (Assoc_Module.Nested_Objects, Obj_Sem_Info_Index (I));
             begin
                if Const_Sem.all in Sym_Reference_Info'Class then
                   --  We want to copy from another type-desc.
@@ -7507,7 +7562,7 @@ package body PSC.Trees.Semantics.Dynamic is
                                     Add_Element
                                       (Nearest_Enc_Module.Nested_Objects,
                                        Sem_Ptr (Obj_Ref),
-                                       Sem_Info_Index (Constant_Index));
+                                       Obj_Sem_Info_Index (Constant_Index));
 
                                     return
                                       (Type_Area,
@@ -7519,7 +7574,7 @@ package body PSC.Trees.Semantics.Dynamic is
                                     Add_Element
                                       (Compile_Time_Known_Const_Table,
                                        Sem_Ptr (Obj_Ref),
-                                       Sem_Info_Index (Constant_Index));
+                                       Obj_Sem_Info_Index (Constant_Index));
 
                                     return
                                       (Const_Area,
@@ -13496,6 +13551,7 @@ package body PSC.Trees.Semantics.Dynamic is
                   Emit_Annotation_List
                     (Check_Visitor, Trees.Annotation.Tree (Annotation_Tree));
                   return;   ------  All done now  ------
+
                else
                   --  Emit code for it
                   Emit_Code_For_Resolved_Tree
@@ -13539,6 +13595,46 @@ package body PSC.Trees.Semantics.Dynamic is
                --  Start back at original offset
                Check_And_Set_Local_Offset
                  (Check_Visitor, Starting_Offset);
+
+               if Static.Is_Compile_Time_Known
+                    (Resolved_Tree (Next_Annotation),
+                     Disallow_Concurrent_Types => True)
+                 and then
+                  (Annotation_Tree not in Identifier.Tree
+                     or else
+                   Underlying_Sem_Info (Next_Annotation).all not in
+                     Literal_Semantic_Info)
+               then
+                  --  Is compile-time known annotation, but not a literal,
+                  --  so we treat it specially by adding it to list of
+                  --  compile-time-known assertions which we will
+                  --  check immediately after they are evaluated,
+                  --  rather than waiting for run time.
+                  declare
+                     Anon_Const_Ref : constant Anon_Const_Tables.Element_Ref :=
+                       Find_Element (Anon_Const_Table,
+                                     Resolved_Tree (Next_Annotation));
+                     use type Anon_Const_Tables.Element_Ref;
+                     Annotation_Info : CTK_Annotation_Info;
+                     Num_Annot_Entries : CTK_Annotation_Vectors.Elem_Index;
+                  begin
+                     if Anon_Const_Ref = null then
+                        --  Should be in table if a constant computation
+                        if Debug_Code_Gen then
+                           Put_Line ("Compile-time-known annotation not found"
+                             & " in Anon_Const_Table: "
+                             & Subtree_Image (Next_Annotation));
+                        end if;
+                     else
+                        --  Add an entry into CTK_Annotation_Vector.
+                        Annotation_Info.CTK_Annotation := Next_Annotation;
+                        --  Save index into anon-const table
+                        Annotation_Info.CTK_Index := Anon_Const_Ref.all;
+                        Add_Element (CTK_Annotation_Vector, Annotation_Info,
+                          Num_Annot_Entries);
+                     end if;
+                  end;
+               end if;
             end if;
          end;
       end loop;
@@ -14824,7 +14920,7 @@ package body PSC.Trees.Semantics.Dynamic is
                                            Find_Element (Anon_Const_Table,
                                                          Val);
                                        use type Anon_Const_Tables.Element_Ref;
-                                       Const_Index : Sem_Info_Index := 0;
+                                       Const_Index : Obj_Sem_Info_Index := 0;
                                        Const_Sem : Sem_Ptr;
                                     begin
                                        if Anon_Const_Ref = null then
@@ -15737,7 +15833,7 @@ package body PSC.Trees.Semantics.Dynamic is
                         Add_Element
                           (Compile_Time_Known_Const_Table,
                            Sem_Ptr (Obj_Sem),
-                           Sem_Info_Index (Constant_Index));
+                           Obj_Sem_Info_Index (Constant_Index));
                         Obj_Sem.Info.Obj_Location :=
                           (Const_Area,
                            Offset_Within_Area (Constant_Index), No_VM_Obj_Id);
@@ -15748,9 +15844,9 @@ package body PSC.Trees.Semantics.Dynamic is
                      else
                         --  Add to list of nested objects of enclosing module
                         Add_Element
-                          (Enc_Module.Nested_Objects,  --  TBD: change name
+                          (Enc_Module.Nested_Objects,
                            Sem_Ptr (Obj_Sem),
-                           Sem_Info_Index (Constant_Index));
+                           Obj_Sem_Info_Index (Constant_Index));
 
                         Obj_Sem.Info.Obj_Location :=
                           (Type_Area,
@@ -15826,7 +15922,7 @@ package body PSC.Trees.Semantics.Dynamic is
                     Find_Element (Anon_Const_Table,
                                   Local_CTK_Value);
                   use type Anon_Const_Tables.Element_Ref;
-                  Const_Index : Sem_Info_Index := 0;
+                  Const_Index : Obj_Sem_Info_Index := 0;
                   Existing_Elem : Anon_Const_Tables.Element_Ref;
                begin
                   if Anon_Const_Ref /= null then
@@ -16758,7 +16854,7 @@ package body PSC.Trees.Semantics.Dynamic is
                        Find_Element (Anon_Const_Table,
                                      Call_Sem.Definition);
                      use type Anon_Const_Tables.Element_Ref;
-                     Const_Index : Sem_Info_Index := 0;
+                     Const_Index : Obj_Sem_Info_Index := 0;
                      Existing_Elem : Anon_Const_Tables.Element_Ref;
                      Const_Obj_Location : Object_Locator;
 
@@ -16767,7 +16863,7 @@ package body PSC.Trees.Semantics.Dynamic is
                         --  is an anonymous routine created by Evaluate_Tree.
                        Is_Inside_Parameterless_Computation (Visitor.Op_Sem);
 
-                     use type Sem_Info_Index;
+                     use type Obj_Sem_Info_Index;
                      use type CTK_Info_Index;
                      Num_Computed_Consts : CTK_Info_Index :=
                        Num_Elements (Compile_Time_Known_Consts);
