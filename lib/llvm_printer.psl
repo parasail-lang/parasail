@@ -1331,7 +1331,7 @@ class PSC::LLVM_Top_Level_Op<> is
          Println("End_Inlined_Call |P.Buffer| now " | |P.Buffer|);
       end if
 
-      P.Inline_Context_Stack.Pop();
+      P.Inline_Context_Stack.Discard();
    end func End_Inlined_Call
 
    func Add_Label(var P : LLVM_Top_Level_Op; Skip_Amt : Int) 
