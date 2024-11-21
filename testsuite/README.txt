@@ -123,9 +123,9 @@ of the ParaSail test named "apply_op". This is the full sequence:
         the test are copied to ./tmp before executing each test and the
         new output of the test is generated in ./tmp/tmp.out
 
-4) Update the SVN repository
+4) Update the git repository
 
-    $ svn ci
+    $ git commit apply_op/test.out
 
 
 Controlling the execution of the test (test.opt) [minimum support yet]
