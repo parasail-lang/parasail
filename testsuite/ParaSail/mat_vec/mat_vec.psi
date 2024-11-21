@@ -19,6 +19,8 @@ interface Matrix<Rows : Univ_Integer; Cols : Univ_Integer> is
         var R : Row;
         var C : Col;
 	op "=?"(Left, Right : Row_Col) -> Ordering;
+        func Strict_Compare(Left, Right : Row_Col) -> Ordered::Full_Ordering
+          is (Left =? Right);
 	func First() -> Row_Col;
 	func Last() -> Row_Col;
         func Min(Left, Right : optional Row_Col) -> optional Row_Col;

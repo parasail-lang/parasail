@@ -20,6 +20,8 @@ interface IMatrix<Rows : Univ_Integer; Cols : Univ_Integer> is
         var R : Row;
         var C : Col;
 	op "=?"(Left, Right : Row_Col) -> Ordering;
+        func Strict_Compare(Left, Right : Row_Col) -> Ordered::Full_Ordering
+          is (Left =? Right);
 	func First() -> Row_Col;
 	func Last() -> Row_Col;
 	op "+"(Left : Row_Col; Right : Univ_Integer) -> Row_Col;

@@ -87,7 +87,7 @@ class N_Queens is
           // Next_State returns a Solution_State produced by
           // adding a queen at (Current_Column(S), R).
             return (C => S.C+1, 
-              Trial     => S.Trial | [R => S.C],
+              Trial     => S.Trial / [R => S.C],
               Diag_Sum  => S.Diag_Sum | (R+S.C),
               Diag_Diff => S.Diag_Diff | (R-S.C));
         end func Next_State;
@@ -96,7 +96,7 @@ class N_Queens is
           // Final_Result returns a result produced by adding a queen
           // at (Columns.Last, R) to a solution with all other columns
           // placed.
-            return S.Trial | [R => S.C];
+            return S.Trial / [R => S.C];
         end func Final_Result;
 
     end class Solution_State;
