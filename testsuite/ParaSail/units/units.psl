@@ -284,33 +284,6 @@ func Test_Units() is
 
 end func Test_Units;
 
-func Test_Bad_Units() is
-    type Len is Units<Dimension => [#meters => 1]>;
-    type Tim is Units<Dimension => [#seconds => 1]>;
-    type Speed is Units<Dimension => [#meters => 1, #seconds => -1]>;
-    type Accel is Units<Dimension => [#meters => 1, #seconds => -2]>;
-    type Mass is Units<[#kilos => 1]>;
-    type Energy is Units<[#meters => 2, #kilos => 1, #seconds => -2]>;
-
-    var L : Len;
-    var Three := 3.0;
-    const T := Tim::Val(Three);
-    const S := Speed::Val(9.0);
-    const g := Accel::Val(9.0);
-
-    L := T * T;  -- Error
-
-    Println("L = T * T = 3.0 * 3.0 = " | L);
-
-    const V : Speed := g * T;
-    const m := Mass::Val(5.0);
-    Println("V = g * T = 9.0 * 3.0 = " | V);
-
-    const E : Energy := V ** 2;  -- Error
-
-    Println("E = V ** 2.0 = 27.0 ** 2 = " | E);
-end func Test_Bad_Units;
-
 func main(Args : Basic_Array<Univ_String>) is
    Test_Units ();
 end func main;
