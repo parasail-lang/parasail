@@ -39,7 +39,7 @@ class PSC::Type_Desc_LLVM_Utils is
    //     a region*2, + 1 (so it is odd)
 
    //  Masks, etc. for picking apart a "special" large object
-   const High_And_Low_Bit := "or (i64 shl (i64 1, i64 63), i64 1)"
+   const High_And_Low_Bit := "-9223372036854775807" // (1 << 63) | 1
    const Chunk_Shift_Amount := 32;
    const Str_Shift_Amount := Chunk_Shift_Amount;
    const Chunk_Divisor := 2**Chunk_Shift_Amount;
