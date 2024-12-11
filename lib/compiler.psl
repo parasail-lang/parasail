@@ -1810,7 +1810,7 @@ class PSC::Translate is
                //  Null value for this type is same as that for
                //  Univ_Integer, which is the most-negative value
                //  (- 2**63)
-               TLO |= Gets | " = bitcast i64 shl(i64 1, i64 63) to i64"
+               TLO |= Gets | " = bitcast i64 -9223372036854775808 to i64"
             else
                //  Just represent null value of type as an integer
                TLO |= Gets | " = bitcast i64 `(Null_Val) to i64"
@@ -1965,7 +1965,7 @@ class PSC::Translate is
                //  Univ_Integer then we use the most-negative value
                //  which = 1 << 63
                const Null_Val_Str := (Null_Val is null?
-                                        "shl (i64 1, i64 63)":
+                                        "-9223372036854775808":
                                         To_String(Null_Val))
 
                TLO |= Result_Bit | " = icmp `(Eq_Or_Ne) i64 " | Arg |
