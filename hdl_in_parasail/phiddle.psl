@@ -1,0 +1,452 @@
+//  Prototype ParaSail-based Hardware Design Language (Phiddle)
+//  We are mostly using VHDL vocabulary (entity, signal, port).
+
+interface Phiddle<> is
+   type Part_Kind is Enum<[#entity, #signal, #port]>;
+
+   type In_Or_Out is Enum<[#in, #out]>;
+
+   type Bits is new Integer<Range => 0 .. 256>;
+   //  A count of bits
+
+   interface Unsigned_Value<Width : Bits := 1>
+     extends Integer<> is    --  tbd:stt <0 .. 2**Width-1> is
+    //  An unsigned integer type with the given number of bits
+
+      op "slicing"(Val : Base_Type is Unsigned_Value<>;
+                   Select : Countable_Range<Bits>)
+       {Select.First >= 0 and then Select.Last < Base_Type::Width
+        and then Select.Last - Select.First + 1 == Width}
+        -> Unsigned_Value;
+      //  An operation to select the given subset of bits
+      //  Bits are numbered 0 .. Width-1
+
+   end interface Unsigned_Value;
+
+end interface Phiddle;
+
+class Phiddle is
+  exports
+   class Unsigned_Value is
+    //  An unsigned integer type with the given number of bits
+
+     exports
+      op "slicing"(Val : Base_Type is Unsigned_Value<>;
+                   Select : Countable_Range<Bits>) -> Unsigned_Value is
+      //  An operation to select the given subset of bits
+      //  Bits are numbered 0 .. Width-1
+         const Modulus : Univ_Integer := 2 ** [[Select.Last+1]];
+         const Divisor : Univ_Integer := 2 ** [[Select.First]];
+         return [[Val]] mod Modulus / Divisor;
+      end op "slicing";
+
+   end class Unsigned_Value;
+end class Phiddle;
+
+interface Phiddle::Id<Name : Part_Kind> is
+ //  Id's are used to identify Entities, Signals, and Ports within a System.
+   op "=?"(Left, Right : Id) -> Ordering;
+   func Strict_Compare(Left, Right : Id) -> Ordered::Full_Ordering
+     is (Left =? Right);
+   func Hash(Id) -> Unsigned_64;
+   func To_String(Id) -> Univ_String;
+   func From_String(Univ_String) -> optional Id;
+
+   const Max_Num_Ids := 999;
+   type Numeric_Id is new Integer<0 .. Max_Num_Ids>;
+
+   //  Convert to/from and ID given an integer
+   func Nth_Id(Numeric_Id) -> Id;
+   func Id_Num(Id) -> Numeric_Id;
+
+   func Zero_Extend(I : Numeric_Id) -> Univ_String;
+   //  Return a zero-extended representation of a Numeric_Id
+end interface Phiddle::Id;
+
+class Phiddle::Id is
+   const Num : Numeric_Id;
+
+ exports
+
+   op "=?"(Left, Right : Id) -> Ordering is
+     (Left.Num =? Right.Num);
+
+   func Hash(Id) -> Unsigned_64 is
+     (Hash (Id.Num));
+
+   func To_String(Id) -> Univ_String is
+      const Nam_Str : Univ_String := To_String(Name);
+      return Nam_Str[2 .. Nam_Str.Bounds().Last] | "#" | Zero_Extend(Id.Num);
+   end func To_String;
+
+   func From_String(Image : Univ_String) -> optional Id is
+      var Num : Numeric_Id := 0;
+      for (I in Image.Bounds() reverse; Mult := 1 then Mult*10) loop
+         if Image[I] in '0' .. '9' then
+            Num := Num + (Image[I]-'0') * Mult
+         end if;
+      end loop;
+      return (Num => Num);
+   end func From_String;
+
+   func Nth_Id(Numeric_Id) -> Id is ((Num => Numeric_Id));
+   func Id_Num(Id) -> Numeric_Id is (Id.Num);
+
+   func Zero_Extend(I : Numeric_Id) -> Result : Univ_String is
+   //  Return a zero-extended representation of a Numeric_Id
+      Result := "";
+      for J := 1 then J * 10 while J < Max_Num_Ids loop
+         const Char : Univ_Character := I / J mod 10 + '0';
+         Result := Char | Result;
+      end loop;
+   end func Zero_Extend;
+
+end class Phiddle::Id
+
+interface Phiddle::Basic_Entity<> is
+  //  An entity is essentially a component or a cell in the system
+   type Entity_Id is Id<#entity>
+   func Id(Basic_Entity) -> optional Id<#entity>;
+   func Set_Id(var Basic_Entity; Id<#entity>);
+
+   func Kind(Ent : Basic_Entity) -> Univ_String is ("Basic_Entity");
+   func Name(Ent : Basic_Entity+) -> Univ_String
+     is (Ent.Kind() | "#" |
+         Entity_Id::Zero_Extend(Id(Ent).Id_Num()));
+
+   func To_String(Basic_Entity) -> Univ_String
+     is (To_String(Id(Basic_Entity)));
+   func From_String(Univ_String) -> optional Basic_Entity is (null);
+   op "=?"(Left, Right : Basic_Entity) -> Ordering
+     is (Id(Left) =? Id(Right))
+   func Hash(Basic_Entity) -> Unsigned_64
+     is (Hash(Id(Basic_Entity)));
+
+   func Create() -> Basic_Entity;
+end interface Phiddle::Basic_Entity;
+
+class Phiddle::Basic_Entity is
+   var Ent_Id : optional Id<#entity> := null;
+  exports
+   func Id(Basic_Entity) -> optional Id<#entity> is
+      (Basic_Entity.Ent_Id);
+
+   func Set_Id(var Basic_Entity; Id<#entity>) is
+      Basic_Entity.Ent_Id := Id;
+   end func Set_Id;
+
+   func Create() -> Basic_Entity is (());
+end class Phiddle::Basic_Entity;
+
+interface Phiddle::Basic_Signal<> is
+  //  A signal is a wire between two or more entities
+   type Signal_Id is Id<#signal>;
+   func Id(Basic_Signal)-> optional Id<#signal>;
+   func Set_Id(var Basic_Signal; Id<#signal>);
+
+   func To_String(Basic_Signal) -> Univ_String
+     is (To_String(Id(Basic_Signal)));
+   func From_String(Univ_String) -> optional Basic_Signal is (null);
+   op "=?"(Left, Right : Basic_Signal) -> Ordering
+     is (Id(Left) =? Id(Right))
+   func Hash(Basic_Signal) -> Unsigned_64
+     is (Hash(Id(Basic_Signal)));
+
+   func Create() -> Basic_Signal;
+end interface Phiddle::Basic_Signal;
+
+class Phiddle::Basic_Signal is
+   var Sig_Id : optional Id<#signal> := null;
+  exports
+   func Id(Basic_Signal) -> optional Id<#signal> is
+      (Basic_Signal.Sig_Id);
+
+   func Set_Id(var Basic_Signal; Id<#signal>) is
+      Basic_Signal.Sig_Id := Id;
+   end func Set_Id;
+
+   func Create() -> Basic_Signal is (());
+end class Phiddle::Basic_Signal;
+
+interface Phiddle::Basic_Port<> is
+  //  A port is a place for a signal to connect to an entity
+   type Port_Id is Id<#port>;
+   func Id(Basic_Port) -> optional Id<#port>;
+   func Set_Id(var Basic_Port; Id<#port>);
+
+   func To_String(Basic_Port) -> Univ_String
+     is (To_String(Id(Basic_Port)));
+   func From_String(Univ_String) -> optional Basic_Port is (null);
+   op "=?"(Left, Right : Basic_Port) -> Ordering
+     is (Id(Left) =? Id(Right))
+   func Hash(Basic_Port) -> Unsigned_64
+     is (Hash(Id(Basic_Port)));
+
+   func Create() -> Basic_Port;
+end interface Phiddle::Basic_Port;
+
+class Phiddle::Basic_Port is
+   var Port_Id : optional Id<#port> := null;
+  exports
+   func Id(Basic_Port) -> optional Id<#port> is
+      (Basic_Port.Port_Id);
+
+   func Set_Id(var Basic_Port; Id<#port>) is
+      Basic_Port.Port_Id := Id;
+   end func Set_Id;
+
+   func Create() -> Basic_Port is (());
+end class Phiddle::Basic_Port;
+
+interface Phiddle::System<> is
+   func Create() -> System;
+   //  Create the overall system
+
+   func Add (ref var System; Basic_Entity+)
+     -> ref var Basic_Entity+;
+   //  Copy an entity into the system, return a ref to entity within System.
+   func Add (ref var System; Basic_Signal+)
+     -> ref var Basic_Signal+;
+   //  Copy a signal into the system, return a ref to signal within System.
+   func Add (ref var System; Basic_Port+)
+     -> ref var Basic_Port+;
+   //  Copy a port into the system, return a ref to port within System.
+
+   op "indexing"(ref System; Id<#entity>) -> ref Basic_Entity+;
+   op "indexing"(ref System; Id<#signal>) -> ref Basic_Signal+;
+   op "indexing"(ref System; Id<#port>) -> ref Basic_Port+;
+
+   func Display_State (Sys : System);
+   --  Display the state of the system.
+
+   func Dump_To_JSON_File
+     (File : Univ_String; Obj : Obj_Type is Assignable<>);
+end interface Phiddle::System;
+
+class Phiddle::System is
+   var Entity_Vec : Vector<Basic_Entity+> := [];
+   var Signal_Vec : Vector<Basic_Signal+> := [];
+   var Port_Vec : Vector<Basic_Port+> := [];
+  exports
+   func Create() -> System is (());
+
+   func Add (ref var System; Basic_Entity+)
+     -> ref var Basic_Entity+ is
+      {Basic_Entity.Id() is null}
+      System.Entity_Vec |= Basic_Entity;
+      const Num := |System.Entity_Vec|;
+      Set_Id(System.Entity_Vec[Num], Nth_Id (Num));
+      return System.Entity_Vec[Num];
+   end func Add;
+
+   func Add (ref var System; Basic_Signal+)
+     -> ref var Basic_Signal+ is
+      {Basic_Signal.Id() is null}
+      System.Signal_Vec |= Basic_Signal;
+      const Num := |System.Signal_Vec|;
+      Set_Id(System.Signal_Vec[Num], Nth_Id (Num));
+      return System.Signal_Vec[Num];
+   end func Add;
+
+   func Add (ref var System; Basic_Port+)
+     -> ref var Basic_Port+ is
+      {Basic_Port.Id() is null}
+      System.Port_Vec |= Basic_Port;
+      const Num := |System.Port_Vec|;
+      Set_Id(System.Port_Vec[Num], Nth_Id (Num));
+      return System.Port_Vec[Num];
+   end func Add;
+
+   op "indexing"(ref System; Id<#entity>) -> ref Basic_Entity+ is
+      (System.Entity_Vec[Id_Num(Id)]);
+
+   op "indexing"(ref System; Id<#signal>) -> ref Basic_Signal+ is
+      (System.Signal_Vec[Id_Num(Id)]);
+
+   op "indexing"(ref System; Id<#port>) -> ref Basic_Port+ is
+      (System.Port_Vec[Id_Num(Id)]);
+
+   func Display_State (Sys : System) is
+   --  Display the state of the system.
+      Println ("System state:");
+      Print ("Entities: ");
+      for each E of Sys.Entity_Vec forward loop
+         Print (" " | E.Name());
+      end loop;
+      Println("");
+
+      Print ("Ports: ");
+      for each P of Sys.Port_Vec forward loop
+         Print (" " | P);
+      end loop;
+      Println("");
+
+      Print ("Signals: ");
+      for each S of Sys.Signal_Vec forward loop
+         Print (" " | S);
+      end loop;
+      Println("");
+   end func Display_State;
+
+   func Dump_To_JSON_File
+     (File : Univ_String; Obj : Obj_Type is Assignable<>) is
+      var IO := IO::Get_IO();
+      var B_File : Byte_Stream_Output_File := IO.Create ("phdl_system.json");
+
+      ref var OVS : JSON_Output_Value_Stream => Create(B_File);
+
+      ref var OOS : Output_Object_Stream => Create(OVS);
+
+      Write_Obj (OOS, Obj);
+   end func Dump_To_JSON_File;
+
+end class Phiddle::System;
+
+interface Phiddle::Signal<Wid : Bits := 1> extends Basic_Signal<> is
+  //  A signal with a specified width
+   const Width : Bits := 1;
+
+   func Value(Signal) -> Unsigned_Value<Width>;
+   func Set_Value(var Signal; Value : Unsigned_Value<Width>);
+
+   func Add(ref var System; Initial : Unsigned_Value<Width> := 0)
+     -> ref var Signal;
+     //  Add a signal to the system, with a defaulted-to-zero initial value
+
+   func From_String(Univ_String) -> optional Signal is (null);
+   func Create() -> Signal;
+end interface Phiddle::Signal;
+
+class Phiddle::Signal is
+   var Cur_Value : Unsigned_Value<Width> := 0;
+   var Inputs : Vector<Id<#port>> := [];
+   var Outputs : Vector<Id<#port>> := [];
+  exports
+   func Value(Signal) -> Unsigned_Value<Width> is
+     (Signal.Cur_Value);
+   func Set_Value(var Signal; Value : Unsigned_Value<Width>) is
+      Signal.Cur_Value := Value;
+   end func Set_Value;
+
+   func Add(ref var System; Initial : Unsigned_Value<Width> := 0)
+     -> ref var Signal is
+     const Sig : Basic_Signal+ :=
+       Signal::(Basic_Signal => Create(), Cur_Value => Initial);
+
+     case System::Add (System, Sig) of
+        [Added : Signal] => return Added;
+        [..] => {#false}; 
+     end case;
+
+   end func Add;
+
+   func Create() -> Signal is (Basic_Signal => Create());
+end class Phiddle::Signal;
+
+interface Phiddle::Port<Mode : In_Or_Out; Width : Bits := 1>
+  extends Basic_Port<> is
+  // A port of Mode #in or #out, of the given width
+
+   func Add(ref var System; Name : Univ_String)
+     -> ref var Port;
+     //  Add a port to the system, with the given name
+
+   func From_String(Univ_String) -> optional Port is (null);
+   func Create() -> Port;
+end interface Phiddle::Port;
+
+class Phiddle::Port is
+   const Name : Univ_String;
+  exports
+
+   func Add(ref var System; Name : Univ_String)
+     -> ref var Port is
+     //  Add a port to the system, with the given name
+     const P : Basic_Port+ :=
+       Port::(Basic_Port => Create(), Name => Name);
+
+     case System::Add (System, P) of
+        [Added : Port] => return Added;
+        [..] => {#false}; 
+     end case;
+
+   end func Add;
+
+
+   func Create() -> Port
+    is (Basic_Port => Create(), Name => "port");
+end class Phiddle::Port;
+
+interface Phiddle::Mux
+  <Select_Type is Unsigned_Value <>;
+   Num_Inputs : Univ_Integer;  --  tbd:stt  := 2 ** Select_Type::Width;
+   Num_Outputs : Univ_Integer := 1> extends Basic_Entity<> is
+
+   func Kind(Ent : Mux) -> Univ_String is ("Mux");
+
+   func Add(ref var Sys : System)
+     -> ref var Mux;
+     //  Add a mux to the system
+
+   func From_String(Univ_String) -> optional Mux is (null);
+   func Create() -> Mux;
+end interface Phiddle::Mux;
+
+class Phiddle::Mux is
+   var Input_Ports : Vector<Id<#port>> := [];
+   var Output_Ports : Vector<Id<#port>> := [];
+
+  exports
+
+   func Add(ref var Sys : System)
+     -> ref var Mux is
+     //  Add a mux to the system
+     var M : Mux :=
+       Mux::(Basic_Entity => Create());
+
+     type In_Port is Port<#in, Width => 1>;
+     type Out_Port is Port<#in, Width => 1>;
+
+     for I in 1 .. Num_Inputs loop
+        ref P => In_Port::Add(Sys, "in_" | ('A' + (I-1)))
+        M.Input_Ports |= Id(P);
+     end loop;
+
+     for I in 1 .. Num_Outputs loop
+        ref P => Out_Port::Add(Sys, "out_" | ('Z' - Num_Outputs + I))
+        M.Output_Ports |= Id(P);
+     end loop;
+
+     const Ent : Basic_Entity+ := M;
+
+     --  tbd:stt  should be expressible as Mux::(polymorphic_obj)
+     case System::Add (Sys, Ent) of
+        [Added : Mux] => return Added;
+        [..] => {#false}; 
+     end case;
+   end func Add;
+   
+   func Create() -> Mux is (Basic_Entity => Create());
+end class Phiddle::Mux;
+
+import Phiddle::*;
+func Test_Phiddle() is
+   var Sys : Phiddle::System := Create();
+
+   type Bit_Signal is Signal<1>;
+   type Mux_4_1 is Mux
+     <Select_Type => Unsigned_Value<Width => 2>, Num_Inputs => 4>
+
+   ref Mux1 => Mux_4_1::Add(Sys);
+
+   ref Sig1 => Bit_Signal::Add(Sys);
+   ref Sig2 => Bit_Signal::Add(Sys);
+   ref Sig3 => Bit_Signal::Add(Sys);
+
+   Sig1.Set_Value (1);
+   Sig3.Set_Value (0);
+   Sig2.Set_Value (Sig3.Value());
+
+   Phiddle::System::Display_State(Sys);
+   Phiddle::System::Dump_To_JSON_File ("phdl_system.json", Sys);
+end func Test_Phiddle;
