@@ -1,4 +1,4 @@
-#! /bin/tcsh -f
+#! /bin/tcsh
 
 # compile parasail files
 # call with "-h" for help

@@ -78,10 +78,6 @@ package body PSC.Interpreter is
    --  thread is spawned. On a mono-processor, this will get more of the
    --  server tasks active sooner by creating a "round-robin" effect.
 
-   Propagating_Exception : exception;
-      --  Used to indicate exception has been reported, and is now
-      --  being propagated.
-
    ------------------------------------------------------------
    -- ParaSail Routine Table (both Interpreted and Compiled) --
    ------------------------------------------------------------

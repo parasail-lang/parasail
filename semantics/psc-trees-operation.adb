@@ -195,7 +195,8 @@ package body PSC.Trees.Operation is
              Lists.Length (T.Operation_Outputs) +
              Lists.Length (T.Global_Read_List) +
              Lists.Length (T.Global_Update_List) +
-             Boolean'Pos (Not_Null (T.Statements)) +
+             Boolean'Pos (T.Operation_Kind = Lambda_Operation
+               and then Not_Null (T.Statements)) +  --  for lambdas only
              Boolean'Pos (Not_Null (T.Op_Equiv)) +
              Boolean'Pos (Not_Null (T.Op_Location));
    end Num_Operands;
@@ -226,7 +227,9 @@ package body PSC.Trees.Operation is
                return Lists.Nth_Element (T.Global_Update_List, Index);
             end if;
             Index := Index - Num_Global_Updates;
-            if Not_Null (T.Statements) then
+            if T.Operation_Kind = Lambda_Operation  --  only for Lambdas
+              and then Not_Null (T.Statements)
+            then
                Index := Index - 1;
                if Index = 0 then
                   return T.Statements;
@@ -283,7 +286,9 @@ package body PSC.Trees.Operation is
                return;
             end if;
             Index := Index - Num_Global_Updates;
-            if Not_Null (T.Statements) then
+            if T.Operation_Kind = Lambda_Operation  --  only for Lambdas
+              and then Not_Null (T.Statements)
+            then
                Index := Index - 1;
                if Index = 0 then
                   T.Statements := New_Operand;
@@ -340,9 +345,13 @@ package body PSC.Trees.Operation is
       New_Tree.Global_Update_List :=
          Lists.Make (New_Operands (Index .. Index + Num_Global_Updates - 1));
       Index := Index + Num_Global_Updates;
-      if Not_Null (T.Statements) then
+      if T.Operation_Kind = Lambda_Operation  --  only for Lambdas
+        and then Not_Null (T.Statements)
+      then
          New_Tree.Statements := New_Operands (Index);
          Index := Index + 1;
+      else
+         New_Tree.Statements := Null_Optional_Tree;
       end if;
       if Not_Null (T.Op_Equiv) then
          New_Tree.Op_Equiv := New_Operands (Index);

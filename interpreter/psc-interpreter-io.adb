@@ -31,6 +31,8 @@ with PSC.Messages;
 with PSC.Strings;
 with PSC.Univ_Strings;
 with PSC.Vectors;
+
+with Ada.Exceptions;
 with Ada.Text_IO;
 with Ada.Text_IO.Text_Streams;
 with Ada.Streams.Stream_IO;
@@ -700,30 +702,42 @@ package body PSC.Interpreter.IO is
       Line : String (1 .. Max_Line);
       Char : Character;
       Last : Natural := 0;
-   begin
+
+      use Ada.Text_IO;
+
+   begin  --  Read_From_File
+
       --  Read until get LF or CR/LF
       while Last < Line'Last loop
-         Character'Read (Stream (Info_Ptr.File), Char);
-         case Char is
-            when ASCII.CR =>
-               declare
-                  Next_Char : Character;
-               begin
-                  Character'Read (Stream (Info_Ptr.File), Next_Char);
-                  --  Treat CR/LF as a single line terminator
-                  exit when Next_Char = ASCII.LF;
-                  Last := Last + 2;
-                  Line (Last - 1) := Char;
-                  Line (Last) := Next_Char;
-               end;
-            when ASCII.LF =>
-               --  End of line
-               exit;
-            when others =>
-               --  Add char to line
-               Last := Last + 1;
-               Line (Last) := Char;
-         end case;
+         begin
+            Character'Read (Stream (Info_Ptr.File), Char);
+            case Char is
+               when ASCII.CR =>
+                  declare
+                     Next_Char : Character;
+                  begin
+                     Character'Read (Stream (Info_Ptr.File), Next_Char);
+                     --  Treat CR/LF as a single line terminator
+                     exit when Next_Char = ASCII.LF;
+                     Last := Last + 2;
+                     Line (Last - 1) := Char;
+                     Line (Last) := Next_Char;
+                  end;
+               when ASCII.LF =>
+                  --  End of line
+                  exit;
+               when others =>
+                  --  Add char to line
+                  Last := Last + 1;
+                  Line (Last) := Char;
+            end case;
+         exception
+            when E : others =>
+               Put_Line (Standard_Error,
+                         "Read-from-file Propagating exception: " &
+                         Ada.Exceptions.Exception_Information (E));
+               raise;
+         end;
       end loop;
       --  End of line or 4096 chars, whichever came first
       --  Store result
@@ -731,7 +745,7 @@ package body PSC.Interpreter.IO is
                                              Target,
                                              Context.Server_Index));
    exception
-      when End_Error =>
+      when Ada.Streams.Stream_IO.End_Error =>
          if Last > 0 then
             --  Last line
             Store_Word (Params, 0,
@@ -746,6 +760,16 @@ package body PSC.Interpreter.IO is
                  Univ_Strings.Null_Of_Same_Rgn
                    (Univ_Strings.From_Word_Type (Target)));
          end if;
+      when E : others =>
+         Put_Line (Standard_Error, "Unexpected exception: " &
+                   Ada.Exceptions.Exception_Information (E));
+
+         --  Return a "null" of Univ_String type
+         Store_Word
+           (Params, 0,
+              Univ_Strings.Null_Of_Same_Rgn
+                (Univ_Strings.From_Word_Type (Target)));
+
    end Read_From_File;
 
    --------------------------

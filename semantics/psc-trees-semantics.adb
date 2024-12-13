@@ -876,6 +876,16 @@ package body PSC.Trees.Semantics is
                   --  Indicator of user-requested termination.
                   return Natural'Last;
                end if;
+            exception
+               when Interpreter.Propagating_Exception =>
+                  Put_Line
+                    (Current_Error,
+                     "Exception propagated out of Interpeter");
+               when E : others =>
+                  Put_Line
+                    (Current_Error,
+                     "Unexpected exception propagated out of Interpreter: " &
+                     Ada.Exceptions.Exception_Information (E));
             end;
          end;
       end loop;
@@ -947,7 +957,7 @@ package body PSC.Trees.Semantics is
    exception
       when E : others =>
          Put_Line
-           (Standard_Error,
+           (Current_Error,
             "Internal error: Unhandled exception " &
             Ada.Exceptions.Exception_Information (E));
          New_Line;

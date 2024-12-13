@@ -3088,6 +3088,10 @@ package PSC.Interpreter is
      return Exec_Context_RW_Ptr;
    --  Return pointer to current exec-context for given server
 
+   Propagating_Exception : exception;
+      --  Used to indicate exception has been reported, and is now
+      --  being propagated.
+
    procedure Execute
      (Instructions      : Routine_Ptr;
       Start_Pc          : Code_Index;
