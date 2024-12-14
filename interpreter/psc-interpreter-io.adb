@@ -1138,6 +1138,15 @@ package body PSC.Interpreter.IO is
             declare
                Lock_Obj : constant Lock_Obj_Index :=
                             Large_Obj_Lock_Obj (Obj);
+
+               --  Get actual (structural) type from object
+               --  because passed-in type might not be correct
+               --  for the actual object inside a polymorphic object.
+               --  TBD: Should we write the type name also??
+               --       If not, what is polymorphic read supposed to do?
+               Structural_Type : constant Non_Op_Map_Type_Ptr :=
+                            Large_Obj_Type_Desc (Obj);
+               
             begin
                if Debug then
                   Put_Line
@@ -1150,7 +1159,7 @@ package body PSC.Interpreter.IO is
                      Stg_Rgn_Index'Image (Large_Obj_Stg_Rgn_Index (Obj)));
                   Put_Line
                     (" type = " &
-                     Strings.To_String (Non_Map_Type_Desc.Name));
+                     Strings.To_String (Structural_Type.Name));
 
                   if Lock_Obj /= 0 then
                      Put_Line
@@ -1158,11 +1167,11 @@ package body PSC.Interpreter.IO is
                   end if;
                end if;
 
-               if Non_Map_Type_Desc.Type_Kind = Basic_Array_Kind then
+               if Structural_Type.Type_Kind = Basic_Array_Kind then
                   --  write "Basic_Array" components
                   declare
                      Comp_Type : constant Type_Descriptor_Ptr :=
-                       Basic_Array_Comp_Type (Non_Map_Type_Desc);
+                       Basic_Array_Comp_Type (Structural_Type);
                      Len : constant Word_Type :=
                        Content_Of_Virtual_Address
                           (Obj + Large_Obj_Header_Size);
@@ -1215,18 +1224,18 @@ package body PSC.Interpreter.IO is
                      Target_Base => Type_Area,
                      Op_Index => Begin_Obj_Op_Index);
 
-                  for I in 1 .. Non_Map_Type_Desc.Num_Components loop
+                  for I in 1 .. Structural_Type.Num_Components loop
                      declare
                         Comp_Type : constant Non_Op_Map_Type_Ptr :=
                           Skip_Over_Op_Map
-                             (Non_Map_Type_Desc.Components (I).Type_Desc);
+                             (Structural_Type.Components (I).Type_Desc);
                         Comp_Value : constant Word_Type :=
                           Content_Of_Virtual_Address
                              (Obj +
                               Large_Obj_Header_Size +
                               Offset_Within_Area (I - 1));
                      begin
-                        if Non_Map_Type_Desc.Components (I).Is_By_Ref then
+                        if Structural_Type.Components (I).Is_By_Ref then
                            --  TBD -- by-ref component
                            Put_Line
                              ("  Ref: " & Hex_Image (Comp_Value));
