@@ -456,5 +456,5 @@ func Test_Phiddle() is
    Sig2.Set_Value (Sig3.Value());
 
    Phiddle::System::Display_State(Sys);
-   -- Phiddle::System::Dump_To_JSON_File ("phdl_system.json", Sys);
+   Phiddle::System::Dump_To_JSON_File ("phdl_system.json", Sys);
 end func Test_Phiddle;
