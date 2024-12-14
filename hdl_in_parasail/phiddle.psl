@@ -105,13 +105,15 @@ end class Phiddle::Id
 
 interface Phiddle::Basic_Entity<> is
   //  An entity is essentially a component or a cell in the system
+   const Name : Univ_String;
+
    type Entity_Id is Id<#entity>
    func Id(Basic_Entity) -> optional Id<#entity>;
    func Set_Id(var Basic_Entity; Id<#entity>);
 
    func Kind(Ent : Basic_Entity) -> Univ_String is ("Basic_Entity");
-   func Name(Ent : Basic_Entity+) -> Univ_String
-     is (Ent.Kind() | "#" |
+   func Full_Name(Ent : Basic_Entity+) -> Univ_String
+     is (Ent.Kind() | "-" | Ent.Name | "#" |
          Entity_Id::Zero_Extend(Id(Ent).Id_Num()));
 
    func To_String(Basic_Entity) -> Univ_String
@@ -122,7 +124,7 @@ interface Phiddle::Basic_Entity<> is
    func Hash(Basic_Entity) -> Unsigned_64
      is (Hash(Id(Basic_Entity)));
 
-   func Create() -> Basic_Entity;
+   func Create(Name : Univ_String) -> Basic_Entity;
 end interface Phiddle::Basic_Entity;
 
 class Phiddle::Basic_Entity is
@@ -135,12 +137,15 @@ class Phiddle::Basic_Entity is
       Basic_Entity.Ent_Id := Id;
    end func Set_Id;
 
-   func Create() -> Basic_Entity is (());
+   func Create(Name : Univ_String) -> Basic_Entity is ((Name => Name));
 end class Phiddle::Basic_Entity;
 
 interface Phiddle::Basic_Signal<> is
   //  A signal is a wire between two or more entities
+   const Name : Univ_String;
+
    type Signal_Id is Id<#signal>;
+
    func Id(Basic_Signal)-> optional Id<#signal>;
    func Set_Id(var Basic_Signal; Id<#signal>);
 
@@ -152,7 +157,7 @@ interface Phiddle::Basic_Signal<> is
    func Hash(Basic_Signal) -> Unsigned_64
      is (Hash(Id(Basic_Signal)));
 
-   func Create() -> Basic_Signal;
+   func Create(Name : Univ_String) -> Basic_Signal;
 end interface Phiddle::Basic_Signal;
 
 class Phiddle::Basic_Signal is
@@ -165,11 +170,13 @@ class Phiddle::Basic_Signal is
       Basic_Signal.Sig_Id := Id;
    end func Set_Id;
 
-   func Create() -> Basic_Signal is (());
+   func Create(Name : Univ_String) -> Basic_Signal is ((Name => Name));
 end class Phiddle::Basic_Signal;
 
 interface Phiddle::Basic_Port<> is
   //  A port is a place for a signal to connect to an entity
+   const Name : Univ_String;
+
    type Port_Id is Id<#port>;
    func Id(Basic_Port) -> optional Id<#port>;
    func Set_Id(var Basic_Port; Id<#port>);
@@ -182,7 +189,7 @@ interface Phiddle::Basic_Port<> is
    func Hash(Basic_Port) -> Unsigned_64
      is (Hash(Id(Basic_Port)));
 
-   func Create() -> Basic_Port;
+   func Create(Name : Univ_String) -> Basic_Port;
 end interface Phiddle::Basic_Port;
 
 class Phiddle::Basic_Port is
@@ -195,7 +202,7 @@ class Phiddle::Basic_Port is
       Basic_Port.Port_Id := Id;
    end func Set_Id;
 
-   func Create() -> Basic_Port is (());
+   func Create(Name : Univ_String) -> Basic_Port is ((Name => Name));
 end class Phiddle::Basic_Port;
 
 interface Phiddle::System<> is
@@ -271,7 +278,7 @@ class Phiddle::System is
       Println ("System state:");
       Print ("Entities: ");
       for each E of Sys.Entity_Vec forward loop
-         Print (" " | E.Name());
+         Print (" " | E.Name);
       end loop;
       Println("");
 
@@ -309,12 +316,13 @@ interface Phiddle::Signal<Wid : Bits := 1> extends Basic_Signal<> is
    func Value(Signal) -> Unsigned_Value<Width>;
    func Set_Value(var Signal; Value : Unsigned_Value<Width>);
 
-   func Add(ref var System; Initial : Unsigned_Value<Width> := 0)
+   func Add(ref var System; Name : Univ_String;
+     Initial : Unsigned_Value<Width> := 0)
      -> ref var Signal;
      //  Add a signal to the system, with a defaulted-to-zero initial value
 
    func From_String(Univ_String) -> optional Signal is (null);
-   func Create() -> Signal;
+   func Create(Name : Univ_String) -> Signal;
 end interface Phiddle::Signal;
 
 class Phiddle::Signal is
@@ -328,10 +336,11 @@ class Phiddle::Signal is
       Signal.Cur_Value := Value;
    end func Set_Value;
 
-   func Add(ref var System; Initial : Unsigned_Value<Width> := 0)
+   func Add(ref var System; Name : Univ_String;
+     Initial : Unsigned_Value<Width> := 0)
      -> ref var Signal is
      const Sig : Basic_Signal+ :=
-       Signal::(Basic_Signal => Create(), Cur_Value => Initial);
+       Signal::(Basic_Signal => Create(Name), Cur_Value => Initial);
 
      case System::Add (System, Sig) of
         [Added : Signal] => return Added;
@@ -340,7 +349,7 @@ class Phiddle::Signal is
 
    end func Add;
 
-   func Create() -> Signal is (Basic_Signal => Create());
+   func Create(Name : Univ_String) -> Signal is (Basic_Signal => Create(Name));
 end class Phiddle::Signal;
 
 interface Phiddle::Port<Mode : In_Or_Out; Width : Bits := 1>
@@ -352,18 +361,17 @@ interface Phiddle::Port<Mode : In_Or_Out; Width : Bits := 1>
      //  Add a port to the system, with the given name
 
    func From_String(Univ_String) -> optional Port is (null);
-   func Create() -> Port;
+   func Create(Name : Univ_String) -> Port;
 end interface Phiddle::Port;
 
 class Phiddle::Port is
-   const Name : Univ_String;
   exports
 
    func Add(ref var System; Name : Univ_String)
      -> ref var Port is
      //  Add a port to the system, with the given name
      const P : Basic_Port+ :=
-       Port::(Basic_Port => Create(), Name => Name);
+       Port::(Basic_Port => Create(Name));
 
      case System::Add (System, P) of
         [Added : Port] => return Added;
@@ -373,8 +381,8 @@ class Phiddle::Port is
    end func Add;
 
 
-   func Create() -> Port
-    is (Basic_Port => Create(), Name => "port");
+   func Create(Name : Univ_String) -> Port
+    is (Basic_Port => Create(Name));
 end class Phiddle::Port;
 
 interface Phiddle::Mux
@@ -384,12 +392,12 @@ interface Phiddle::Mux
 
    func Kind(Ent : Mux) -> Univ_String is ("Mux");
 
-   func Add(ref var Sys : System)
+   func Add(ref var Sys : System; Name : Univ_String)
      -> ref var Mux;
      //  Add a mux to the system
 
    func From_String(Univ_String) -> optional Mux is (null);
-   func Create() -> Mux;
+   func Create(Name : Univ_String) -> Mux;
 end interface Phiddle::Mux;
 
 class Phiddle::Mux is
@@ -398,22 +406,22 @@ class Phiddle::Mux is
 
   exports
 
-   func Add(ref var Sys : System)
+   func Add(ref var Sys : System; Name : Univ_String)
      -> ref var Mux is
      //  Add a mux to the system
      var M : Mux :=
-       Mux::(Basic_Entity => Create());
+       Mux::(Basic_Entity => Create(Name));
 
      type In_Port is Port<#in, Width => 1>;
      type Out_Port is Port<#in, Width => 1>;
 
      for I in 1 .. Num_Inputs loop
-        ref P => In_Port::Add(Sys, "in_" | ('A' + (I-1)))
+        ref P => In_Port::Add(Sys, Name => "in_" | ('A' + (I-1)))
         M.Input_Ports |= Id(P);
      end loop;
 
      for I in 1 .. Num_Outputs loop
-        ref P => Out_Port::Add(Sys, "out_" | ('Z' - Num_Outputs + I))
+        ref P => Out_Port::Add(Sys, Name => "out_" | ('Z' - Num_Outputs + I))
         M.Output_Ports |= Id(P);
      end loop;
 
@@ -426,7 +434,7 @@ class Phiddle::Mux is
      end case;
    end func Add;
    
-   func Create() -> Mux is (Basic_Entity => Create());
+   func Create(Name : Univ_String) -> Mux is (Basic_Entity => Create(Name));
 end class Phiddle::Mux;
 
 import Phiddle::*;
@@ -437,16 +445,16 @@ func Test_Phiddle() is
    type Mux_4_1 is Mux
      <Select_Type => Unsigned_Value<Width => 2>, Num_Inputs => 4>
 
-   ref Mux1 => Mux_4_1::Add(Sys);
+   ref Mux1 => Mux_4_1::Add(Sys, "mux1");
 
-   ref Sig1 => Bit_Signal::Add(Sys);
-   ref Sig2 => Bit_Signal::Add(Sys);
-   ref Sig3 => Bit_Signal::Add(Sys);
+   ref Sig1 => Bit_Signal::Add(Sys, "s1");
+   ref Sig2 => Bit_Signal::Add(Sys, "s2");
+   ref Sig3 => Bit_Signal::Add(Sys, "s3");
 
    Sig1.Set_Value (1);
    Sig3.Set_Value (0);
    Sig2.Set_Value (Sig3.Value());
 
    Phiddle::System::Display_State(Sys);
-   Phiddle::System::Dump_To_JSON_File ("phdl_system.json", Sys);
+   -- Phiddle::System::Dump_To_JSON_File ("phdl_system.json", Sys);
 end func Test_Phiddle;
