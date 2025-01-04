@@ -1,6 +1,6 @@
 // ParaSail Prototype Standard Library
 
-// Copyright (C) 2011-2015, AdaCore, New York, NY
+// Copyright (C) 2011-2025, AdaCore, New York, NY
 // This program is provided "as is" with no warranty.
 // Report errors at http://groups.google.com/group/parasail-programming-language
 
@@ -10646,9 +10646,15 @@ interface PSL::Containers::Indexed_Set<Element_Type is Hashable<>;
    op "[]"() -> Indexed_Set
      // Create an empty indexed set
 
+   op "<|="(var Left : Indexed_Set; var Right : optional Element_Type);
+     // Move element into set, leaving Right null afterward.
+
    func Get_Unique_Id(var Indexed_Set; Element_Type) -> Id_Type
      // Add element to set if not there; in any case return the unique Id
      // for the element.
+
+   func Find_Unique_Id(Indexed_Set; Element_Type) -> optional Id_Type
+     // Find unique id for element, if present, else return null.
 
    op "indexing"(ref const Indexed_Set; Id : Id_Type)
     -> ref const Element_Type
@@ -10659,6 +10665,9 @@ interface PSL::Containers::Indexed_Set<Element_Type is Hashable<>;
 
    op "in"(Id : Id_Type; Indexed_Set) -> Boolean
      //  Return #true if Id is in the range of the Indexed_Set
+
+   op "in"(Elem : Element_Type; Indexed_Set) -> Boolean
+     //  Return #true if Elem appears in the Indexed_Set
 
    func All_Ids(Indexed_Set) -> Countable_Range<Id_Type> is "index_set"
      //  Set of all ids in index set
@@ -10690,38 +10699,15 @@ class PSL::Containers::Indexed_Set is
    var IS_Vector   : Vector<With_Hash> := []
    var IS_Hash_Tab : Vector<optional Bucket> :=
      Create(Initial_Size, Empty_Bucket)
-  exports
-   op "[]"() -> Indexed_Set is
-     // Create an empty indexed set
-      return ()  //  Everything defaults properly
-   end op "[]"
 
-   op "indexing"(ref const Indexed_Set; Id : Id_Type)
-     -> ref const Element_Type is
-     //  Return ref to element in Indexed_Set with given Id
-      return Indexed_Set.IS_Vector[Id].Elem
-   end op "indexing"
-
-   op "index_set"(Indexed_Set) -> Countable_Range<Id_Type> is
-      return 1 .. |Indexed_Set.IS_Vector|
-   end op "index_set"
-
-   op "in"(Id : Id_Type; Indexed_Set) -> Boolean is
-     //  Return #true if Id is in the range of the Indexed_Set
-      return Id in Indexed_Set.All_Ids()
-   end op "in"
-
-   func Get_Unique_Id(var Indexed_Set; Elem : Element_Type) -> Id_Type is
-     // Add element to set if not there; in any case return the unique Id
-     // for the element.
-
-      const Hash_Val := Hash(Elem)
-
-      //  Search to see if it is already in table
-      var Index := Hash_Val mod |Indexed_Set.IS_Hash_Tab| + 1
-      ref Bucket_List => Indexed_Set.IS_Hash_Tab[Index]
+   func Find
+     (Set : Indexed_Set; Elem : Element_Type; Hash_Val : Unsigned_64)
+     -> optional Id_Type is
+   //  Search to see if it is already in table
+      var Index := Hash_Val mod |Set.IS_Hash_Tab| + 1
+      ref Bucket_List => Set.IS_Hash_Tab[Index]
       for B => Bucket_List then B.Next while B not null loop
-         ref Elem_In_Table => Indexed_Set.IS_Vector[B.Id]
+         ref Elem_In_Table => Set.IS_Vector[B.Id]
          if Elem_In_Table.Saved_Hash == Hash_Val
            and then Elem_In_Table.Elem == Elem
          then
@@ -10729,16 +10715,34 @@ class PSL::Containers::Indexed_Set is
             return B.Id
          end if
       end loop
+      return null;
+   end func Find;
+
+   func Get_Unique_Id_And_Move
+    (var Indexed_Set; var Elem : optional Element_Type) -> Id_Type is
+     // Move element to set if not there; in any case return the unique Id
+     // for the element.
+
+      const Hash_Val := Hash(Elem)
+
+      //  Search to see if it is already in table
+      const Existing_Id := Find (Indexed_Set, Elem, Hash_Val);
+
+      if Existing_Id not null then
+         return Existing_Id;
+      end if;
 
       //  Not in table; add to end of vector
       var Elem_With_Hash : With_Hash for Indexed_Set :=
-        (Elem => Elem, Saved_Hash => Hash_Val)
+        (Elem <== Elem, Saved_Hash => Hash_Val)
       Indexed_Set.IS_Vector <|= Elem_With_Hash
 
       //  Assign it a unique id based on position in Indexed_Set
       const New_Id : Id_Type := |Indexed_Set.IS_Vector|
 
       //  Add to appropriate bucket
+      var Index := Hash_Val mod |Indexed_Set.IS_Hash_Tab| + 1
+      ref Bucket_List => Indexed_Set.IS_Hash_Tab[Index]
       Bucket_List := (Id => New_Id, Next <== Bucket_List)
 
       //  Now check to see if hash table should be expanded
@@ -10761,6 +10765,55 @@ class PSL::Containers::Indexed_Set is
       end if // Expanding table
 
       return New_Id
+   end func Get_Unique_Id_And_Move
+
+  exports
+   op "[]"() -> Indexed_Set is
+     // Create an empty indexed set
+      return ()  //  Everything defaults properly
+   end op "[]"
+
+   op "<|="(var Left : Indexed_Set; var Right : optional Element_Type)
+     is
+       // Move element into set, leaving Right null afterward.
+       const Ignore := Get_Unique_Id_And_Move (Left, Right);
+   end op "<|="
+
+   op "indexing"(ref const Indexed_Set; Id : Id_Type)
+     -> ref const Element_Type is
+     //  Return ref to element in Indexed_Set with given Id
+      return Indexed_Set.IS_Vector[Id].Elem
+   end op "indexing"
+
+   op "index_set"(Indexed_Set) -> Countable_Range<Id_Type> is
+      return 1 .. |Indexed_Set.IS_Vector|
+   end op "index_set"
+
+   op "in"(Id : Id_Type; Indexed_Set) -> Boolean is
+     //  Return #true if Id is in the range of the Indexed_Set
+      return Id in Indexed_Set.All_Ids()
+   end op "in"
+
+   op "in"(Elem : Element_Type; Indexed_Set) -> Boolean is
+     //  Return #true if Elem appears in the Indexed_Set
+      return Find_Unique_Id (Indexed_Set, Elem) not null;
+   end op "in"
+
+   func Find_Unique_Id(Indexed_Set; Element_Type) -> optional Id_Type is
+     // Find unique id for element, if present, else return null.
+      return Find (Indexed_Set, Element_Type, Hash (Element_Type));
+   end func Find_Unique_Id;
+
+   func Get_Unique_Id
+    (var Indexed_Set; Elem : Element_Type) -> Id_Type is
+     // Add element to set if not there; in any case return the unique Id
+     // for the element.
+
+      var Elem_Copy : optional Element_Type for Indexed_Set := Elem;
+      //  Make a copy in proper space
+
+      //  Move into Indexed_Set
+      return Get_Unique_Id_And_Move (Indexed_Set, Elem_Copy);
    end func Get_Unique_Id
 
    func Count(Indexed_Set) -> Univ_Integer is (|Indexed_Set.IS_Vector|)
@@ -12017,6 +12070,379 @@ func PSL::Test::Test_Node_Tree() is
       Println("  " | C)
    end loop
 end func PSL::Test::Test_Node_Tree
+
+interface PSL::Containers::Sequenced_Set<Element_Type is Hashable<>> is
+  // A set that preserves original insertion order
+    op "[]"() -> Sequenced_Set
+
+    func Singleton(Elem : Element_Type) -> Sequenced_Set
+
+    op "|"(Left, Right : Element_Type) -> Sequenced_Set
+    op "|"(Left : Sequenced_Set; Right : Element_Type) 
+      -> Sequenced_Set
+    op "|"(Left : Element_Type; Right : Sequenced_Set) 
+      -> Sequenced_Set
+    op "|"(Left : Sequenced_Set; Right : Sequenced_Set) 
+      -> Sequenced_Set
+
+    op "|="(var Left : Sequenced_Set; Right : Element_Type)
+    op "|="(var Left : Sequenced_Set; Right : Sequenced_Set)
+
+    op "<|="(var Left : Sequenced_Set; var Right : optional Element_Type)
+        // Move element into set, leaving Right null afterward.
+
+    op "-"(Left, Right : Sequenced_Set) -> Sequenced_Set
+      // Set difference
+    op "-"(Left : Sequenced_Set; Right : Element_Type) 
+      -> Sequenced_Set
+      // Remove one element
+    op "or"(Left : Sequenced_Set; Right : Sequenced_Set) 
+      -> Sequenced_Set is "|"   // union
+    op "or="(var Left : Sequenced_Set; Right : Sequenced_Set)
+      is "|="
+
+    op "+"(Left : Sequenced_Set; Right : Sequenced_Set) 
+      -> Sequenced_Set is "|"   // Union
+    op "+="(var Left : Sequenced_Set; Right : Sequenced_Set)
+      is "|="
+    op "+="(var Left : Sequenced_Set; Right : Element_Type) is "|="
+   
+    op "and"(Left, Right : Sequenced_Set) -> Sequenced_Set
+        // Intersection
+
+    op "xor"(Left, Right : Sequenced_Set) -> Sequenced_Set
+        // Symmetric difference
+
+    op "in"(Left : Element_Type; Right : Sequenced_Set) -> Boolean
+
+    op "=?"(Left, Right : Sequenced_Set) -> Ordering
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left is a proper subset of Right
+        // Return #greater if Left is a proper superset of Right
+        // Return #unordered otherwise
+
+    func Count(S : Sequenced_Set) -> Univ_Integer
+
+    op "magnitude"(Sequenced_Set) -> Univ_Integer is Count
+
+    func Is_Empty(S : Sequenced_Set) -> Boolean
+
+    func First(S : Sequenced_Set) -> optional Element_Type
+    func Last(S : Sequenced_Set) -> optional Element_Type
+
+    op "indexing"(ref const Sequenced_Set; Id : Integer)
+     -> ref const Element_Type
+      //  Return ref to element in Sequenced_Set with given Id
+
+    op "index_set"(Sequenced_Set) -> Countable_Range<Integer>
+      //  Return set of Ids of all elements in the Sequenced_Set
+
+end interface PSL::Containers::Sequenced_Set
+
+class PSL::Containers::Sequenced_Set is
+    var Items : Indexed_Set<Element_Type, Integer<>> := [];
+  exports
+    op "[]"() -> Sequenced_Set is
+        return (Items => [])
+    end op "[]"
+
+    func Singleton(Elem : Element_Type) -> Result : Sequenced_Set is
+        Result := []
+        Result |= Elem;
+    end func Singleton
+
+    op "|"(Left, Right : Element_Type) -> Result : Sequenced_Set is
+        Result := [];
+        Result |= Left;
+        Result |= Right;
+    end op "|"
+
+    op "|"(Left : Sequenced_Set; Right : Element_Type) 
+      -> Result : Sequenced_Set is
+        Result := Left
+        Result |= Right;
+    end op "|"
+
+    op "|"(Left : Element_Type; Right : Sequenced_Set) 
+      -> Sequenced_Set is
+        return Singleton (Left) | Right;
+    end op "|"
+
+    op "|"(Left : Sequenced_Set; Right : Sequenced_Set) 
+      -> Result : Sequenced_Set is
+        Result := Left
+        Result |= Right
+    end op "|"
+
+    op "|="(var Left : Sequenced_Set; Right : Element_Type) is
+        const Ignore := Get_Unique_Id (Left.Items, Right);
+    end op "|="
+
+    op "|="(var Left : Sequenced_Set; Right : Sequenced_Set) is
+        for R in Right.Items.All_Ids() forward loop
+           Left |= Right.Items[R];
+        end loop;
+    end op "|="
+
+    op "<|="(var Left : Sequenced_Set; var Right : optional Element_Type) is
+        // Move element into set, leaving Right null afterward.
+        Left.Items <|= Right
+    end op "<|="
+
+    op "-"(Left, Right : Sequenced_Set) 
+      -> Result : Sequenced_Set is
+      // Set difference
+        Result := [];
+        for each L of Left {L not in Right} forward loop
+           Result |= L;
+        end loop;
+    end op "-"
+
+    op "-"(Left : Sequenced_Set; Right : Element_Type)
+      -> Result : Sequenced_Set is
+      // Remove one element
+        Result := [];
+        for each L of Left {L != Right} forward loop
+           Result |= L;
+        end loop;
+    end op "-"
+        
+    op "and"(Left, Right : Sequenced_Set)
+      -> Result : Sequenced_Set is
+        // Intersection
+        Result := []
+        for each Elem of Left {Elem in Right} forward loop
+            Result |= Elem
+        end loop
+    end op "and"
+
+    op "xor"(Left, Right : Sequenced_Set) 
+      -> Result : Sequenced_Set is
+        // Symmetric difference
+        Result := []
+        for each Elem of Left {Elem not in Right} forward loop
+           Result |= Elem;
+        end loop;
+        for each Elem of Right {Elem not in Left} forward loop
+           Result |= Elem;
+        end loop;
+    end op "xor"
+
+    op "in"(Left : Element_Type; Right : Sequenced_Set) -> Boolean is
+        return Left in Right.Items;
+    end op "in"
+
+    op "=?"(Left, Right : Sequenced_Set) -> Ordering is
+        // Return #equal if Left and Right have the same elements
+        // Return #less if Left is a proper subset of Right
+        // Return #greater if Left is a proper superset of Right
+        // Return #unordered otherwise
+        var Overlaps := 0
+        var Missing := 0
+        for each Elem of Left loop
+            if Elem not in Right then
+                Missing += 1
+            else
+                Overlaps += 1
+            end if
+        end loop
+
+        if Missing > 0 then
+            // Can't be equal, but Left might be a proper superset
+            if Overlaps < Count(Right) then
+                return #unordered
+            else
+                // Left is a superset
+                return #greater
+            end if
+        else
+            // Might be equal or Left might be a proper subset
+            if Overlaps < Count(Right) then
+                // Left is a proper subset of Right
+                return #less
+            else
+                return #equal
+            end if
+        end if
+    end op "=?"
+
+    func Count(S : Sequenced_Set) -> Result : Univ_Integer is
+        // Return count of items in set
+        return Count(S.Items);
+    end func Count
+
+    func Is_Empty(S : Sequenced_Set) -> Boolean is
+        return Count(S.Items) == 0;
+    end func Is_Empty
+
+    func First(S : Sequenced_Set) -> optional Element_Type is
+        return S.Items[1];
+    end func First
+
+    func Last(S : Sequenced_Set) -> optional Element_Type is
+        return S.Items[Count(S.Items)];
+    end func Last
+
+    op "indexing"(ref const Sequenced_Set; Id : Integer)
+     -> ref const Element_Type is
+      //  Return ref to element in Sequenced_Set with given Id
+      return Sequenced_Set.Items[Id];
+    end op "indexing";
+
+    op "index_set"(Sequenced_Set) -> Countable_Range<Integer> is
+      //  Return set of Ids of all elements in the Sequenced_Set
+       return "index_set"(Sequenced_Set.Items);
+    end op "index_set";
+
+end class PSL::Containers::Sequenced_Set
+
+interface PSL::Containers::Sequenced_Map
+  <Key_Type is Hashable<>; Value_Type is Assignable<>> is
+  // A Sequenced map module, allowing iterating over the elements in
+  // forward or reverse order of *insertion*.
+
+    type Pair is Key_Value<Key_Type, Value_Type>
+
+    op "[]"() -> Sequenced_Map
+
+    op "|="(var Left : Sequenced_Map; Right : Pair)
+        // Add Key=>Value to Map, replacing pre-existing mapping
+        // for Key, if any.
+
+    op "|"(Left : Sequenced_Map; Right : Pair) -> Sequenced_Map
+        // Add Key=>Value to Map, replacing pre-existing mapping
+        // for Key, if any in result.
+
+    op "+="(var Left : Sequenced_Map; Right : Pair) is "|="
+        // A synonym for adding a key=>value pair
+
+    op "in"(Left : Key_Type; Right : Sequenced_Map) -> Boolean
+        // Return True if given key has a mapping in the Map
+
+    op "index_set"(M : Sequenced_Map) -> Sequenced_Set<Key_Type>
+        // Return set of keys with mappings
+
+    func Keys(M : Sequenced_Map) -> Sequenced_Set<Key_Type> is "index_set"
+
+    op "indexing"(ref M : Sequenced_Map; Key : Key_Type) {Key in M}
+      -> ref Value_Type
+        // Used for references to M[Key]; requires the Key to be in M.
+
+    op "var_indexing"(ref var M : Sequenced_Map; Key : Key_Type) 
+      -> ref var optional Value_Type
+        // Used for assignments to M[Key]; Key is added to M if not present
+
+    func Count(M : Sequenced_Map) -> Univ_Integer
+        // Number of mappings in the table
+
+    op "magnitude"(Sequenced_Map) -> Univ_Integer is Count
+
+    func Is_Empty(M : Sequenced_Map) -> Boolean
+        // Return True if no mappings in the table
+
+    func Dump_Statistics(M : Sequenced_Map)
+      // A debugging routine to show bucket sizes of Map
+
+end interface PSL::Containers::Sequenced_Map
+
+class PSL::Containers::Sequenced_Map is
+    var Index : Indexed_Set<Key_Type, Integer<>> := [];
+    var Values : Vector<optional Value_Type> := [];
+  exports
+    op "[]"() -> Sequenced_Map is ();
+
+    op "|="(var Left : Sequenced_Map; Right : Pair) is
+        // Add Key=>Value to Map, replacing pre-existing mapping
+        // for Key, if any.
+        const Id := Get_Unique_Id (Left.Index, Right.Key);
+        if Id > |Left.Values| then
+           Left.Values |= Right.Value;
+           {Id == |Left.Values|}
+        else
+           Left.Values[Id] := Right.Value;
+        end if;
+    end op "|="
+
+    op "|"(Left : Sequenced_Map; Right : Pair) -> Result : Sequenced_Map is
+        // Add Key=>Value to Map, replacing pre-existing mapping
+        // for Key, if any in result.
+        Result := Left
+        Result |= Right
+    end op "|"
+
+    op "in"(Left : Key_Type; Right : Sequenced_Map) -> Boolean is
+        // Return True if given key has a mapping in the Map
+        return Left in Right.Index;
+    end op "in"
+
+    op "index_set"(M : Sequenced_Map) -> Result : Sequenced_Set<Key_Type> is
+        // Return set of keys with mappings
+       Result := [];
+       for each Item of M.Index forward loop
+          Result |= Item;
+       end loop;
+    end op "index_set";
+
+    op "indexing"(ref M : Sequenced_Map; Key : Key_Type) {Key in M}
+      -> ref Value_Type is
+        // Used for references to M[Key]; requires the Key to be in M.
+        const Id := Find_Unique_Id(M.Index, Key);
+        {Id not null}
+
+        return M.Values[Id];
+    end op "indexing"
+
+    op "var_indexing"(ref var M : Sequenced_Map; Key : Key_Type) 
+      -> ref var optional Value_Type is
+        // Used for assignments to M[Key]; Key is added to M if not present
+
+        if Key not in M then
+            //  Insert new item with Value null
+            M |= (Key => Key, Value => null);
+        end if
+
+        //  Return reference to item
+        return "indexing"(M, Key)
+    end op "var_indexing"
+
+    func Count(M : Sequenced_Map) -> Univ_Integer is (|M.Values|)
+        // Number of mappings in the table
+
+    func Is_Empty(M : Sequenced_Map) -> Boolean is (|M.Values| == 0)
+        // Return True if no mappings in the table
+
+    func Dump_Statistics(M : Sequenced_Map) is (null)
+      // A debugging routine to show bucket sizes of Map
+
+end class PSL::Containers::Sequenced_Map
+
+func PSL::Test::Test_Sequenced_Map() is
+    var M : Sequenced_Map<Univ_Integer, Univ_String> := []
+    
+    M |= [3 => "three"]
+    M |= [1 => "one"]
+    M |= [5 => "five"]
+
+    Println("M = [" |
+     (for (each K of Keys(M) forward ; Sep := "" then ", ") =>
+        <""> | Sep | K | " => " | M[K]) | "]")
+
+    M |= [2 => "deux"]
+    M |= [1 => "un"]
+    M |= [3 => "trois"]
+    M |= [5 => "cinq"]
+
+    Println("French M = [" |
+     (for (each K of Keys(M) forward ; Sep := "" then ", ") =>
+        <""> | Sep | K | " => " | M[K]) | "]")
+
+    const Keys := M.Keys()
+
+    Println("Keys of M = [" |
+     (for (each K of  Keys forward; Sep := "" then ", ") =>
+        <""> | Sep | K) | "]")
+
+end func PSL::Test::Test_Sequenced_Map
 
 //  Byte stream used for (de)serializing values/objects
 //

@@ -6,7 +6,8 @@ interface Phiddle<> is
 
    type In_Or_Out is Enum<[#in, #out, #inout]>;
 
-   type Bits is new Integer<Range => 0 .. 256>;
+   const Max_Width := 256;
+   type Bits is new Integer<Range => 0 .. Max_Width>;
    //  A count of bits
 
    //  We use enumeration literals for naming
@@ -29,10 +30,10 @@ interface Phiddle<> is
    end interface Unsigned_Value;
 
    //  A port map is a way to assign names and widths to a set of ports
-   type Port_Map is new Map<Port_Name, Bits>;
+   type Port_Map is Sequenced_Map<Port_Name, Bits>;
 
    //  A port set is a way to specify names, while width is assumed to be one.
-   type Port_Set is new Set<Port_Name>;
+   type Port_Set is Sequenced_Set<Port_Name>;
 
    --  Return Enum literal without the leading '#'
    func Str(E : Enum_Type is Enum<>) -> Univ_String;
@@ -85,7 +86,7 @@ interface Phiddle::Id<Kind : Part_Kind> is
      is (Left =? Right);
    func Hash(Id) -> Unsigned_64;
    func To_String(Id) -> Univ_String;
-   func From_String(Univ_String) -> optional Id;
+   optional func From_String(Univ_String) -> optional Id;
 
    const Max_Num_Ids := 999;
    type Numeric_Id is new Integer<0 .. Max_Num_Ids>;
@@ -113,7 +114,7 @@ class Phiddle::Id is
       return Str(Kind) | "#" | Zero_Extend(Id.Num);
    end func To_String;
 
-   func From_String(Image : Univ_String) -> optional Id is
+   optional func From_String(Image : Univ_String) -> optional Id is
       var Num : Numeric_Id := 0;
       for (I in Image.Bounds() reverse; Mult := 1 then Mult*10) loop
          if Image[I] in '0' .. '9' then
@@ -152,13 +153,16 @@ interface Phiddle::Basic_Entity<> is
 
    func To_String(Basic_Entity) -> Univ_String
      is (To_String(Id(Basic_Entity)));
-   func From_String(Univ_String) -> optional Basic_Entity is (null);
+   optional func From_String(Univ_String) -> optional Basic_Entity is (null);
    op "=?"(Left, Right : Basic_Entity) -> Ordering
      is (Id(Left) =? Id(Right))
    func Hash(Basic_Entity) -> Unsigned_64
      is (Hash(Id(Basic_Entity)));
 
    func Create(Name : Entity_Name) -> Basic_Entity;
+
+   //  Perform one process step for the Entity
+   func Process (var Sys : System; Ent : Basic_Entity) is (null);
 end interface Phiddle::Basic_Entity;
 
 class Phiddle::Basic_Entity is
@@ -183,19 +187,30 @@ interface Phiddle::Basic_Signal<> is
    func Id(Basic_Signal)-> optional Id<#signal>;
    func Set_Id(var Basic_Signal; Id<#signal>);
 
+   func Value(Basic_Signal) -> Unsigned_Value<Max_Width>;
+   func Set_Value(var Basic_Signal; Value : Unsigned_Value<Max_Width>);
+
    func To_String(Basic_Signal) -> Univ_String
      is (To_String(Id(Basic_Signal)));
-   func From_String(Univ_String) -> optional Basic_Signal is (null);
+   optional func From_String(Univ_String) -> optional Basic_Signal is (null);
    op "=?"(Left, Right : Basic_Signal) -> Ordering
      is (Id(Left) =? Id(Right))
    func Hash(Basic_Signal) -> Unsigned_64
      is (Hash(Id(Basic_Signal)));
 
-   func Create(Name : Signal_Name) -> Basic_Signal;
+   func Create
+     (Name : Signal_Name; Initial_Value : Unsigned_Value<Max_Width> := 0)
+     -> Basic_Signal;
+
+   //  Connect a port of the given mode to the signal
+   func Set_Connected_Port(var Basic_Signal; Id<#port>; Mode : In_Or_Out);
 end interface Phiddle::Basic_Signal;
 
 class Phiddle::Basic_Signal is
    var Sig_Id : optional Id<#signal> := null;
+   var Connected_Ports :
+     Array <optional Id<#port>, Indexed_By => In_Or_Out> := Create([..], null);
+   var Cur_Value : Unsigned_Value<Max_Width> := 0;
   exports
    func Id(Basic_Signal) -> optional Id<#signal> is
       (Basic_Signal.Sig_Id);
@@ -204,30 +219,54 @@ class Phiddle::Basic_Signal is
       Basic_Signal.Sig_Id := Id;
    end func Set_Id;
 
-   func Create(Name : Signal_Name) -> Basic_Signal is ((Name => Name));
+   func Value(Basic_Signal) -> Unsigned_Value<Max_Width> is
+     (Basic_Signal.Cur_Value);
+   func Set_Value(var Basic_Signal; Value : Unsigned_Value<Max_Width>) is
+      Basic_Signal.Cur_Value := Value;
+   end func Set_Value;
+
+   func Create
+     (Name : Signal_Name; Initial_Value : Unsigned_Value<Max_Width> := 0)
+     -> Basic_Signal is ((Name => Name, Cur_Value => Initial_Value));
+
+   //  Connect a port of the given mode to the signal
+   func Set_Connected_Port(var Basic_Signal; Id<#port>; Mode : In_Or_Out) is
+      {Basic_Signal.Connected_Ports[Mode] is null};
+      Basic_Signal.Connected_Ports[Mode] := Id;
+   end func Set_Connected_Port;
 end class Phiddle::Basic_Signal;
 
 interface Phiddle::Basic_Port<> is
   //  A port is a place for a signal to connect to an entity
    const Name : Port_Name;
+   const Mode : In_Or_Out;
 
    type Port_Id is Id<#port>;
    func Id(Basic_Port) -> optional Id<#port>;
    func Set_Id(var Basic_Port; Id<#port>);
 
+   func Value(Basic_Port) -> Unsigned_Value<Max_Width>;
+   func Set_Value(var Basic_Port; Value : Unsigned_Value<Max_Width>);
+
    func To_String(Basic_Port) -> Univ_String
      is (To_String(Id(Basic_Port)));
-   func From_String(Univ_String) -> optional Basic_Port is (null);
+   optional func From_String(Univ_String) -> optional Basic_Port is (null);
    op "=?"(Left, Right : Basic_Port) -> Ordering
      is (Id(Left) =? Id(Right))
    func Hash(Basic_Port) -> Unsigned_64
      is (Hash(Id(Basic_Port)));
 
-   func Create(Name : Port_Name) -> Basic_Port;
+   func Create(Name : Port_Name; Mode : In_Or_Out;
+               Initial_Value : Unsigned_Value<Max_Width> := 0) -> Basic_Port;
+
+   //  Set signal id of connected signal
+   func Set_Connected_Signal(var Basic_Port; Id<#signal>);
 end interface Phiddle::Basic_Port;
 
 class Phiddle::Basic_Port is
    var Port_Id : optional Id<#port> := null;
+   var Connected_Signal : optional Id<#signal> := null;
+   var Cur_Value : Unsigned_Value<Max_Width> := 0;
   exports
    func Id(Basic_Port) -> optional Id<#port> is
       (Basic_Port.Port_Id);
@@ -236,7 +275,21 @@ class Phiddle::Basic_Port is
       Basic_Port.Port_Id := Id;
    end func Set_Id;
 
-   func Create(Name : Port_Name) -> Basic_Port is ((Name => Name));
+   func Value(Basic_Port) -> Unsigned_Value<Max_Width> is
+     (Basic_Port.Cur_Value);
+   func Set_Value(var Basic_Port; Value : Unsigned_Value<Max_Width>) is
+      Basic_Port.Cur_Value := Value;
+   end func Set_Value;
+
+   func Create(Name : Port_Name; Mode : In_Or_Out;
+               Initial_Value : Unsigned_Value<Max_Width> := 0) -> Basic_Port
+     is ((Name => Name, Mode => Mode, Cur_Value => Initial_Value));
+
+   //  Set signal id of connected signal
+   func Set_Connected_Signal(var Basic_Port; Id<#signal>) is
+      {Basic_Port.Connected_Signal is null}
+      Basic_Port.Connected_Signal := Id;
+   end func Set_Connected_Signal;
 end class Phiddle::Basic_Port;
 
 interface Phiddle::System<> is
@@ -257,8 +310,18 @@ interface Phiddle::System<> is
    op "indexing"(ref System; Id<#signal>) -> ref Basic_Signal+;
    op "indexing"(ref System; Id<#port>) -> ref Basic_Port+;
 
+   func Connect (var System;
+                 var Signal : Basic_Signal+;
+                 var Port : Basic_Port+;
+                 Mode : In_Or_Out);
+   //  Connect signal and port
+
+   func Run_Processes (var Sys : System; Num_Steps : Univ_Integer := 1);
+   //  Run the Process operation on all entities
+   //  the given number of steps.
+
    func Display_State (Sys : System);
-   --  Display the state of the system.
+   //  Display the state of the system.
 
    func Dump_To_JSON_File
      (File : Univ_String; Obj : Obj_Type is Assignable<>);
@@ -307,8 +370,26 @@ class Phiddle::System is
    op "indexing"(ref System; Id<#port>) -> ref Basic_Port+ is
       (System.Port_Vec[Id_Num(Id)]);
 
+   func Connect (var System;
+                 var Signal : Basic_Signal+;
+                 var Port : Basic_Port+;
+                 Mode : In_Or_Out) is
+   //  Connect signal and port
+      Set_Connected_Port (Signal, Id(Port), Mode);
+      Set_Connected_Signal (Port, Id(Signal));
+   end func Connect;
+
+   func Run_Processes (var Sys : System; Num_Steps : Univ_Integer := 1) is
+   //  Run the Process operation on all entities
+   //  the given number of steps.
+      for each E of Sys.Entity_Vec forward loop
+         Println("Running `(E.Name):`(E).Process()");
+         Sys.Process(E);
+      end loop;
+   end func Run_Processes;
+
    func Display_State (Sys : System) is
-   --  Display the state of the system.
+   //  Display the state of the system.
       Println ("System state:");
       Print ("Entities: ");
       for each E of Sys.Entity_Vec forward loop
@@ -318,7 +399,8 @@ class Phiddle::System is
 
       Print ("Ports: ");
       for each P of Sys.Port_Vec forward loop
-         Print (" " | P.Name | ":" | P);
+         Print (" " | P.Name | ":" | P | " = ");
+         Println (Value(P));
       end loop;
       Println("");
 
@@ -343,38 +425,28 @@ class Phiddle::System is
 
 end class Phiddle::System;
 
-interface Phiddle::Signal<Wid : Bits := 1> extends Basic_Signal<> is
+interface Phiddle::Signal<Width : Bits := 1> extends Basic_Signal<> is
   //  A signal with a specified width
-   const Width : Bits := 1;
-
-   func Value(Signal) -> Unsigned_Value<Width>;
-   func Set_Value(var Signal; Value : Unsigned_Value<Width>);
 
    func Add(ref var System; Name : Signal_Name;
-     Initial : Unsigned_Value<Width> := 0)
+     Initial : Unsigned_Value<Max_Width> := 0)
      -> ref var Signal;
      //  Add a signal to the system, with a defaulted-to-zero initial value
 
-   func From_String(Univ_String) -> optional Signal is (null);
-   func Create(Name : Signal_Name) -> Signal;
+   optional func From_String(Univ_String) -> optional Signal is (null);
+   func Create(Name : Signal_Name;
+               Initial_Value : Unsigned_Value<Max_Width> := 0) -> Signal;
 end interface Phiddle::Signal;
 
 class Phiddle::Signal is
-   var Cur_Value : Unsigned_Value<Width> := 0;
    var Inputs : Vector<Id<#port>> := [];
    var Outputs : Vector<Id<#port>> := [];
   exports
-   func Value(Signal) -> Unsigned_Value<Width> is
-     (Signal.Cur_Value);
-   func Set_Value(var Signal; Value : Unsigned_Value<Width>) is
-      Signal.Cur_Value := Value;
-   end func Set_Value;
-
    func Add(ref var System; Name : Signal_Name;
-     Initial : Unsigned_Value<Width> := 0)
+     Initial : Unsigned_Value<Max_Width> := 0)
      -> ref var Signal is
      const Sig : Basic_Signal+ :=
-       Signal::(Basic_Signal => Create(Name), Cur_Value => Initial);
+       Signal::(Basic_Signal => Create(Name, Initial_Value => Initial));
 
      case System::Add (System, Sig) of
         [Added : Signal] => return Added;
@@ -383,10 +455,12 @@ class Phiddle::Signal is
 
    end func Add;
 
-   func Create(Name : Signal_Name) -> Signal is (Basic_Signal => Create(Name));
+   func Create(Name : Signal_Name;
+               Initial_Value : Unsigned_Value<Max_Width>)
+      -> Signal is (Basic_Signal => Create(Name, Initial_Value));
 end class Phiddle::Signal;
 
-interface Phiddle::Port<Mode : In_Or_Out>
+interface Phiddle::Port<Port_Mode : In_Or_Out>
   extends Basic_Port<> is
   // A port of Mode #in, #out, or #inout
 
@@ -394,19 +468,28 @@ interface Phiddle::Port<Mode : In_Or_Out>
      -> ref var Port;
      //  Add a port to the system, with the given name and width
 
-   func From_String(Univ_String) -> optional Port is (null);
-   func Create(Name : Port_Name) -> Port;
+   optional func From_String(Univ_String) -> optional Port is (null);
+   func Create(Name : Port_Name; Mode : In_Or_Out := Port_Mode;
+     Initial_Value : Unsigned_Value<Max_Width> := 0) -> Port;
+
+   func Local_Create(Name : Port_Name; Mode : In_Or_Out := Port_Mode;
+     Width : Bits; Initial_Value : Unsigned_Value<Max_Width> := 0) -> Port;
+
 end interface Phiddle::Port;
 
 class Phiddle::Port is
    const Width : Bits;
+
   exports
+
+   func Local_Create(Name : Port_Name; Mode : In_Or_Out := Port_Mode;
+     Width : Bits; Initial_Value : Unsigned_Value<Max_Width> := 0) -> Port
+    is ((Basic_Port => Create(Name, Mode, Initial_Value), Width => Width));
 
    func Add(ref var System; Name : Port_Name; Width : Bits := 1)
      -> ref var Port is
      //  Add a port to the system, with the given name
-     const P : Basic_Port+ :=
-       Port::(Basic_Port => Create(Name), Width => Width);
+     const P : Basic_Port+ := Local_Create(Name, Width => Width);
 
      case System::Add (System, P) of
         [Added : Port] => return Added;
@@ -415,72 +498,94 @@ class Phiddle::Port is
 
    end func Add;
 
-   func Create(Name : Port_Name) -> Port
-    is ((Basic_Port => Create(Name), Width => 1));
+   func Create(Name : Port_Name; Mode : In_Or_Out := Port_Mode;
+     Initial_Value : Unsigned_Value<Max_Width> := 0) -> Port
+    is ((Basic_Port => Create(Name, Mode, Initial_Value), Width => 1));
+        //  NOTE: Width will be set properly when added to the system.
+
 end class Phiddle::Port;
 
 interface Phiddle::Entity <> extends Basic_Entity is
 
    func Kind(Ent : Entity) -> Univ_String is ("Entity");
 
-   func Add(ref var Sys : System; Name : Entity_Name;
-            Input_Ports, Output_Ports : Port_Map)
-     -> ref var Entity;
-     //  Add an Entity to the system, with the given ports
-
-   func From_String(Univ_String) -> optional Entity is (null);
+   optional func From_String(Univ_String) -> optional Entity is (null);
    func Create(Name : Entity_Name) -> Entity;
 
-   --  Add ports to entity
+   //  Add ports to entity
    func Add_Ports
      (var Sys : System; var Ent : Entity;
-      Input_Ports, Output_Ports : Port_Map);
+      Input_Ports, Output_Ports : Port_Map;
+      Process_Sensitive : optional Port_Set := null);
+
+   func Inputs (Entity) -> Port_Set;
+   func Outputs (Entity) -> Port_Set;
+   func Sensitive_To (Entity) -> Port_Set;
+
+   //  Get Port_Id given name of Port within entity
+   op "indexing"(Entity; Name : Port_Name) -> Id<#port>;
+
+   //  Perform one process step for the Entity
+   func Process (var Sys : System; Ent : Entity) is (null);
 end interface Phiddle::Entity;
 
 class Phiddle::Entity is
-   var Input_Ports : Vector<Id<#port>> := [];
-   var Output_Ports : Vector<Id<#port>> := [];
+   type Port_Id_Map is Sequenced_Map<Port_Name, Id<#port>>;
+
+   var Input_Ports : Port_Id_Map := [];
+   var Output_Ports : Port_Id_Map := [];
+   var Process_Sensitive : Port_Set := [];
 
   exports
 
-   func Add(ref var Sys : System; Name : Entity_Name;
-            Input_Ports, Output_Ports : Port_Map)
-     -> ref var Entity is
-     //  Add an Entity to the system
-     var E : Entity :=
-       Entity::(Basic_Entity => Create(Name));
-
-     const Ent : Basic_Entity+ := E;
-
-     --  tbd:stt  should be expressible as Entity::(polymorphic_obj)
-     case System::Add (Sys, Ent) of
-        [Added : Entity] =>
-           Add_Ports (Sys, Added, Input_Ports, Output_Ports);
-           return Added;
-        [..] => {#false}; 
-     end case;
-   end func Add;
-   
    func Create(Name : Entity_Name) -> Entity is (Basic_Entity => Create(Name));
 
-   --  Add ports to entity
+   //  Add ports to entity
    func Add_Ports
      (var Sys : System; var Ent : Entity;
-      Input_Ports, Output_Ports : Port_Map) is
+      Input_Ports, Output_Ports : Port_Map;
+      Process_Sensitive : optional Port_Set := null) is
 
      type In_Port is Port<#in>;
      type Out_Port is Port<#out>;
 
-     for each [Name => Width] of Input_Ports loop
-        ref P => In_Port::Add(Sys, Name => Name, Width => Width);
-        Ent.Input_Ports |= Id(P);
+     for each Name of Keys(Input_Ports) forward loop
+        ref P => In_Port::Add(Sys, Name => Name, Width => Input_Ports[Name]);
+        Ent.Input_Ports |= [Name => Id(P)];
      end loop;
 
-     for each [Name => Width] of Output_Ports loop
-        ref P => Out_Port::Add(Sys, Name => Name, Width => Width);
-        Ent.Output_Ports |= Id(P);
+     for each Name of Keys(Output_Ports) forward loop
+        {Name not in Ent.Input_Ports}  //  No dups between Input and outputs
+        ref P => Out_Port::Add(Sys, Name => Name, Width => Output_Ports[Name]);
+        Ent.Output_Ports |= [Name => Id(P)];
      end loop;
+
+     const All_Inputs : Port_Set := Keys (Input_Ports);
+
+     if Process_Sensitive is null then
+        //  Process is sensitive to all inputs
+        Ent.Process_Sensitive := All_Inputs;
+     else
+        //  User has specified the ports to which Process is sensitive
+        {Process_Sensitive <= All_Inputs};
+        Ent.Process_Sensitive := Process_Sensitive;
+     end if;
    end func Add_Ports;
+
+   func Inputs (Entity) -> Port_Set
+     is (Keys (Entity.Input_Ports))
+   func Outputs (Entity) -> Port_Set
+     is (Keys (Entity.Output_Ports));
+   func Sensitive_To (Entity) -> Port_Set is (Entity.Process_Sensitive);
+
+   //  Get Port_Id given name of Port within entity
+   op "indexing"(Entity; Name : Port_Name) -> Id<#port> is
+      if Name in Entity.Input_Ports then
+         return Entity.Input_Ports[Name];
+      else
+         return Entity.Output_Ports[Name];
+      end if;
+   end op "indexing";
 end class Phiddle::Entity;
 
 interface Phiddle::Mux <> extends Entity is
@@ -492,11 +597,15 @@ interface Phiddle::Mux <> extends Entity is
      -> ref var Mux;
      //  Add a mux to the system
 
-   func From_String(Univ_String) -> optional Mux is (null);
+   optional func From_String(Univ_String) -> optional Mux is (null);
    func Create(Name : Entity_Name) -> Mux;
+
+   //  Perform one process step for the Mux
+   func Process(var Sys : System; Mux);
 end interface Phiddle::Mux;
 
 class Phiddle::Mux is
+   var Num_Lines : Univ_Integer := 4;
   exports
 
    func Add(ref var Sys : System; Name : Entity_Name;
@@ -512,7 +621,7 @@ class Phiddle::Mux is
         [Added : Mux] =>
            var Input_Port_Map : Port_Map := [#select => Log_2(|Input_Ports|)];
 
-           for each P of Input_Ports loop
+           for each P of Input_Ports forward loop
               Input_Port_Map |= [P => 1];
            end loop;
               
@@ -526,6 +635,16 @@ class Phiddle::Mux is
    end func Add;
    
    func Create(Name : Entity_Name) -> Mux is (Entity => Create(Name));
+
+   //  Perform one process step for the Mux
+   func Process(var Sys : System; Mux) is
+      Println ("In Process for Mux:`(Mux)");
+      Print ("Inputs:");
+      for each IP of Mux.Inputs() forward loop
+         Print (" " | IP);
+      end loop;
+      Println("");
+   end func Process;
 end class Phiddle::Mux;
 
 import Phiddle::*;
@@ -549,6 +668,10 @@ func Test_Phiddle() is
    Sig1.Set_Value (1);
    Sig3.Set_Value (0);
    Sig2.Set_Value (Sig3.Value());
+
+   Phiddle::System::Display_State(Sys);
+
+   Sys.Run_Processes();
 
    Phiddle::System::Display_State(Sys);
    Phiddle::System::Dump_To_JSON_File ("phdl_system.json", Sys);
