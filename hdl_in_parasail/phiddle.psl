@@ -163,6 +163,10 @@ interface Phiddle::Basic_Entity<> is
 
    //  Perform one process step for the Entity
    func Process (var Sys : System; Ent : Basic_Entity) is (null);
+
+   //  Returns #true if should invoke Process operation given current values
+   //  of inputs.
+   func Needs_Processing (Sys : System; var Ent : Basic_Entity) -> Boolean;
 end interface Phiddle::Basic_Entity;
 
 class Phiddle::Basic_Entity is
@@ -176,6 +180,11 @@ class Phiddle::Basic_Entity is
    end func Set_Id;
 
    func Create(Name : Entity_Name) -> Basic_Entity is ((Name => Name));
+
+   func Needs_Processing (Sys : System; var Ent : Basic_Entity) -> Boolean is
+      Println("In default Needs_Processing for `(Ent)");
+      return #false;
+   end func Needs_Processing;
 end class Phiddle::Basic_Entity;
 
 interface Phiddle::Basic_Signal<> is
@@ -203,13 +212,17 @@ interface Phiddle::Basic_Signal<> is
      -> Basic_Signal;
 
    //  Connect a port of the given mode to the signal
-   func Set_Connected_Port(var Basic_Signal; Id<#port>; Mode : In_Or_Out);
+   func Connect_Port(var Basic_Signal; Id<#port>; Mode : In_Or_Out);
+
+   //  Return vector of port Ids connected to signal with given mode.
+   func Connected_Ports(Basic_Signal; Mode : In_Or_Out)
+     -> Vector<Id<#port>>;
 end interface Phiddle::Basic_Signal;
 
 class Phiddle::Basic_Signal is
    var Sig_Id : optional Id<#signal> := null;
    var Connected_Ports :
-     Array <optional Id<#port>, Indexed_By => In_Or_Out> := Create([..], null);
+     Array <Vector<Id<#port>>, Indexed_By => In_Or_Out> := Create([..], []);
    var Cur_Value : Unsigned_Value<Max_Width> := 0;
   exports
    func Id(Basic_Signal) -> optional Id<#signal> is
@@ -230,10 +243,13 @@ class Phiddle::Basic_Signal is
      -> Basic_Signal is ((Name => Name, Cur_Value => Initial_Value));
 
    //  Connect a port of the given mode to the signal
-   func Set_Connected_Port(var Basic_Signal; Id<#port>; Mode : In_Or_Out) is
-      {Basic_Signal.Connected_Ports[Mode] is null};
-      Basic_Signal.Connected_Ports[Mode] := Id;
-   end func Set_Connected_Port;
+   func Connect_Port(var Basic_Signal; Id<#port>; Mode : In_Or_Out) is
+      Basic_Signal.Connected_Ports[Mode] |= Id;
+   end func Connect_Port;
+
+   //  Return vector of port Ids connected to signal with given mode.
+   func Connected_Ports(Basic_Signal; Mode : In_Or_Out)
+     -> Vector<Id<#port>> is (Basic_Signal.Connected_Ports[Mode]);
 end class Phiddle::Basic_Signal;
 
 interface Phiddle::Basic_Port<> is
@@ -249,7 +265,7 @@ interface Phiddle::Basic_Port<> is
    func Set_Value(var Basic_Port; Value : Unsigned_Value<Max_Width>);
 
    func To_String(Basic_Port) -> Univ_String
-     is (To_String(Id(Basic_Port)));
+     is (Str(Basic_Port.Mode) | '-' | To_String(Id(Basic_Port)));
    optional func From_String(Univ_String) -> optional Basic_Port is (null);
    op "=?"(Left, Right : Basic_Port) -> Ordering
      is (Id(Left) =? Id(Right))
@@ -260,7 +276,10 @@ interface Phiddle::Basic_Port<> is
                Initial_Value : Unsigned_Value<Max_Width> := 0) -> Basic_Port;
 
    //  Set signal id of connected signal
-   func Set_Connected_Signal(var Basic_Port; Id<#signal>);
+   func Connect_Signal(var Basic_Port; Id<#signal>);
+
+   //  Return id of connected signal, if any
+   func Connected_Signal(Basic_Port) -> optional Id<#signal>;
 end interface Phiddle::Basic_Port;
 
 class Phiddle::Basic_Port is
@@ -286,10 +305,14 @@ class Phiddle::Basic_Port is
      is ((Name => Name, Mode => Mode, Cur_Value => Initial_Value));
 
    //  Set signal id of connected signal
-   func Set_Connected_Signal(var Basic_Port; Id<#signal>) is
+   func Connect_Signal(var Basic_Port; Id<#signal>) is
       {Basic_Port.Connected_Signal is null}
       Basic_Port.Connected_Signal := Id;
-   end func Set_Connected_Signal;
+   end func Connect_Signal;
+
+   //  Return id of connected signal, if any
+   func Connected_Signal(Basic_Port) -> optional Id<#signal> is
+     (Basic_Port.Connected_Signal);
 end class Phiddle::Basic_Port;
 
 interface Phiddle::System<> is
@@ -306,6 +329,7 @@ interface Phiddle::System<> is
      -> ref var Basic_Port+;
    //  Copy a port into the system, return a ref to port within System.
 
+   //  Return ref to given Entity/Signal/Port given its Id
    op "indexing"(ref System; Id<#entity>) -> ref Basic_Entity+;
    op "indexing"(ref System; Id<#signal>) -> ref Basic_Signal+;
    op "indexing"(ref System; Id<#port>) -> ref Basic_Port+;
@@ -324,13 +348,37 @@ interface Phiddle::System<> is
    //  Display the state of the system.
 
    func Dump_To_JSON_File
-     (File : Univ_String; Obj : Obj_Type is Assignable<>);
+     (Obj : Obj_Type is Assignable<>; File : Univ_String);
 end interface Phiddle::System;
 
 class Phiddle::System is
    var Entity_Vec : Vector<Basic_Entity+> := [];
    var Signal_Vec : Vector<Basic_Signal+> := [];
    var Port_Vec : Vector<Basic_Port+> := [];
+
+   //  Propagate signals to/from ports
+   func Propagate_Signals (var Sys : System) is
+      for each S of Sys.Signal_Vec forward loop
+
+         //  Set new value from ports driving the signal
+         const Drivers := S.Connected_Ports(#out) | S.Connected_Ports(#inout);
+         if |Drivers| > 0 then
+            Println ("Old value of " | S | " = " | S.Value());
+            S.Set_Value((for each P of Drivers => Max (<0>, Sys[P].Value())));
+            //  TBD: Using Max if multiple connected ports
+         end if;
+
+         Println ("Propagating current value of " | S | " = " | S.Value());
+
+         //  Propagate new values to driven ports
+         const Driven := S.Connected_Ports(#in) | S.Connected_Ports(#inout);
+         for each P of Driven loop
+            Sys[P].Set_Value(S.Value());
+         end loop;
+
+      end loop;
+   end func Propagate_Signals;
+
   exports
    func Create() -> System is (());
 
@@ -375,17 +423,20 @@ class Phiddle::System is
                  var Port : Basic_Port+;
                  Mode : In_Or_Out) is
    //  Connect signal and port
-      Set_Connected_Port (Signal, Id(Port), Mode);
-      Set_Connected_Signal (Port, Id(Signal));
+      Connect_Port (Signal, Id(Port), Mode);
+      Connect_Signal (Port, Id(Signal));
    end func Connect;
 
    func Run_Processes (var Sys : System; Num_Steps : Univ_Integer := 1) is
    //  Run the Process operation on all entities
    //  the given number of steps.
-      for each E of Sys.Entity_Vec forward loop
-         Println("Running `(E.Name):`(E).Process()");
-         Sys.Process(E);
+      for each E : Basic_Entity+ of Sys.Entity_Vec forward loop
+         if Needs_Processing (Sys, E) then
+            Println("Running `(E.Name):`(E).Process()");
+            Sys.Process(E);
+         end if;
       end loop;
+      Propagate_Signals (Sys);
    end func Run_Processes;
 
    func Display_State (Sys : System) is
@@ -399,22 +450,25 @@ class Phiddle::System is
 
       Print ("Ports: ");
       for each P of Sys.Port_Vec forward loop
-         Print (" " | P.Name | ":" | P | " = ");
+         const Sig := Connected_Signal (P);
+         Print (" " | P.Name | ":" | P |
+           (if Sig not null then "(`(Sig))" else "") | " = ");
          Println (Value(P));
       end loop;
       Println("");
 
       Print ("Signals: ");
       for each S of Sys.Signal_Vec forward loop
-         Print (" " | S.Name | ":" | S);
+         Print (" " | S.Name | ":" | S | " = ");
+         Println (Value(S));
       end loop;
       Println("");
    end func Display_State;
 
    func Dump_To_JSON_File
-     (File : Univ_String; Obj : Obj_Type is Assignable<>) is
+     (Obj : Obj_Type is Assignable<>; File : Univ_String) is
       var IO := IO::Get_IO();
-      var B_File : Byte_Stream_Output_File := IO.Create ("phdl_system.json");
+      var B_File : Byte_Stream_Output_File := IO.Create (File);
 
       ref var OVS : JSON_Output_Value_Stream => Create(B_File);
 
@@ -527,6 +581,10 @@ interface Phiddle::Entity <> extends Basic_Entity is
 
    //  Perform one process step for the Entity
    func Process (var Sys : System; Ent : Entity) is (null);
+
+   //  Returns #true if should invoke Process operation given current values
+   //  of inputs.
+   func Needs_Processing (Sys : System; var Ent : Entity) -> Boolean;
 end interface Phiddle::Entity;
 
 class Phiddle::Entity is
@@ -535,6 +593,7 @@ class Phiddle::Entity is
    var Input_Ports : Port_Id_Map := [];
    var Output_Ports : Port_Id_Map := [];
    var Process_Sensitive : Port_Set := [];
+   var Trigger_Values : Vector<Unsigned_Value<Max_Width>> := [];
 
   exports
 
@@ -586,6 +645,33 @@ class Phiddle::Entity is
          return Entity.Output_Ports[Name];
       end if;
    end op "indexing";
+
+   //  Returns #true if should invoke Process operation given current values
+   //  of inputs.
+   func Needs_Processing (Sys : System; var Ent : Entity) -> Boolean is
+      Println ("Checking if `(Ent) needs processing");
+      const Triggers := Ent.Process_Sensitive;
+      const Trigger_Values : Vector<Unsigned_Value<Max_Width>> :=
+        [for each T of Triggers forward => Value(Sys[Ent[T]]) ];
+
+      Println ("Old: " |
+        (for each V of Ent.Trigger_Values => <""> | ' ' | V));
+      Println ("New: " |
+        (for each V of Trigger_Values => <""> | ' ' | V));
+
+      if |Trigger_Values| != |Ent.Trigger_Values|
+        or else
+         (for some I in Trigger_Values.Bounds() =>
+           Trigger_Values[I] != Ent.Trigger_Values[I])
+      then
+         Ent.Trigger_Values := Trigger_Values;
+         return #true;
+      else
+         //  No change.
+         Println ("No change in triggers:");
+         return #false;
+      end if;
+   end func Needs_Processing;
 end class Phiddle::Entity;
 
 interface Phiddle::Mux <> extends Entity is
@@ -640,10 +726,24 @@ class Phiddle::Mux is
    func Process(var Sys : System; Mux) is
       Println ("In Process for Mux:`(Mux)");
       Print ("Inputs:");
-      for each IP of Mux.Inputs() forward loop
-         Print (" " | IP);
+      const Inps := Mux.Inputs();
+      for each IP of Inps forward loop
+         Print (" " | IP | " = " | Sys[Mux[IP]].Value());
       end loop;
       Println("");
+
+      const Outs := Mux.Outputs();
+      {|Outs| == 1}  //  expecting only one output
+
+      const Sel := Sys[Mux[#select]].Value();
+      if Sel in 0 .. |Inps|-2 then
+         //  Set the output from selected input
+         const Selected_Inp := Inps[ [[Sel+2]] ];
+         Println("Setting `(Mux) output from input `(Selected_Inp)");
+         Sys[Mux[Outs[1]]].Set_Value (Sys[Mux[Selected_Inp]].Value());
+      else
+         Println("Bad select value in " | Mux | " = " | Sel);
+      end if;
    end func Process;
 end class Phiddle::Mux;
 
@@ -665,14 +765,26 @@ func Test_Phiddle() is
    ref Sig2 => Bit_Signal::Add(Sys, #s2);
    ref Sig3 => Bit_Signal::Add(Sys, #s3);
 
+   Sys.Connect(Sig1, Sys[Mux1[#select]], #in);
+   Sys.Connect(Sig2, Sys[Mux1[#a]], #in);
+   Sys.Connect(Sig3, Sys[Mux1[#x]], #out);
+
+   Sys.Display_State();
+   Sys.Run_Processes();
+   Sys.Display_State();
+
    Sig1.Set_Value (1);
    Sig3.Set_Value (0);
-   Sig2.Set_Value (Sig3.Value());
+   Sig2.Set_Value (Sig1.Value() + 1);
 
-   Phiddle::System::Display_State(Sys);
+   Sys.Display_State();
 
    Sys.Run_Processes();
 
-   Phiddle::System::Display_State(Sys);
-   Phiddle::System::Dump_To_JSON_File ("phdl_system.json", Sys);
+   Sys.Display_State();
+
+   Sys.Run_Processes();
+
+   Sys.Display_State();
+   System::Dump_To_JSON_File (Sys, "phdl_system.json");
 end func Test_Phiddle;
