@@ -670,9 +670,9 @@ class Phiddle::Entity is
         [for each T of Triggers forward => Value(Sys[Ent[T]]) ];
 
       Println ("Old: " |
-        (for each V of Ent.Trigger_Values => <""> | ' ' | V));
+        (for each V of Ent.Trigger_Values forward => <""> | ' ' | V));
       Println ("New: " |
-        (for each V of Trigger_Values => <""> | ' ' | V));
+        (for each V of Trigger_Values forward => <""> | ' ' | V));
 
       if |Trigger_Values| != |Ent.Trigger_Values|
         or else
@@ -779,17 +779,19 @@ func Test_Phiddle() is
    ref Sig1 => Bit_Signal::Add(Sys, #s1);
    ref Sig2 => Bit_Signal::Add(Sys, #s2);
    ref Sig3 => Bit_Signal::Add(Sys, #s3);
+   ref Sig4 => Bit_Signal::Add(Sys, #s4);
 
    Sys.Connect(Sig1, Sys[Mux1[#select]], #in);
    Sys.Connect(Sig2, Sys[Mux1[#a]], #in);
-   Sys.Connect(Sig3, Sys[Mux1[#x]], #out);
+   Sys.Connect(Sig3, Sys[Mux1[#b]], #in);
+   Sys.Connect(Sig4, Sys[Mux1[#x]], #out);
 
    Sys.Display_State();
    Sys.Do_Processing();
    Sys.Display_State();
 
    Sig1.Set_Value (1);
-   Sig3.Set_Value (0);
+   Sig3.Set_Value (3);
    Sig2.Set_Value (Sig1.Value() + 1);
 
    Sys.Display_State();
