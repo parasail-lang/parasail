@@ -340,9 +340,9 @@ interface Phiddle::System<> is
                  Mode : In_Or_Out);
    //  Connect signal and port
 
-   func Run_Processes (var Sys : System; Num_Steps : Univ_Integer := 1);
+   func Do_Processing (var Sys : System; Max_Steps : Univ_Integer := 100);
    //  Run the Process operation on all entities
-   //  the given number of steps.
+   //  at most the given number of steps.
 
    func Display_State (Sys : System);
    //  Display the state of the system.
@@ -427,17 +427,32 @@ class Phiddle::System is
       Connect_Signal (Port, Id(Signal));
    end func Connect;
 
-   func Run_Processes (var Sys : System; Num_Steps : Univ_Integer := 1) is
+   func Do_Processing (var Sys : System; Max_Steps : Univ_Integer := 100) is
    //  Run the Process operation on all entities
-   //  the given number of steps.
-      for each E : Basic_Entity+ of Sys.Entity_Vec forward loop
-         if Needs_Processing (Sys, E) then
-            Println("Running `(E.Name):`(E).Process()");
-            Sys.Process(E);
+   //  at most the given number of steps.
+      for I in 1 .. Max_Steps forward loop
+         var Some_Processing_Occurred : Boolean := #false;
+
+         //  Propagate signal values to/from ports
+         Propagate_Signals (Sys);
+
+         for each E : Basic_Entity+ of Sys.Entity_Vec forward loop
+            if Needs_Processing (Sys, E) then
+               Some_Processing_Occurred := #true;
+               Println("Running `(E.Name):`(E).Process()");
+               Sys.Process(E);
+            end if;
+         end loop;
+
+         if not Some_Processing_Occurred then
+            Println("Do_Processing complete " |
+              "after `(I-1) step `(I != 2? "s": "")");
+            return;
          end if;
       end loop;
-      Propagate_Signals (Sys);
-   end func Run_Processes;
+
+      Println("Do_Processing exited after running Max_Steps => `(Max_Steps)");
+   end func Do_Processing;
 
    func Display_State (Sys : System) is
    //  Display the state of the system.
@@ -770,7 +785,7 @@ func Test_Phiddle() is
    Sys.Connect(Sig3, Sys[Mux1[#x]], #out);
 
    Sys.Display_State();
-   Sys.Run_Processes();
+   Sys.Do_Processing();
    Sys.Display_State();
 
    Sig1.Set_Value (1);
@@ -778,13 +793,8 @@ func Test_Phiddle() is
    Sig2.Set_Value (Sig1.Value() + 1);
 
    Sys.Display_State();
-
-   Sys.Run_Processes();
-
+   Sys.Do_Processing();
    Sys.Display_State();
 
-   Sys.Run_Processes();
-
-   Sys.Display_State();
    System::Dump_To_JSON_File (Sys, "phdl_system.json");
 end func Test_Phiddle;
