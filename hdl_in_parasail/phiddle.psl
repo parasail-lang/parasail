@@ -6,7 +6,7 @@ interface Phiddle<> is
 
    type In_Or_Out is Enum<[#in, #out, #inout]>;
 
-   const Max_Width := 256;
+   const Max_Width := 63;
    type Bits is new Integer<Range => 0 .. Max_Width>;
    //  A count of bits
 
@@ -15,17 +15,15 @@ interface Phiddle<> is
    type Port_Name is new Univ_Enumeration;
    type Signal_Name is new Univ_Enumeration;
 
-   interface Unsigned_Value<Width : Bits := 1>
-     extends Integer<> is    --  tbd:stt <0 .. 2**Width-1> is
-    //  An unsigned integer type with the given number of bits
+   interface Unsigned_Value<>
+     extends Integer<0 .. 2**Max_Width-1> is
+    //  An unsigned integer type
 
-      op "slicing"(Val : Base_Type is Unsigned_Value<>;
+      op "slicing"(Val : Unsigned_Value;
                    Select : Countable_Range<Bits>)
-       {Select.First >= 0 and then Select.Last < Base_Type::Width
-        and then Select.Last - Select.First + 1 == Width}
         -> Unsigned_Value;
       //  An operation to select the given subset of bits
-      //  Bits are numbered 0 .. Width-1
+      //  Bits are numbered 0 .. Max_Width-1
 
    end interface Unsigned_Value;
 
@@ -40,6 +38,23 @@ interface Phiddle<> is
 
    --  Log 2, rounded up
    func Log_2(V : Univ_Integer {V > 0}) -> Bits;
+
+   interface Time_Delay<> is
+      func ns(Univ_Integer) -> Time_Delay;
+      func us(Univ_Integer) -> Time_Delay;
+      func ms(Univ_Integer) -> Time_Delay;
+      func sec(Univ_Integer) -> Time_Delay;
+
+      op "+"(Left, Right : Time_Delay) -> Time_Delay;
+      func Strict_Compare(Left, Right : Time_Delay)
+        -> Ordered::Full_Ordering;
+      op "=?"(Left, Right : Time_Delay) -> Ordering is Strict_Compare;
+
+      type Seconds is Fixed<Delta => 1.0e-9>;
+      func Delay_In_Seconds(Time_Delay) -> Seconds;
+
+      func No_Delay() -> Time_Delay is (sec(0));
+   end interface Time_Delay;
 end interface Phiddle;
 
 class Phiddle is
@@ -48,7 +63,7 @@ class Phiddle is
     //  An unsigned integer type with the given number of bits
 
      exports
-      op "slicing"(Val : Base_Type is Unsigned_Value<>;
+      op "slicing"(Val : Unsigned_Value;
                    Select : Countable_Range<Bits>) -> Unsigned_Value is
       //  An operation to select the given subset of bits
       //  Bits are numbered 0 .. Width-1
@@ -77,6 +92,32 @@ class Phiddle is
       {#false}
       return Bits::Range.Last;
    end func Log_2;
+
+   class Time_Delay is
+      const Amount : Seconds;
+     exports
+      func ns(Univ_Integer) -> Time_Delay is
+        (Amount => Univ_Integer * 1.0e-9);
+
+      func us(Univ_Integer) -> Time_Delay is
+        (Amount => Univ_Integer * 1.0e-6);
+
+      func ms(Univ_Integer) -> Time_Delay is
+        (Amount => Univ_Integer * 1.0e-3);
+
+      func sec(Univ_Integer) -> Time_Delay is
+        (Amount => Univ_Integer * 1.0);
+
+      op "+"(Left, Right : Time_Delay) -> Time_Delay is
+        ((Amount => Left.Amount + Right.Amount));
+
+      func Strict_Compare(Left, Right : Time_Delay)
+        -> Ordered::Full_Ordering is
+        (Strict_Compare (Left.Amount, Right.Amount));
+
+      func Delay_In_Seconds(Time_Delay) -> Seconds is
+        (Time_Delay.Amount);
+   end class Time_Delay;
 end class Phiddle;
 
 interface Phiddle::Id<Kind : Part_Kind> is
@@ -196,8 +237,8 @@ interface Phiddle::Basic_Signal<> is
    func Id(Basic_Signal)-> optional Id<#signal>;
    func Set_Id(var Basic_Signal; Id<#signal>);
 
-   func Value(Basic_Signal) -> Unsigned_Value<Max_Width>;
-   func Set_Value(var Basic_Signal; Value : Unsigned_Value<Max_Width>);
+   func Value(Basic_Signal) -> Unsigned_Value;
+   func Set_Value(var Basic_Signal; Value : Unsigned_Value);
 
    func To_String(Basic_Signal) -> Univ_String
      is (To_String(Id(Basic_Signal)));
@@ -208,7 +249,7 @@ interface Phiddle::Basic_Signal<> is
      is (Hash(Id(Basic_Signal)));
 
    func Create
-     (Name : Signal_Name; Initial_Value : Unsigned_Value<Max_Width> := 0)
+     (Name : Signal_Name; Initial_Value : Unsigned_Value := 0)
      -> Basic_Signal;
 
    //  Connect a port of the given mode to the signal
@@ -223,7 +264,7 @@ class Phiddle::Basic_Signal is
    var Sig_Id : optional Id<#signal> := null;
    var Connected_Ports :
      Array <Vector<Id<#port>>, Indexed_By => In_Or_Out> := Create([..], []);
-   var Cur_Value : Unsigned_Value<Max_Width> := 0;
+   var Cur_Value : Unsigned_Value := 0;
   exports
    func Id(Basic_Signal) -> optional Id<#signal> is
       (Basic_Signal.Sig_Id);
@@ -232,14 +273,15 @@ class Phiddle::Basic_Signal is
       Basic_Signal.Sig_Id := Id;
    end func Set_Id;
 
-   func Value(Basic_Signal) -> Unsigned_Value<Max_Width> is
+   func Value(Basic_Signal) -> Unsigned_Value is
      (Basic_Signal.Cur_Value);
-   func Set_Value(var Basic_Signal; Value : Unsigned_Value<Max_Width>) is
+
+   func Set_Value(var Basic_Signal; Value : Unsigned_Value) is
       Basic_Signal.Cur_Value := Value;
    end func Set_Value;
 
    func Create
-     (Name : Signal_Name; Initial_Value : Unsigned_Value<Max_Width> := 0)
+     (Name : Signal_Name; Initial_Value : Unsigned_Value := 0)
      -> Basic_Signal is ((Name => Name, Cur_Value => Initial_Value));
 
    //  Connect a port of the given mode to the signal
@@ -261,8 +303,8 @@ interface Phiddle::Basic_Port<> is
    func Id(Basic_Port) -> optional Id<#port>;
    func Set_Id(var Basic_Port; Id<#port>);
 
-   func Value(Basic_Port) -> Unsigned_Value<Max_Width>;
-   func Set_Value(var Basic_Port; Value : Unsigned_Value<Max_Width>);
+   func Value(Basic_Port) -> Unsigned_Value;
+   func Set_Value(var Basic_Port; Value : Unsigned_Value);
 
    func To_String(Basic_Port) -> Univ_String
      is (Str(Basic_Port.Mode) | '-' | To_String(Id(Basic_Port)));
@@ -273,7 +315,7 @@ interface Phiddle::Basic_Port<> is
      is (Hash(Id(Basic_Port)));
 
    func Create(Name : Port_Name; Mode : In_Or_Out;
-               Initial_Value : Unsigned_Value<Max_Width> := 0) -> Basic_Port;
+               Initial_Value : Unsigned_Value := 0) -> Basic_Port;
 
    //  Set signal id of connected signal
    func Connect_Signal(var Basic_Port; Id<#signal>);
@@ -285,7 +327,7 @@ end interface Phiddle::Basic_Port;
 class Phiddle::Basic_Port is
    var Port_Id : optional Id<#port> := null;
    var Connected_Signal : optional Id<#signal> := null;
-   var Cur_Value : Unsigned_Value<Max_Width> := 0;
+   var Cur_Value : Unsigned_Value := 0;
   exports
    func Id(Basic_Port) -> optional Id<#port> is
       (Basic_Port.Port_Id);
@@ -294,14 +336,14 @@ class Phiddle::Basic_Port is
       Basic_Port.Port_Id := Id;
    end func Set_Id;
 
-   func Value(Basic_Port) -> Unsigned_Value<Max_Width> is
+   func Value(Basic_Port) -> Unsigned_Value is
      (Basic_Port.Cur_Value);
-   func Set_Value(var Basic_Port; Value : Unsigned_Value<Max_Width>) is
+   func Set_Value(var Basic_Port; Value : Unsigned_Value) is
       Basic_Port.Cur_Value := Value;
    end func Set_Value;
 
    func Create(Name : Port_Name; Mode : In_Or_Out;
-               Initial_Value : Unsigned_Value<Max_Width> := 0) -> Basic_Port
+               Initial_Value : Unsigned_Value := 0) -> Basic_Port
      is ((Name => Name, Mode => Mode, Cur_Value => Initial_Value));
 
    //  Set signal id of connected signal
@@ -314,6 +356,103 @@ class Phiddle::Basic_Port is
    func Connected_Signal(Basic_Port) -> optional Id<#signal> is
      (Basic_Port.Connected_Signal);
 end class Phiddle::Basic_Port;
+
+interface Phiddle::Delay_Queue<Item_Type is Comparable<>> is
+   //  Queue of items ordered by delay time
+   //  "Transport" property determines whether 
+   //  Adding the same item a second time cancels all later entries for item
+   //  If "Transport" is true, later items remain; if false, they are removed.
+
+   func Cur_Time (Queue : Delay_Queue) -> Time_Delay;
+
+   func Add_Item
+     (var Queue : Delay_Queue;
+      Item : Item_Type;
+      Delay : Time_Delay;  //  Relative to the current time
+      Transport : Boolean := #false);
+
+   //  Return set of items that all share the same wakeup time
+   //  (in insertion order) and advance Cur_Time to match that.
+   func Advance_And_Remove_Items (var Queue : Delay_Queue)
+     -> Vector<Item_Type>;
+
+   func Create() -> Delay_Queue;
+
+end interface Phiddle::Delay_Queue;
+
+class Phiddle::Delay_Queue is
+   interface Delay_Queue_Element<> is
+      const Item : Item_Type;
+      const Wakeup : Time_Delay;
+      const Transport : Boolean;
+      var Next : optional Delay_Queue_Element := null;
+   end interface Delay_Queue_Element;
+
+   var Elements : optional Delay_Queue_Element := null;
+   var Cur_Time : Time_Delay := sec(0);
+
+  exports
+   func Cur_Time (Queue : Delay_Queue) -> Time_Delay is (Queue.Cur_Time);
+
+   func Add_Item
+     (var Queue : Delay_Queue;
+      Item : Item_Type;
+      Delay : Time_Delay;
+      Transport : Boolean := #false) is
+
+      const Abs_Time := Queue.Cur_Time + Delay;
+
+      var New_Elem : Delay_Queue_Element for Queue.Elements :=
+        (Item => Item, Wakeup => Abs_Time, Transport => Transport);
+
+      for E => Queue.Elements then E.Next while E not null loop
+         if E.Wakeup > Abs_Time then
+            New_Elem.Next <== E;
+            E <== New_Elem;
+            if not Transport then
+               //  Remove elements with same Item with later wakeups
+               null;   //  TBD
+            end if;
+            return;
+         elsif E.Next is null then
+            E.Next <== New_Elem;
+            return;
+         elsif E.Item == Item then
+            //  Item at same or earlier wakeup
+            null;   //  TBD
+         end if;
+      end loop;
+
+      //  Queue must be empty
+      {Queue.Elements is null}
+      Queue.Elements <== New_Elem;
+   end func Add_Item;
+
+   func Advance_And_Remove_Items (var Queue : Delay_Queue)
+     -> Result : Vector<Item_Type> is
+      Result := [];
+      if Queue.Elements is null then
+         return;
+      else
+         Queue.Cur_Time := Queue.Elements.Wakeup;
+         for E => Queue.Elements then E.Next while E not null loop
+            if E.Wakeup > Queue.Cur_Time then
+               //  New first element on queue
+               Queue.Elements := E;
+               //  All done
+               return;
+            else
+               Result |= E.Item;
+            end if;
+         end loop;
+         //  All items waking up now
+         Queue.Elements := null;
+         return;
+      end if;
+   end func Advance_And_Remove_Items;
+
+   func Create() -> Delay_Queue is (());
+end class Phiddle::Delay_Queue;
 
 interface Phiddle::System<> is
    func Create() -> System;
@@ -340,6 +479,14 @@ interface Phiddle::System<> is
                  Mode : In_Or_Out);
    //  Connect signal and port
 
+   //  Schedule a delayed update to value of a Port
+   func Set_Value (var Sys : System; P : Id<#port>; Value : Unsigned_Value;
+                   After : Time_Delay; Transport : Boolean := #false);
+
+   //  Schedule a delayed update to value of a Signal
+   func Set_Value (var Sys : System; S : Id<#signal>; Value : Unsigned_Value;
+                   After : Time_Delay; Transport : Boolean := #false)
+
    func Do_Processing (var Sys : System; Max_Steps : Univ_Integer := 100);
    //  Run the Process operation on all entities
    //  at most the given number of steps.
@@ -355,6 +502,42 @@ class Phiddle::System is
    var Entity_Vec : Vector<Basic_Entity+> := [];
    var Signal_Vec : Vector<Basic_Signal+> := [];
    var Port_Vec : Vector<Basic_Port+> := [];
+
+   abstract interface Item_And_Value<> is
+      const Value : Unsigned_Value;
+      op "=?"(Left, Right : Item_And_Value) -> Ordering;
+      func Set_Value(var Sys : System; IV : Item_And_Value);
+   end interface Item_And_Value;
+
+   interface Port_And_Value<> extends Item_And_Value is
+      const Port : Id<#port>;
+      op "=?"(Left, Right : Port_And_Value) -> Ordering is
+        (Left.Port =? Right.Port);
+      func Set_Value(var Sys : System; PV : Port_And_Value);
+   end interface Port_And_Value;
+
+   class Port_And_Value is
+     exports
+      func Set_Value(var Sys : System; PV : Port_And_Value) is
+         Sys[PV.Port].Set_Value(PV.Value);
+      end func Set_Value;
+   end class Port_And_Value;
+
+   interface Sig_And_Value<> extends Item_And_Value is
+      const Sig : Id<#signal>;
+      op "=?"(Left, Right : Sig_And_Value) -> Ordering is
+        (Left.Sig =? Right.Sig);
+      func Set_Value(var Sys : System; SV : Sig_And_Value);
+   end interface Sig_And_Value;
+
+   class Sig_And_Value is
+     exports
+      func Set_Value(var Sys : System; SV : Sig_And_Value) is
+         Sys[SV.Sig].Set_Value(SV.Value);
+      end func Set_Value;
+   end class Sig_And_Value;
+
+   var Queued_Port_Updates : Delay_Queue <Item_And_Value+> := Create();
 
    //  Propagate signals to/from ports
    func Propagate_Signals (var Sys : System) is
@@ -427,6 +610,20 @@ class Phiddle::System is
       Connect_Signal (Port, Id(Signal));
    end func Connect;
 
+   //  Schedule a delayed update to value of a Port
+   func Set_Value (var Sys : System; P : Id<#port>; Value : Unsigned_Value;
+                   After : Time_Delay; Transport : Boolean := #false) is
+      Sys.Queued_Port_Updates.Add_Item
+        (Port_And_Value::(Value, P), After, Transport);
+   end func Set_Value;
+
+   //  Schedule a delayed update to value of a Signal
+   func Set_Value (var Sys : System; S : Id<#signal>; Value : Unsigned_Value;
+                   After : Time_Delay; Transport : Boolean := #false) is
+      Sys.Queued_Port_Updates.Add_Item
+        (Sig_And_Value::(Value, S), After, Transport);
+   end func Set_Value;
+
    func Do_Processing (var Sys : System; Max_Steps : Univ_Integer := 100) is
    //  Run the Process operation on all entities
    //  at most the given number of steps.
@@ -445,9 +642,19 @@ class Phiddle::System is
          end loop;
 
          if not Some_Processing_Occurred then
-            Println("Do_Processing complete " |
-              "after `(I-1) step `(I != 2? "s": "")");
-            return;
+            const Items_To_Update :=
+              Sys.Queued_Port_Updates.Advance_And_Remove_Items();
+
+            if |Items_To_Update| == 0 then
+               Println("Do_Processing complete " |
+                 "after `(I-1) step`(I != 2? "s": "")");
+               return;
+            else
+               //  Perform the deferred updates and keep processing
+               for each IV of Items_To_Update loop
+                  Set_Value (Sys, IV);
+               end loop;
+            end if;
          end if;
       end loop;
 
@@ -498,13 +705,13 @@ interface Phiddle::Signal<Width : Bits := 1> extends Basic_Signal<> is
   //  A signal with a specified width
 
    func Add(ref var System; Name : Signal_Name;
-     Initial : Unsigned_Value<Max_Width> := 0)
+     Initial : Unsigned_Value := 0)
      -> ref var Signal;
      //  Add a signal to the system, with a defaulted-to-zero initial value
 
    optional func From_String(Univ_String) -> optional Signal is (null);
    func Create(Name : Signal_Name;
-               Initial_Value : Unsigned_Value<Max_Width> := 0) -> Signal;
+               Initial_Value : Unsigned_Value := 0) -> Signal;
 end interface Phiddle::Signal;
 
 class Phiddle::Signal is
@@ -512,7 +719,7 @@ class Phiddle::Signal is
    var Outputs : Vector<Id<#port>> := [];
   exports
    func Add(ref var System; Name : Signal_Name;
-     Initial : Unsigned_Value<Max_Width> := 0)
+     Initial : Unsigned_Value := 0)
      -> ref var Signal is
      const Sig : Basic_Signal+ :=
        Signal::(Basic_Signal => Create(Name, Initial_Value => Initial));
@@ -525,7 +732,7 @@ class Phiddle::Signal is
    end func Add;
 
    func Create(Name : Signal_Name;
-               Initial_Value : Unsigned_Value<Max_Width>)
+               Initial_Value : Unsigned_Value)
       -> Signal is (Basic_Signal => Create(Name, Initial_Value));
 end class Phiddle::Signal;
 
@@ -539,10 +746,10 @@ interface Phiddle::Port<Port_Mode : In_Or_Out>
 
    optional func From_String(Univ_String) -> optional Port is (null);
    func Create(Name : Port_Name; Mode : In_Or_Out := Port_Mode;
-     Initial_Value : Unsigned_Value<Max_Width> := 0) -> Port;
+     Initial_Value : Unsigned_Value := 0) -> Port;
 
    func Local_Create(Name : Port_Name; Mode : In_Or_Out := Port_Mode;
-     Width : Bits; Initial_Value : Unsigned_Value<Max_Width> := 0) -> Port;
+     Width : Bits; Initial_Value : Unsigned_Value := 0) -> Port;
 
 end interface Phiddle::Port;
 
@@ -552,7 +759,7 @@ class Phiddle::Port is
   exports
 
    func Local_Create(Name : Port_Name; Mode : In_Or_Out := Port_Mode;
-     Width : Bits; Initial_Value : Unsigned_Value<Max_Width> := 0) -> Port
+     Width : Bits; Initial_Value : Unsigned_Value := 0) -> Port
     is ((Basic_Port => Create(Name, Mode, Initial_Value), Width => Width));
 
    func Add(ref var System; Name : Port_Name; Width : Bits := 1)
@@ -568,7 +775,7 @@ class Phiddle::Port is
    end func Add;
 
    func Create(Name : Port_Name; Mode : In_Or_Out := Port_Mode;
-     Initial_Value : Unsigned_Value<Max_Width> := 0) -> Port
+     Initial_Value : Unsigned_Value := 0) -> Port
     is ((Basic_Port => Create(Name, Mode, Initial_Value), Width => 1));
         //  NOTE: Width will be set properly when added to the system.
 
@@ -608,7 +815,7 @@ class Phiddle::Entity is
    var Input_Ports : Port_Id_Map := [];
    var Output_Ports : Port_Id_Map := [];
    var Process_Sensitive : Port_Set := [];
-   var Trigger_Values : Vector<Unsigned_Value<Max_Width>> := [];
+   var Trigger_Values : Vector<Unsigned_Value> := [];
 
   exports
 
@@ -666,7 +873,7 @@ class Phiddle::Entity is
    func Needs_Processing (Sys : System; var Ent : Entity) -> Boolean is
       Println ("Checking if `(Ent) needs processing");
       const Triggers := Ent.Process_Sensitive;
-      const Trigger_Values : Vector<Unsigned_Value<Max_Width>> :=
+      const Trigger_Values : Vector<Unsigned_Value> :=
         [for each T of Triggers forward => Value(Sys[Ent[T]]) ];
 
       Println ("Old: " |
@@ -683,7 +890,7 @@ class Phiddle::Entity is
          return #true;
       else
          //  No change.
-         Println ("No change in triggers:");
+         Println ("No change in triggers");
          return #false;
       end if;
    end func Needs_Processing;
@@ -795,6 +1002,10 @@ func Test_Phiddle() is
    Sig2.Set_Value (Sig1.Value() + 1);
 
    Sys.Display_State();
+   Sys.Do_Processing();
+   Sys.Display_State();
+
+   Sys.Set_Value (Id(Sig1), 0, After => ns(20));
    Sys.Do_Processing();
    Sys.Display_State();
 
