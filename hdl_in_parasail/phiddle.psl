@@ -229,7 +229,7 @@ class Phiddle::Basic_Entity is
 end class Phiddle::Basic_Entity;
 
 interface Phiddle::Basic_Signal<> is
-  //  A signal is a wire between two or more entities
+  //  A signal is a wire between two or more ports
    const Name : Signal_Name;
 
    type Signal_Id is Id<#signal>;
@@ -481,11 +481,13 @@ interface Phiddle::System<> is
 
    //  Schedule a delayed update to value of a Port
    func Set_Value (var Sys : System; P : Id<#port>; Value : Unsigned_Value;
-                   After : Time_Delay; Transport : Boolean := #false);
+                   After : Time_Delay := No_Delay();
+                   Transport : Boolean := #false);
 
    //  Schedule a delayed update to value of a Signal
    func Set_Value (var Sys : System; S : Id<#signal>; Value : Unsigned_Value;
-                   After : Time_Delay; Transport : Boolean := #false)
+                   After : Time_Delay := No_Delay();
+                   Transport : Boolean := #false)
 
    func Do_Processing (var Sys : System; Max_Steps : Univ_Integer := 100);
    //  Run the Process operation on all entities
@@ -612,14 +614,16 @@ class Phiddle::System is
 
    //  Schedule a delayed update to value of a Port
    func Set_Value (var Sys : System; P : Id<#port>; Value : Unsigned_Value;
-                   After : Time_Delay; Transport : Boolean := #false) is
+                   After : Time_Delay := No_Delay();
+                   Transport : Boolean := #false) is
       Sys.Queued_Port_Updates.Add_Item
         (Port_And_Value::(Value, P), After, Transport);
    end func Set_Value;
 
    //  Schedule a delayed update to value of a Signal
    func Set_Value (var Sys : System; S : Id<#signal>; Value : Unsigned_Value;
-                   After : Time_Delay; Transport : Boolean := #false) is
+                   After : Time_Delay := No_Delay();
+                   Transport : Boolean := #false) is
       Sys.Queued_Port_Updates.Add_Item
         (Sig_And_Value::(Value, S), After, Transport);
    end func Set_Value;
