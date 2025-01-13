@@ -7664,12 +7664,30 @@ package body PSC.Trees.Semantics.Static is
       return Result;
    end Substitute_In_List;
 
-   function Create_To_Univ_Call
-     (Operand : Optional_Tree;
-      To_Univ_Type : Type_Sem_Ptr)
-      return Optional_Tree;
-      --  Create call on "to_univ" from given Operand which
-      --  is not of a universal type, to the target To_Univ_Type.
+   generic
+      Operation_Name : Strings.U_String;
+      Debug_Type_Prefix : String;
+      with function Type_Assertion
+         (T : Type_Sem_Ptr) return Boolean;
+   function Create_Conv_Call 
+      (Operand : Optional_Tree;
+       Target_Type : Type_Sem_Ptr)
+       return Optional_Tree;
+       --  Generic function that wraps a value inside a "conversion"
+       --  operand invocation. This is used for "to_univ" and "to_bool"
+       --  conversions.
+
+   function Type_Is_Univ (T : Type_Sem_Ptr) return Boolean is
+   begin
+      return T.Is_Universal;
+   end Type_Is_Univ;
+   --  Predicate for checking universal type
+
+   function Type_Is_Bool (T : Type_Sem_Ptr) return Boolean is
+   begin
+      return Types_Match(T, Boolean_Type);
+   end Type_Is_Bool;
+   --  Predicates for checking bool type
 
    function Create_Ref_Call (Operand : Optional_Tree) return Optional_Tree;
       --  Create call on "ref" from given Operand which
@@ -9968,9 +9986,11 @@ package body PSC.Trees.Semantics.Static is
      (Prior_Interp : Optional_Tree;
       Prior_Is_Call_On_Generic : Boolean;
       Prior_Univ_Conversion_Count : Natural;
+      Prior_Impl_Conversion_Count : Natural;
       New_Interp : Optional_Tree;
       New_Is_Call_On_Generic : Boolean;
       New_Univ_Conversion_Count : Natural;
+      New_Impl_Conversion_Count : Natural;
       Formal_Is_Var : Boolean;
       Stmt_Context : Boolean := False)
      return Interp_Comparison_Enum is
@@ -10066,6 +10086,19 @@ package body PSC.Trees.Semantics.Static is
             end if;
             return Prefer_New;
          end if;
+      elsif Prior_Impl_Conversion_Count /= New_Impl_Conversion_Count then
+         --  We prefer fewer implicit conversions
+         if Prior_Impl_Conversion_Count < New_Impl_Conversion_Count then
+            if Debug_Second_Pass then
+               Put_Line ("  Prefer prior interp with fewer implicit conversions");
+            end if;
+            return Prefer_Prior;
+         else
+            if Debug_Second_Pass then
+               Put_Line ("  Prefer new interp with fewer implicit conversions");
+            end if;
+            return Prefer_New;
+         end if;
       else
          --  TBD: Might apply other preference rules here
          return Interps_Are_Ambig;
@@ -10105,8 +10138,28 @@ package body PSC.Trees.Semantics.Static is
       --  Add Opnd_Interp to list of ambiguities.
       --  Init Ambiguity to "Result" if currently null.
 
-      function Count_Univ_Conversions (Call_Sem : Call_Sem_Ptr) return Natural;
-      --  Count number of (implicit) conversions to/from a univ type.
+      generic
+         with function Op_Predicate
+            (Opnd : Optional_Tree) return Boolean;
+      function Count_Conversions (Call_Sem : Call_Sem_Ptr) return Natural;
+      --  Count operations that meet a the supplied predicate
+
+      function Is_Impl_Conversion (Opnd : Optional_Tree) return Boolean;
+      function Is_Univ_Conversion (Opnd : Optional_Tree) return Boolean;
+      --  Find conversion operations
+
+      generic
+         Debug_Name : String;
+         with function Type_Assertion
+            (T : Type_Sem_Ptr) return Boolean;
+         with function Create_Conversion_Call 
+            (Operand : Optional_Tree;
+             Target_Type : Type_Sem_Ptr) 
+             return Optional_Tree;
+      procedure Check_One_Conv
+         (Assoc_Type_Region : Type_Region_Ptr;
+          Opnd_Interp : Optional_Tree);
+      --  Check semantics for single implicit conversion
 
       --  Indicates whether current result is a call on a generic operation.
       --  If so, we ignore it if we find other interpretations which
@@ -10116,9 +10169,11 @@ package body PSC.Trees.Semantics.Static is
       --  Indicates number of conversions to/from universal involved
       --  in current interpretation.
       Result_Univ_Conversion_Count : Natural := 0;
+      Result_Impl_Conversion_Count : Natural := 0;
 
       Found_Univ_Interp : Boolean := False;
       Try_Conv_To_Univ : Boolean := False;
+      Try_Conv_To_Bool : Boolean := False;
       Found_Place_To_Call_Ref : Boolean := False;
 
       Opnd_Sem : constant Sem_Ptr := Sem_Ptr (Sem_Info (Opnd));
@@ -10155,59 +10210,91 @@ package body PSC.Trees.Semantics.Static is
 
       end Add_Ambiguity;
 
-      function Count_Univ_Conversions (Call_Sem : Call_Sem_Ptr) return Natural
-      --  Count number of (implicit) conversions to/from a univ type.
+      function Count_Conversions (Call_Sem : Call_Sem_Ptr) return Natural
       is
          Result : Natural := 0;
          Invoc_Tree : Invocation.Tree renames
            Invocation.Tree (Tree_Ptr_Of (Call_Sem.Equiv_Invocation).all);
-
-         function Is_Univ_Conversion (Opnd : Optional_Tree) return Boolean;
-         --  Return True if Opnd is a conversion to/from a univ type
-
-         function Is_Univ_Conversion (Opnd : Optional_Tree) return Boolean is
-            Opnd_Sem : constant Sem_Ptr := Sem_Ptr (Sem_Info (Opnd));
-         begin
-            if Opnd_Sem = null
-              or else Opnd_Sem.all not in Call_Semantic_Info'Class
-              or else Call_Sem_Ptr (Opnd_Sem).Op_Sem = null
-              or else Call_Sem_Ptr (Opnd_Sem).Op_Sem.Associated_Symbol = null
-            then
-               return False;
-            else
-               declare
-                  Op_Str : constant String :=
-                    Strings.To_String
-                      (Call_Sem_Ptr (Opnd_Sem).Op_Sem.Associated_Symbol.Str);
-                  Univ_Invoc : Invocation.Tree renames
-                    Invocation.Tree (Tree_Ptr_Of (Opnd_Sem.Definition).all);
-                  use type Source_Positions.Source_Position;
-               begin
-                  --  We are interested only in *implicit* conversions
-                  --  so we want the source pos of the whole operation
-                  --  to come from the only operand.
-                  --  TBF: This is not a very good way to identify this!
-                  return (Op_Str = """to_univ"""
-                             or else
-                          Op_Str = """from_univ""")
-                       and then
-                          Find_Source_Pos (Opnd_Sem.Definition) =
-                            Find_Source_Pos
-                              (Lists.Nth_Element (Univ_Invoc.Operands, 1));
-               end;
-            end if;
-         end Is_Univ_Conversion;
-
-      begin  --  Count_Univ_Conversions
-
+      begin
          for I in 1 .. Lists.Length (Invoc_Tree.Operands) loop
-            if Is_Univ_Conversion (Lists.Nth_Element (Invoc_Tree.Operands, I))
+            if Op_Predicate (Lists.Nth_Element (Invoc_Tree.Operands, I))
             then
                Result := Result + 1;
             end if;
          end loop;
          return Result;
-      end Count_Univ_Conversions;
+      end Count_Conversions;
+
+      function Is_Impl_Conversion (Opnd : Optional_Tree) return Boolean
+      is
+         Opnd_Sem : constant Sem_Ptr := Sem_Ptr (Sem_Info (Opnd));
+      begin
+         if Opnd_Sem = null
+            or else Opnd_Sem.all not in Call_Semantic_Info'Class
+            or else Call_Sem_Ptr (Opnd_Sem).Op_Sem = null
+            or else Call_Sem_Ptr (Opnd_Sem).Op_Sem.Associated_Symbol = null
+         then
+            return False;
+         else
+            declare
+               Op_Str : constant String :=
+                  Strings.To_String
+                     (Call_Sem_Ptr (Opnd_Sem).Op_Sem.Associated_Symbol.Str);
+               Impl_Invoc : Invocation.Tree renames
+                  Invocation.Tree (Tree_Ptr_Of (Opnd_Sem.Definition).all);
+               use type Source_Positions.Source_Position;
+            begin
+               -- Check if operation is to_bool with one param
+               return (Op_Str = To_Bool_String)
+                     and then
+                        Lists.Length (Impl_Invoc.Operands) = 1
+                     and then
+                        Find_Source_Pos (Opnd_Sem.Definition) =
+                           Find_Source_Pos
+                           (Lists.Nth_Element (Impl_Invoc.Operands, 1));
+            end;
+         end if;
+      end Is_Impl_Conversion;
+
+      function Count_Impl_Conversions is new Count_Conversions (
+         Op_Predicate => Is_Impl_Conversion);
+
+      function Is_Univ_Conversion (Opnd : Optional_Tree) return Boolean is
+         Opnd_Sem : constant Sem_Ptr := Sem_Ptr (Sem_Info (Opnd));
+      begin
+         if Opnd_Sem = null
+            or else Opnd_Sem.all not in Call_Semantic_Info'Class
+            or else Call_Sem_Ptr (Opnd_Sem).Op_Sem = null
+            or else Call_Sem_Ptr (Opnd_Sem).Op_Sem.Associated_Symbol = null
+         then
+            return False;
+         else
+            declare
+               Op_Str : constant String :=
+                  Strings.To_String
+                     (Call_Sem_Ptr (Opnd_Sem).Op_Sem.Associated_Symbol.Str);
+               Univ_Invoc : Invocation.Tree renames
+                  Invocation.Tree (Tree_Ptr_Of (Opnd_Sem.Definition).all);
+               use type Source_Positions.Source_Position;
+            begin
+               --  We are interested only in *implicit* conversions
+               --  so we want the source pos of the whole operation
+               --  to come from the only operand.
+               --  TBF: This is not a very good way to identify this!
+               return (Op_Str = """to_univ"""
+                           or else
+                        Op_Str = """from_univ""")
+                     and then
+                        Find_Source_Pos (Opnd_Sem.Definition) =
+                           Find_Source_Pos
+                           (Lists.Nth_Element (Univ_Invoc.Operands, 1));
+            end;
+         end if;
+      end Is_Univ_Conversion;
+
+      function Count_Univ_Conversions is new Count_Conversions (
+         Op_Predicate => Is_Univ_Conversion);
+         --  Count number of (implicit) conversions to/from a univ type.
 
       procedure Diagnose_One
         (Opnd_Interp : Optional_Tree;
@@ -10242,6 +10329,8 @@ package body PSC.Trees.Semantics.Static is
          --  Indicates count of to/from-univ conversions in operand
          --  interp.
          Opnd_Univ_Conversion_Count : Natural := 0;
+         -- Conversion counts for implicit conversions
+         Opnd_Impl_Conversion_Count : Natural := 0;
 
          Opnd_Call_Sem : Call_Sem_Ptr;
          Opnd_Type_Is_Generic : Boolean := False;
@@ -10350,6 +10439,8 @@ package body PSC.Trees.Semantics.Static is
             --  Count how many conversions in the call
             Opnd_Univ_Conversion_Count :=
               Count_Univ_Conversions (Opnd_Call_Sem);
+            Opnd_Impl_Conversion_Count :=
+               Count_Impl_Conversions (Opnd_Call_Sem);
          end if;
 
          if Param_Type = null or else Param_Type.Is_Plastic then
@@ -10357,8 +10448,10 @@ package body PSC.Trees.Semantics.Static is
             case Compare_Interps
                    (Result, Result_Is_Call_On_Generic,
                     Result_Univ_Conversion_Count,
+                    Result_Impl_Conversion_Count,
                     Opnd_Interp, Opnd_Is_Call_On_Generic,
                     Opnd_Univ_Conversion_Count,
+                    Opnd_Impl_Conversion_Count,
                     Formal_Is_Var,
                     Stmt_Context => Stmt_Context) is
 
@@ -10581,8 +10674,10 @@ package body PSC.Trees.Semantics.Static is
                   case Compare_Interps
                          (Result, Result_Is_Call_On_Generic,
                           Result_Univ_Conversion_Count,
+                          Result_Impl_Conversion_Count,
                           Opnd_Interp, Opnd_Is_Call_On_Generic,
                           Opnd_Univ_Conversion_Count,
+                          Opnd_Impl_Conversion_Count,
                           Formal_Is_Var) is
 
                   when Prefer_Prior =>
@@ -10650,6 +10745,16 @@ package body PSC.Trees.Semantics.Static is
                   --  We will try inserting "to_univ" call, unless there
                   --  is some other interp already of the univ type.
                   Try_Conv_To_Univ := True;
+               elsif Types_Match(Param_Type, Boolean_Type)
+                 and then not Types_Match(Opnd_Type, Boolean_Type)
+                 and then (Opnd_Call_Sem = null
+                   or else Orig_Opnd_Param_Map = null)
+                 and then U_Base_Type_Region (Param_Type) /=
+                   Find_Interp_Of_Type.Assoc_Type_Region  --  Avoid ambiguity
+                 and then U_Base_Type_Region (Opnd_Type) /=
+                   Find_Interp_Of_Type.Assoc_Type_Region  --  Avoid ambiguity
+               then
+                  Try_Conv_To_Bool := True;
                end if;
             end;
          end if;  --  Whether Param_Type is null
@@ -10825,36 +10930,34 @@ package body PSC.Trees.Semantics.Static is
       procedure Check_Univ_Interps is new Interpretations.Iterate_Interps (
          Check_One_Univ_Interp);
 
-      procedure Check_One_Conv_To_Univ
-        (Assoc_Type_Region : Type_Region_Ptr;
-         Opnd_Interp : Optional_Tree) is
-         --  Check whether given Interp has a "to_univ" operation
-         --  that converts to Param_Type.
-         Opnd_Type : constant Type_Sem_Ptr := Resolved_Type (Opnd_Interp);
-         pragma Assert (Param_Type.Is_Universal);
+      procedure Check_One_Conv
+         (Assoc_Type_Region : Type_Region_Ptr;
+          Opnd_Interp : Optional_Tree) is
+          Opnd_Type : constant Type_Sem_Ptr := Resolved_Type (Opnd_Interp);
+          pragma Assert (Type_Assertion (Param_Type));
       begin
-         if Opnd_Type = null or else Opnd_Type.Is_Universal then
+         if Opnd_Type = null or else Type_Assertion (Opnd_Type) then
             --  Ignore this one
             null;
          elsif Opnd_Type.U_Base_Structure = Param_Type.U_Base_Structure then
-            --  Allow implicit conversion from "new" univ type to univ
+            --  Allow implicit conversion from "new" univ/bool type to univ/bool
             --  TBD: Also allow conversion from descendant of univ type.
             if Is_Null (Result) then
                Result := Opnd_Interp;  --  TBD: Should create explicit conv,
                --  check for ambig, etc.
             end if;
          else
-            --  Try inserting "to_univ" call
+            --  Try inserting conversion call
             declare
                To_Univ_Call : constant Optional_Tree :=
-                 Create_To_Univ_Call
-                    (Operand => Opnd_Interp,
-                     To_Univ_Type => Param_Type);
+                  Create_Conversion_Call
+                     (Operand => Opnd_Interp,
+                      Target_Type => Param_Type);
             begin
                if Not_Null (To_Univ_Call) then
                   if Debug_Second_Pass then
                      Put_Line
-                       ("  Create_To_Univ_Call for " &
+                       ("  " & Debug_Name &  " for " &
                         Subtree_Image (Opnd_Interp) &
                         " returned non-null result for type " &
                         Type_Image (Opnd_Type));
@@ -10880,13 +10983,36 @@ package body PSC.Trees.Semantics.Static is
                         Src_Pos => Find_Source_Pos (Opnd_Interp),
                         Message_Kind => "Info");
                   end if;
-               end if;  --  Whether "to_univ" operator defined
+               end if;  --  Whether conversion operator defined
             end;
          end if;
-      end Check_One_Conv_To_Univ;
+      end Check_One_Conv;
+
+      function Create_To_Univ_Call is new Create_Conv_Call (
+         Operation_Name => To_Univ_Str,
+         Debug_Type_Prefix => "univ type ",
+         Type_Assertion => Type_Is_Univ);
+
+      function Create_To_Bool_Conv_Call is new Create_Conv_Call (
+         Operation_Name => To_Bool_Str,
+         Debug_Type_Prefix => "",
+         Type_Assertion => Type_Is_Bool);
+
+      procedure Check_One_Conv_To_Univ is new Check_One_Conv (
+         Debug_Name => "Create_To_Univ_Call",
+         Type_Assertion => Type_Is_Univ,
+         Create_Conversion_Call => Create_To_Univ_Call);
 
       procedure Check_Conv_To_Univ is new Interpretations.Iterate_Interps (
          Check_One_Conv_To_Univ);
+
+      procedure Check_One_Conv_To_Bool is new Check_One_Conv (
+         Debug_Name => "Create_To_Bool_Conv_Call",
+         Type_Assertion => Type_Is_Bool,
+         Create_Conversion_Call => Create_To_Bool_Conv_Call);
+
+      procedure Check_Conv_To_Bool is new Interpretations.Iterate_Interps (
+         Check_One_Conv_To_Bool);
 
       procedure Check_One_Ref_Call
         (Assoc_Type_Region : Type_Region_Ptr;
@@ -10923,6 +11049,10 @@ package body PSC.Trees.Semantics.Static is
                   if Try_Conv_To_Univ and then Is_Null (Result) then
                      --  Try inserting a conversion by "to_univ"
                      Check_Conv_To_Univ
+                        (Operand_Sem_Ptr (Sem_Info (Ref_Call)).Interps);
+                  end if;
+                  if Try_Conv_To_Bool and then Is_Null (Result) then
+                     Check_Conv_To_Bool
                         (Operand_Sem_Ptr (Sem_Info (Ref_Call)).Interps);
                   end if;
                else
@@ -11088,6 +11218,10 @@ package body PSC.Trees.Semantics.Static is
                if Try_Conv_To_Univ and then Is_Null (Result) then
                   --  Try inserting a conversion by "to_univ"
                   Check_Conv_To_Univ (Operand_Sem_Ptr (Opnd_Sem).Interps);
+               end if;
+               if Try_Conv_To_Bool and then Is_Null (Result) then
+                  -- Try inserting a conversion by "to_bool"
+                  Check_Conv_To_Bool (Operand_Sem_Ptr (Opnd_Sem).Interps);
                end if;
                if Found_Place_To_Call_Ref
                  and then (Is_Null (Result) or else Formal_Is_Var)
@@ -15426,64 +15560,61 @@ package body PSC.Trees.Semantics.Static is
       end if;
    end Create_From_Univ_Call;
 
-   function Create_To_Univ_Call
-     (Operand : Optional_Tree;
-      To_Univ_Type : Type_Sem_Ptr)
-      return Optional_Tree
+   function Create_Conv_Call
+      (Operand : Optional_Tree;
+       Target_Type : Type_Sem_Ptr)
+       return Optional_Tree
    is
-      --  Create call on "to_univ" from given Operand which
-      --  is of a non-universal type, to the target To_Univ_Type.
       Opnd_Type : constant Type_Sem_Ptr := Resolved_Type (Operand);
-      pragma Assert (not Opnd_Type.Is_Universal);
+      pragma Assert (Type_Assertion (Target_Type));
+      pragma Assert (not Type_Assertion (Opnd_Type));
 
-      To_Univ_Interps : Interpretations.Interp_Tree := null;
+      Op_Interps : Interpretations.Interp_Tree := null;
 
       use type Interpretations.Interp_Tree;
-
-   begin  --  Create_To_Univ_Call
-
+   begin
       Add_Operation_Interps
-        (To_Univ_Interps,
+        (Op_Interps,
          U_Base_Type_Region (Opnd_Type),
-         To_Univ_Str,
+         Operation_Name,
          Source_Pos => Find_Source_Pos (Operand));
-
-      if not Interpretations.Has_Interp (To_Univ_Interps) then
-         --  No "to_univ" in region of target type.
+      
+      if not Interpretations.Has_Interp (Op_Interps) then
+         --  No conversion operation in region of target type.
          return Null_Optional_Tree;
       else
-         --  We have at least one interp for "to_univ"
+         --  We have at least one interp for the conversion op
          --  declared in target type's region.
          --  Create a call on it and see if it resolves.
          declare
-            To_Univ_Op : constant Optional_Tree :=
+            Op_Ident : constant Optional_Tree :=
               PSC.Trees.Identifier.Make
-                 (To_Univ_Str,
+                 (Operation_Name,
                   Source_Pos => Find_Source_Pos (Operand));
-            To_Univ_Sem : constant Operand_Sem_Ptr :=
+            Op_Sem : constant Operand_Sem_Ptr :=
               new Sym_Reference_Info;
-            To_Univ_Call : constant Optional_Tree :=
+            Op_Call : constant Optional_Tree :=
               Invocation.Make
                  (Kind => Invocation.Operation_Call,
-                  Prefix => To_Univ_Op,
+                  Prefix => Op_Ident,
                   Operands => Lists.Make
                     ((1 => Make_Copy_Of_Operand (Operand))));
          begin
-            To_Univ_Sem.Interps := To_Univ_Interps;
-            Set_Sem_Info (To_Univ_Op, Root_Sem_Ptr (To_Univ_Sem));
+            Op_Sem.Interps := Op_Interps;
+            Set_Sem_Info (Op_Ident, Root_Sem_Ptr (Op_Sem));
             if Debug_Second_Pass then
                Put_Line
                  ("  Operand " &
                   Subtree_Image (Operand) &
-                  " is of type possibly convertible to univ type " &
-                  Type_Image (To_Univ_Type));
+                  " is of type possibly convertible to " & Debug_Type_Prefix &
+                  Type_Image (Target_Type));
             end if;
-            Create_Call_Interps (To_Univ_Call);
+            Create_Call_Interps (Op_Call);
 
-            return To_Univ_Call;
+            return Op_Call;
          end;
       end if;
-   end Create_To_Univ_Call;
+   end Create_Conv_Call;
 
    function Create_Ref_Call (Operand : Optional_Tree) return Optional_Tree is
       --  Create call on "ref" from given Operand which
