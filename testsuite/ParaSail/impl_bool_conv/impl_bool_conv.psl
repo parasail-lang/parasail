@@ -1,0 +1,51 @@
+interface True_On<Val : Univ_Integer> is
+    const Value : Univ_Integer;
+    op "to_bool"(S : True_On) -> Boolean;
+    op "from_univ"(U : Univ_Integer) -> True_On;
+end interface True_On
+
+class True_On<Val : Univ_Integer> is
+exports
+    op "to_bool"(S : True_On) -> Boolean is
+        return S.Value == Val;
+    end op "to_bool"
+
+    op "from_univ"(U : Univ_Integer) -> True_On is
+        return (Value => U);
+    end op "from_univ"
+end class True_On
+
+func Test_Bool(Id : Univ_Integer; Value : Boolean) is
+    Println("Bool test " | Id | ": " | Value);
+end func Test_Bool
+
+func main(Args : Basic_Array<Univ_String>) is
+    const Test_1 : True_On<3> := 5;
+    const Test_2 : True_On<3> := 3;
+    const Test_3 : True_On<10> := 4;
+    const Test_4 : True_On<10> := 10;
+
+    if Test_1 then
+        Println("Test_1 is truthy");
+    end if
+
+    if Test_2 then
+        Println("Test_2 is truthy");
+    end if
+
+    if Test_3 then
+        Println("Test_3 is truthy");
+    end if
+
+    if Test_4 then
+        Println("Test_4 is truthy");
+    end if
+
+    if Test_2 and then Test_4 then
+        Println("Test_2 and Test_4 are both truthy");
+    end if
+
+    const A : Boolean := Test_2;
+    Test_Bool(1, A);
+    Test_Bool(2, Test_3);
+end func main

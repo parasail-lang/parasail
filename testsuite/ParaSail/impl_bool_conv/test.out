@@ -1,0 +1,5 @@
+Test_2 is truthy
+Test_4 is truthy
+Test_2 and Test_4 are both truthy
+Bool test 1: #true
+Bool test 2: #false
