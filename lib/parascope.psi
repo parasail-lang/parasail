@@ -946,7 +946,7 @@ interface PSC::Analysis::Local_Addr_VN<>
    const BB_Id : CFG::Node_Id  //  Zero for up-level reference
    const Offset : Reflection::Offset_Within_Area
 
-   func Hash(Local_Addr_VN) -> Unsigned_64 is (Local_Addr_VN.Offset)
+   func Hash(Local_Addr_VN) -> Unsigned_64 is ([[Local_Addr_VN.Offset]])
 
    op "=?"(Left, Right : Local_Addr_VN) -> Ordering
      is (Left.Level != Right.Level? Left.Level =? Right.Level:
@@ -964,7 +964,7 @@ interface PSC::Analysis::Param_Addr_VN<>
    const BB_Id : CFG::Node_Id  //  Zero for up-level reference
    const Offset : Reflection::Offset_Within_Area
 
-   func Hash(Param_Addr_VN) -> Unsigned_64 is (Param_Addr_VN.Offset)
+   func Hash(Param_Addr_VN) -> Unsigned_64 is ([[Param_Addr_VN.Offset]])
 
    op "=?"(Left, Right : Param_Addr_VN) -> Ordering
      is (Left.Level != Right.Level? Left.Level =? Right.Level:
@@ -981,7 +981,7 @@ interface PSC::Analysis::Type_Addr_VN<>
    const Uplevel : Code_Nesting_Level
    const Offset : Reflection::Offset_Within_Area
 
-   func Hash(Type_Addr_VN) -> Unsigned_64 is (Type_Addr_VN.Offset)
+   func Hash(Type_Addr_VN) -> Unsigned_64 is ([[Type_Addr_VN.Offset]])
 
    op "=?"(Left, Right : Type_Addr_VN) -> Ordering
      is (Left.Uplevel != Right.Uplevel? Left.Uplevel =? Right.Uplevel:
@@ -996,7 +996,7 @@ interface PSC::Analysis::Const_Area_VN<>
    //  Address of a variable in the Const_Area
    const Offset : Reflection::Offset_Within_Area
 
-   func Hash(Const_Area_VN) -> Unsigned_64 is (Const_Area_VN.Offset)
+   func Hash(Const_Area_VN) -> Unsigned_64 is ([[Const_Area_VN.Offset]])
 
    op "=?"(Left, Right : Const_Area_VN) -> Ordering
      is (Left.Offset =? Right.Offset)
@@ -1401,7 +1401,7 @@ interface PSC::Analysis::Condition_Mask_VN<>
    const Mask : Reflection::Instruction::Condition_Bit_Mask;
 
    func Hash(N : Condition_Mask_VN) -> Unsigned_64
-     is ([[N.Tested_Val]] + N.Mask.To_Rep());
+     is ([[N.Tested_Val]] + [[N.Mask.To_Rep()]]);
 
    op "=?"(Left, Right : Condition_Mask_VN) -> Ordering
      is (Left.Tested_Val != Right.Tested_Val?
