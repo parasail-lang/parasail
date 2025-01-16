@@ -450,10 +450,10 @@ interface Phiddle::Delay_Queue<Item_Type is Comparable<>> is
 
    func Create() -> Delay_Queue;
 
-   //  Iterate through the delay queue calling Display_Item.
+   //  Iterate through the delay queue calling View_Item.
    func Iterate_Queue
      (Queue : Delay_Queue;
-      Display_Item : func (Elem : Item_Type; Wakeup : Time_Delay));
+      View_Item : func (Elem : Item_Type; Wakeup : Time_Delay));
 end interface Phiddle::Delay_Queue;
 
 class Phiddle::Delay_Queue is
@@ -531,10 +531,10 @@ class Phiddle::Delay_Queue is
 
    func Iterate_Queue
      (Queue : Delay_Queue;
-      Display_Item : func (Elem : Item_Type; Wakeup : Time_Delay)) is
+      View_Item : func (Elem : Item_Type; Wakeup : Time_Delay)) is
 
       for E => Queue.Elements then E.Next while E not null loop
-         Display_Item (E.Item, E.Wakeup);
+         View_Item (E.Item, E.Wakeup);
       end loop;
    end func Iterate_Queue;
 end class Phiddle::Delay_Queue;
