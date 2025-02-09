@@ -1053,7 +1053,7 @@ exports  // check that indent of 0 works
     end func Length
 
     op "[]"() -> Countable_Range is
-        return Bound_Type::First()+1 .. Bound_Type::First()
+        return Bound_Type::First() <.. Bound_Type::First()
     end op "[]"
 
     op "[..]"() -> Countable_Range is
@@ -1369,7 +1369,7 @@ class PSL::Containers::Packed_Word is
 
    const Bit_Field_Offsets : Array<Unsigned_64, Indexed_By => Key_Type> :=
      [for each [Key => Size] of Bit_Field_Sizes, Key =>
-        (for K in Key_Type::First() .. Key-1 =>
+        (for K in Key_Type::First() ..< Key =>
            <Unsigned_64::0> + [[|Bit_Field_Sizes[K]|]])]
 
  exports
@@ -1545,7 +1545,7 @@ class PSL::Containers::Packed_Array is
     const Debug_End_Op : Boolean := #false
 
     func Num_Bits(Num_Vals : Univ_Integer) -> Univ_Integer is
-        for (Bits in 1 .. Word_Size-1; Pow := 2 then Pow + Pow) forward loop
+        for (Bits in 1 ..< Word_Size; Pow := 2 then Pow + Pow) forward loop
             if Pow >= Num_Vals then
                 return Bits
             end if
@@ -1765,7 +1765,7 @@ class PSL::Containers::Packed_Array is
 
     op "[]"() -> Result : Packed_Array is
         return (Data => Create(0, 0),
-          Bounds => Indexed_By::First()+1 .. Indexed_By::First())
+          Bounds => Indexed_By::First() <.. Indexed_By::First())
             // Bounds not meaningful when empty
     end op "[]"
 
@@ -1895,7 +1895,7 @@ class PSL::Containers::Basic_Packed_Array is
 
     const Word_Size := 64 
     func Num_Bits(Num_Vals : Unsigned_64) -> Unsigned_64 is
-        for (Bits in 1 .. Word_Size-1; Pow := 2 then Pow + Pow) forward loop
+        for (Bits in 1 ..< Word_Size; Pow := 2 then Pow + Pow) forward loop
             if Pow >= Num_Vals then
                 return Bits
             end if
@@ -2154,7 +2154,7 @@ class PSL::Core::Univ_String is
     func To_Int_Array(ref Substr_Array)
       -> ref Basic_Array<Univ_Integer> is import(#identity)
 
-    type Int8 is Integer<0 .. 2**8-1>
+    type Int8 is Integer<0 ..< 2**8>
     type Int8_Array is Basic_Packed_Array<Int8>
 
     func To_Int8_Array(ref Substr_Array) -> ref Int8_Array
@@ -2163,7 +2163,7 @@ class PSL::Core::Univ_String is
     func From_Int8_Array(ref Int8_Array) -> ref Substr_Array
       is import(#identity)
 
-    type Int16 is Integer<0 .. 2**16-1>
+    type Int16 is Integer<0 ..< 2**16>
     type Int16_Array is Basic_Packed_Array<Int16>
 
     func To_Int16_Array(ref Substr_Array) -> ref Int16_Array
@@ -2483,7 +2483,7 @@ interface PSL::Core::Direction<> is
 end interface PSL::Core::Direction
 interface PSL::Core::Integer_64 <> is
     //  Normal 64-bit Integer, but with a "null" value.
-    op "from_univ"(Lit : Univ_Integer) {Lit in -2**63+1 .. 2**63-1}
+    op "from_univ"(Lit : Univ_Integer) {Lit in -2**63 <..< 2**63}
       -> Integer_64 
       is import(#integer_from_univ)
 
@@ -2618,7 +2618,7 @@ end interface PSL::Core::Integer_64
 
 interface PSL::Core::Integer
   <Range : Countable_Range<Univ_Integer> :=
-              -2**63+1 .. +2**63-1> is
+              -2**63 <..< +2**63> is
     // NOTE: We leave room for null.
     op "from_univ"(Lit : Univ_Integer) {Lit in Range} -> Integer 
       is import(#integer_from_univ)
@@ -8686,9 +8686,9 @@ class PSL::Containers::Index_Pair_Set is
     op "[]"() -> Index_Pair_Set is
         return
           (Bounds1 =>
-             Pair::Index1_Type::First()+1 .. Pair::Index1_Type::First(),
+             Pair::Index1_Type::First() <.. Pair::Index1_Type::First(),
            Bounds2 =>
-             Pair::Index2_Type::First()+1 .. Pair::Index2_Type::First(),
+             Pair::Index2_Type::First() <.. Pair::Index2_Type::First(),
            First => 1,
            Last => 0)
     end op "[]"
@@ -8866,8 +8866,8 @@ class PSL::Containers::Array2D is
 
     op "[]"() -> Array2D is
         return (Data => [],
-          Bounds1 => Index1::First()+1 .. Index1::First(),
-          Bounds2 => Index2::First()+1 .. Index2::First())
+          Bounds1 => Index1::First() <.. Index1::First(),
+          Bounds2 => Index2::First() <.. Index2::First())
             // Bounds not meaningful when empty
     end op "[]"
 
@@ -9413,7 +9413,7 @@ interface PSL::Core::Unsigned_64<> is
   implements for Summable
 
     func From_Int (Int : Univ_Integer) -> optional Unsigned_64 is
-      (Int in 0 .. 2**64-1? Int : null)
+      (Int in 0 ..< 2**64? Int : null)
     func Trunc_To_Int(Val : Unsigned_64) -> Univ_Integer is
       ("to_univ"(Val))
     func Round_To_Int(Val : Unsigned_64) -> Univ_Integer is
@@ -9575,7 +9575,7 @@ interface PSL::Core::Modular<Modulus : Unsigned_64> is
   implements for Summable
 
     func From_Int (Int : Univ_Integer) -> optional Modular is
-      (Int in 0 .. Modulus-1? Int : null)
+      (Int in 0 ..< Modulus? Int : null)
     func Trunc_To_Int(Val : Modular) -> Univ_Integer is
       ("to_univ"(Val))
     func Round_To_Int(Val : Modular) -> Univ_Integer is
@@ -11759,7 +11759,7 @@ end class PSL::Containers::Big_Array
 func PSL::Test::Test_Big_Array(Len : Univ_Integer) is
    {Len > 0}
    Println("Len = " | Len)
-   type Elem is Integer<0 .. 2**24-1>
+   type Elem is Integer<0 ..< 2**24>
    var BA : Big_Array<Elem, Indexed_By => Univ_Integer> := Create(1..Len, 0)
    BA[(Len+1)/2] := 42
    BA[Len] := 33
@@ -11810,7 +11810,7 @@ class PSL::Containers::Stack is
       is (S.Data[S.Depth - Index])
 
     op "index_set"(S : Stack) -> Countable_Range<Univ_Integer>
-      is (0 .. S.Depth-1)
+      is (0 ..< S.Depth)
 
     func Push(var S : Stack; Elem : Element_Type) is
        S.Depth += 1
@@ -12757,9 +12757,9 @@ class PSL::Core::Byte_Stream_Buffer is
      (var BSB : Byte_Stream_Buffer) -> Result : Stream_Element_Array is
    //  Return everything left in stream as a single array.
       
-      Result := Create(0 .. Bytes_To_Read (BSB), 0);
-      for (I in 0 .. Result.Bounds.Last;
-           J in BSB.Read_Index .. BSB.Write_Index - 1) forward loop
+      Result := Create(0 ..< Bytes_To_Read (BSB), 0);
+      for (I in Result.Bounds;
+           J in BSB.Read_Index ..< BSB.Write_Index) forward loop
          Result[I] := BSB.Buf[J];
       end loop;
       BSB.Read_Index := 0;
@@ -14498,7 +14498,8 @@ class PSL::Core::JSON_Value is
    //  Provide general To_String operation
    func To_String (Val : JSON_Value+) -> Univ_String is
       var B_Strm : Byte_Stream_Buffer := Create();
-      ref var JVS : JSON_Output_Value_Stream => Create(B_Strm);
+      ref var JVS : JSON_Output_Value_Stream =>
+        Create(B_Strm, End_With_NL => #false);
 
       Write_JSON_Value (JVS, Val);
 
@@ -14520,7 +14521,8 @@ interface PSL::Core::JSON_Output_Value_Stream<>
    //  This kind of value stream is used for output of ParaSail values
    //  in JSON format, given a byte stream of some sort.
 
-   func Create(ref var Output_Byte_Stream+ {Output_Byte_Stream not null})
+   func Create(ref var Output_Byte_Stream+; End_With_NL : Boolean := #true)
+     {Output_Byte_Stream not null}
      -> JSON_Output_Value_Stream;
 
    func Is_Self_Describing (JSON_Output_Value_Stream) -> Boolean;
@@ -14582,9 +14584,10 @@ class PSL::Core::JSON_Output_Value_Stream is
    ref var Byte_Str : Output_Byte_Stream+;
    var End_Reached : Boolean := #false;
    type JSON_Output_State is Enum
-     <[#Initial, #Expecting_First_Seq_Elem, #Expecting_Seq_Elem,
+     <[#Initial_NL, #Initial_No_NL,
+       #Expecting_First_Seq_Elem, #Expecting_Seq_Elem,
        #Expecting_First_Map_Key, #Expecting_Map_Key, #Expecting_Map_Value]>;
-   var State_Stack : Stack<JSON_Output_State> := [#Initial];
+   var State_Stack : Stack<JSON_Output_State> := [#Initial_No_NL];
    var Indent := 0;
    const Indent_Inc := 2;  --  Indent by 2 each level of nesting
 
@@ -14606,7 +14609,7 @@ class PSL::Core::JSON_Output_Value_Stream is
    func Start_Item (var OVS : JSON_Output_Value_Stream) is
       //  Emit extra JSON syntax according to current state
       case OVS.State_Stack.Top() of
-       [#Initial] =>
+       [#Initial_NL | #Initial_No_NL] =>
          //  Should probably only start an object in this state.
          null;
 
@@ -14657,8 +14660,8 @@ class PSL::Core::JSON_Output_Value_Stream is
    end func Start_Item;
 
    func End_Item (var OVS : JSON_Output_Value_Stream) is
-      //  Emit new line if back to #Initial state
-      if OVS.State_Stack.Top() == #Initial then
+      //  Emit new line if back to #Initial_NL state
+      if OVS.State_Stack.Top() == #Initial_NL then
          Write_UTF8 (OVS, "\n");
       end if;
    end func End_Item;
@@ -14691,7 +14694,7 @@ class PSL::Core::JSON_Output_Value_Stream is
          Write_UTF8 (OVS, "]");
          End_Item (OVS);
 
-       [#Initial |
+       [#Initial_NL | #Initial_No_NL |
         #Expecting_First_Map_Key |
         #Expecting_Map_Key |
         #Expecting_Map_Value] =>
@@ -14771,8 +14774,11 @@ class PSL::Core::JSON_Output_Value_Stream is
 
  exports
 
-   func Create(ref var Output_Byte_Stream+) -> JSON_Output_Value_Stream is
-     ((Byte_Str => Output_Byte_Stream));
+   func Create(ref var Output_Byte_Stream+; End_With_NL : Boolean := #true)
+     -> JSON_Output_Value_Stream is
+     ((Byte_Str => Output_Byte_Stream,
+       State_Stack =>
+         [(if End_With_NL then #Initial_NL else #Initial_No_NL)]));
 
    func Is_Self_Describing (JSON_Output_Value_Stream) -> Boolean is
      (#true);
@@ -14833,7 +14839,7 @@ class PSL::Core::JSON_Output_Value_Stream is
             if Str[I] == '.' then
                //  Reached trailing '.'
                //  Return slice of Str
-               return Str[1 .. I-1];
+               return Str[1 ..< I];
             elsif Str[I] != '0' then
                //  Return up through final non-zero digit
                return Str[1..I];
@@ -14934,7 +14940,7 @@ class PSL::Core::JSON_Output_Value_Stream is
          Write_UTF8 (OVS, OVS.Indent * ' ');
          Write_UTF8 (OVS, "}");
 
-       [#Initial |
+       [#Initial_NL | #Initial_No_NL |
         #Expecting_First_Seq_Elem |
         #Expecting_Seq_Elem |
         #Expecting_Map_Value] =>
@@ -15488,7 +15494,7 @@ class PSL::Core::JSON_Input_Value_Stream is
       case Token[1] of
        ['"'] =>
          //  Strip off the double quotes
-         return Token[2 .. |Token|-1];
+         return Token[2 ..< |Token|];
 
        ['n'] =>
          //  "null"
