@@ -33,6 +33,7 @@ with PSC.Univ_Strings;
 with PSC.Vectors;
 
 with Ada.Exceptions;
+with Ada.IO_Exceptions;
 with Ada.Text_IO;
 with Ada.Text_IO.Text_Streams;
 with Ada.Streams.Stream_IO;
@@ -705,39 +706,41 @@ package body PSC.Interpreter.IO is
 
       use Ada.Text_IO;
 
+      procedure ReadC (Ch : out Character) is
+      --  Work around GNAT bug; stream read exception not handleable locally
+      begin
+         Character'Read (Stream (Info_Ptr.File), Ch);
+      exception
+         when others =>
+            Put_Line ("Excep in ReadC");  --  Never triggered!  GNAT bug
+            raise;
+      end ReadC;
+
    begin  --  Read_From_File
 
       --  Read until get LF or CR/LF
       while Last < Line'Last loop
-         begin
-            Character'Read (Stream (Info_Ptr.File), Char);
-            case Char is
-               when ASCII.CR =>
-                  declare
-                     Next_Char : Character;
-                  begin
-                     Character'Read (Stream (Info_Ptr.File), Next_Char);
-                     --  Treat CR/LF as a single line terminator
-                     exit when Next_Char = ASCII.LF;
-                     Last := Last + 2;
-                     Line (Last - 1) := Char;
-                     Line (Last) := Next_Char;
-                  end;
-               when ASCII.LF =>
-                  --  End of line
-                  exit;
-               when others =>
-                  --  Add char to line
-                  Last := Last + 1;
-                  Line (Last) := Char;
-            end case;
-         exception
-            when E : others =>
-               Put_Line (Standard_Error,
-                         "Read-from-file Propagating exception: " &
-                         Ada.Exceptions.Exception_Information (E));
-               raise;
-         end;
+         ReadC (Char);
+         case Char is
+            when ASCII.CR =>
+               declare
+                  Next_Char : Character;
+               begin
+                  ReadC (Next_Char);
+                  --  Treat CR/LF as a single line terminator
+                  exit when Next_Char = ASCII.LF;
+                  Last := Last + 2;
+                  Line (Last - 1) := Char;
+                  Line (Last) := Next_Char;
+               end;
+            when ASCII.LF =>
+               --  End of line
+               exit;
+            when others =>
+               --  Add char to line
+               Last := Last + 1;
+               Line (Last) := Char;
+         end case;
       end loop;
       --  End of line or 4096 chars, whichever came first
       --  Store result
