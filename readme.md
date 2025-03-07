@@ -96,11 +96,13 @@ end class Dining_Philosophers;
 
 - Read ["ParaSail: Less is More with Multicore"].
 - To perfect your understanding read ["ParaSail: A Pointer-Free Pervasively-Parallel Language for Irregular Computations"].
+	- Associated slide presentation ["Presentaton on ParaSail: Pointer-Free Pervasively-Parallel Language"].
 - To gain reference knowledge read ["ParaSail: Reference Manual"].
 - To follow along the original multi-year design process of ParaSail, read the blog ["Designing ParaSail, a new programming language"].
 
 ["ParaSail: Less is More with Multicore"]: https://github.com/parasail-lang/parasail/blob/main/documentation/parasail_intro.pdf   
-["ParaSail: A Pointer-Free Pervasively-Parallel Language for Irregular Computations"]: https://github.com/parasail-lang/parasail/blob/main/documentation/Irregular_Computations_in_ParaSail.pdf   
+["ParaSail: A Pointer-Free Pervasively-Parallel Language for Irregular Computations"]: https://github.com/parasail-lang/parasail/blob/main/documentation/Irregular_Computations_in_ParaSail.pdf
+["Presentaton on ParaSail: Pointer-Free Pervasively-Parallel Language"]: https://github.com/parasail-lang/parasail/blob/main/documentation/programming_journal_2018/ParaSail_Programming_2019_slides.pdf
 ["ParaSail: Reference Manual"]: https://github.com/parasail-lang/parasail/blob/main/documentation/ref_manual/parasail_ref_manual.pdf
 ["Designing ParaSail, a new programming language"]: https://parasail-programming-language.blogspot.com
 
