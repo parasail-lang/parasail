@@ -1958,10 +1958,16 @@ package PSC.Interpreter is
    --  Read in the contents of the param info array
 
    --  Info on components of type
-   type Component_Info is record
+   type Component_Info (Compiled : Boolean := False) is record
       Type_Desc   : Type_Descriptor_Ptr;
       Is_By_Ref   : Boolean := False;
       Is_Optional : Boolean := True;
+      Is_Var      : Boolean := False;
+      case Compiled is
+      when False =>
+         Decl     : Trees.Optional_Tree := Trees.Null_Optional_Tree;
+      when True => null;
+      end case;
    end record;
    type Component_Info_Array is array (Positive range <>) of Component_Info;
    type Component_Info_Array_Ptr is access all Component_Info_Array;

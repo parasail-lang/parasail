@@ -4944,6 +4944,16 @@ package body PSC.Trees.Semantics.Translator is
                   Store_Word (Result +
                     Large_Obj_Header_Size + Offset_Within_Area'(2),
                     Boolean'Pos (Comp_Info.Is_Optional));
+
+                  --  Set the "Is_Var" field
+                  Store_Word (Result +
+                    Large_Obj_Header_Size + Offset_Within_Area'(3),
+                    Boolean'Pos (Comp_Info.Is_Var));
+
+                  --  Fill in the "Component_Decl" field
+                  Store_Word (Result +
+                    Large_Obj_Header_Size + Offset_Within_Area'(4),
+                     To_Word_Type (Sem_Info (Comp_Info.Decl)));
                end;
 
             when Nested_Types_Kind =>
