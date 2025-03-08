@@ -5570,6 +5570,9 @@ package body PSC.Trees.Semantics.Dynamic is
                Comp_Is_By_Ref : constant Boolean :=
                  Comp_Sem.Associated_Symbol /= null
                 and then Static.Sym_Is_By_Ref (Comp_Sem.Associated_Symbol);
+               Comp_Is_Var : constant Boolean :=
+                  Comp_Sem.Associated_Symbol /= null
+                and then Static.Sym_Is_Variable (Comp_Sem.Associated_Symbol);
             begin
                if Obj_Type.All_Parameters_Known then
                   --  Substitute into formal type
@@ -5612,10 +5615,12 @@ package body PSC.Trees.Semantics.Dynamic is
                end if;
 
                Type_Desc.Components (I).Is_By_Ref := Comp_Is_By_Ref;
+               Type_Desc.Components (I).Is_Var := Comp_Is_Var;
                Type_Desc.Components (I).Is_Optional :=
                  Comp_Actual_Type.Value_Is_Optional;
                    --  TBD: Should we "or" with
                    --       Comp_Formal_Type.Value_Is_Optional?
+               Type_Desc.Components (I).Decl := Comp_Tree;
                if Comp_Formal_Type.Known_To_Be_Assignable
                  and then not Comp_Is_By_Ref
                  and then not Comp_Actual_Type.Known_To_Be_Assignable
@@ -6772,7 +6777,9 @@ package body PSC.Trees.Semantics.Dynamic is
                  new Component_Info_Array'(1 =>
                    (Type_Desc => Underlying_Type_Desc,
                     Is_By_Ref => False,
-                    Is_Optional => True)),  --  TBD: can it be null?
+                    Is_Optional => True,
+                    Is_Var => True,
+                    Decl => Underlying_Type_Desc.Type_Sem.Definition)),  --  TBD: can it be null?
                Num_Nested_Types => Ancestors'Length,
                Nested_Types => Ancestors,
                Num_Nested_Objs => 0,
