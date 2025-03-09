@@ -117,6 +117,8 @@ interface PSC::Reflection<> is
     type Decl_Index is new Integer<0..2**6>
       // An index into a declarative region
 
+    type Tree_Index is new Integer<0..2**31-1>
+
     type Code_Nesting_Level is new Integer<0 .. 7>
       // Depth of nesting in operations; level 0 is static constants.
       // and top-level operations.
@@ -149,6 +151,24 @@ interface PSC::Reflection<> is
           is import(#nth_library_item)
  
     end interface Environment
+
+    interface Tree<> is
+      type Tree_Kind is Enum<
+        [#Annotation, #Assign_Stmt, #Binary,
+         #Compound_Stmt, #Control_Stmt, #Identifier,
+         #Implements_Element, #Invocation, #Iterator,
+         #Module, #Obj_Decl, #Operation, #Param_Decl,
+         #Property, #Qualified_Name, #Qualifier,
+         #Reference, #Selection, #Type_Decl, #Unary]>;
+
+      func Kind(Tree) -> Tree_Kind
+        is import(#tree_kind)
+
+      func Num_Operands(Tree) -> Tree_Index
+       is import(#tree_num_operands)
+      func Nth_Operand(Tree; Tree_Index) -> optional Tree
+        is import(#tree_nth_operand)
+    end interface Tree
 
     interface Region<> is
         type Region_Kind is Enum<
@@ -185,6 +205,11 @@ interface PSC::Reflection<> is
           is import(#region_nth_nested_region)
         func Sibling_Region(Region) -> optional Region
           is import(#region_sibling_region)
+
+        func Num_Trees(Region) -> Tree_Index
+          is import(#region_num_trees)
+        func Nth_Tree(Region; Tree_Index) -> optional Tree
+          is import(#region_nth_tree);
 
         func Region_At_Index(Region_Index) -> Region
           is import(#region_at_index)
