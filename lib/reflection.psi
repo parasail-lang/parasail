@@ -150,6 +150,19 @@ interface PSC::Reflection<> is
  
     end interface Environment
 
+    interface Tree<> is
+      type Tree_Kind is Enum<
+        [#Annotation, #Assign_Stmt, #Binary,
+         #Compound_Stmt, #Control_Stmt, #Identifier,
+         #Implements_Element, #Invocation, #Iterator,
+         #Module, #Obj_Decl, #Operation, #Param_Decl,
+         #Property, #Qualified_Name, #Qualifier,
+         #Reference, #Selection, #Type_Decl, #Unary]>;
+
+      func Kind(Tree) -> Tree_Kind
+        is import(#tree_kind)
+    end interface Tree
+
     interface Region<> is
         type Region_Kind is Enum<
           [#No_Region_Kind,
@@ -166,6 +179,7 @@ interface PSC::Reflection<> is
            #Type_Annotation_Region_Kind]>
 
         type Region_Index is Integer<0..2**31-1>
+        type Tree_Index is Integer<1..2**31-1>
 
         func Kind(Region) -> Region_Kind
           is import(#region_kind)
@@ -185,6 +199,11 @@ interface PSC::Reflection<> is
           is import(#region_nth_nested_region)
         func Sibling_Region(Region) -> optional Region
           is import(#region_sibling_region)
+
+        func Num_Trees(Region) -> Tree_Index
+          is import(#region_num_trees)
+        func Nth_Tree(Region; Tree_Index) -> optional Tree
+          is import(#region_nth_tree);
 
         func Region_At_Index(Region_Index) -> Region
           is import(#region_at_index)
