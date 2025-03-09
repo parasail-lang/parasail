@@ -117,6 +117,8 @@ interface PSC::Reflection<> is
     type Decl_Index is new Integer<0..2**6>
       // An index into a declarative region
 
+    type Tree_Index is new Integer<0..2**31-1>
+
     type Code_Nesting_Level is new Integer<0 .. 7>
       // Depth of nesting in operations; level 0 is static constants.
       // and top-level operations.
@@ -161,6 +163,11 @@ interface PSC::Reflection<> is
 
       func Kind(Tree) -> Tree_Kind
         is import(#tree_kind)
+
+      func Num_Operands(Tree) -> Tree_Index
+       is import(#tree_num_operands)
+      func Nth_Operand(Tree; Tree_Index) -> optional Tree
+        is import(#tree_nth_operand)
     end interface Tree
 
     interface Region<> is
@@ -179,7 +186,6 @@ interface PSC::Reflection<> is
            #Type_Annotation_Region_Kind]>
 
         type Region_Index is Integer<0..2**31-1>
-        type Tree_Index is Integer<1..2**31-1>
 
         func Kind(Region) -> Region_Kind
           is import(#region_kind)

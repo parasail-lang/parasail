@@ -369,6 +369,18 @@ package body PSC.Trees.Semantics.Translator is
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Kind, "_psc_tree_kind");
 
+   procedure Tree_Num_Operands
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Num_Operands, "_psc_tree_num_operands");
+
+   procedure Tree_Nth_Operand
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Nth_Operand, "_psc_tree_nth_operand");
+
    procedure Region_Nth_Tree
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -1272,7 +1284,7 @@ package body PSC.Trees.Semantics.Translator is
      (System.Address, Tree_Ptr);
 
    function To_Optional_Tree (Val : Word_Type) return Optional_Tree is
-   --  Convert ParaSail "small" obj representation back into a Optional_Tree pointer.
+   --  Convert ParaSail "small" obj representation back into a Optional_Tree.
    begin
       if Val = Null_Value then
          return Null_Optional_Tree;
@@ -2310,12 +2322,15 @@ package body PSC.Trees.Semantics.Translator is
       --    is import(#region_nth_tree)
       Region : constant Symbols.Region_Ptr :=
         To_Region_Ptr (Fetch_Word (Params, 1));
-      Index : constant Word_Type := Fetch_Word (Params, 2);
+      Index : constant Integer := Integer (Fetch_Word (Params, 2));
       Statements : constant Trees.Lists.List := Region.Stmt_List;
-      Statement : constant Optional_Tree :=
-               Trees.Lists.Nth_Element (Statements, Integer(Index));
    begin
-       Store_Word (Params, 0, To_Word_Type (Statement));
+      if Index > 0 and then Index <= Trees.Lists.Length (Statements) then
+         Store_Word (Params, 0, To_Word_Type
+            (Trees.Lists.Nth_Element (Statements, Index)));
+      else
+         Store_Word (Params, 0, Null_Value);
+      end if;
    end Region_Nth_Tree;
 
    procedure Tree_Kind
@@ -2382,6 +2397,55 @@ package body PSC.Trees.Semantics.Translator is
         (Params, 0,
          Tree_Kind_Enum'Pos (Kind));
    end Tree_Kind;
+
+   procedure Tree_Num_Operands
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Num_Operands(Tree) -> Tree_Index
+      --    is import(#tree_num_operands)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Op = Null_Optional_Tree then
+         Store_Word (Params, 0, 0);
+      else
+         declare
+            Op_Tree : constant Tree'Class := Tree_Of (Op);
+         begin
+            Store_Word
+               (Params, 0,
+                Word_Type (Num_Operands (Op_Tree)));
+         end;
+      end if;
+   end Tree_Num_Operands;
+
+   procedure Tree_Nth_Operand
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Nth_Operand(Tree; Tree_Index) -> optional Tree
+      --    is import(#tree_nth_operand)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+      Index : constant Word_Type := Fetch_Word (Params, 2);
+   begin
+      if Not_Null (Op) and then Index > 0 then
+         declare
+            Op_Tree : constant Tree'Class := Tree_Of (Op);
+         begin
+            if Natural(Index) <= Num_Operands(Op_Tree) then
+               Store_Word
+                  (Params, 0, To_Word_Type 
+                   (Nth_Operand (Op_Tree, Positive(Index))));
+               return;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_Nth_Operand;
 
    procedure Decl_Region
      (Context : in out Exec_Context;
@@ -5860,6 +5924,14 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_kind"),
       Tree_Kind'Access);
+   
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_num_operands"),
+      Tree_Num_Operands'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_nth_operand"),
+      Tree_Nth_Operand'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#new_conv_desc"),
