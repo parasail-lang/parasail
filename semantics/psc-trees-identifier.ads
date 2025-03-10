@@ -40,6 +40,9 @@ package PSC.Trees.Identifier is
       return Optional_Tree;
    --  Build up an identifier Tree
 
+   function Kind (T : Tree) return Tree_Kind_Enum;
+   -- Return tree type as enum
+
    procedure Display_Subtree
      (T : Tree;
       On : access Ada.Streams.Root_Stream_Type'Class;

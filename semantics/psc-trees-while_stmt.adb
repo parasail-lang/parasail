@@ -82,6 +82,11 @@ package body PSC.Trees.While_Stmt is
       end case;
    end Set_Nth_Operand;
 
+   function Kind (T : Tree) return Tree_Kind_Enum is
+   begin
+      return While_Stmt_Kind;
+   end Kind;
+
    procedure Display_Subtree
      (T : Tree;
       On : access Ada.Streams.Root_Stream_Type'Class;

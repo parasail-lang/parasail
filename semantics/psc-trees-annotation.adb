@@ -110,6 +110,11 @@ package body PSC.Trees.Annotation is
          Lists.Replace_Nth_Element (T.Annotations, N, New_Operand);
    end Set_Nth_Operand;
 
+   function Kind (T : Tree) return Tree_Kind_Enum is
+   begin
+      return Annotation_Kind;
+   end Kind;
+
    procedure Display_Subtree
      (T : Tree;
       On : access Ada.Streams.Root_Stream_Type'Class;
