@@ -155,11 +155,13 @@ interface PSC::Reflection<> is
     interface Tree<> is
       type Tree_Kind is Enum<
         [#Annotation, #Assign_Stmt, #Binary,
-         #Compound_Stmt, #Control_Stmt, #Identifier,
+         #Block_Stmt, #Case_Construct, #Conditional,
+         #Control_Stmt, #For_Loop, #Identifier,
          #Implements_Element, #Invocation, #Iterator,
          #Module, #Obj_Decl, #Operation, #Param_Decl,
          #Property, #Qualified_Name, #Qualifier,
-         #Reference, #Selection, #Type_Decl, #Unary]>;
+         #Reference, #Selection, #Type_Decl,
+         #Unary, #While_Stmt]>;
 
       func Kind(Tree) -> Tree_Kind
         is import(#tree_kind)

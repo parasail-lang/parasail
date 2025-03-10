@@ -88,6 +88,11 @@ package body PSC.Trees.Case_Construct is
       end if;
    end Set_Nth_Operand;
 
+   function Kind (T : Tree) return Tree_Kind_Enum is
+   begin
+      return Case_Construct_Kind;
+   end Kind;
+
    function Substitute_Operands
      (T : Tree;
       New_Operands : Tree_Array)

@@ -65,6 +65,11 @@ package body PSC.Trees.Reference is
       end if;
    end Set_Nth_Operand;
 
+   function Kind (T : Tree) return Tree_Kind_Enum is
+   begin
+      return Reference_Kind;
+   end Kind;
+
    procedure Display_Subtree
      (T : Tree;
       On : access Ada.Streams.Root_Stream_Type'Class;

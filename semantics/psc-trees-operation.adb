@@ -308,6 +308,11 @@ package body PSC.Trees.Operation is
       return;
    end Set_Nth_Operand;
 
+   function Kind (T : Tree) return Tree_Kind_Enum is
+   begin
+      return Operation_Kind;
+   end Kind;
+
    function Substitute_Operands
      (T : Tree;
       New_Operands : Tree_Array)

@@ -108,6 +108,11 @@ package body PSC.Trees.Qualifier is
       T.Operand := New_Operand;
    end Set_Nth_Operand;
 
+   function Kind (T : Tree) return Tree_Kind_Enum is
+   begin
+      return Qualifier_Kind;
+   end Kind;
+
    function Qualifier_Image (Op : Qualifier_Enum) return String is
    begin
       case Op is

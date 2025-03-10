@@ -129,6 +129,11 @@ package body PSC.Trees.Invocation is
       end if;
    end Set_Nth_Operand;
 
+   function Kind (T : Tree) return Tree_Kind_Enum is
+   begin
+      return Invocation_Kind;
+   end Kind;
+
    function Substitute_Operands
      (T : Tree;
       New_Operands : Tree_Array)

@@ -30,6 +30,16 @@ with PSC.Source_Positions;
 with Ada.Text_IO.Text_Streams;
 package PSC.Trees is
 
+   type Tree_Kind_Enum is
+     (Annotation_Kind, Assign_Stmt_Kind, Binary_Kind,
+      Block_Stmt_Kind, Case_Construct_Kind, Conditional_Kind,
+      Control_Stmt_Kind, For_Loop_Kind, Identifier_Kind,
+      Implements_Element_Kind, Invocation_Kind, Iterator_Kind,
+      Module_Kind, Obj_Decl_Kind, Operation_Kind, Param_Decl_Kind,
+      Property_Kind, Qualified_Name_Kind, Qualifier_Kind,
+      Reference_Kind, Selection_Kind, Type_Decl_Kind, Unary_Kind,
+      While_Stmt_Kind);
+
    type Optional_Tree is private;
    --  A possibly empty subtree
 
@@ -98,6 +108,9 @@ package PSC.Trees is
       N : Positive;
       New_Operand : Optional_Tree);
    --  Set Nth operand of given Tree
+
+   function Kind (T : Tree) return Tree_Kind_Enum;
+   -- Return tree type as enum
 
    type Tree_Array is array (Positive range <>) of Optional_Tree;
 

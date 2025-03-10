@@ -67,6 +67,11 @@ package body PSC.Trees.Type_Decl is
       raise Program_Error;
    end Set_Nth_Operand;
 
+   function Kind (T : Tree) return Tree_Kind_Enum is
+   begin
+      return Type_Decl_Kind;
+   end Kind;
+
    procedure Display_Subtree
      (T : Tree;
       On : access Ada.Streams.Root_Stream_Type'Class;

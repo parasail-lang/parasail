@@ -34,32 +34,6 @@ with PSC.Trees.Semantics.Info;
 with PSC.Trees.Semantics.Static;
 with PSC.Univ_Strings;
 
-with PSC.Trees.Module;
-with PSC.Trees.Implements_Element;
-with PSC.Trees.Binary;
-with PSC.Trees.Unary;
-with PSC.Trees.Identifier;
-with PSC.Trees.Qualified_Name;
-with PSC.Trees.Obj_Decl;
-with PSC.Trees.Param_Decl;
-with PSC.Trees.Operation;
-with PSC.Trees.Reference;
-with PSC.Trees.Assign_Stmt;
-with PSC.Trees.Conditional;
-with PSC.Trees.Invocation;
-with PSC.Trees.Control_Stmt;
-with PSC.Trees.Type_Decl;
-with PSC.Trees.Selection;
-with PSC.Trees.Case_Construct;
-with PSC.Trees.Iterator;
-with PSC.Trees.While_Stmt;
-with PSC.Trees.Block_Stmt;
-with PSC.Trees.For_Loop_Construct;
-with PSC.Trees.Qualifier;
-with PSC.Trees.Annotation;
-with PSC.Trees.Property;
-with PSC.Trees.Compound_Stmt;
-
 pragma Elaborate_All (PSC.Interpreter.Builtins);
 pragma Elaborate_All (PSC.Strings);
 package body PSC.Trees.Semantics.Translator is
@@ -71,14 +45,6 @@ package body PSC.Trees.Semantics.Translator is
 
    type Decl_Kind_Enum is  --  Enumeration of kinds of decls
      (Module_Kind, Type_Kind, Object_Kind, Operation_Kind);
-
-   type Tree_Kind_Enum is
-     (Annotation_Kind, Assign_Stmt_Kind, Binary_Kind,
-      Compound_Stmt_Kind, Control_Stmt_Kind, Identifier_Kind,
-      Implements_Element_Kind, Invocation_Kind, Iterator_Kind,
-      Module_Kind, Obj_Decl_Kind, Operation_Kind, Param_Decl_Kind,
-      Property_Kind, Qualified_Name_Kind, Qualifier_Kind,
-      Reference_Kind, Selection_Kind, Type_Decl_Kind, Unary_Kind);
 
    type Decl_Context_Enum is  --  Enumeration of where decls can appear
      (Exported_Context, Inherited_Context,
@@ -2341,61 +2307,19 @@ package body PSC.Trees.Semantics.Translator is
       --    is import(#tree_kind)
       Op : constant Optional_Tree :=
          To_Optional_Tree (Fetch_Word (Params, 1));
-      Op_Ptr : constant Tree_Ptr := Tree_Ptr_Of (Op);
-      Kind : Tree_Kind_Enum;
    begin
       --  Determine kind of tree
-      if Op_Ptr.all in PSC.Trees.Module.Tree'Class then
-         Kind := Annotation_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Assign_Stmt.Tree'Class then
-         Kind := Assign_Stmt_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Binary.Tree'Class then
-         Kind := Binary_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Compound_Stmt.Tree'Class then
-         Kind := Compound_Stmt_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Control_Stmt.Tree'Class then
-         Kind := Control_Stmt_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Identifier.Tree'Class then
-         Kind := Identifier_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Implements_Element.Tree'Class then
-         Kind := Implements_Element_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Invocation.Tree'Class then
-         Kind := Invocation_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Iterator.Tree'Class then
-         Kind := Iterator_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Module.Tree'Class then
-         Kind := Module_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Obj_Decl.Tree'Class then
-         Kind := Obj_Decl_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Operation.Tree'Class then
-         Kind := Operation_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Param_Decl.Tree'Class then
-         Kind := Param_Decl_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Property.Tree'Class then
-         Kind := Property_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Qualified_Name.Tree'Class then
-         Kind := Qualified_Name_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Qualifier.Tree'Class then
-         Kind := Qualifier_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Reference.Tree'Class then
-         Kind := Reference_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Selection.Tree'Class then
-         Kind := Selection_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Type_Decl.Tree'Class then
-         Kind := Type_Decl_Kind;
-      elsif Op_Ptr.all in PSC.Trees.Unary.Tree'Class then
-         Kind := Unary_Kind;
+      if Not_Null(Op) then
+         declare
+            Op_Tree : constant Tree'Class := Tree_Of (Op);
+         begin
+            Store_Word
+              (Params, 0,
+               Tree_Kind_Enum'Pos (Kind (Op_Tree)));
+         end;
       else
-         --  None of the above; return null.
-         Store_Word
-           (Params, 0,
-            Null_Value);
-         return;
+         Store_Word (Params, 0, Null_Value);
       end if;
-
-      Store_Word
-        (Params, 0,
-         Tree_Kind_Enum'Pos (Kind));
    end Tree_Kind;
 
    procedure Tree_Num_Operands
