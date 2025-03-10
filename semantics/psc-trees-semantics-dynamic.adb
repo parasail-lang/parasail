@@ -4568,7 +4568,10 @@ package body PSC.Trees.Semantics.Dynamic is
               New_CTK_Index);
             pragma Assert (Natural (New_CTK_Index) = I);
 
-            if Const_Sem.all in Sym_Reference_Info'Class then
+            if Const_Sem.all in Sym_Reference_Info'Class
+              and then
+               Sym_Ref_Ptr (Const_Sem).Target_Polymorphic_Type = null
+            then
                --  These will be handled later
                null;
             elsif Const_Sem.all in Object_Semantic_Info'Class
@@ -4681,8 +4684,13 @@ package body PSC.Trees.Semantics.Dynamic is
                  (Compile_Time_Known_Const_Table,
                   Obj_Sem_Info_Index (I));
          begin
-            if Const_Sem.all not in Sym_Reference_Info'Class then
+            if Const_Sem.all not in Sym_Reference_Info'Class
+              or else
+               Sym_Ref_Ptr (Const_Sem).Target_Polymorphic_Type /= null
+            then
                --  Compute constants that are needed and not yet computed.
+               --  This includes cases where the original constant is
+               --  monomorphic, but the new constant is polymorphic.
                declare
                   CTK_Info : constant Computable_Const_Info_Ptr :=
                     Nth_Element (Compile_Time_Known_Consts,
@@ -4729,9 +4737,13 @@ package body PSC.Trees.Semantics.Dynamic is
                  (Compile_Time_Known_Const_Table,
                   Obj_Sem_Info_Index (I));
          begin
-            if Const_Sem.all in Sym_Reference_Info'Class then
+            if Const_Sem.all in Sym_Reference_Info'Class
+              and then
+               Sym_Ref_Ptr (Const_Sem).Target_Polymorphic_Type = null
+            then
                --  This is a case where we want a copy of the
-               --  original constant
+               --  original constant as is (i.e. *without* having to first
+               --  convert it to a polymorphic object).
                declare
                   Const_Ref : constant Sym_Ref_Ptr := Sym_Ref_Ptr (Const_Sem);
                   From_Type_Desc : constant Type_Descriptor_Ptr :=
