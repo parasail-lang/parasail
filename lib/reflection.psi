@@ -154,14 +154,28 @@ interface PSC::Reflection<> is
 
     interface Tree<> is
       type Tree_Kind is Enum<
-        [#Annotation, #Assign_Stmt, #Binary,
-         #Block_Stmt, #Case_Construct, #Conditional,
-         #Control_Stmt, #For_Loop, #Identifier,
-         #Implements_Element, #Invocation, #Iterator,
-         #Module, #Obj_Decl, #Operation, #Param_Decl,
-         #Property, #Qualified_Name, #Qualifier,
-         #Reference, #Selection, #Type_Decl,
-         #Unary, #While_Stmt]>;
+        [#annotation, #assign_stmt, #binary,
+         #block_stmt, #case_construct, #conditional,
+         #control_stmt, #for_loop, #identifier,
+         #implements_element, #invocation, #iterator,
+         #module, #obj_decl, #operation, #param_decl,
+         #property, #qualified_name, #qualifier,
+         #reference, #selection, #type_decl,
+         #unary, #while_stmt]>;
+      type Unary_Op_Kind is Enum<
+        [#plus_op, #minus_op, #not_op, #abs_op, #is_null_op,
+         #not_null_op, #meaning_op, #magnitude_op,
+         #updated_value_op, #initial_value_op]>
+      type Binary_Op_Kind is Enum<
+        [#plus_op, #minus_op, #times_op, #divide_op,
+         #mod_op, #rem_op, #power_op, #compare_op, #less_op,
+         #leq_op, #equal_op, #neq_op, #geq_op, #greater_op,
+         #and_op, #or_op, #xor_op, #and_then_op, #or_else_op,
+         #implies_op, #combine_op, #ampersand_op, #in_op,
+         #not_in_op, #meaning_op, #left_shift_op, #right_shift_op,
+         #closed_interval_op, #open_interval_op, #open_closed_interval_op,
+         #closed_open_interval_op, #sequential_stmt_op, #parallel_stmt_op,
+         #handled_stmt_op, #next_stmt_op, #then_stmt_op]>
 
       func Kind(Tree) -> Tree_Kind
         is import(#tree_kind)
@@ -175,6 +189,11 @@ interface PSC::Reflection<> is
         is import(#tree_source_pos)
       func Resolved_Type(Tree) -> optional Type_Descriptor
         is import(#tree_resolved_type)
+
+      func Unary_Op(Tree {Kind(Tree) == #unary}) -> Unary_Op_Kind
+        is import(#tree_unary_op)
+      func Binary_Op(Tree {Kind(Tree) == #binary}) -> Binary_Op_Kind
+        is import(#tree_binary_op)
     end interface Tree
 
     interface Region<> is

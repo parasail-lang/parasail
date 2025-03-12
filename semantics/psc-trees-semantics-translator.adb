@@ -34,7 +34,8 @@ with PSC.Trees.Semantics.Info;
 with PSC.Trees.Semantics.Static;
 with PSC.Univ_Strings;
 
-with Ada.Text_IO; use Ada.Text_IO;
+with PSC.Trees.Unary;
+with PSC.Trees.Binary;
 
 pragma Elaborate_All (PSC.Interpreter.Builtins);
 pragma Elaborate_All (PSC.Strings);
@@ -354,6 +355,18 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Resolved_Type, "_psc_tree_resolved_type");
+
+   procedure Tree_Unary_Op
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Unary_Op, "_psc_tree_unary_op");
+
+   procedure Tree_Binary_Op
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Binary_Op, "_psc_tree_binary_op");
 
    procedure Tree_Source_Pos
      (Context : in out Exec_Context;
@@ -2436,6 +2449,65 @@ package body PSC.Trees.Semantics.Translator is
            (Params, 0, Null_Value);
       end if;
    end Tree_Resolved_Type;
+
+   procedure Tree_Unary_Op
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Unary_Op(Tree {Kind(Tree) == #unary}) -> Unary_Op_Kind
+      --    is import(#tree_unary_op)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : constant Tree_Ptr := Tree_Ptr_Of (Op);
+         begin
+            if Op_Tree.all in Trees.Unary.Tree then
+               declare
+                  Un_Tree : constant Trees.Unary.Tree_Ptr :=
+                     Trees.Unary.Tree_Ptr (Op_Tree);
+               begin
+                  Store_Word
+                     (Params, 0,
+                      Trees.Unary.Unary_Operator_Enum'Pos (Un_Tree.Operator));
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_Unary_Op;
+
+   procedure Tree_Binary_Op
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Binary_Op(Tree {Kind(Tree) == #binary}) -> Binary_Op_Kind
+      --    is import(#tree_binary_op)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+      Op_Sem : constant Root_Sem_Ptr := Sem_Info (Op);
+   begin
+      if Op_Sem /= null and then Op_Sem.all in Call_Semantic_Info'Class then
+         declare
+            Bin_Sem : Call_Sem_Ptr := Call_Sem_Ptr (Op_Sem);
+            Index : Word_Type := Trees.Binary.Binary_Operator_Enum_With_Null'Pos
+               (Bin_Sem.Original_Binary_Operator);
+         begin
+            if Index > 0 then
+               Store_Word
+                 (Params, 0, Index - 1);
+               return;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_Binary_Op;
 
    procedure Decl_Region
      (Context : in out Exec_Context;
@@ -5926,6 +5998,14 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_resolved_type"),
       Tree_Resolved_Type'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_unary_op"),
+      Tree_Unary_Op'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_binary_op"),
+      Tree_Binary_Op'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_source_pos"),
