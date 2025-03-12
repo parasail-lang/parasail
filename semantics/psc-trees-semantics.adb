@@ -677,10 +677,10 @@ package body PSC.Trees.Semantics is
       end if;
    end Add_Top_Level_Tree;
 
-   function Analyze_With_Servers
+   function Analyze_Library
      (Command_To_Execute : Strings.U_String_Array :=
         (1 .. 0 => Strings.Null_U_String)) return Natural is
-      --  Analyze trees in library, presume Servers already started.
+      --  Analyze trees in library, starting servers when needed.
       --  If Command_To_Execute is non-null, invoke specified operation
       --  with given arguments.
       --  Return number of compile-time errors (0 if A-OK).
@@ -702,7 +702,7 @@ package body PSC.Trees.Semantics is
         PSC.Languages.Language;
          --  Remember language we last parsed
 
-   begin  --  Analyze_With_Servers
+   begin  --  Analyze_Library
 
       if not Verbose_Semantics then
          --  If there is a command, only show statistics if debug-threading
@@ -805,6 +805,13 @@ package body PSC.Trees.Semantics is
          Put_Line ("Evaluating global constants.");
       end if;
 
+      --  Now we need to actually start up thread servers
+      --  (might be able to wait a *bit* more)
+      if Command_To_Execute'Length = 0 then
+         Put_Line ("Starting up thread servers");
+      end if;
+      Interpreter.Start_Up_Thread_Servers;
+
       Dynamic.Evaluate_Global_Constants;
 
       --  We might have some unfinished type descriptors
@@ -892,7 +899,7 @@ package body PSC.Trees.Semantics is
 
       return 0;
 
-   end Analyze_With_Servers;
+   end Analyze_Library;
 
    function Analyze
      (Command_To_Execute : Strings.U_String_Array :=
@@ -904,14 +911,8 @@ package body PSC.Trees.Semantics is
       --  Return Natural'Last if command was terminated by the user.
       Num_Errors : Natural := 0;
    begin
-      --  Begin the thread servers
-      if Command_To_Execute'Length = 0 then
-         Put_Line ("Starting up thread servers");
-      end if;
-      Interpreter.Start_Up_Thread_Servers;
-
       --  Do semantic analysis and execute the command(s)
-      Num_Errors := Analyze_With_Servers (Command_To_Execute);
+      Num_Errors := Analyze_Library (Command_To_Execute);
 
       --  Shut down thread servers
       if Command_To_Execute'Length = 0 then
@@ -932,6 +933,9 @@ package body PSC.Trees.Semantics is
    --  If no Command_Given, then
    --     Analyze all modules in the library
    --     If no errors, prompt for commands and execute them.
+   --  If there was a Command_Given, then
+   --    we will have already analyzed everything and executed the command
+   --    during the Parse_All operation.
    --  Shut down the thread servers
    begin
       if Total_Errors = 0 then

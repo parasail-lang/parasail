@@ -206,6 +206,10 @@ package PSC.Trees.Semantics is
    --  If no Command_Given, then
    --     Analyze all modules in the library
    --     If no errors, prompt for commands and execute them.
+   --  If there was a Command_Given, then
+   --    we will have already analyzed everything and executed the command
+   --    during the Parse_All operation.
+   --  Shut down the thread servers
 
    procedure Finish_Type_Descriptor
      (Type_Desc : Interpreter.Type_Descriptor_Ptr;
