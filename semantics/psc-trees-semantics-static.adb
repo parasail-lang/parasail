@@ -9098,6 +9098,14 @@ package body PSC.Trees.Semantics.Static is
                      "does NOT explicitly implement it");
                end if;
                return False;
+
+            elsif Formal_Type.Associated_Module.Num_Visible_Components > 0 then
+               if Debug_Second_Pass then
+                  Put_Line
+                    (" Formal has visible components and actual " &
+                     "does NOT explicitly implement it");
+               end if;
+               return False;
             end if;
 
             --  We allow "ad hoc" matching for parameterless interfaces
