@@ -22874,8 +22874,8 @@ package body PSC.Trees.Semantics.Static is
                               declare
                                  --  Bundle up info needed by
                                  --  Substitute_Actuals_From_Instantiation
-                                 Instantiation_Info :
-                                   aliased constant Instantiation_Info_Record :=
+                                 Instantiation_Info : aliased constant
+                                   Instantiation_Info_Record :=
                                    (Decl_Region => Visitor.Decl_Region,
                                     Instantiation_Module => Module_Sem,
                                     Instantiation => Optional (T'Access));
@@ -22908,25 +22908,30 @@ package body PSC.Trees.Semantics.Static is
                               end;
                            end if;
 
-                           if Resolved_Type.Func_Type_Op_Sem /= null then
-                              --  We want an operation name, not
-                              --  a normal object value.
-                              Context_To_Use := Formal_Op_Context;
+                           if Resolved_Type = null then
+                              Sem_Error (Formal, "Formal type not defined");
+                           else
+                              if Resolved_Type.Func_Type_Op_Sem /= null then
+                                 --  We want an operation name, not
+                                 --  a normal object value.
+                                 Context_To_Use := Formal_Op_Context;
+                              end if;
+
+                              Second_Pass
+                                (Visitor.Decl_Region, Actual,
+                                 Context => Context_To_Use);
+                              Resolve_Expression
+                                (Visitor, Actual, Resolved_Type);
+
+                              --  Record sem-info of actual
+                              Actual_Sem_Infos (Formal_Index) :=
+                                Sem_Ptr (Sem_Info (Actual));
+
+                              pragma Assert
+                                (Tree_Ptr_Of
+                                   (Sem_Info (Actual).Definition).all not in
+                                   Param_Decl.Tree);
                            end if;
-
-                           Second_Pass
-                             (Visitor.Decl_Region, Actual,
-                              Context => Context_To_Use);
-                           Resolve_Expression (Visitor, Actual, Resolved_Type);
-
-                           --  Record sem-info of actual
-                           Actual_Sem_Infos (Formal_Index) :=
-                             Sem_Ptr (Sem_Info (Actual));
-
-                           pragma Assert
-                             (Tree_Ptr_Of
-                                (Sem_Info (Actual).Definition).all not in
-                                Param_Decl.Tree);
 
                         elsif Formal_Tree in Type_Decl.Tree'Class then
                            --  Expecting a type
