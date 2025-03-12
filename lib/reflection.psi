@@ -170,6 +170,11 @@ interface PSC::Reflection<> is
        is import(#tree_num_operands)
       func Nth_Operand(Tree; Tree_Index) -> optional Tree
         is import(#tree_nth_operand)
+
+      func Source_Pos(Tree) -> optional Source_Position
+        is import(#tree_source_pos)
+      func Resolved_Type(Tree) -> optional Type_Descriptor
+        is import(#tree_resolved_type)
     end interface Tree
 
     interface Region<> is

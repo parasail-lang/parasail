@@ -34,6 +34,8 @@ with PSC.Trees.Semantics.Info;
 with PSC.Trees.Semantics.Static;
 with PSC.Univ_Strings;
 
+with Ada.Text_IO; use Ada.Text_IO;
+
 pragma Elaborate_All (PSC.Interpreter.Builtins);
 pragma Elaborate_All (PSC.Strings);
 package body PSC.Trees.Semantics.Translator is
@@ -346,6 +348,18 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Nth_Operand, "_psc_tree_nth_operand");
+
+   procedure Tree_Resolved_Type
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Resolved_Type, "_psc_tree_resolved_type");
+
+   procedure Tree_Source_Pos
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Source_Pos, "_psc_tree_source_pos");
 
    procedure Region_Nth_Tree
      (Context : in out Exec_Context;
@@ -1260,6 +1274,13 @@ package body PSC.Trees.Semantics.Translator is
               (To_Unsigned_Word (Val)))));
       end if;
    end To_Optional_Tree;
+
+   function To_Word_Type (Src : PSC.Source_Positions.Source_Position) return Word_Type is
+   begin
+      return Word_Type (Src.File) * 2**32 +
+         Word_Type (Src.Line) * 2**10 +
+         Word_Type (Src.Col);
+   end To_Word_Type;
 
    use Type_Descriptor_Ops;
 
@@ -2370,6 +2391,51 @@ package body PSC.Trees.Semantics.Translator is
       Store_Word
          (Params, 0, Null_Value);
    end Tree_Nth_Operand;
+
+   procedure Tree_Source_Pos
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Source_Pos(Tree) -> optional Source_Position
+      --    is import(#tree_source_pos)
+      use Source_Positions;
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+      Pos : constant Source_Positions.Source_Position :=
+         Source_Pos (Op);
+   begin
+      if Pos = Source_Positions.Null_Source_Position then
+         Store_Word
+           (Params, 0, Null_Value);
+      else
+         Store_Word
+           (Params, 0,
+            To_Word_Type (Pos));
+      end if;
+   end Tree_Source_Pos;
+
+   procedure Tree_Resolved_Type
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  fufunc Resolved_Type(Tree) -> optional Type_Descriptor
+      --    is import(#tree_resolved_type)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+      Op_Sem : constant Operand_Sem_Ptr :=
+         Operand_Sem_Ptr (Sem_Info (Op));
+   begin
+      if Op_Sem /= null and then Op_Sem.Resolved_Type /= null then
+         
+         Store_Word
+           (Params, 0,
+            To_Word_Type (Get_Type_Desc
+              (Context, Op_Sem.Resolved_Type.Type_Descriptor_Location)));
+      else
+         Store_Word
+           (Params, 0, Null_Value);
+      end if;
+   end Tree_Resolved_Type;
 
    procedure Decl_Region
      (Context : in out Exec_Context;
@@ -5856,6 +5922,14 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_nth_operand"),
       Tree_Nth_Operand'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_resolved_type"),
+      Tree_Resolved_Type'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_source_pos"),
+      Tree_Source_Pos'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#new_conv_desc"),
