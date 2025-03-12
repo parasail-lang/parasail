@@ -36,6 +36,7 @@ with PSC.Univ_Strings;
 
 with PSC.Trees.Unary;
 with PSC.Trees.Binary;
+with PSC.Trees.Identifier;
 
 pragma Elaborate_All (PSC.Interpreter.Builtins);
 pragma Elaborate_All (PSC.Strings);
@@ -373,6 +374,18 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Source_Pos, "_psc_tree_source_pos");
+
+   procedure Tree_Lit_Kind
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Lit_Kind, "_psc_tree_lit_kind");
+
+   procedure Tree_Identifier
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Identifier, "_psc_tree_identifier");
 
    procedure Region_Nth_Tree
      (Context : in out Exec_Context;
@@ -2439,7 +2452,6 @@ package body PSC.Trees.Semantics.Translator is
          Operand_Sem_Ptr (Sem_Info (Op));
    begin
       if Op_Sem /= null and then Op_Sem.Resolved_Type /= null then
-         
          Store_Word
            (Params, 0,
             To_Word_Type (Get_Type_Desc
@@ -2508,6 +2520,65 @@ package body PSC.Trees.Semantics.Translator is
       Store_Word
          (Params, 0, Null_Value);
    end Tree_Binary_Op;
+
+   procedure Tree_Lit_Kind
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Lit_Kind(Tree {Kind(Tree) == #identifier}) -> optional Literal_Kind
+      --    is import(#tree_lit_kind)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+      Op_Sem : constant Root_Sem_Ptr := Sem_Info (Op);
+   begin
+      if Op_Sem /= null and then Op_Sem.all in Literal_Semantic_Info'Class then
+         declare
+            Lit_Sem : Literal_Sem_Ptr := Literal_Sem_Ptr (Op_Sem);
+            Index : Word_Type := Literal_Kind_Enum'Pos (Lit_Sem.Lit_Kind);
+         begin
+            if Lit_Sem.Lit_Kind /= Not_A_Literal then
+               Store_Word
+                 (Params, 0, Index - 1);
+               return;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_Lit_Kind;
+
+   procedure Tree_Identifier
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Identifier(Tree {Kind(Tree) == #identifier}) -> Univ_String
+      --    is import(#tree_identifier)
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree_Ptr := Tree_Ptr_Of (Op);
+         begin
+            if Op_Tree.all in Trees.Identifier.Tree then
+               declare
+                  Ident_Tree : Trees.Identifier.Tree_Ptr :=
+                     Trees.Identifier.Tree_Ptr (Op_Tree);
+                  Word_Str : Word_Type := To_Univ_String_Word
+                     (Ident_Tree.Str, Target);
+               begin
+                  Store_Word (Params, 0, Word_Str);
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_Identifier;
 
    procedure Decl_Region
      (Context : in out Exec_Context;
@@ -6006,6 +6077,14 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_binary_op"),
       Tree_Binary_Op'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_lit_kind"),
+      Tree_Lit_Kind'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_identifier"),
+      Tree_Identifier'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_source_pos"),

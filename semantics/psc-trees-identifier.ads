@@ -26,6 +26,8 @@ package PSC.Trees.Identifier is
       Str : Strings.U_String;
    end record;
 
+   type Tree_Ptr is access all Tree'Class;
+
    function Make
      (Str : Strings.U_String;
       Source_Pos : Source_Positions.Source_Position :=

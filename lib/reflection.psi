@@ -176,6 +176,9 @@ interface PSC::Reflection<> is
          #closed_interval_op, #open_interval_op, #open_closed_interval_op,
          #closed_open_interval_op, #sequential_stmt_op, #parallel_stmt_op,
          #handled_stmt_op, #next_stmt_op, #then_stmt_op]>
+      type Literal_Kind is Enum<
+        [#integer_literal, #real_literal, #string_literal,
+         #char_literal, #enum_literal, #null_literal]>;
 
       func Kind(Tree) -> Tree_Kind
         is import(#tree_kind)
@@ -194,6 +197,11 @@ interface PSC::Reflection<> is
         is import(#tree_unary_op)
       func Binary_Op(Tree {Kind(Tree) == #binary}) -> Binary_Op_Kind
         is import(#tree_binary_op)
+
+      func Lit_Kind(Tree {Kind(Tree) == #identifier}) -> optional Literal_Kind
+        is import(#tree_lit_kind)
+      func Identifier(Tree {Kind(Tree) == #identifier}) -> Univ_String
+        is import(#tree_identifier)
     end interface Tree
 
     interface Region<> is
