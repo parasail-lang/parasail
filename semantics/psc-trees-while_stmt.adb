@@ -82,10 +82,7 @@ package body PSC.Trees.While_Stmt is
       end case;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is
-   begin
-      return While_Stmt_Kind;
-   end Kind;
+   function Kind (T : Tree) return Tree_Kind_Enum is (While_Stmt_Kind);
 
    procedure Display_Subtree
      (T : Tree;

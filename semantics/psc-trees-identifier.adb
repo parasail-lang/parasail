@@ -52,10 +52,7 @@ package body PSC.Trees.Identifier is
       return Make (PSC.Strings.String_Lookup (Id), Source_Pos);
    end Make;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is
-   begin
-      return Identifier_Kind;
-   end Kind;
+   function Kind (T : Tree) return Tree_Kind_Enum is (Identifier_Kind);
 
    procedure Display_Subtree
      (T : Tree;

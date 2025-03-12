@@ -106,10 +106,7 @@ package body PSC.Trees.Param_Decl is
       return;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is
-   begin
-      return Param_Decl_Kind;
-   end Kind;
+   function Kind (T : Tree) return Tree_Kind_Enum is (Param_Decl_Kind);
 
    function Param_Kind_Image
      (Kind : Param_Kind; Locking : Param_Locking := Not_Locked) return String

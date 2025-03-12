@@ -64,10 +64,7 @@ package body PSC.Trees.Selection is
       end if;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is
-   begin
-      return Selection_Kind;
-   end Kind;
+   function Kind (T : Tree) return Tree_Kind_Enum is (Selection_Kind);
 
    procedure Display_Subtree
      (T : Tree;

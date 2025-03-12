@@ -89,10 +89,7 @@ package body PSC.Trees.Conditional is
       end case;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is
-   begin
-      return Conditional_Kind;
-   end Kind;
+   function Kind (T : Tree) return Tree_Kind_Enum is (Conditional_Kind);
 
    procedure Display_Subtree
      (T : Tree;

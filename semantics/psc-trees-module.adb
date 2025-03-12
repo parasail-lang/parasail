@@ -141,10 +141,7 @@ package body PSC.Trees.Module is
       raise Program_Error;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is
-   begin
-      return Module_Kind;
-   end Kind;
+   function Kind (T : Tree) return Tree_Kind_Enum is (Module_Kind);
 
    procedure Display_Subtree
      (T : Tree;

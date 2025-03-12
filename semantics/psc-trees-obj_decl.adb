@@ -132,10 +132,7 @@ package body PSC.Trees.Obj_Decl is
       return;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is
-   begin
-      return Obj_Decl_Kind;
-   end Kind;
+   function Kind (T : Tree) return Tree_Kind_Enum is (Obj_Decl_Kind);
 
    procedure Display_Subtree
      (T : Tree;

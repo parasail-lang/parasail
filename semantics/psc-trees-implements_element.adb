@@ -71,10 +71,7 @@ package body PSC.Trees.Implements_Element is
       return Optional (New_Tree);
    end Substitute_Operands;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is
-   begin
-      return Implements_Element_Kind;
-   end Kind;
+   function Kind (T : Tree) return Tree_Kind_Enum is (Implements_Element_Kind);
 
    procedure Display_Subtree
      (T : Tree;

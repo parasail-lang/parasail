@@ -64,10 +64,7 @@ package body PSC.Trees.Block_Stmt is
       raise Program_Error;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is
-   begin
-      return Block_Stmt_Kind;
-   end Kind;
+   function Kind (T : Tree) return Tree_Kind_Enum is (Block_Stmt_Kind);
 
    procedure Display_Subtree
      (T : Tree;

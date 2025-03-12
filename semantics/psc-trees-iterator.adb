@@ -113,10 +113,7 @@ package body PSC.Trees.Iterator is
       end case;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is
-   begin
-      return Iterator_Kind;
-   end Kind;
+   function Kind (T : Tree) return Tree_Kind_Enum is (Iterator_Kind);
  
    procedure Display_Subtree
      (T : Tree;
