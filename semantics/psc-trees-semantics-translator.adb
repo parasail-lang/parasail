@@ -188,6 +188,12 @@ package body PSC.Trees.Semantics.Translator is
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Location, "_psc_decl_location");
 
+   procedure Decl_Tree_Of
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Decl_Tree_Of, "_psc_decl_tree_of");
+
    procedure Decl_Component_Index
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -356,6 +362,12 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Resolved_Type, "_psc_tree_resolved_type");
+
+   procedure Tree_Decl_Of
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Decl_Of, "_psc_tree_decl_of");
 
    procedure Tree_Unary_Op
      (Context : in out Exec_Context;
@@ -1716,6 +1728,20 @@ package body PSC.Trees.Semantics.Translator is
          Languages.Convention_Enum'Pos (Convention));
    end Decl_Convention;
 
+   procedure Decl_Tree_Of
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Tree_Of(Decl) -> Tree
+      --    is import(#decl_tree_of)
+      Decl_Sem : Root_Semantic_Info'Class renames
+        To_Root_Sem_Ptr (Fetch_Word (Params, 1)).all;
+      Result_Op : Optional_Tree := Decl_Sem.Definition;
+   begin
+      Store_Word
+        (Params, 0, To_Word_Type (Result_Op));
+   end Decl_Tree_Of;
+
    procedure Decl_Location
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -2444,23 +2470,58 @@ package body PSC.Trees.Semantics.Translator is
       (Context : in out Exec_Context;
        Params : Word_Ptr;
        Static_Link : Non_Op_Map_Type_Ptr) is
-      --  fufunc Resolved_Type(Tree) -> optional Type_Descriptor
+      --  func Resolved_Type(Tree) -> optional Type_Descriptor
       --    is import(#tree_resolved_type)
       Op : constant Optional_Tree :=
          To_Optional_Tree (Fetch_Word (Params, 1));
-      Op_Sem : constant Operand_Sem_Ptr :=
-         Operand_Sem_Ptr (Sem_Info (Op));
+      Op_Sem : constant Root_Sem_Ptr := Sem_Info (Op);
    begin
-      if Op_Sem /= null and then Op_Sem.Resolved_Type /= null then
+      if Op_Sem /= null and then 
+         Op_Sem.all in Operand_Semantic_Info'Class
+      then
+         declare
+            Opnd_Sem : constant Operand_Sem_Ptr :=
+               Operand_Sem_Ptr (Op_Sem);
+            Res_Type : constant Type_Sem_Ptr :=
+               Opnd_Sem.Resolved_Type;
+         begin
+            if Res_Type /= null then
+               Store_Word
+               (Params, 0,
+                  To_Word_Type (Get_Type_Desc
+                  (Context, Res_Type.Type_Descriptor_Location)));
+               return;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0, Null_Value);
+   end Tree_Resolved_Type;
+
+   procedure Tree_Decl_Of
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Decl_Of(Tree) -> optional Decl
+      --    is import(#tree_decl_of)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+      Op_Sem : constant Root_Sem_Ptr := Sem_Info (Op);
+   begin
+      if Op_Sem /= null and then 
+         (Op_Sem.all in Module_Semantic_Info'Class or else
+          Op_Sem.all in Type_Semantic_Info'Class or else
+          Op_Sem.all in Object_Semantic_Info'Class or else
+          Op_Sem.all in Operation_Semantic_Info'Class)
+      then
          Store_Word
-           (Params, 0,
-            To_Word_Type (Get_Type_Desc
-              (Context, Op_Sem.Resolved_Type.Type_Descriptor_Location)));
+           (Params, 0, To_Word_Type (Op_Sem));
       else
          Store_Word
            (Params, 0, Null_Value);
       end if;
-   end Tree_Resolved_Type;
+   end Tree_Decl_Of;
 
    procedure Tree_Unary_Op
       (Context : in out Exec_Context;
@@ -5739,6 +5800,10 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#decl_convention"),
       Decl_Convention'Access);
+   
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#decl_tree_of"),
+      Decl_Tree_Of'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#decl_location"),
@@ -6069,6 +6134,10 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_resolved_type"),
       Tree_Resolved_Type'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_decl_of"),
+      Tree_Decl_Of'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_unary_op"),

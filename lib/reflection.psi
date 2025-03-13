@@ -192,6 +192,8 @@ interface PSC::Reflection<> is
         is import(#tree_source_pos)
       func Resolved_Type(Tree) -> optional Type_Descriptor
         is import(#tree_resolved_type)
+      func Decl_Of(Tree) -> optional Decl
+        is import(#tree_decl_of)
 
       func Unary_Op(Tree {Kind(Tree) == #unary}) -> Unary_Op_Kind
         is import(#tree_unary_op)
@@ -408,6 +410,9 @@ interface PSC::Reflection<> is
           is import(#decl_level)
         func Convention(Decl) -> Convention_Enum
           is import(#decl_convention)
+
+        func Tree_Of(Decl) -> Tree
+          is import(#decl_tree_of)
 
         func Location(Decl) -> Object_Locator  //  Rename routine
           is in Object_Locator
