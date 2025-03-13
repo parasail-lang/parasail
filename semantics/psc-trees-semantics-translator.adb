@@ -2562,18 +2562,22 @@ package body PSC.Trees.Semantics.Translator is
       --    is import(#tree_binary_op)
       Op : constant Optional_Tree :=
          To_Optional_Tree (Fetch_Word (Params, 1));
-      Op_Sem : constant Root_Sem_Ptr := Sem_Info (Op);
    begin
-      if Op_Sem /= null and then Op_Sem.all in Call_Semantic_Info'Class then
+      if Not_Null (Op) then
          declare
-            Bin_Sem : Call_Sem_Ptr := Call_Sem_Ptr (Op_Sem);
-            Index : Word_Type := Trees.Binary.Binary_Operator_Enum_With_Null'Pos
-               (Bin_Sem.Original_Binary_Operator);
+            Op_Tree : Tree_Ptr := Tree_Ptr_Of (Op);
          begin
-            if Index > 0 then
-               Store_Word
-                 (Params, 0, Index - 1);
-               return;
+            if Op_Tree.all in Trees.Binary.Tree'Class then
+               declare
+                  Bin_Tree : constant Trees.Binary.Tree_Ptr :=
+                     Trees.Binary.Tree_Ptr (Op_Tree);
+                  Index : Word_Type := Trees.Binary.Binary_Operator_Enum'Pos
+                     (Bin_Tree.Operator);
+               begin
+                  Store_Word
+                     (Params, 0, Index - 1);
+                  return;
+               end;
             end if;
          end;
       end if;
