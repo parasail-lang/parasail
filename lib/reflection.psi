@@ -187,6 +187,10 @@ interface PSC::Reflection<> is
        is import(#tree_num_operands)
       func Nth_Operand(Tree; Tree_Index) -> optional Tree
         is import(#tree_nth_operand)
+      func Pre_Annotation(Tree) -> optional Tree
+        is import(#tree_pre_annotation)
+      func Post_Annotation(Tree) -> optional Tree
+        is import(#tree_post_annotation)
 
       func Source_Pos(Tree) -> optional Source_Position
         is import(#tree_source_pos)

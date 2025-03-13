@@ -357,6 +357,18 @@ package body PSC.Trees.Semantics.Translator is
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Nth_Operand, "_psc_tree_nth_operand");
 
+   procedure Tree_Pre_Annotation
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Pre_Annotation, "_psc_tree_pre_annotation");
+
+   procedure Tree_Post_Annotation
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Post_Annotation, "_psc_tree_post_annotation");
+
    procedure Tree_Resolved_Type
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -2443,6 +2455,48 @@ package body PSC.Trees.Semantics.Translator is
       Store_Word
          (Params, 0, Null_Value);
    end Tree_Nth_Operand;
+
+   procedure Tree_Pre_Annotation
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Pre_Annotation(Tree) -> optional Tree
+      --    is import(#tree_pre_annotation)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : constant Tree'Class := Tree_Of (Op);
+         begin
+            Store_Word
+              (Params, 0, To_Word_Type (Op_Tree.Pre_Annotation));
+         end;
+      else
+         Store_Word (Params, 0, Null_Value);
+      end if;
+   end Tree_Pre_Annotation;
+
+   procedure Tree_Post_Annotation
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Post_Annotation(Tree) -> optional Tree
+      --    is import(#tree_post_annotation)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : constant Tree'Class := Tree_Of (Op);
+         begin
+            Store_Word
+              (Params, 0, To_Word_Type (Op_Tree.Post_Annotation));
+         end;
+      else
+         Store_Word (Params, 0, Null_Value);
+      end if;
+   end Tree_Post_Annotation;
 
    procedure Tree_Source_Pos
       (Context : in out Exec_Context;
@@ -6134,6 +6188,14 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_nth_operand"),
       Tree_Nth_Operand'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_pre_annotation"),
+      Tree_Pre_Annotation'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_post_annotation"),
+      Tree_Post_Annotation'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_resolved_type"),
