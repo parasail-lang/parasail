@@ -881,9 +881,11 @@ interface PSC::Reflection<> is
     end interface Const_Info
 
     interface Component_Info<> is
-        const Type_Desc   : Type_Descriptor
-        const Is_By_Ref   : Boolean
-        const Is_Optional : Boolean
+        const Type_Desc      : Type_Descriptor
+        const Is_By_Ref      : Boolean
+        const Is_Optional    : Boolean
+        const Is_Var         : Boolean
+        const Component_Decl : Decl
     end interface Component_Info
 
     interface Routine_Info<> is

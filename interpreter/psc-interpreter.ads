@@ -1962,6 +1962,8 @@ package PSC.Interpreter is
       Type_Desc   : Type_Descriptor_Ptr;
       Is_By_Ref   : Boolean := False;
       Is_Optional : Boolean := True;
+      Is_Var      : Boolean := False;
+      Decl     : Trees.Optional_Tree := Trees.Null_Optional_Tree;
    end record;
    type Component_Info_Array is array (Positive range <>) of Component_Info;
    type Component_Info_Array_Ptr is access all Component_Info_Array;
