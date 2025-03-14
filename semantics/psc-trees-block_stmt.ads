@@ -48,6 +48,9 @@ package PSC.Trees.Block_Stmt is
    pragma No_Return (Set_Nth_Operand);
    --  Set Nth operand of given Tree
 
+   function Kind (T : Tree) return Tree_Kind_Enum is (Block_Stmt_Kind);
+   -- Return tree type as enum
+
    procedure Display_Subtree
      (T : Tree;
       On : access Ada.Streams.Root_Stream_Type'Class;

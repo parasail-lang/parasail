@@ -64,6 +64,9 @@ package PSC.Trees.Assign_Stmt is
       New_Operand : Optional_Tree);
    --  Set Nth operand of given Tree
 
+   function Kind (T : Tree) return Tree_Kind_Enum is (Assign_Stmt_Kind);
+   -- Return tree type as enum
+
    function Assign_Operator_Designator
      (Op : Assign_Operator_Enum)
       return Strings.U_String;

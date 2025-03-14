@@ -52,6 +52,9 @@ package PSC.Trees.Case_Construct is
       New_Operand : Optional_Tree);
    --  Set Nth operand of given Tree
 
+   function Kind (T : Tree) return Tree_Kind_Enum is (Case_Construct_Kind);
+   -- Return tree type as enum
+
    function Substitute_Operands
      (T : Tree;
       New_Operands : Tree_Array)

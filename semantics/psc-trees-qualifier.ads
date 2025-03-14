@@ -64,6 +64,9 @@ package PSC.Trees.Qualifier is
       New_Operand : Optional_Tree);
    --  Set Nth operand of given Tree
 
+   function Kind (T : Tree) return Tree_Kind_Enum is (Qualifier_Kind);
+   -- Return tree type as enum
+
    procedure Display_Subtree
      (T : Tree;
       On : access Ada.Streams.Root_Stream_Type'Class;

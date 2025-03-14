@@ -57,6 +57,9 @@ package PSC.Trees.Property is
       New_Operand : Optional_Tree);
    --  Set Nth operand of given Tree
 
+   function Kind (T : Tree) return Tree_Kind_Enum is (Property_Kind);
+   -- Return tree type as enum
+
    procedure Display_Subtree
      (T : Tree;
       On : access Ada.Streams.Root_Stream_Type'Class;

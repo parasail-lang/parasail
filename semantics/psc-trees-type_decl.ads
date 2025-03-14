@@ -49,6 +49,9 @@ package PSC.Trees.Type_Decl is
    --  Set Nth operand of given Tree
    pragma No_Return (Set_Nth_Operand);
 
+   function Kind (T : Tree) return Tree_Kind_Enum is (Type_Decl_Kind);
+   -- Return tree type as enum
+
    procedure Display_Subtree
      (T : Tree;
       On : access Ada.Streams.Root_Stream_Type'Class;

@@ -117,6 +117,8 @@ interface PSC::Reflection<> is
     type Decl_Index is new Integer<0..2**6>
       // An index into a declarative region
 
+    type Tree_Index is new Integer<0..2**31-1>
+
     type Code_Nesting_Level is new Integer<0 .. 7>
       // Depth of nesting in operations; level 0 is static constants.
       // and top-level operations.
@@ -149,6 +151,64 @@ interface PSC::Reflection<> is
           is import(#nth_library_item)
  
     end interface Environment
+
+    interface Tree<> is
+      type Tree_Kind is Enum<
+        [#annotation, #assign_stmt, #binary,
+         #block_stmt, #case_construct, #conditional,
+         #control_stmt, #for_loop, #identifier,
+         #implements_element, #invocation, #iterator,
+         #module, #obj_decl, #operation, #param_decl,
+         #property, #qualified_name, #qualifier,
+         #reference, #selection, #type_decl,
+         #unary, #while_stmt]>;
+      type Unary_Op_Kind is Enum<
+        [#plus_op, #minus_op, #not_op, #abs_op, #is_null_op,
+         #not_null_op, #meaning_op, #magnitude_op,
+         #updated_value_op, #initial_value_op]>
+      type Binary_Op_Kind is Enum<
+        [#plus_op, #minus_op, #times_op, #divide_op,
+         #mod_op, #rem_op, #power_op, #compare_op, #less_op,
+         #leq_op, #equal_op, #neq_op, #geq_op, #greater_op,
+         #and_op, #or_op, #xor_op, #and_then_op, #or_else_op,
+         #implies_op, #combine_op, #ampersand_op, #in_op,
+         #not_in_op, #meaning_op, #left_shift_op, #right_shift_op,
+         #closed_interval_op, #open_interval_op, #open_closed_interval_op,
+         #closed_open_interval_op, #sequential_stmt_op, #parallel_stmt_op,
+         #handled_stmt_op, #next_stmt_op, #then_stmt_op]>
+      type Literal_Kind is Enum<
+        [#integer_literal, #real_literal, #string_literal,
+         #char_literal, #enum_literal, #null_literal]>;
+
+      func Kind(Tree) -> Tree_Kind
+        is import(#tree_kind)
+
+      func Num_Operands(Tree) -> Tree_Index
+       is import(#tree_num_operands)
+      func Nth_Operand(Tree; Tree_Index) -> optional Tree
+        is import(#tree_nth_operand)
+      func Pre_Annotation(Tree) -> optional Tree
+        is import(#tree_pre_annotation)
+      func Post_Annotation(Tree) -> optional Tree
+        is import(#tree_post_annotation)
+
+      func Source_Pos(Tree) -> optional Source_Position
+        is import(#tree_source_pos)
+      func Resolved_Type(Tree) -> optional Type_Descriptor
+        is import(#tree_resolved_type)
+      func Decl_Of(Tree) -> optional Decl
+        is import(#tree_decl_of)
+
+      func Unary_Op(Tree {Kind(Tree) == #unary}) -> Unary_Op_Kind
+        is import(#tree_unary_op)
+      func Binary_Op(Tree {Kind(Tree) == #binary}) -> Binary_Op_Kind
+        is import(#tree_binary_op)
+
+      func Lit_Kind(Tree {Kind(Tree) == #identifier}) -> optional Literal_Kind
+        is import(#tree_lit_kind)
+      func Identifier(Tree {Kind(Tree) == #identifier}) -> Univ_String
+        is import(#tree_identifier)
+    end interface Tree
 
     interface Region<> is
         type Region_Kind is Enum<
@@ -185,6 +245,11 @@ interface PSC::Reflection<> is
           is import(#region_nth_nested_region)
         func Sibling_Region(Region) -> optional Region
           is import(#region_sibling_region)
+
+        func Num_Trees(Region) -> Tree_Index
+          is import(#region_num_trees)
+        func Nth_Tree(Region; Tree_Index) -> optional Tree
+          is import(#region_nth_tree);
 
         func Region_At_Index(Region_Index) -> Region
           is import(#region_at_index)
@@ -349,6 +414,9 @@ interface PSC::Reflection<> is
           is import(#decl_level)
         func Convention(Decl) -> Convention_Enum
           is import(#decl_convention)
+
+        func Tree_Of(Decl) -> Tree
+          is import(#decl_tree_of)
 
         func Location(Decl) -> Object_Locator  //  Rename routine
           is in Object_Locator
