@@ -1748,7 +1748,7 @@ package body PSC.Trees.Semantics.Translator is
       --    is import(#decl_tree_of)
       Decl_Sem : Root_Semantic_Info'Class renames
         To_Root_Sem_Ptr (Fetch_Word (Params, 1)).all;
-      Result_Op : Optional_Tree := Decl_Sem.Definition;
+      Result_Op : constant Optional_Tree := Decl_Sem.Definition;
    begin
       Store_Word
         (Params, 0, To_Word_Type (Result_Op));
@@ -2588,12 +2588,12 @@ package body PSC.Trees.Semantics.Translator is
    begin
       if Not_Null (Op) then
          declare
-            Op_Tree : constant Tree_Ptr := Tree_Ptr_Of (Op);
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree.all in Trees.Unary.Tree then
+            if Op_Tree in Trees.Unary.Tree then
                declare
-                  Un_Tree : constant Trees.Unary.Tree_Ptr :=
-                     Trees.Unary.Tree_Ptr (Op_Tree);
+                  Un_Tree : constant Trees.Unary.Tree :=
+                     Trees.Unary.Tree (Op_Tree);
                begin
                   Store_Word
                      (Params, 0,
@@ -2619,12 +2619,12 @@ package body PSC.Trees.Semantics.Translator is
    begin
       if Not_Null (Op) then
          declare
-            Op_Tree : Tree_Ptr := Tree_Ptr_Of (Op);
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree.all in Trees.Binary.Tree'Class then
+            if Op_Tree in Trees.Binary.Tree'Class then
                declare
-                  Bin_Tree : constant Trees.Binary.Tree_Ptr :=
-                     Trees.Binary.Tree_Ptr (Op_Tree);
+                  Bin_Tree : constant Trees.Binary.Tree :=
+                     Trees.Binary.Tree (Op_Tree);
                   Index : Word_Type := Trees.Binary.Binary_Operator_Enum'Pos
                      (Bin_Tree.Operator);
                begin
@@ -2679,12 +2679,12 @@ package body PSC.Trees.Semantics.Translator is
    begin
       if Not_Null (Op) then
          declare
-            Op_Tree : Tree_Ptr := Tree_Ptr_Of (Op);
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree.all in Trees.Identifier.Tree then
+            if Op_Tree in Trees.Identifier.Tree then
                declare
-                  Ident_Tree : Trees.Identifier.Tree_Ptr :=
-                     Trees.Identifier.Tree_Ptr (Op_Tree);
+                  Ident_Tree : Trees.Identifier.Tree :=
+                     Trees.Identifier.Tree (Op_Tree);
                   Word_Str : Word_Type := To_Univ_String_Word
                      (Ident_Tree.Str, Target);
                begin

@@ -150,8 +150,6 @@ package PSC.Trees.Binary is
       Right_Operand : Optional_Tree;
    end record;
 
-   type Tree_Ptr is access all Tree'Class;
-
    function Make
      (Operator : Binary_Operator_Enum;
       Left_Operand : Optional_Tree;

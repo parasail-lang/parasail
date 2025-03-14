@@ -48,8 +48,6 @@ package PSC.Trees.Unary is
       Operand : Optional_Tree;
    end record;
 
-   type Tree_Ptr is access all Tree'Class;
-
    function Make
      (Operator : Unary_Operator_Enum;
       Operand : Optional_Tree)
