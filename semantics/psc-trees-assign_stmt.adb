@@ -143,8 +143,6 @@ package body PSC.Trees.Assign_Stmt is
       end if;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is (Assign_Stmt_Kind);
-
    function Assign_Operator_Image
      (Assign_Operator : Assign_Operator_Enum)
       return String

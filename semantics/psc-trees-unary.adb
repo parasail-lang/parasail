@@ -58,8 +58,6 @@ package body PSC.Trees.Unary is
       T.Operand := New_Operand;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is (Unary_Kind);
-
    function Unary_Operator_Image (Op : Unary_Operator_Enum) return String is
    --  Return string name for Op (surrounding "" are omitted).
    begin

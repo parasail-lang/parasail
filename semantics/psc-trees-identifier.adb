@@ -52,8 +52,6 @@ package body PSC.Trees.Identifier is
       return Make (PSC.Strings.String_Lookup (Id), Source_Pos);
    end Make;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is (Identifier_Kind);
-
    procedure Display_Subtree
      (T : Tree;
       On : access Ada.Streams.Root_Stream_Type'Class;

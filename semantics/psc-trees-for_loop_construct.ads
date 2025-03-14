@@ -95,7 +95,7 @@ package PSC.Trees.For_Loop_Construct is
       New_Operand : Optional_Tree);
    --  Set Nth operand of given Tree
 
-   function Kind (T : Tree) return Tree_Kind_Enum;
+   function Kind (T : Tree) return Tree_Kind_Enum is (For_Loop_Kind);
    -- Return tree type as enum
 
    procedure Display_Subtree

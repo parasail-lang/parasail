@@ -94,8 +94,6 @@ package body PSC.Trees.Control_Stmt is
       T.Values := New_Operand;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is (Control_Stmt_Kind);
-
    function Exitable_Construct_Image
      (Construct : Exitable_Construct_Enum)
       return String

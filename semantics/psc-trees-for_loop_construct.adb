@@ -443,8 +443,6 @@ package body PSC.Trees.For_Loop_Construct is
       end if;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is (For_Loop_Kind);
-
    procedure Display_Subtree
      (T : Tree;
       On : access Ada.Streams.Root_Stream_Type'Class;

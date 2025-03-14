@@ -78,7 +78,7 @@ package PSC.Trees.Module is
    pragma No_Return (Set_Nth_Operand);
    --  Set Nth operand of given Tree
 
-   function Kind (T : Tree) return Tree_Kind_Enum;
+   function Kind (T : Tree) return Tree_Kind_Enum is (Module_Kind);
    -- Return tree type as enum
 
    procedure Display_Subtree

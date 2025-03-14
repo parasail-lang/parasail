@@ -40,7 +40,7 @@ package PSC.Trees.Identifier is
       return Optional_Tree;
    --  Build up an identifier Tree
 
-   function Kind (T : Tree) return Tree_Kind_Enum;
+   function Kind (T : Tree) return Tree_Kind_Enum is (Identifier_Kind);
    -- Return tree type as enum
 
    procedure Display_Subtree

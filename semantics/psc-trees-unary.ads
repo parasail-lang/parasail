@@ -76,7 +76,7 @@ package PSC.Trees.Unary is
       New_Operand : Optional_Tree);
    --  Set Nth operand of given Tree
 
-   function Kind (T : Tree) return Tree_Kind_Enum;
+   function Kind (T : Tree) return Tree_Kind_Enum is (Unary_Kind);
    -- Return tree type as enum
 
    procedure Display_Subtree

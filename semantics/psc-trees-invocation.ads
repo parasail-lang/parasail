@@ -72,7 +72,7 @@ package PSC.Trees.Invocation is
       New_Operand : Optional_Tree);
    --  Set Nth operand of given Tree
 
-   function Kind (T : Tree) return Tree_Kind_Enum;
+   function Kind (T : Tree) return Tree_Kind_Enum is (Invocation_Kind);
    -- Return tree type as enum
 
    function Substitute_Operands

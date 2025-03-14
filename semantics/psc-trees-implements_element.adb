@@ -71,8 +71,6 @@ package body PSC.Trees.Implements_Element is
       return Optional (New_Tree);
    end Substitute_Operands;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is (Implements_Element_Kind);
-
    procedure Display_Subtree
      (T : Tree;
       On : access Ada.Streams.Root_Stream_Type'Class;

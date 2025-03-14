@@ -74,8 +74,6 @@ package body PSC.Trees.Binary is
       end if;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is (Binary_Kind);
-
    function Precedence (OT : Optional_Tree) return Precedence_Type is
    --  Return precedence of given tree.
    --  Return Max_Precedence if not a unary or binary operator

@@ -64,8 +64,6 @@ package body PSC.Trees.Block_Stmt is
       raise Program_Error;
    end Set_Nth_Operand;
 
-   function Kind (T : Tree) return Tree_Kind_Enum is (Block_Stmt_Kind);
-
    procedure Display_Subtree
      (T : Tree;
       On : access Ada.Streams.Root_Stream_Type'Class;
