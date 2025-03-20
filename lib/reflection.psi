@@ -153,7 +153,7 @@ interface PSC::Reflection<> is
     end interface Environment
 
     interface Tree<> is
-      type Tree_Kind is Enum<
+      type Tree_Kind_Enum is Enum<
         [#annotation, #assign_stmt, #binary,
          #block_stmt, #case_construct, #conditional,
          #control_stmt, #for_loop, #identifier,
@@ -162,11 +162,11 @@ interface PSC::Reflection<> is
          #property, #qualified_name, #qualifier,
          #reference, #selection, #type_decl,
          #unary, #while_stmt]>;
-      type Unary_Op_Kind is Enum<
+      type Unary_Op_Kind_Enum is Enum<
         [#plus_op, #minus_op, #not_op, #abs_op, #is_null_op,
          #not_null_op, #meaning_op, #magnitude_op,
          #updated_value_op, #initial_value_op]>
-      type Binary_Op_Kind is Enum<
+      type Binary_Op_Kind_Enum is Enum<
         [#plus_op, #minus_op, #times_op, #divide_op,
          #mod_op, #rem_op, #power_op, #compare_op, #less_op,
          #leq_op, #equal_op, #neq_op, #geq_op, #greater_op,
@@ -176,7 +176,7 @@ interface PSC::Reflection<> is
          #closed_interval_op, #open_interval_op, #open_closed_interval_op,
          #closed_open_interval_op, #sequential_stmt_op, #parallel_stmt_op,
          #handled_stmt_op, #next_stmt_op, #then_stmt_op]>
-      type Assign_Op_Kind is Enum<
+      type Assign_Op_Kind_Enum is Enum<
         [#assign_op, #plus_assign_op, #minus_assign_op,
          #times_assign_op, #divide_assign_op, #power_assign_op,
          #combine_assign_op, #ampersand_assign_op, #and_assign_op,
@@ -212,7 +212,49 @@ interface PSC::Reflection<> is
          #proc_type_specifier, #protected_func_type,
          #protected_proc_type]>
 
-      func Kind(Tree) -> Tree_Kind
+      const Assign_Left_Op : Tree_Index := 1
+      const Assigny_Right_Op : Tree_Index := 2
+
+      const Binary_Left_Op : Tree_Index := 1
+      const Binary_Right_Op : Tree_Index := 2
+
+      const Conditional_Cond_Op : Tree_Index := 1
+      const Conditional_Then_Op : Tree_Index := 2
+      const Conditional_Else_Op : Tree_Index := 3
+
+      const Case_Selector_Op : Tree_Index := 1
+
+      const Control_Stmt_Val_Op : Tree_Index := 1
+
+      const Iterator_Obj_Op : Tree_Index := 1
+      const Iterator_While_Op : Tree_Index := 2
+
+      const Obj_Decl_Type_Op : Tree_Index := 1
+      const Obj_Decl_Value_Op : Tree_Index := 2
+
+      const Param_Decl_Type_Op : Tree_Index := 1
+      const Param_Decl_Value_Op : Tree_Index := 2
+
+      const Property_Val_Op : Tree_Index := 1
+      const Property_Id_Op : Tree_Index := 2
+
+      const Qualified_Name_Prefix_Op : Tree_Index := 1
+      const Qualified_Name_Id_Op : Tree_Index := 2
+
+      const Qualifier_Val_Op : Tree_Index := 1
+
+      const Reference_Key_Op : Tree_Index := 1
+      const Reference_Referent_Op : Tree_Index := 2
+
+      const Selection_Prefix_Op : Tree_Index := 1
+      const Selection_Selector_Op : Tree_Index := 2
+
+      const Unary_Val_Op : Tree_Index := 1
+
+      const While_Cond_Op : Tree_Index := 1
+      const While_Body_Op : Tree_Index := 2
+
+      func Kind(Tree) -> Tree_Kind_Enum
         is import(#tree_kind)
 
       func Num_Operands(Tree) -> Tree_Index
@@ -231,11 +273,11 @@ interface PSC::Reflection<> is
       func Decl_Of(Tree) -> optional Decl
         is import(#tree_decl_of)
 
-      func Unary_Op(Tree {Kind(Tree) == #unary}) -> Unary_Op_Kind
+      func Unary_Op(Tree {Kind(Tree) == #unary}) -> Unary_Op_Kind_Enum
         is import(#tree_unary_op)
-      func Binary_Op(Tree {Kind(Tree) == #binary}) -> Binary_Op_Kind
+      func Binary_Op(Tree {Kind(Tree) == #binary}) -> Binary_Op_Kind_Enum
         is import(#tree_binary_op)
-      func Assignment_Op(Tree {Kind(Tree) == #assign_stmt}) -> Assign_Op_Kind
+      func Assignment_Op(Tree {Kind(Tree) == #assign_stmt}) -> Assign_Op_Kind_Enum
         is import(#tree_assignment_op)
 
       func Conditional_Kind(Tree {Kind(Tree) == #conditional}) -> Conditional_Kind_Enum
