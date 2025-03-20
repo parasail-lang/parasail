@@ -34,9 +34,18 @@ with PSC.Trees.Semantics.Info;
 with PSC.Trees.Semantics.Static;
 with PSC.Univ_Strings;
 
-with PSC.Trees.Unary;
+with PSC.Trees.Assign_Stmt;
 with PSC.Trees.Binary;
+with PSC.Trees.Conditional;
+with PSC.Trees.Control_Stmt;
+with PSC.Trees.For_Loop_Construct;
+with PSC.Trees.Operation;
+with PSC.Trees.Unary;
 with PSC.Trees.Identifier;
+with PSC.Trees.Invocation;
+with PSC.Trees.Iterator;
+
+with Ada.Text_IO; use Ada.Text_IO;
 
 pragma Elaborate_All (PSC.Interpreter.Builtins);
 pragma Elaborate_All (PSC.Strings);
@@ -392,6 +401,54 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Binary_Op, "_psc_tree_binary_op");
+
+   procedure Tree_Assignment_Op
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Assignment_Op, "_psc_tree_assignnent_op");
+
+   procedure Tree_Conditional_Kind
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Conditional_Kind, "_psc_tree_conditional_kind");
+
+   procedure Tree_Control_Stmt_Kind
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Control_Stmt_Kind, "_psc_tree_control_stmt_kind");
+
+   procedure Tree_Applies_To
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Applies_To, "_psc_tree_applies_to");
+
+   procedure Tree_For_Loop_Kind
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_For_Loop_Kind, "_psc_tree_for_loop_kind");
+
+   procedure Tree_Invocation_Kind
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Invocation_Kind, "_psc_tree_invocation_kind");
+
+   procedure Tree_Iterator_Kind
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Iterator_Kind, "_psc_tree_iterator_kind");
+
+   procedure Tree_Operation_Kind
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Operation_Kind, "_psc_tree_operation_kind");
 
    procedure Tree_Source_Pos
      (Context : in out Exec_Context;
@@ -2639,6 +2696,258 @@ package body PSC.Trees.Semantics.Translator is
       Store_Word
          (Params, 0, Null_Value);
    end Tree_Binary_Op;
+
+   procedure Tree_Assignment_Op
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Assignment_Op(Tree {Kind(Tree) == #assign_stmt}) -> Assign_Op_Kind
+      --    is import(#tree_assignment_op)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Assign_Stmt.Tree'Class then
+               declare
+                  Assign_Tree : constant Trees.Assign_Stmt.Tree :=
+                     Trees.Assign_Stmt.Tree (Op_Tree);
+                  Index : Word_Type := Trees.Assign_Stmt.Assign_Operator_Enum'Pos
+                     (Assign_Tree.Assign_Operator);
+               begin
+                  Store_Word (Params, 0, Index);
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_Assignment_Op;
+
+   ---------------------------
+   -- Tree_Conditional_Kind --
+   ---------------------------
+
+   procedure Tree_Conditional_Kind
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Get_Conditional_Kind(Tree {Kind(Tree) == #conditional})
+      --    -> Conditional_Kind import(#tree_conditional_kind)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Conditional.Tree'Class then
+               declare
+                  Cond_Tree : constant Trees.Conditional.Tree :=
+                     Trees.Conditional.Tree (Op_Tree);
+                  Index : Word_Type := Trees.Conditional.Conditional_Kind_Enum'Pos
+                     (Cond_Tree.Kind);
+               begin
+                  Store_Word (Params, 0, Index);
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_Conditional_Kind;
+
+   procedure Tree_Control_Stmt_Kind
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Get_Control_Stmt_Kind(Tree {Kind(Tree) == #control_stmt}) -> Control_Stmt_Kind
+      --    is import(#tree_control_stmt_kind)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Control_Stmt.Tree'Class then
+               declare
+                  Ctrl_Tree : constant Trees.Control_Stmt.Tree :=
+                     Trees.Control_Stmt.Tree (Op_Tree);
+                  Index : Word_Type := Trees.Control_Stmt.Control_Stmt_Enum'Pos
+                     (Ctrl_Tree.Kind);
+               begin
+                  Store_Word (Params, 0, Index);
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_Control_Stmt_Kind;
+
+   procedure Tree_Applies_To
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Applies_To(Tree {Kind(Tree) == #control_stmt}) -> Exitable_Construct_Kind
+      --    is import(#tree_applies_to)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Control_Stmt.Tree'Class then
+               declare
+                  AT_Tree : constant Trees.Control_Stmt.Tree :=
+                     Trees.Control_Stmt.Tree (Op_Tree);
+                  Index : Word_Type := Trees.Control_Stmt.Exitable_Construct_Enum'Pos
+                     (AT_Tree.Applies_To);
+               begin
+                  Store_Word (Params, 0, Index);
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_Applies_To;
+
+   procedure Tree_For_Loop_Kind
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func For_Loop_Kind(Tree {Kind(Tree) == #for_loop}) -> For_Loop_Kind_Enum
+      --    is import(#tree_for_loop_kind)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.For_Loop_Construct.Tree'Class then
+               declare
+                  Loop_Tree : constant Trees.For_Loop_Construct.Tree :=
+                     Trees.For_Loop_Construct.Tree (Op_Tree);
+                  Index : Word_Type := Trees.For_Loop_Construct.For_Loop_Kind_Enum'Pos
+                     (Loop_Tree.Kind);
+               begin
+                  Store_Word (Params, 0, Index);
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_For_Loop_Kind;
+
+   procedure Tree_Invocation_Kind
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Invocation_Kind(Tree {Kind(Tree) == #invocation}) -> Invocation_Kind_Enum
+      --    is import(#tree_invocation_kind)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Invocation.Tree'Class then
+               declare
+                  Invoc_Tree : constant Trees.Invocation.Tree :=
+                     Trees.Invocation.Tree (Op_Tree);
+                  Index : Word_Type := Trees.Invocation.Invocation_Kind_Enum'Pos
+                     (Invoc_Tree.Kind);
+               begin
+                  Store_Word (Params, 0, Index);
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_Invocation_Kind;
+
+   procedure Tree_Iterator_Kind
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Iterator_Kind(Tree {Kind(Tree) == #iterator}) -> Iterator_Kind_Enum
+      --    is import(#tree_iterator_kind)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Iterator.Tree'Class then
+               declare
+                  Iter_Tree : constant Trees.Iterator.Tree :=
+                     Trees.Iterator.Tree (Op_Tree);
+                  Index : Word_Type := Trees.Iterator.Iterator_Kind_Enum'Pos
+                     (Iter_Tree.Kind);
+               begin
+                  Store_Word (Params, 0, Index);
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_Iterator_Kind;
+
+   procedure Tree_Operation_Kind
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Operation_Kind(Tree {Kind(Tree) == #operation}) -> Operation_Kind_Enum
+      --    is import(#tree_operation_kind)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Operation.Tree'Class then
+               declare
+                  Operand_Tree : constant Trees.Operation.Tree :=
+                     Trees.Operation.Tree (Op_Tree);
+                  Index : Word_Type := Trees.Operation.Operation_Kind_Enum'Pos
+                     (Operand_Tree.Operation_Kind);
+               begin
+                  Store_Word (Params, 0, Index);
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_Operation_Kind;
 
    procedure Tree_Lit_Kind
       (Context : in out Exec_Context;
@@ -6222,6 +6531,38 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_binary_op"),
       Tree_Binary_Op'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_assignment_op"),
+      Tree_Assignment_Op'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_conditional_kind"),
+      Tree_Conditional_Kind'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_control_stmt_kind"),
+      Tree_Control_Stmt_Kind'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_applies_to"),
+      Tree_Applies_To'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_for_loop_kind"),
+      Tree_For_Loop_Kind'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_invocation_kind"),
+      Tree_Invocation_Kind'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_iterator_kind"),
+      Tree_Iterator_Kind'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_operation_kind"),
+      Tree_Operation_Kind'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_lit_kind"),

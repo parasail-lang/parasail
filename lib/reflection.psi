@@ -176,9 +176,41 @@ interface PSC::Reflection<> is
          #closed_interval_op, #open_interval_op, #open_closed_interval_op,
          #closed_open_interval_op, #sequential_stmt_op, #parallel_stmt_op,
          #handled_stmt_op, #next_stmt_op, #then_stmt_op]>
-      type Literal_Kind is Enum<
+      type Assign_Op_Kind is Enum<
+        [#assign_op, #plus_assign_op, #minus_assign_op,
+         #times_assign_op, #divide_assign_op, #power_assign_op,
+         #combine_assign_op, #ampersand_assign_op, #and_assign_op,
+         #or_assign_op, #xor_assign_op, #left_shift_assign_op,
+         #right_shift_assign_op, #swap_op, #move_op, #combine_move_o4p]>
+      type Literal_Kind_Enum is Enum<
         [#integer_literal, #real_literal, #string_literal,
          #char_literal, #enum_literal, #null_literal]>;
+      type Conditional_Kind_Enum is Enum<
+        [#if_stmt, #elsif_stmt, #if_expr,
+        #elsif_expr, #quest_colon]>
+      type Control_Stmt_Kind_Enum is Enum<
+        [#null_stmt, #return_stmt, #continue_stmt, #exit_stmt]>
+      type Exitable_Construct_Kind_Enum is Enum<
+        [#operation_body, #loop_stmt, #if_stmt, #case_stmt,
+         #block_stmt, #case_or_loop_stmt, #any_labeled_stmt]>
+      type For_Loop_Kind_Enum is Enum<
+        [#for_loop_statement, #existential_quantified_expr,
+         #univ_quantified_expr, #container_comprehension,
+         #map_reduce_expr]>
+      type Invocation_Kind_Enum is Enum<
+        [#operation_call, #container_indexing,
+         #class_aggregate, #container_aggregate,
+         #map_set_aggregate, #module_instantiation,
+         #is_function_of, #tuple_type_definition]>
+      type Iterator_Kind_Enum is Enum<
+        [#set_iterator, #each_value, #each_key_value,
+         #initial_next_value, #initial_value]>
+      type Operation_Kind_Enum is Enum<
+        [#function_operation, #procedure_operation,
+         #func_operation, #proc_operation, #operator_operation,
+         #op_operation, #lambda_operation, #func_type_specifier,
+         #proc_type_specifier, #protected_func_type,
+         #protected_proc_type]>
 
       func Kind(Tree) -> Tree_Kind
         is import(#tree_kind)
@@ -203,8 +235,25 @@ interface PSC::Reflection<> is
         is import(#tree_unary_op)
       func Binary_Op(Tree {Kind(Tree) == #binary}) -> Binary_Op_Kind
         is import(#tree_binary_op)
+      func Assignment_Op(Tree {Kind(Tree) == #assign_stmt}) -> Assign_Op_Kind
+        is import(#tree_assignment_op)
 
-      func Lit_Kind(Tree {Kind(Tree) == #identifier}) -> optional Literal_Kind
+      func Conditional_Kind(Tree {Kind(Tree) == #conditional}) -> Conditional_Kind_Enum
+        is import(#tree_conditional_kind)
+      func Control_Stmt_Kind(Tree {Kind(Tree) == #control_stmt}) -> Control_Stmt_Kind_Enum
+        is import(#tree_control_stmt_kind)
+      func Applies_To(Tree {Kind(Tree) == #control_stmt}) -> Exitable_Construct_Kind_Enum
+        is import(#tree_applies_to)
+      func For_Loop_Kind(Tree {Kind(Tree) == #for_loop}) -> For_Loop_Kind_Enum
+        is import(#tree_for_loop_kind)
+      func Invocation_Kind(Tree {Kind(Tree) == #invocation}) -> Invocation_Kind_Enum
+        is import(#tree_invocation_kind)
+      func Iterator_Kind(Tree {Kind(Tree) == #iterator}) -> Iterator_Kind_Enum
+        is import(#tree_iterator_kind)
+      func Operation_Kind(Tree {Kind(Tree) == #operation}) -> Operation_Kind_Enum
+        is import(#tree_operation_kind)
+
+      func Lit_Kind(Tree {Kind(Tree) == #identifier}) -> optional Literal_Kind_Enum
         is import(#tree_lit_kind)
       func Identifier(Tree {Kind(Tree) == #identifier}) -> Univ_String
         is import(#tree_identifier)
