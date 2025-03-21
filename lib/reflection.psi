@@ -299,6 +299,22 @@ interface PSC::Reflection<> is
         is import(#tree_lit_kind)
       func Identifier(Tree {Kind(Tree) == #identifier}) -> Univ_String
         is import(#tree_identifier)
+
+      func Case_Is_Expr(Tree {Kind(Tree) == #case_construct}) -> Boolean
+        is import(#tree_case_is_expr)
+
+      func Obj_Decl_Is_Var(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+        is import(#tree_obj_decl_is_var)
+      func Obj_Decl_Is_Const(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+        is import(#tree_obj_decl_is_const)
+      func Obj_Decl_Is_Ref(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+        is import(#tree_obj_decl_is_ref)
+      func Obj_Decl_Is_Optional(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+        is import(#tree_obj_decl_is_optional)
+      func Obj_Decl_Is_Move(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+        is import(#tree_obj_decl_is_move)
+      func Obj_Decl_Is_Global(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+        is import(#tree_obj_decl_is_global)
     end interface Tree
 
     interface Region<> is

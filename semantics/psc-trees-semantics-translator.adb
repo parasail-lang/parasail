@@ -36,14 +36,16 @@ with PSC.Univ_Strings;
 
 with PSC.Trees.Assign_Stmt;
 with PSC.Trees.Binary;
+with PSC.Trees.Case_Construct;
 with PSC.Trees.Conditional;
 with PSC.Trees.Control_Stmt;
 with PSC.Trees.For_Loop_Construct;
+with PSC.Trees.Obj_Decl;
 with PSC.Trees.Operation;
-with PSC.Trees.Unary;
 with PSC.Trees.Identifier;
 with PSC.Trees.Invocation;
 with PSC.Trees.Iterator;
+with PSC.Trees.Unary;
 
 with Ada.Text_IO; use Ada.Text_IO;
 
@@ -449,6 +451,48 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Operation_Kind, "_psc_tree_operation_kind");
+
+   procedure Tree_Case_Is_Expr
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Case_Is_Expr, "_psc_tree_case_is_expr");
+
+   procedure Tree_Obj_Decl_Is_Var
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Obj_Decl_Is_Var, "_psc_tree_obj_decl_is_var");
+
+   procedure Tree_Obj_Decl_Is_Const
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Obj_Decl_Is_Const, "_psc_tree_obj_decl_is_const");
+
+   procedure Tree_Obj_Decl_Is_Ref
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Obj_Decl_Is_Ref, "_psc_tree_obj_decl_is_ref");
+
+   procedure Tree_Obj_Decl_Is_Optional
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Obj_Decl_Is_Optional, "_psc_tree_obj_decl_is_optional");
+
+   procedure Tree_Obj_Decl_Is_Move
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Obj_Decl_Is_Move, "_psc_tree_obj_decl_is_move");
+
+   procedure Tree_Obj_Decl_Is_Global
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Obj_Decl_Is_Global, "_psc_tree_obj_decl_is_global");
 
    procedure Tree_Source_Pos
      (Context : in out Exec_Context;
@@ -2728,15 +2772,11 @@ package body PSC.Trees.Semantics.Translator is
          (Params, 0, Null_Value);
    end Tree_Assignment_Op;
 
-   ---------------------------
-   -- Tree_Conditional_Kind --
-   ---------------------------
-
    procedure Tree_Conditional_Kind
       (Context : in out Exec_Context;
        Params : Word_Ptr;
        Static_Link : Non_Op_Map_Type_Ptr) is
-      --  func Get_Conditional_Kind(Tree {Kind(Tree) == #conditional})
+      --  func Conditional_Kind(Tree {Kind(Tree) == #conditional})
       --    -> Conditional_Kind import(#tree_conditional_kind)
       Op : constant Optional_Tree :=
          To_Optional_Tree (Fetch_Word (Params, 1));
@@ -3007,6 +3047,195 @@ package body PSC.Trees.Semantics.Translator is
       Store_Word
          (Params, 0, Null_Value);
    end Tree_Identifier;
+
+   procedure Tree_Case_Is_Expr
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Case_Is_Expr(Tree {Kind(Tree) == #case_construct}) -> Boolean
+      --    is import(#tree_case_is_expr)
+      Case_Is_Expr : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Case_Construct.Tree then
+               Case_Is_Expr := Trees.Case_Construct.Tree
+                  (Op_Tree).Is_Case_Expr;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Case_Is_Expr));
+   end Tree_Case_Is_Expr;
+
+   procedure Tree_Obj_Decl_Is_Var
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Obj_Decl_Is_Var(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+      --    is import(#tree_obj_decl_is_var)
+      Is_Var : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Obj_Decl.Tree then
+               Is_Var := Trees.Obj_Decl.Tree
+                  (Op_Tree).Is_Var;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Var));
+   end Tree_Obj_Decl_Is_Var;
+
+   procedure Tree_Obj_Decl_Is_Const
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Obj_Decl_Is_Const(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+      --    is import(#tree_obj_decl_is_const)
+      Is_Const : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Obj_Decl.Tree then
+               Is_Const := Trees.Obj_Decl.Tree
+                  (Op_Tree).Is_Const;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Const));
+   end Tree_Obj_Decl_Is_Const;
+
+   procedure Tree_Obj_Decl_Is_Ref
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Obj_Decl_Is_Ref(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+      --    is import(#tree_obj_decl_is_ref)
+      Is_Ref : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Obj_Decl.Tree then
+               Is_Ref := Trees.Obj_Decl.Tree
+                  (Op_Tree).Is_Ref;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Ref));
+   end Tree_Obj_Decl_Is_Ref;
+
+   procedure Tree_Obj_Decl_Is_Optional
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Obj_Decl_Is_Optional(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+      --    is import(#tree_obj_decl_is_optional)
+      Is_Optional : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Obj_Decl.Tree then
+               Is_Optional := Trees.Obj_Decl.Tree
+                  (Op_Tree).Is_Optional;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Optional));
+   end Tree_Obj_Decl_Is_Optional;
+
+   procedure Tree_Obj_Decl_Is_Move
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Obj_Decl_Is_Move(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+      --    is import(#tree_obj_decl_is_move)
+      Is_Move : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Obj_Decl.Tree then
+               Is_Move := Trees.Obj_Decl.Tree
+                  (Op_Tree).Is_Move;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Move));
+   end Tree_Obj_Decl_Is_Move;
+
+   procedure Tree_Obj_Decl_Is_Global
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Obj_Decl_Is_Global(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+      --    is import(#tree_obj_decl_is_global)
+      Is_Global : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Obj_Decl.Tree then
+               Is_Global := Trees.Obj_Decl.Tree
+                  (Op_Tree).Is_Global;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Global));
+   end Tree_Obj_Decl_Is_Global;
 
    procedure Decl_Region
      (Context : in out Exec_Context;
@@ -6571,6 +6800,34 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_identifier"),
       Tree_Identifier'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_case_is_expr"),
+      Tree_Case_Is_Expr'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_obj_decl_is_var"),
+      Tree_Obj_Decl_Is_Var'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_obj_decl_is_const"),
+      Tree_Obj_Decl_Is_Const'Access);
+      
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_obj_decl_is_ref"),
+      Tree_Obj_Decl_Is_Ref'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_obj_decl_is_optional"),
+      Tree_Obj_Decl_Is_Optional'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_obj_decl_is_move"),
+      Tree_Obj_Decl_Is_Move'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_obj_decl_is_global"),
+      Tree_Obj_Decl_Is_Global'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_source_pos"),
