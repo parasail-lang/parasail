@@ -40,11 +40,12 @@ with PSC.Trees.Case_Construct;
 with PSC.Trees.Conditional;
 with PSC.Trees.Control_Stmt;
 with PSC.Trees.For_Loop_Construct;
-with PSC.Trees.Obj_Decl;
-with PSC.Trees.Operation;
 with PSC.Trees.Identifier;
 with PSC.Trees.Invocation;
 with PSC.Trees.Iterator;
+with PSC.Trees.Obj_Decl;
+with PSC.Trees.Operation;
+with PSC.Trees.Param_Decl;
 with PSC.Trees.Unary;
 
 with Ada.Text_IO; use Ada.Text_IO;
@@ -499,6 +500,12 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Source_Pos, "_psc_tree_source_pos");
+
+   procedure Tree_Param_Decl_Kind
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Param_Decl_Kind, "_psc_tree_param_decl_kind");
 
    procedure Tree_Lit_Kind
      (Context : in out Exec_Context;
@@ -2988,6 +2995,37 @@ package body PSC.Trees.Semantics.Translator is
       Store_Word
          (Params, 0, Null_Value);
    end Tree_Operation_Kind;
+
+   procedure Tree_Param_Decl_Kind
+      (Context : in out Exec_Context;
+       Params : Word_Ptr;
+       Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Param_Decl_Kind(Tree {Kind(Tree) == #param_decl}) -> Param_Decl_Kind_Enum
+      --    is import(#tree_param_decl_kind)
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Param_Decl.Tree'Class then
+               declare
+                  Param_Tree : constant Trees.Param_Decl.Tree :=
+                     Trees.Param_Decl.Tree (Op_Tree);
+                  Index : Word_Type := Trees.Param_Decl.Param_Kind'Pos
+                     (Param_Tree.Kind);
+               begin
+                  Store_Word (Params, 0, Index);
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+         (Params, 0, Null_Value);
+   end Tree_Param_Decl_Kind;
 
    procedure Tree_Lit_Kind
       (Context : in out Exec_Context;
@@ -6792,6 +6830,10 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_operation_kind"),
       Tree_Operation_Kind'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_param_decl_kind"),
+      Tree_Param_Decl_Kind'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_lit_kind"),

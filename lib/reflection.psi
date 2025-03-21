@@ -211,6 +211,10 @@ interface PSC::Reflection<> is
          #op_operation, #lambda_operation, #func_type_specifier,
          #proc_type_specifier, #protected_func_type,
          #protected_proc_type]>
+      type Param_Decl_Kind_Enum is Enum<
+        [#default_param, #out_param, #var_param, #ref_param,
+         #ref_const_param, #ref_out_param, #ref_var_param,
+         #global_param, #global_out_param, #global_var_param]>
 
       const Assign_Left_Op : Tree_Index := 1
       const Assigny_Right_Op : Tree_Index := 2
@@ -294,6 +298,8 @@ interface PSC::Reflection<> is
         is import(#tree_iterator_kind)
       func Operation_Kind(Tree {Kind(Tree) == #operation}) -> Operation_Kind_Enum
         is import(#tree_operation_kind)
+      func Param_Decl_Kind(Tree {Kind(Tree) == #param_decl}) -> Param_Decl_Kind_Enum
+        is import(#tree_param_decl_kind)
 
       func Lit_Kind(Tree {Kind(Tree) == #identifier}) -> optional Literal_Kind_Enum
         is import(#tree_lit_kind)
