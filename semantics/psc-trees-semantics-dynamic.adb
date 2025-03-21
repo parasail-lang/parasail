@@ -13509,10 +13509,12 @@ package body PSC.Trees.Semantics.Dynamic is
 
    procedure Emit_Annotation_List
      (Check_Visitor : in out Code_Gen_Visitor;
-      T : Annotation.Tree) is
+      T : Annotation.Tree;
+      Requires_CTK : Boolean := False) is
    --  Emit list of annotations, and-then-ing them together.
    --  Boolean result ends up at original Check_Visitor.Target_Local_Offset,
    --  which is then incremented.
+   --  If Requires_CTK is True, complain if not compile-time-known.
 
       use Interpreter;
 
@@ -13529,6 +13531,8 @@ package body PSC.Trees.Semantics.Dynamic is
       Check_VM_Info : VM_Obj_Id_Type := Orig_VM_Info;
       Enc_Module : constant Module_Sem_Ptr :=
         Static.Find_Enclosing_Module_Interface (Check_Visitor.Decl_Region);
+      Orig_Annotation_Mode : constant Visitor_Annotation_Mode_Enum :=
+        Check_Visitor.Annotation_Mode;
    begin
       if Num_Annotations > 1 and then not Check_VM_Info.Is_Var then
          --  We need a variable as the target
@@ -13557,6 +13561,8 @@ package body PSC.Trees.Semantics.Dynamic is
               Lists.Nth_Element (T.Annotations, I);
             Annotation_Tree : Trees.Tree'Class
               renames Tree_Ptr_Of (Next_Annotation).all;
+            Resolved_Annot : constant Optional_Tree :=
+              Resolved_Tree (Next_Annotation);
          begin
             Check_Visitor.Target_VM_Info := Check_VM_Info;
 
@@ -13565,31 +13571,46 @@ package body PSC.Trees.Semantics.Dynamic is
                --  We will turn this into a nested Check,
                --  unless it is the only annotation in this outer list,
                --  in which case we will emit it directly.
-               if Num_Annotations = 1 then
-                  --  It is the only one, recurse with it
-                  Emit_Annotation_List
-                    (Check_Visitor, Trees.Annotation.Tree (Annotation_Tree));
-                  return;   ------  All done now  ------
+               declare
+                  Nested_Annot : Annotation.Tree renames
+                    Trees.Annotation.Tree (Annotation_Tree);
+               begin
+                  if Num_Annotations = 1 then
+                     --  It is the only one, recurse with it
+                     Emit_Annotation_List
+                       (Check_Visitor, Nested_Annot,
+                        Requires_CTK => Is_Null (Nested_Annot.Label));
+                           --  Requires_CTK unless nesting is due to a label.
+                     return;   ------  All done now  ------
 
-               else
-                  --  Emit code for it
-                  Emit_Code_For_Resolved_Tree
-                    (Next_Annotation, Check_Visitor);
-                  --  There is no boolean left on the stack, so no need
-                  --  to test it.  But if this is the last annotation,
-                  --  we need to load a #true.
-                  if I = Num_Annotations then
-                     --  Load a #true onto the stack
-                     Emit
-                       (Check_Visitor,
-                        (Store_Int_Lit_Op,
-                         Source_Pos => Find_Source_Pos (Next_Annotation),
-                         Destination => (Local_Area, Starting_Offset,
-                                         Check_VM_Info),
-                         Dest_Name => Strings.Null_U_String_Index,
-                         Int_Value => Boolean'Pos (True)));
+                  else
+                     --  Emit code for it
+                     if Is_Null (Nested_Annot.Label) then
+                        --  Nested, but not because of a label.
+                        Check_Visitor.Annotation_Mode := Requires_CTK_Mode;
+                        Emit_Code_For_Resolved_Tree
+                          (Next_Annotation, Check_Visitor);
+                        Check_Visitor.Annotation_Mode := Orig_Annotation_Mode;
+                     else
+                        Emit_Code_For_Resolved_Tree
+                          (Next_Annotation, Check_Visitor);
+                     end if;
+                     --  There is no boolean left on the stack, so no need
+                     --  to test it.  But if this is the last annotation,
+                     --  we need to load a #true.
+                     if I = Num_Annotations then
+                        --  Load a #true onto the stack
+                        Emit
+                          (Check_Visitor,
+                           (Store_Int_Lit_Op,
+                            Source_Pos => Find_Source_Pos (Next_Annotation),
+                            Destination => (Local_Area, Starting_Offset,
+                                            Check_VM_Info),
+                            Dest_Name => Strings.Null_U_String_Index,
+                            Int_Value => Boolean'Pos (True)));
+                     end if;
                   end if;
-               end if;
+               end;
             elsif Annotation_Tree not in Reference.Tree then
                --  Not a nested annotation list,
                --  and not a "key => ...", so presume it is
@@ -13616,7 +13637,7 @@ package body PSC.Trees.Semantics.Dynamic is
                  (Check_Visitor, Starting_Offset);
 
                if Static.Is_Compile_Time_Known
-                    (Resolved_Tree (Next_Annotation),
+                    (Resolved_Annot,
                      Disallow_Concurrent_Types => True)
                  and then
                   (Annotation_Tree not in Identifier.Tree
@@ -13632,7 +13653,7 @@ package body PSC.Trees.Semantics.Dynamic is
                   declare
                      Anon_Const_Ref : constant Anon_Const_Tables.Element_Ref :=
                        Find_Element (Anon_Const_Table,
-                                     Resolved_Tree (Next_Annotation));
+                                     Resolved_Annot);
                      use type Anon_Const_Tables.Element_Ref;
                      Annotation_Info : CTK_Annotation_Info;
                      Num_Annot_Entries : CTK_Annotation_Vectors.Elem_Index;
@@ -13653,6 +13674,13 @@ package body PSC.Trees.Semantics.Dynamic is
                           Num_Annot_Entries);
                      end if;
                   end;
+               elsif Requires_CTK
+                  or else Check_Visitor.Annotation_Mode = Requires_CTK_Mode
+               then
+                  --  Annotation was nested, but not compile-time known.
+                  Sem_Warning ("Annotation not compile-time known: " &
+                    Subtree_Image (Annotation_Tree),
+                    Src_Pos => Find_Source_Pos (Annotation_Tree));
                end if;
             end if;
          end;
@@ -13922,7 +13950,8 @@ package body PSC.Trees.Semantics.Dynamic is
          Result_VM_Info := Assign_VM_Obj_Id (Check_Visitor);
          Check_Visitor.Target_VM_Info := Result_VM_Info;
 
-         Emit_Annotation_List (Check_Visitor, Ann_Tree);
+         Emit_Annotation_List (Check_Visitor, Ann_Tree,
+           Requires_CTK => Check_Visitor.Annotation_Mode = Requires_CTK_Mode);
 
          --  Copy final boolean result to output at (Param_Area, 0)
          Emit
@@ -16273,7 +16302,7 @@ package body PSC.Trees.Semantics.Dynamic is
       Referring_Module : constant Module_Sem_Ptr :=
         Static.Find_Enclosing_Module_Interface (Visitor.Decl_Region);
    begin
-      if Visitor.Annotation_Mode /= Normal_Mode then
+      if Visitor.Annotation_Mode in Pre_Post_Condition_Mode then
          --  Nothing to do for this mode
          return;
       end if;

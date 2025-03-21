@@ -37,6 +37,8 @@ private package PSC.Trees.Semantics.Dynamic is
 
    type Visitor_Annotation_Mode_Enum is
      (Normal_Mode,         --  "Normal" walk
+      Requires_CTK_Mode,   --  We require nested annotations be
+                           --  compile-time known e.g. {{X > 5}}
       Precondition_Mode,   --  Walk expecting a precondition
       Entry_Temp_Mode,     --  Walk to initialize entry temps
       Postcondition_Mode_No_Check,     --  Walk expecting a postcondition
