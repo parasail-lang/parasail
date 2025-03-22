@@ -142,6 +142,8 @@ interface PSC::Reflection<> is
     type VM_Reg_Num is new Integer<0 .. 2**31-1>
       // Unique id of VM register within a given code block of an operation.
 
+    type Natural is Integer<0 .. 1_000_000>
+
     concurrent interface Environment<> is
         func Get_Current_Env() -> optional Environment
         func Outermost_Region(Env : Environment) -> optional Region
@@ -153,7 +155,7 @@ interface PSC::Reflection<> is
     end interface Environment
 
     interface Tree<> is
-      type Tree_Kind is Enum<
+      type Tree_Kind_Enum is Enum<
         [#annotation, #assign_stmt, #binary,
          #block_stmt, #case_construct, #conditional,
          #control_stmt, #for_loop, #identifier,
@@ -162,11 +164,11 @@ interface PSC::Reflection<> is
          #property, #qualified_name, #qualifier,
          #reference, #selection, #type_decl,
          #unary, #while_stmt]>;
-      type Unary_Op_Kind is Enum<
+      type Unary_Op_Kind_Enum is Enum<
         [#plus_op, #minus_op, #not_op, #abs_op, #is_null_op,
          #not_null_op, #meaning_op, #magnitude_op,
          #updated_value_op, #initial_value_op]>
-      type Binary_Op_Kind is Enum<
+      type Binary_Op_Kind_Enum is Enum<
         [#plus_op, #minus_op, #times_op, #divide_op,
          #mod_op, #rem_op, #power_op, #compare_op, #less_op,
          #leq_op, #equal_op, #neq_op, #geq_op, #greater_op,
@@ -176,11 +178,89 @@ interface PSC::Reflection<> is
          #closed_interval_op, #open_interval_op, #open_closed_interval_op,
          #closed_open_interval_op, #sequential_stmt_op, #parallel_stmt_op,
          #handled_stmt_op, #next_stmt_op, #then_stmt_op]>
-      type Literal_Kind is Enum<
+      type Assign_Op_Kind_Enum is Enum<
+        [#assign_op, #plus_assign_op, #minus_assign_op,
+         #times_assign_op, #divide_assign_op, #power_assign_op,
+         #combine_assign_op, #ampersand_assign_op, #and_assign_op,
+         #or_assign_op, #xor_assign_op, #left_shift_assign_op,
+         #right_shift_assign_op, #swap_op, #move_op, #combine_move_o4p]>
+      type Literal_Kind_Enum is Enum<
         [#integer_literal, #real_literal, #string_literal,
          #char_literal, #enum_literal, #null_literal]>;
+      type Conditional_Kind_Enum is Enum<
+        [#if_stmt, #elsif_stmt, #if_expr,
+        #elsif_expr, #quest_colon]>
+      type Control_Stmt_Kind_Enum is Enum<
+        [#null_stmt, #return_stmt, #continue_stmt, #exit_stmt]>
+      type Exitable_Construct_Kind_Enum is Enum<
+        [#operation_body, #loop_stmt, #if_stmt, #case_stmt,
+         #block_stmt, #case_or_loop_stmt, #any_labeled_stmt]>
+      type For_Loop_Kind_Enum is Enum<
+        [#for_loop_statement, #existential_quantified_expr,
+         #univ_quantified_expr, #container_comprehension,
+         #map_reduce_expr]>
+      type Invocation_Kind_Enum is Enum<
+        [#operation_call, #container_indexing,
+         #class_aggregate, #container_aggregate,
+         #map_set_aggregate, #module_instantiation,
+         #is_function_of, #tuple_type_definition]>
+      type Iterator_Kind_Enum is Enum<
+        [#set_iterator, #each_value, #each_key_value,
+         #initial_next_value, #initial_value]>
+      type Operation_Kind_Enum is Enum<
+        [#function_operation, #procedure_operation,
+         #func_operation, #proc_operation, #operator_operation,
+         #op_operation, #lambda_operation, #func_type_specifier,
+         #proc_type_specifier, #protected_func_type,
+         #protected_proc_type]>
+      type Param_Decl_Kind_Enum is Enum<
+        [#default_param, #out_param, #var_param, #ref_param,
+         #ref_const_param, #ref_out_param, #ref_var_param,
+         #global_param, #global_out_param, #global_var_param]>
 
-      func Kind(Tree) -> Tree_Kind
+      const Assign_Left_Op : Tree_Index := 1
+      const Assign_Right_Op : Tree_Index := 2
+
+      const Binary_Left_Op : Tree_Index := 1
+      const Binary_Right_Op : Tree_Index := 2
+
+      const Conditional_Cond_Op : Tree_Index := 1
+      const Conditional_Then_Op : Tree_Index := 2
+      const Conditional_Else_Op : Tree_Index := 3
+
+      const Case_Selector_Op : Tree_Index := 1
+
+      const Control_Stmt_Val_Op : Tree_Index := 1
+
+      const Iterator_Obj_Op : Tree_Index := 1
+      const Iterator_While_Op : Tree_Index := 2
+
+      const Obj_Decl_Type_Op : Tree_Index := 1
+      const Obj_Decl_Value_Op : Tree_Index := 2
+
+      const Param_Decl_Type_Op : Tree_Index := 1
+      const Param_Decl_Value_Op : Tree_Index := 2
+
+      const Property_Val_Op : Tree_Index := 1
+      const Property_Id_Op : Tree_Index := 2
+
+      const Qualified_Name_Prefix_Op : Tree_Index := 1
+      const Qualified_Name_Id_Op : Tree_Index := 2
+
+      const Qualifier_Val_Op : Tree_Index := 1
+
+      const Reference_Key_Op : Tree_Index := 1
+      const Reference_Referent_Op : Tree_Index := 2
+
+      const Selection_Prefix_Op : Tree_Index := 1
+      const Selection_Selector_Op : Tree_Index := 2
+
+      const Unary_Val_Op : Tree_Index := 1
+
+      const While_Cond_Op : Tree_Index := 1
+      const While_Body_Op : Tree_Index := 2
+
+      func Kind(Tree) -> Tree_Kind_Enum
         is import(#tree_kind)
 
       func Num_Operands(Tree) -> Tree_Index
@@ -199,15 +279,78 @@ interface PSC::Reflection<> is
       func Decl_Of(Tree) -> optional Decl
         is import(#tree_decl_of)
 
-      func Unary_Op(Tree {Kind(Tree) == #unary}) -> Unary_Op_Kind
+      func Unary_Op(Tree {Kind(Tree) == #unary}) -> Unary_Op_Kind_Enum
         is import(#tree_unary_op)
-      func Binary_Op(Tree {Kind(Tree) == #binary}) -> Binary_Op_Kind
+      func Binary_Op(Tree {Kind(Tree) == #binary}) -> Binary_Op_Kind_Enum
         is import(#tree_binary_op)
+      func Assignment_Op(Tree {Kind(Tree) == #assign_stmt}) -> Assign_Op_Kind_Enum
+        is import(#tree_assignment_op)
 
-      func Lit_Kind(Tree {Kind(Tree) == #identifier}) -> optional Literal_Kind
+      func Conditional_Kind(Tree {Kind(Tree) == #conditional}) -> Conditional_Kind_Enum
+        is import(#tree_conditional_kind)
+      func Control_Stmt_Kind(Tree {Kind(Tree) == #control_stmt}) -> Control_Stmt_Kind_Enum
+        is import(#tree_control_stmt_kind)
+      func Applies_To(Tree {Kind(Tree) == #control_stmt}) -> Exitable_Construct_Kind_Enum
+        is import(#tree_applies_to)
+      func For_Loop_Kind(Tree {Kind(Tree) == #for_loop}) -> For_Loop_Kind_Enum
+        is import(#tree_for_loop_kind)
+      func Invocation_Kind(Tree {Kind(Tree) == #invocation}) -> Invocation_Kind_Enum
+        is import(#tree_invocation_kind)
+      func Iterator_Kind(Tree {Kind(Tree) == #iterator}) -> Iterator_Kind_Enum
+        is import(#tree_iterator_kind)
+      func Operation_Kind(Tree {Kind(Tree) == #operation}) -> Operation_Kind_Enum
+        is import(#tree_operation_kind)
+      func Param_Decl_Kind(Tree {Kind(Tree) == #param_decl}) -> Param_Decl_Kind_Enum
+        is import(#tree_param_decl_kind)
+
+      func Lit_Kind(Tree {Kind(Tree) == #identifier}) -> optional Literal_Kind_Enum
         is import(#tree_lit_kind)
       func Identifier(Tree {Kind(Tree) == #identifier}) -> Univ_String
         is import(#tree_identifier)
+
+      func Case_Is_Expr(Tree {Kind(Tree) == #case_construct}) -> Boolean
+        is import(#tree_case_is_expr)
+
+      func Obj_Decl_Is_Var(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+        is import(#tree_obj_decl_is_var)
+      func Obj_Decl_Is_Const(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+        is import(#tree_obj_decl_is_const)
+      func Obj_Decl_Is_Ref(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+        is import(#tree_obj_decl_is_ref)
+      func Obj_Decl_Is_Optional(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+        is import(#tree_obj_decl_is_optional)
+      func Obj_Decl_Is_Move(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+        is import(#tree_obj_decl_is_move)
+      func Obj_Decl_Is_Global(Tree {Kind(Tree) == #obj_decl}) -> Boolean
+        is import(#tree_obj_decl_is_global)
+
+      func Qualifier_Is_Ref(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_ref)
+      func Qualifier_Is_Abstract(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_abstract)
+      func Qualifier_Is_Optional(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_optional)
+      func Qualifier_Is_Not_Null(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_not_null)
+      func Qualifier_Is_Mutable(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_mutable)
+      func Qualifier_Is_Concurrent(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_concurrent)
+      func Qualifier_Is_Var(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_var)
+      func Qualifier_Is_Const(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_const)
+      func Qualifier_Is_Polymorphic(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_polymorphic)
+
+      func Case_Num_Alts(Tree {Kind(Tree) == #case_construct}) -> Natural
+        is import(#tree_case_num_alts)
+      func For_Loop_Num_Iters(Tree {Kind(Tree) == #for_loop}) -> Natural
+        is import(#tree_for_loop_num_iters)
+      func For_Loop_Num_Prologue(Tree {Kind(Tree) == #for_loop}) -> Natural
+        is import(#tree_for_loop_num_prologue)
+      func For_Loop_Body(T : Tree {Kind(T) == #for_loop}) -> Tree
+        is (Nth_Operand(T, [[For_Loop_Num_Iters(T) + 1]]))
     end interface Tree
 
     interface Region<> is
@@ -544,8 +687,6 @@ interface PSC::Reflection<> is
            func Hash(Val : Code_Block_Descriptor) -> Unsigned_64
              is (Hash (Val.Pc_Offset))
         end interface Code_Block_Descriptor
-
-        type Natural is Integer<0 .. 1_000_000>
 
         type Condition_Bit_Mask is Enum_Mask <Modular <2 ** 4>,
           [#compare_less => 2 ** 0,

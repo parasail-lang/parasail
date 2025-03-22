@@ -58,7 +58,7 @@ package body PSC.Trees.While_Stmt is
          when 1 =>
             return T.While_Cond;
          when 2 =>
-            return T.Loop_Body;  --  TBD: Is this useful?
+            return T.Loop_Body;
          when others =>
             pragma Assert (N <= 2);
             return Null_Optional_Tree;
@@ -75,7 +75,7 @@ package body PSC.Trees.While_Stmt is
          when 1 =>
             T.While_Cond := New_Operand;
          when 2 =>
-            T.Loop_Body := New_Operand;  --  TBD: Is this useful?
+            T.Loop_Body := New_Operand;
          when others =>
             pragma Assert (N <= 2);
             return;
