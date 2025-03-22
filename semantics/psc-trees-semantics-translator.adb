@@ -550,6 +550,24 @@ package body PSC.Trees.Semantics.Translator is
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Qualifier_Is_Polymorphic, "_psc_tree_qualifier_is_polymorphic");
 
+   procedure Tree_Case_Num_Alts
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Case_Num_Alts, "_psc_tree_case_num_alts");
+
+   procedure Tree_For_Loop_Num_Iters
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_For_Loop_Num_Iters, "_psc_tree_for_loop_num_iters");
+
+   procedure Tree_For_Loop_Num_Prologue
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_For_Loop_Num_Prologue, "_psc_tree_for_loop_num_prologue");
+
    procedure Tree_Source_Pos
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -3571,6 +3589,87 @@ package body PSC.Trees.Semantics.Translator is
         (Params, 0,
          Boolean'Pos (Is_Polymorphic));
    end Tree_Qualifier_Is_Polymorphic;
+
+   procedure Tree_Case_Num_Alts
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Case_Num_Alts(Tree {Kind(Tree) == #case_construct}) -> Natural
+      --     is import(#tree_case_num_alts)
+      Alt_Count : Natural := 0;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+        To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Case_Construct.Tree then
+               Alt_Count := Trees.Lists.Length (Trees.Case_Construct.Tree
+                 (Op_Tree).Case_Alt_List);
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Word_Type (Alt_Count));
+   end Tree_Case_Num_Alts;
+
+   procedure Tree_For_Loop_Num_Iters
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func For_Loop_Num_Iters(Tree {Kind(Tree) == #for_loop}) -> Natural
+      --     is import(#tree_for_loop_num_iters)
+      Iter_Count : Natural := 0;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+        To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.For_Loop_Construct.Tree then
+               Iter_Count := Trees.Lists.Length (Trees.For_Loop_Construct.Tree
+                 (Op_Tree).Iterators);
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Word_Type (Iter_Count));
+   end Tree_For_Loop_Num_Iters;
+
+   procedure Tree_For_Loop_Num_Prologue
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func For_Loop_Num_Prologue(Tree {Kind(Tree) == #for_loop}) -> Natural
+      --     is import(#tree_for_loop_num_prologue)
+      Iter_Count : Natural := 0;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+        To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.For_Loop_Construct.Tree then
+               Iter_Count := Trees.Lists.Length (Trees.For_Loop_Construct.Tree
+                 (Op_Tree).Prologue);
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Word_Type (Iter_Count));
+   end Tree_For_Loop_Num_Prologue;
 
    procedure Decl_Region
      (Context : in out Exec_Context;
@@ -7203,6 +7302,18 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_qualifier_is_polymorphic"),
       Tree_Qualifier_Is_Polymorphic'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_case_num_alts"),
+      Tree_Case_Num_Alts'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_for_loop_num_iters"),
+      Tree_For_Loop_Num_Iters'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_for_loop_num_prologue"),
+      Tree_For_Loop_Num_Prologue'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_source_pos"),

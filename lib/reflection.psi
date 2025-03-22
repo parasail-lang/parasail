@@ -142,6 +142,8 @@ interface PSC::Reflection<> is
     type VM_Reg_Num is new Integer<0 .. 2**31-1>
       // Unique id of VM register within a given code block of an operation.
 
+    type Natural is Integer<0 .. 1_000_000>
+
     concurrent interface Environment<> is
         func Get_Current_Env() -> optional Environment
         func Outermost_Region(Env : Environment) -> optional Region
@@ -340,6 +342,15 @@ interface PSC::Reflection<> is
         is import(#tree_qualifier_is_const)
       func Qualifier_Is_Polymorphic(Tree {Kind(Tree) == #qualifier}) -> Boolean
         is import(#tree_qualifier_is_polymorphic)
+
+      func Case_Num_Alts(Tree {Kind(Tree) == #case_construct}) -> Natural
+        is import(#tree_case_num_alts)
+      func For_Loop_Num_Iters(Tree {Kind(Tree) == #for_loop}) -> Natural
+        is import(#tree_for_loop_num_iters)
+      func For_Loop_Num_Prologue(Tree {Kind(Tree) == #for_loop}) -> Natural
+        is import(#tree_for_loop_num_prologue)
+      func For_Loop_Body(T : Tree {Kind(T) == #for_loop}) -> Tree
+        is (Nth_Operand(T, [[For_Loop_Num_Iters(T) + 1]]))
     end interface Tree
 
     interface Region<> is
@@ -676,8 +687,6 @@ interface PSC::Reflection<> is
            func Hash(Val : Code_Block_Descriptor) -> Unsigned_64
              is (Hash (Val.Pc_Offset))
         end interface Code_Block_Descriptor
-
-        type Natural is Integer<0 .. 1_000_000>
 
         type Condition_Bit_Mask is Enum_Mask <Modular <2 ** 4>,
           [#compare_less => 2 ** 0,
