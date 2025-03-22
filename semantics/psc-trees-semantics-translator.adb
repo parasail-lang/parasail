@@ -2514,9 +2514,9 @@ package body PSC.Trees.Semantics.Translator is
    end Region_Sibling_Region;
 
    procedure Region_Num_Trees
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Num_Trees(Region) -> Tree_Index
       --    is import(#region_num_trees)
       Region : constant Symbols.Region_Ptr :=
@@ -2524,14 +2524,14 @@ package body PSC.Trees.Semantics.Translator is
       Statements : constant Trees.Lists.List := Region.Stmt_List;
    begin
       Store_Word
-         (Params, 0,
+        (Params, 0,
          Word_Type (Trees.Lists.Length (Statements)));
    end Region_Num_Trees;
 
    procedure Region_Nth_Tree
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Nth_Tree(Region; Tree_Index) -> optional Tree
       --    is import(#region_nth_tree)
       Region : constant Symbols.Region_Ptr :=
@@ -2541,20 +2541,20 @@ package body PSC.Trees.Semantics.Translator is
    begin
       if Index > 0 and then Index <= Trees.Lists.Length (Statements) then
          Store_Word (Params, 0, To_Word_Type
-            (Trees.Lists.Nth_Element (Statements, Index)));
+           (Trees.Lists.Nth_Element (Statements, Index)));
       else
          Store_Word (Params, 0, Null_Value);
       end if;
    end Region_Nth_Tree;
 
    procedure Tree_Kind
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Kind(Tree) -> Tree_Kind
       --    is import(#tree_kind)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       --  Determine kind of tree
       if Not_Null(Op) then
@@ -2571,13 +2571,13 @@ package body PSC.Trees.Semantics.Translator is
    end Tree_Kind;
 
    procedure Tree_Num_Operands
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Num_Operands(Tree) -> Tree_Index
       --    is import(#tree_num_operands)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Op = Null_Optional_Tree then
          Store_Word (Params, 0, 0);
@@ -2586,20 +2586,20 @@ package body PSC.Trees.Semantics.Translator is
             Op_Tree : constant Tree'Class := Tree_Of (Op);
          begin
             Store_Word
-               (Params, 0,
-                Word_Type (Num_Operands (Op_Tree)));
+              (Params, 0,
+               Word_Type (Num_Operands (Op_Tree)));
          end;
       end if;
    end Tree_Num_Operands;
 
    procedure Tree_Nth_Operand
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Nth_Operand(Tree; Tree_Index) -> optional Tree
       --    is import(#tree_nth_operand)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
       Index : constant Word_Type := Fetch_Word (Params, 2);
    begin
       if Not_Null (Op) and then Index > 0 then
@@ -2608,21 +2608,21 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Natural(Index) <= Num_Operands(Op_Tree) then
                Store_Word
-                  (Params, 0, To_Word_Type 
-                   (Nth_Operand (Op_Tree, Positive(Index))));
+                 (Params, 0, To_Word_Type 
+                  (Nth_Operand (Op_Tree, Positive(Index))));
                return;
             end if;
          end;
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_Nth_Operand;
 
    procedure Tree_Pre_Annotation
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Pre_Annotation(Tree) -> optional Tree
       --    is import(#tree_pre_annotation)
       Op : constant Optional_Tree :=
@@ -2641,13 +2641,13 @@ package body PSC.Trees.Semantics.Translator is
    end Tree_Pre_Annotation;
 
    procedure Tree_Post_Annotation
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Post_Annotation(Tree) -> optional Tree
       --    is import(#tree_post_annotation)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -2662,16 +2662,16 @@ package body PSC.Trees.Semantics.Translator is
    end Tree_Post_Annotation;
 
    procedure Tree_Source_Pos
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Source_Pos(Tree) -> optional Source_Position
       --    is import(#tree_source_pos)
       use Source_Positions;
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
       Pos : constant Source_Positions.Source_Position :=
-         Source_Pos (Op);
+        Source_Pos (Op);
    begin
       if Pos = Source_Positions.Null_Source_Position then
          Store_Word
@@ -2684,27 +2684,27 @@ package body PSC.Trees.Semantics.Translator is
    end Tree_Source_Pos;
 
    procedure Tree_Resolved_Type
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Resolved_Type(Tree) -> optional Type_Descriptor
       --    is import(#tree_resolved_type)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
       Op_Sem : constant Root_Sem_Ptr := Sem_Info (Op);
    begin
       if Op_Sem /= null and then 
-         Op_Sem.all in Operand_Semantic_Info'Class
+        Op_Sem.all in Operand_Semantic_Info'Class
       then
          declare
             Opnd_Sem : constant Operand_Sem_Ptr :=
-               Operand_Sem_Ptr (Op_Sem);
+              Operand_Sem_Ptr (Op_Sem);
             Res_Type : constant Type_Sem_Ptr :=
-               Opnd_Sem.Resolved_Type;
+              Opnd_Sem.Resolved_Type;
          begin
             if Res_Type /= null then
                Store_Word
-               (Params, 0,
+                 (Params, 0,
                   To_Word_Type (Get_Type_Desc
                   (Context, Res_Type.Type_Descriptor_Location)));
                return;
@@ -2717,20 +2717,20 @@ package body PSC.Trees.Semantics.Translator is
    end Tree_Resolved_Type;
 
    procedure Tree_Decl_Of
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Decl_Of(Tree) -> optional Decl
       --    is import(#tree_decl_of)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
       Op_Sem : constant Root_Sem_Ptr := Sem_Info (Op);
    begin
       if Op_Sem /= null and then 
-         (Op_Sem.all in Module_Semantic_Info'Class or else
-          Op_Sem.all in Type_Semantic_Info'Class or else
-          Op_Sem.all in Object_Semantic_Info'Class or else
-          Op_Sem.all in Operation_Semantic_Info'Class)
+        (Op_Sem.all in Module_Semantic_Info'Class or else
+         Op_Sem.all in Type_Semantic_Info'Class or else
+         Op_Sem.all in Object_Semantic_Info'Class or else
+         Op_Sem.all in Operation_Semantic_Info'Class)
       then
          Store_Word
            (Params, 0, To_Word_Type (Op_Sem));
@@ -2741,13 +2741,13 @@ package body PSC.Trees.Semantics.Translator is
    end Tree_Decl_Of;
 
    procedure Tree_Unary_Op
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Unary_Op(Tree {Kind(Tree) == #unary}) -> Unary_Op_Kind
       --    is import(#tree_unary_op)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -2756,11 +2756,11 @@ package body PSC.Trees.Semantics.Translator is
             if Op_Tree in Trees.Unary.Tree then
                declare
                   Un_Tree : constant Trees.Unary.Tree :=
-                     Trees.Unary.Tree (Op_Tree);
+                    Trees.Unary.Tree (Op_Tree);
                begin
                   Store_Word
-                     (Params, 0,
-                      Trees.Unary.Unary_Operator_Enum'Pos (Un_Tree.Operator));
+                    (Params, 0,
+                     Trees.Unary.Unary_Operator_Enum'Pos (Un_Tree.Operator));
                   return;
                end;
             end if;
@@ -2768,17 +2768,17 @@ package body PSC.Trees.Semantics.Translator is
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_Unary_Op;
 
    procedure Tree_Binary_Op
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Binary_Op(Tree {Kind(Tree) == #binary}) -> Binary_Op_Kind
       --    is import(#tree_binary_op)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -2787,12 +2787,11 @@ package body PSC.Trees.Semantics.Translator is
             if Op_Tree in Trees.Binary.Tree'Class then
                declare
                   Bin_Tree : constant Trees.Binary.Tree :=
-                     Trees.Binary.Tree (Op_Tree);
+                    Trees.Binary.Tree (Op_Tree);
                   Index : Word_Type := Trees.Binary.Binary_Operator_Enum'Pos
-                     (Bin_Tree.Operator);
+                    (Bin_Tree.Operator);
                begin
-                  Store_Word
-                     (Params, 0, Index - 1);
+                  Store_Word (Params, 0, Index - 1);
                   return;
                end;
             end if;
@@ -2800,17 +2799,17 @@ package body PSC.Trees.Semantics.Translator is
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_Binary_Op;
 
    procedure Tree_Assignment_Op
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Assignment_Op(Tree {Kind(Tree) == #assign_stmt}) -> Assign_Op_Kind
       --    is import(#tree_assignment_op)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -2819,9 +2818,9 @@ package body PSC.Trees.Semantics.Translator is
             if Op_Tree in Trees.Assign_Stmt.Tree'Class then
                declare
                   Assign_Tree : constant Trees.Assign_Stmt.Tree :=
-                     Trees.Assign_Stmt.Tree (Op_Tree);
+                    Trees.Assign_Stmt.Tree (Op_Tree);
                   Index : Word_Type := Trees.Assign_Stmt.Assign_Operator_Enum'Pos
-                     (Assign_Tree.Assign_Operator);
+                    (Assign_Tree.Assign_Operator);
                begin
                   Store_Word (Params, 0, Index);
                   return;
@@ -2831,17 +2830,17 @@ package body PSC.Trees.Semantics.Translator is
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_Assignment_Op;
 
    procedure Tree_Conditional_Kind
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Conditional_Kind(Tree {Kind(Tree) == #conditional})
       --    -> Conditional_Kind import(#tree_conditional_kind)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -2850,9 +2849,9 @@ package body PSC.Trees.Semantics.Translator is
             if Op_Tree in Trees.Conditional.Tree'Class then
                declare
                   Cond_Tree : constant Trees.Conditional.Tree :=
-                     Trees.Conditional.Tree (Op_Tree);
+                    Trees.Conditional.Tree (Op_Tree);
                   Index : Word_Type := Trees.Conditional.Conditional_Kind_Enum'Pos
-                     (Cond_Tree.Kind);
+                    (Cond_Tree.Kind);
                begin
                   Store_Word (Params, 0, Index);
                   return;
@@ -2862,17 +2861,17 @@ package body PSC.Trees.Semantics.Translator is
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_Conditional_Kind;
 
    procedure Tree_Control_Stmt_Kind
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Get_Control_Stmt_Kind(Tree {Kind(Tree) == #control_stmt}) -> Control_Stmt_Kind
       --    is import(#tree_control_stmt_kind)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -2881,9 +2880,9 @@ package body PSC.Trees.Semantics.Translator is
             if Op_Tree in Trees.Control_Stmt.Tree'Class then
                declare
                   Ctrl_Tree : constant Trees.Control_Stmt.Tree :=
-                     Trees.Control_Stmt.Tree (Op_Tree);
+                    Trees.Control_Stmt.Tree (Op_Tree);
                   Index : Word_Type := Trees.Control_Stmt.Control_Stmt_Enum'Pos
-                     (Ctrl_Tree.Kind);
+                    (Ctrl_Tree.Kind);
                begin
                   Store_Word (Params, 0, Index);
                   return;
@@ -2893,17 +2892,17 @@ package body PSC.Trees.Semantics.Translator is
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_Control_Stmt_Kind;
 
    procedure Tree_Applies_To
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Applies_To(Tree {Kind(Tree) == #control_stmt}) -> Exitable_Construct_Kind
       --    is import(#tree_applies_to)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -2912,9 +2911,9 @@ package body PSC.Trees.Semantics.Translator is
             if Op_Tree in Trees.Control_Stmt.Tree'Class then
                declare
                   AT_Tree : constant Trees.Control_Stmt.Tree :=
-                     Trees.Control_Stmt.Tree (Op_Tree);
+                    Trees.Control_Stmt.Tree (Op_Tree);
                   Index : Word_Type := Trees.Control_Stmt.Exitable_Construct_Enum'Pos
-                     (AT_Tree.Applies_To);
+                    (AT_Tree.Applies_To);
                begin
                   Store_Word (Params, 0, Index);
                   return;
@@ -2924,17 +2923,17 @@ package body PSC.Trees.Semantics.Translator is
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_Applies_To;
 
    procedure Tree_For_Loop_Kind
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func For_Loop_Kind(Tree {Kind(Tree) == #for_loop}) -> For_Loop_Kind_Enum
       --    is import(#tree_for_loop_kind)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -2943,9 +2942,9 @@ package body PSC.Trees.Semantics.Translator is
             if Op_Tree in Trees.For_Loop_Construct.Tree'Class then
                declare
                   Loop_Tree : constant Trees.For_Loop_Construct.Tree :=
-                     Trees.For_Loop_Construct.Tree (Op_Tree);
+                    Trees.For_Loop_Construct.Tree (Op_Tree);
                   Index : Word_Type := Trees.For_Loop_Construct.For_Loop_Kind_Enum'Pos
-                     (Loop_Tree.Kind);
+                    (Loop_Tree.Kind);
                begin
                   Store_Word (Params, 0, Index);
                   return;
@@ -2955,17 +2954,17 @@ package body PSC.Trees.Semantics.Translator is
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_For_Loop_Kind;
 
    procedure Tree_Invocation_Kind
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Invocation_Kind(Tree {Kind(Tree) == #invocation}) -> Invocation_Kind_Enum
       --    is import(#tree_invocation_kind)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -2974,9 +2973,9 @@ package body PSC.Trees.Semantics.Translator is
             if Op_Tree in Trees.Invocation.Tree'Class then
                declare
                   Invoc_Tree : constant Trees.Invocation.Tree :=
-                     Trees.Invocation.Tree (Op_Tree);
+                    Trees.Invocation.Tree (Op_Tree);
                   Index : Word_Type := Trees.Invocation.Invocation_Kind_Enum'Pos
-                     (Invoc_Tree.Kind);
+                    (Invoc_Tree.Kind);
                begin
                   Store_Word (Params, 0, Index);
                   return;
@@ -2986,17 +2985,17 @@ package body PSC.Trees.Semantics.Translator is
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_Invocation_Kind;
 
    procedure Tree_Iterator_Kind
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Iterator_Kind(Tree {Kind(Tree) == #iterator}) -> Iterator_Kind_Enum
       --    is import(#tree_iterator_kind)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3005,9 +3004,9 @@ package body PSC.Trees.Semantics.Translator is
             if Op_Tree in Trees.Iterator.Tree'Class then
                declare
                   Iter_Tree : constant Trees.Iterator.Tree :=
-                     Trees.Iterator.Tree (Op_Tree);
+                    Trees.Iterator.Tree (Op_Tree);
                   Index : Word_Type := Trees.Iterator.Iterator_Kind_Enum'Pos
-                     (Iter_Tree.Kind);
+                    (Iter_Tree.Kind);
                begin
                   Store_Word (Params, 0, Index);
                   return;
@@ -3017,17 +3016,17 @@ package body PSC.Trees.Semantics.Translator is
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_Iterator_Kind;
 
    procedure Tree_Operation_Kind
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Operation_Kind(Tree {Kind(Tree) == #operation}) -> Operation_Kind_Enum
       --    is import(#tree_operation_kind)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3036,9 +3035,9 @@ package body PSC.Trees.Semantics.Translator is
             if Op_Tree in Trees.Operation.Tree'Class then
                declare
                   Operand_Tree : constant Trees.Operation.Tree :=
-                     Trees.Operation.Tree (Op_Tree);
+                    Trees.Operation.Tree (Op_Tree);
                   Index : Word_Type := Trees.Operation.Operation_Kind_Enum'Pos
-                     (Operand_Tree.Operation_Kind);
+                    (Operand_Tree.Operation_Kind);
                begin
                   Store_Word (Params, 0, Index);
                   return;
@@ -3048,17 +3047,17 @@ package body PSC.Trees.Semantics.Translator is
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_Operation_Kind;
 
    procedure Tree_Param_Decl_Kind
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Param_Decl_Kind(Tree {Kind(Tree) == #param_decl}) -> Param_Decl_Kind_Enum
       --    is import(#tree_param_decl_kind)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3067,9 +3066,9 @@ package body PSC.Trees.Semantics.Translator is
             if Op_Tree in Trees.Param_Decl.Tree'Class then
                declare
                   Param_Tree : constant Trees.Param_Decl.Tree :=
-                     Trees.Param_Decl.Tree (Op_Tree);
+                    Trees.Param_Decl.Tree (Op_Tree);
                   Index : Word_Type := Trees.Param_Decl.Param_Kind'Pos
-                     (Param_Tree.Kind);
+                    (Param_Tree.Kind);
                begin
                   Store_Word (Params, 0, Index);
                   return;
@@ -3079,17 +3078,17 @@ package body PSC.Trees.Semantics.Translator is
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_Param_Decl_Kind;
 
    procedure Tree_Lit_Kind
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Lit_Kind(Tree {Kind(Tree) == #identifier}) -> optional Literal_Kind
       --    is import(#tree_lit_kind)
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
       Op_Sem : constant Root_Sem_Ptr := Sem_Info (Op);
    begin
       if Op_Sem /= null and then Op_Sem.all in Literal_Semantic_Info'Class then
@@ -3106,18 +3105,18 @@ package body PSC.Trees.Semantics.Translator is
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_Lit_Kind;
 
    procedure Tree_Identifier
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Identifier(Tree {Kind(Tree) == #identifier}) -> Univ_String
       --    is import(#tree_identifier)
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3126,9 +3125,9 @@ package body PSC.Trees.Semantics.Translator is
             if Op_Tree in Trees.Identifier.Tree then
                declare
                   Ident_Tree : Trees.Identifier.Tree :=
-                     Trees.Identifier.Tree (Op_Tree);
+                    Trees.Identifier.Tree (Op_Tree);
                   Word_Str : Word_Type := To_Univ_String_Word
-                     (Ident_Tree.Str, Target);
+                    (Ident_Tree.Str, Target);
                begin
                   Store_Word (Params, 0, Word_Str);
                   return;
@@ -3138,19 +3137,19 @@ package body PSC.Trees.Semantics.Translator is
       end if;
 
       Store_Word
-         (Params, 0, Null_Value);
+        (Params, 0, Null_Value);
    end Tree_Identifier;
 
    procedure Tree_Case_Is_Expr
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Case_Is_Expr(Tree {Kind(Tree) == #case_construct}) -> Boolean
       --    is import(#tree_case_is_expr)
       Case_Is_Expr : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3158,7 +3157,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Case_Construct.Tree then
                Case_Is_Expr := Trees.Case_Construct.Tree
-                  (Op_Tree).Is_Case_Expr;
+                 (Op_Tree).Is_Case_Expr;
             end if;
          end;
       end if;
@@ -3169,15 +3168,15 @@ package body PSC.Trees.Semantics.Translator is
    end Tree_Case_Is_Expr;
 
    procedure Tree_Obj_Decl_Is_Var
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Obj_Decl_Is_Var(Tree {Kind(Tree) == #obj_decl}) -> Boolean
       --    is import(#tree_obj_decl_is_var)
       Is_Var : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3185,7 +3184,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Obj_Decl.Tree then
                Is_Var := Trees.Obj_Decl.Tree
-                  (Op_Tree).Is_Var;
+                 (Op_Tree).Is_Var;
             end if;
          end;
       end if;
@@ -3196,15 +3195,15 @@ package body PSC.Trees.Semantics.Translator is
    end Tree_Obj_Decl_Is_Var;
 
    procedure Tree_Obj_Decl_Is_Const
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Obj_Decl_Is_Const(Tree {Kind(Tree) == #obj_decl}) -> Boolean
       --    is import(#tree_obj_decl_is_const)
       Is_Const : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3212,7 +3211,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Obj_Decl.Tree then
                Is_Const := Trees.Obj_Decl.Tree
-                  (Op_Tree).Is_Const;
+                 (Op_Tree).Is_Const;
             end if;
          end;
       end if;
@@ -3223,15 +3222,15 @@ package body PSC.Trees.Semantics.Translator is
    end Tree_Obj_Decl_Is_Const;
 
    procedure Tree_Obj_Decl_Is_Ref
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Obj_Decl_Is_Ref(Tree {Kind(Tree) == #obj_decl}) -> Boolean
       --    is import(#tree_obj_decl_is_ref)
       Is_Ref : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3239,7 +3238,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Obj_Decl.Tree then
                Is_Ref := Trees.Obj_Decl.Tree
-                  (Op_Tree).Is_Ref;
+                 (Op_Tree).Is_Ref;
             end if;
          end;
       end if;
@@ -3250,15 +3249,15 @@ package body PSC.Trees.Semantics.Translator is
    end Tree_Obj_Decl_Is_Ref;
 
    procedure Tree_Obj_Decl_Is_Optional
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Obj_Decl_Is_Optional(Tree {Kind(Tree) == #obj_decl}) -> Boolean
       --    is import(#tree_obj_decl_is_optional)
       Is_Optional : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3266,7 +3265,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Obj_Decl.Tree then
                Is_Optional := Trees.Obj_Decl.Tree
-                  (Op_Tree).Is_Optional;
+                 (Op_Tree).Is_Optional;
             end if;
          end;
       end if;
@@ -3277,15 +3276,15 @@ package body PSC.Trees.Semantics.Translator is
    end Tree_Obj_Decl_Is_Optional;
 
    procedure Tree_Obj_Decl_Is_Move
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Obj_Decl_Is_Move(Tree {Kind(Tree) == #obj_decl}) -> Boolean
       --    is import(#tree_obj_decl_is_move)
       Is_Move : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3293,7 +3292,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Obj_Decl.Tree then
                Is_Move := Trees.Obj_Decl.Tree
-                  (Op_Tree).Is_Move;
+                 (Op_Tree).Is_Move;
             end if;
          end;
       end if;
@@ -3304,15 +3303,15 @@ package body PSC.Trees.Semantics.Translator is
    end Tree_Obj_Decl_Is_Move;
 
    procedure Tree_Obj_Decl_Is_Global
-      (Context : in out Exec_Context;
-       Params : Word_Ptr;
-       Static_Link : Non_Op_Map_Type_Ptr) is
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Obj_Decl_Is_Global(Tree {Kind(Tree) == #obj_decl}) -> Boolean
       --    is import(#tree_obj_decl_is_global)
       Is_Global : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3320,7 +3319,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Obj_Decl.Tree then
                Is_Global := Trees.Obj_Decl.Tree
-                  (Op_Tree).Is_Global;
+                 (Op_Tree).Is_Global;
             end if;
          end;
       end if;
@@ -3339,7 +3338,7 @@ package body PSC.Trees.Semantics.Translator is
       Is_Ref : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3347,7 +3346,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Qualifier.Tree then
                Is_Ref := Trees.Qualifier.Tree
-                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Ref);
+                 (Op_Tree).Qualifiers (Trees.Qualifier.Is_Ref);
             end if;
          end;
       end if;
@@ -3366,7 +3365,7 @@ package body PSC.Trees.Semantics.Translator is
       Is_Abstract : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3374,7 +3373,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Qualifier.Tree then
                Is_Abstract := Trees.Qualifier.Tree
-                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Abstract);
+                 (Op_Tree).Qualifiers (Trees.Qualifier.Is_Abstract);
             end if;
          end;
       end if;
@@ -3393,7 +3392,7 @@ package body PSC.Trees.Semantics.Translator is
       Is_Optional : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3401,7 +3400,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Qualifier.Tree then
                Is_Optional := Trees.Qualifier.Tree
-                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Optional);
+                 (Op_Tree).Qualifiers (Trees.Qualifier.Is_Optional);
             end if;
          end;
       end if;
@@ -3420,7 +3419,7 @@ package body PSC.Trees.Semantics.Translator is
       Is_Not_Null : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3428,7 +3427,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Qualifier.Tree then
                Is_Not_Null := Trees.Qualifier.Tree
-                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Not_Null);
+                 (Op_Tree).Qualifiers (Trees.Qualifier.Is_Not_Null);
             end if;
          end;
       end if;
@@ -3447,7 +3446,7 @@ package body PSC.Trees.Semantics.Translator is
       Is_Mutable : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3455,7 +3454,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Qualifier.Tree then
                Is_Mutable := Trees.Qualifier.Tree
-                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Mutable);
+                 (Op_Tree).Qualifiers (Trees.Qualifier.Is_Mutable);
             end if;
          end;
       end if;
@@ -3482,7 +3481,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Qualifier.Tree then
                Is_Concurrent := Trees.Qualifier.Tree
-                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Concurrent);
+                 (Op_Tree).Qualifiers (Trees.Qualifier.Is_Concurrent);
             end if;
          end;
       end if;
@@ -3501,7 +3500,7 @@ package body PSC.Trees.Semantics.Translator is
       Is_Var : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3509,7 +3508,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Qualifier.Tree then
                Is_Var := Trees.Qualifier.Tree
-                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Var);
+                 (Op_Tree).Qualifiers (Trees.Qualifier.Is_Var);
             end if;
          end;
       end if;
@@ -3528,7 +3527,7 @@ package body PSC.Trees.Semantics.Translator is
       Is_Const : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3536,7 +3535,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Qualifier.Tree then
                Is_Const := Trees.Qualifier.Tree
-                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Const);
+                 (Op_Tree).Qualifiers (Trees.Qualifier.Is_Const);
             end if;
          end;
       end if;
@@ -3555,7 +3554,7 @@ package body PSC.Trees.Semantics.Translator is
       Is_Polymorphic : Boolean := False;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Op : constant Optional_Tree :=
-         To_Optional_Tree (Fetch_Word (Params, 1));
+        To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       if Not_Null (Op) then
          declare
@@ -3563,7 +3562,7 @@ package body PSC.Trees.Semantics.Translator is
          begin
             if Op_Tree in Trees.Qualifier.Tree then
                Is_Polymorphic := Trees.Qualifier.Tree
-                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Polymorphic);
+                 (Op_Tree).Qualifiers (Trees.Qualifier.Is_Polymorphic);
             end if;
          end;
       end if;

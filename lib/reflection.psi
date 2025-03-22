@@ -217,7 +217,7 @@ interface PSC::Reflection<> is
          #global_param, #global_out_param, #global_var_param]>
 
       const Assign_Left_Op : Tree_Index := 1
-      const Assigny_Right_Op : Tree_Index := 2
+      const Assign_Right_Op : Tree_Index := 2
 
       const Binary_Left_Op : Tree_Index := 1
       const Binary_Right_Op : Tree_Index := 2
