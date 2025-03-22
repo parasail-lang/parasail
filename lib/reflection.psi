@@ -321,6 +321,25 @@ interface PSC::Reflection<> is
         is import(#tree_obj_decl_is_move)
       func Obj_Decl_Is_Global(Tree {Kind(Tree) == #obj_decl}) -> Boolean
         is import(#tree_obj_decl_is_global)
+
+      func Qualifier_Is_Ref(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_ref)
+      func Qualifier_Is_Abstract(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_abstract)
+      func Qualifier_Is_Optional(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_optional)
+      func Qualifier_Is_Not_Null(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_not_null)
+      func Qualifier_Is_Mutable(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_mutable)
+      func Qualifier_Is_Concurrent(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_concurrent)
+      func Qualifier_Is_Var(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_var)
+      func Qualifier_Is_Const(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_const)
+      func Qualifier_Is_Polymorphic(Tree {Kind(Tree) == #qualifier}) -> Boolean
+        is import(#tree_qualifier_is_polymorphic)
     end interface Tree
 
     interface Region<> is

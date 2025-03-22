@@ -46,6 +46,7 @@ with PSC.Trees.Iterator;
 with PSC.Trees.Obj_Decl;
 with PSC.Trees.Operation;
 with PSC.Trees.Param_Decl;
+with PSC.Trees.Qualifier;
 with PSC.Trees.Unary;
 
 with Ada.Text_IO; use Ada.Text_IO;
@@ -494,6 +495,60 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Obj_Decl_Is_Global, "_psc_tree_obj_decl_is_global");
+
+   procedure Tree_Qualifier_Is_Ref
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Qualifier_Is_Ref, "_psc_tree_qualifier_is_ref");
+
+   procedure Tree_Qualifier_Is_Abstract
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Qualifier_Is_Abstract, "_psc_tree_qualifier_is_abstract");
+
+   procedure Tree_Qualifier_Is_Optional
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Qualifier_Is_Optional, "_psc_tree_qualifier_is_optional");
+
+   procedure Tree_Qualifier_Is_Not_Null
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Qualifier_Is_Not_Null, "_psc_tree_qualifier_is_not_null");
+
+   procedure Tree_Qualifier_Is_Mutable
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Qualifier_Is_Mutable, "_psc_tree_qualifier_is_mutable");
+
+   procedure Tree_Qualifier_Is_Concurrent
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Qualifier_Is_Concurrent, "_psc_tree_qualifier_is_concurrent");
+
+   procedure Tree_Qualifier_Is_Var
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Qualifier_Is_Var, "_psc_tree_qualifier_is_var");
+
+   procedure Tree_Qualifier_Is_Const
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Qualifier_Is_Const, "_psc_tree_qualifier_is_const");
+
+   procedure Tree_Qualifier_Is_Polymorphic
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Qualifier_Is_Polymorphic, "_psc_tree_qualifier_is_polymorphic");
 
    procedure Tree_Source_Pos
      (Context : in out Exec_Context;
@@ -3274,6 +3329,249 @@ package body PSC.Trees.Semantics.Translator is
         (Params, 0,
          Boolean'Pos (Is_Global));
    end Tree_Obj_Decl_Is_Global;
+
+   procedure Tree_Qualifier_Is_Ref
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Qualifier_Is_Ref(Tree {Kind(Tree) == #qualifier}) -> Boolean
+      --    is import(#tree_qualifier_is_ref)
+      Is_Ref : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Qualifier.Tree then
+               Is_Ref := Trees.Qualifier.Tree
+                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Ref);
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Ref));
+   end Tree_Qualifier_Is_Ref;
+
+   procedure Tree_Qualifier_Is_Abstract
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Qualifier_Is_Abstract(Tree {Kind(Tree) == #qualifier}) -> Boolean
+      --    is import(#tree_qualifier_is_abstract)
+      Is_Abstract : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Qualifier.Tree then
+               Is_Abstract := Trees.Qualifier.Tree
+                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Abstract);
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Abstract));
+   end Tree_Qualifier_Is_Abstract;
+
+   procedure Tree_Qualifier_Is_Optional
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Qualifier_Is_Optional(Tree {Kind(Tree) == #qualifier}) -> Boolean
+      --    is import(#tree_qualifier_is_optional)
+      Is_Optional : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Qualifier.Tree then
+               Is_Optional := Trees.Qualifier.Tree
+                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Optional);
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Optional));
+   end Tree_Qualifier_Is_Optional;
+
+   procedure Tree_Qualifier_Is_Not_Null
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Qualifier_Is_Not_Null(Tree {Kind(Tree) == #qualifier}) -> Boolean
+      --    is import(#tree_qualifier_is_not_null)
+      Is_Not_Null : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Qualifier.Tree then
+               Is_Not_Null := Trees.Qualifier.Tree
+                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Not_Null);
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Not_Null));
+   end Tree_Qualifier_Is_Not_Null;
+
+   procedure Tree_Qualifier_Is_Mutable
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Qualifier_Is_Mutable(Tree {Kind(Tree) == #qualifier}) -> Boolean
+      --    is import(#tree_qualifier_is_mutable)
+      Is_Mutable : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Qualifier.Tree then
+               Is_Mutable := Trees.Qualifier.Tree
+                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Mutable);
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Mutable));
+   end Tree_Qualifier_Is_Mutable;
+
+   procedure Tree_Qualifier_Is_Concurrent
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Qualifier_Is_Concurrent(Tree {Kind(Tree) == #qualifier}) -> Boolean
+      --    is import(#tree_qualifier_is_concurrent)
+      Is_Concurrent : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Qualifier.Tree then
+               Is_Concurrent := Trees.Qualifier.Tree
+                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Concurrent);
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Concurrent));
+   end Tree_Qualifier_Is_Concurrent;
+
+   procedure Tree_Qualifier_Is_Var
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Qualifier_Is_Var(Tree {Kind(Tree) == #qualifier}) -> Boolean
+      --    is import(#tree_qualifier_is_var)
+      Is_Var : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Qualifier.Tree then
+               Is_Var := Trees.Qualifier.Tree
+                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Var);
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Var));
+   end Tree_Qualifier_Is_Var;
+
+   procedure Tree_Qualifier_Is_Const
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Qualifier_Is_Const(Tree {Kind(Tree) == #qualifier}) -> Boolean
+      --    is import(#tree_qualifier_is_const)
+      Is_Const : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Qualifier.Tree then
+               Is_Const := Trees.Qualifier.Tree
+                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Const);
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Const));
+   end Tree_Qualifier_Is_Const;
+
+   procedure Tree_Qualifier_Is_Polymorphic
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Qualifier_Is_Polymorphic(Tree {Kind(Tree) == #qualifier}) -> Boolean
+      --    is import(#tree_qualifier_is_polymorphic)
+      Is_Polymorphic : Boolean := False;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Op : constant Optional_Tree :=
+         To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
+         begin
+            if Op_Tree in Trees.Qualifier.Tree then
+               Is_Polymorphic := Trees.Qualifier.Tree
+                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Polymorphic);
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0,
+         Boolean'Pos (Is_Polymorphic));
+   end Tree_Qualifier_Is_Polymorphic;
 
    procedure Decl_Region
      (Context : in out Exec_Context;
@@ -6870,6 +7168,42 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_obj_decl_is_global"),
       Tree_Obj_Decl_Is_Global'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_qualifier_is_ref"),
+      Tree_Qualifier_Is_Ref'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_qualifier_is_abstract"),
+      Tree_Qualifier_Is_Abstract'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_qualifier_is_optional"),
+      Tree_Qualifier_Is_Optional'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_qualifier_is_not_null"),
+      Tree_Qualifier_Is_Not_Null'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_qualifier_is_mutable"),
+      Tree_Qualifier_Is_Mutable'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_qualifier_is_concurrent"),
+      Tree_Qualifier_Is_Concurrent'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_qualifier_is_var"),
+      Tree_Qualifier_Is_Var'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_qualifier_is_const"),
+      Tree_Qualifier_Is_Const'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_qualifier_is_polymorphic"),
+      Tree_Qualifier_Is_Polymorphic'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_source_pos"),
