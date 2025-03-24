@@ -2180,8 +2180,10 @@ package body PSC.Interpreter is
       procedure Dump_Obj_With_Indent
         (Value     : Word_Type;
          Type_Desc : Type_Descriptor_Ptr := null;
-         Indent    : Natural := 0);
-      --  Dump contents of object with given indent
+         Indent    : Natural := 0;
+         Skip_First_Indent : Boolean := False);
+      --  Dump contents of object with given indent;
+      --  Skip indent on first line of output if Skip_First_Indent is True.
 
       procedure Dump_One_Instruction (Instr : Instruction;
                                       Use_Message_Format : Boolean := False);
@@ -13125,11 +13127,27 @@ package body PSC.Interpreter is
       procedure Dump_Obj_With_Indent
         (Value     : Word_Type;
          Type_Desc : Type_Descriptor_Ptr := null;
-         Indent    : Natural := 0)
+         Indent    : Natural := 0;
+         Skip_First_Indent : Boolean := False)
       is
          Type_Desc_To_Use : Non_Op_Map_Type_Ptr :=
                               Skip_Over_Op_Map (Type_Desc);
-         Indent_Str : constant String (1 .. Indent) := (others => ' ');
+
+         Skip_Indent : Boolean := Skip_First_Indent;
+
+         Indent_Str_Val : constant String (1 .. Indent) := (others => ' ');
+
+         function Indent_Str return String is
+            --  Return indent, taking Skip_First_Indent into account
+         begin
+            if not Skip_Indent then
+               return Indent_Str_Val;
+            else
+               Skip_Indent := False;
+               return "";
+            end if;
+         end Indent_Str;
+
          Presuming_Is_Small : Boolean := False;
       begin
          if Type_Desc_To_Use /= null and then Type_Desc_To_Use.Is_Wrapper then
@@ -13141,7 +13159,8 @@ package body PSC.Interpreter is
                Dump_Obj_With_Indent
                  (Value,
                   Type_Desc_To_Use.Components (1).Type_Desc,
-                  Indent);
+                  Indent,
+                  Skip_First_Indent);
                return;
             end if;
          end if;
@@ -13337,7 +13356,10 @@ package body PSC.Interpreter is
                            Dump_Obj_With_Indent
                              (Comp_Value,
                               Comp_Type,
-                              Indent + 2);
+                              Indent + 2,
+                              Skip_First_Indent =>
+                                Comp_Name_Image'Length > 0);
+                                 --  Don't indent if we already have
                         end if;
                      end;
                   end loop;
