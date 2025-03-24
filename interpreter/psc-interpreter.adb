@@ -51,6 +51,7 @@ with PSC.Per_File_Strings;
 with PSC.Strings;
 with PSC.String_Streams;
 with PSC.Trees;
+with PSC.Trees.Obj_Decl;
 with PSC.Univ_Integers;
 with PSC.Univ_Strings;
 with PSC.Vectors;
@@ -14710,15 +14711,28 @@ package body PSC.Interpreter is
 
             if Type_Desc.Components /= null then
                for I in Type_Desc.Components'Range loop
-                  Put ("  Component " & Natural'Image (I) & ": ");
+                  declare
+                     Comp : Component_Info renames Type_Desc.Components (I);
+                     use Trees;
+                  begin
+                     Put ("  Component" & Natural'Image (I) & ": ");
+                     if Not_Null (Comp.Decl)
+                       and then
+                        Tree_Ptr_Of (Comp.Decl).all in Obj_Decl.Tree'Class
+                     then
+                        Put (Subtree_Image
+                         (Obj_Decl.Tree'Class
+                           (Tree_Ptr_Of (Comp.Decl).all).Name) & " : ");
+                     end if;
 
-                  if Type_Desc.Components (I).Is_By_Ref then
-                     Put ("ref ");
-                  end if;
+                     if Comp.Is_By_Ref then
+                        Put ("ref ");
+                     end if;
 
-                  Put_Line
-                    (Type_Desc_Name_And_Num
-                        (Type_Desc.Components (I).Type_Desc));
+                     Put_Line
+                       (Type_Desc_Name_And_Num
+                           (Comp.Type_Desc));
+                  end;
                end loop;
             end if;
 

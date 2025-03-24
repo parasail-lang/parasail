@@ -50,7 +50,7 @@ class PSL::Core::XVector is
                 {V.Data.Length() >= V.Count};
             end if;
         else
-            {V.Width > 0};
+            {V.Width >= 0};
             {V.Subvecs not null};
             {V.Data is null};
         end if;
@@ -213,7 +213,7 @@ class PSL::Core::XVector is
         return (Level => 0, Count => 0, Data => null)
     end op "[]"
 
-    func Create(Length : Univ_Integer; Value : Element_Type) {N >= 0} 
+    func Create(Length : Univ_Integer; Value : Element_Type)
         -> XVector is
 
         if Length <= Leaf_Vec_Capacity then
@@ -428,13 +428,37 @@ func PSL::Test::Test_XVector() is
         end loop
     end loop
     Print('\n');
-//    var Big_V : XVector<Univ_Integer> := []
-//    var Ran := Random::Start()
-//    for I in 1..1_000_000 forward loop
-//        Big_V |= Ran.Next() mod 1_000_000
-//        if |Big_V| mod 50_000 == 0 then
-//            Println("Big_V[" | |Big_V| | "] = " | Big_V[|Big_V|])
-//        end if
-//    end loop
-//    Println("|Big_V| = " | |Big_V|)
+
+    //  Test using a module instantiation inside an expression
+    //  making use of the Rust "turbo fish" syntax.
+    const ABC := XVector::<Univ_String>::["hello", "there", "everybody"];
+    Println ("ABC[2] = `(ABC[2])");
+
+    //  Test associating a constraint/predicate with a type
+    type Vec3 is XVector<Integer> {|vec3| == 3};
+    var V3 : Vec3 := [1, 2, 3];
+    V3 := [5, 6, 7, 8];  //  Should die!
+    Println ("V3[4] == `(V3[4])");
+
+    var Big_V : XVector<Univ_Integer> := []
+    var Ran := Random::Start()
+    var Sum := 0;
+    var Sum_Sqs := 0;
+    for I in 1..75_000 forward loop
+        const R := Ran.Next() mod 1_000_000
+        Big_V |= R
+        Sum += R
+        Sum_Sqs += R**2;
+        if |Big_V| mod 5_000 == 0 then
+            Println("Big_V[" | |Big_V| | "] = " | Big_V[|Big_V|])
+        end if
+    end loop
+    Println("|Big_V| = " | |Big_V|)
+
+    Println ("Average = `(Sum/|Big_V|), Sum_Sqs = `(Sum_Sqs)");
+    const Variance := (Sum_Sqs - Sum*Sum/|Big_V|)/|Big_V|;
+    Println ("Variance = `(Variance)");
+    if Variance >= 0 then
+       Println ("Std. dev = " | Float::Sqrt(Int_To_Float(Variance)));
+    end if;
 end func PSL::Test::Test_XVector

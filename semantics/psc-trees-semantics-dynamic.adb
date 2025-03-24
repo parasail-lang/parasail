@@ -60,6 +60,7 @@ with PSC.Trees.While_Stmt;
 with PSC.Trees.Semantics.Debug; use PSC.Trees.Semantics.Debug;
 
 with PSC.Trees.Semantics.Static;
+pragma Elaborate (PSC.Trees.Semantics.Static);
 
 with PSC.Univ_Strings;
 with PSC.Vectors;
