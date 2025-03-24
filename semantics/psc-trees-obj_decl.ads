@@ -66,7 +66,7 @@ package PSC.Trees.Obj_Decl is
    --  Set Nth operand of given Tree
 
    function Kind (T : Tree) return Tree_Kind_Enum is (Obj_Decl_Kind);
-   -- Return tree type as enum
+   --  Return tree type as enum
 
    procedure Display_Subtree
      (T : Tree;

@@ -13308,11 +13308,32 @@ package body PSC.Interpreter is
                              (Value +
                               Large_Obj_Header_Size +
                               Offset_Within_Area (I - 1));
+
+                        use Trees;
+
+                        Comp_Decl : constant Optional_Tree :=
+                          Type_Desc_To_Use.Components (I).Decl;
+                        Comp_Name_Image : constant String :=
+                          (if Not_Null (Comp_Decl)
+                             and then
+                              Tree_Ptr_Of (Comp_Decl).all in
+                                Obj_Decl.Tree'Class
+                           then
+                              Subtree_Image
+                                (Obj_Decl.Tree'Class
+                                   (Tree_Ptr_Of (Comp_Decl).all).Name) & " :"
+                           else
+                              "");
                      begin
                         if Type_Desc_To_Use.Components (I).Is_By_Ref then
                            Put_Line
-                             (Indent_Str & "  Ref: " & Hex_Image (Comp_Value));
+                             (Indent_Str & "  " &
+                              Comp_Name_Image &
+                              "Ref: " & Hex_Image (Comp_Value));
                         else
+                           if Comp_Name_Image'Length > 0 then
+                              Put_Line (Indent_Str & ' ' & Comp_Name_Image);
+                           end if;
                            Dump_Obj_With_Indent
                              (Comp_Value,
                               Comp_Type,
