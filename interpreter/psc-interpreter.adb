@@ -13137,8 +13137,10 @@ package body PSC.Interpreter is
 
          Indent_Str_Val : constant String (1 .. Indent) := (others => ' ');
 
+         function Indent_Str return String;
+         --  Return indent, taking Skip_First_Indent into account
+
          function Indent_Str return String is
-            --  Return indent, taking Skip_First_Indent into account
          begin
             if not Skip_Indent then
                return Indent_Str_Val;
