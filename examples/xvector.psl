@@ -2,7 +2,8 @@ interface PSL::Core::XVector<Element_Type is Assignable<>>
   implements Indexable<Element_Type, Univ_Integer> is
   // Extendable XVector, indexed by Univ_Integer, 1..Length
     op "[]"() -> XVector
-    func Create(Length : Univ_Integer; Value : Element_Type) -> XVector
+    func Create(Length : Univ_Integer; Value : Element_Type)
+       {Length >= 0} -> XVector
     op "indexing"(ref V : XVector; Index : Univ_Integer) -> 
       ref Element_Type
     op "slicing"(V : XVector; Index_Set : Countable_Range<Univ_Integer>)
@@ -427,6 +428,9 @@ func PSL::Test::Test_XVector() is
             Print(S);
         end loop
     end loop
+    const L3 : XVector<Integer> := [1, 2, 3];
+    {{L3[2] == 2}};
+    {{L3[3] == 3}};
     Print('\n');
 
     //  Test using a module instantiation inside an expression
