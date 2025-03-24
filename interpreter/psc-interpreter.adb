@@ -13321,7 +13321,7 @@ package body PSC.Interpreter is
                            then
                               Subtree_Image
                                 (Obj_Decl.Tree'Class
-                                   (Tree_Ptr_Of (Comp_Decl).all).Name) & " :"
+                                   (Tree_Ptr_Of (Comp_Decl).all).Name) & " => "
                            else
                               "");
                      begin
@@ -13332,7 +13332,7 @@ package body PSC.Interpreter is
                               "Ref: " & Hex_Image (Comp_Value));
                         else
                            if Comp_Name_Image'Length > 0 then
-                              Put_Line (Indent_Str & ' ' & Comp_Name_Image);
+                              Put (Indent_Str & ' ' & Comp_Name_Image);
                            end if;
                            Dump_Obj_With_Indent
                              (Comp_Value,
