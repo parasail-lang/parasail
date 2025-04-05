@@ -388,6 +388,12 @@ package body PSC.Trees.Semantics.Translator is
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Resolved_Type, "_psc_tree_resolved_type");
 
+   procedure Tree_Resolved_Interp
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Resolved_Interp, "_psc_tree_resolved_interp");
+
    procedure Tree_Decl_Of
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -441,6 +447,12 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Invocation_Kind, "_psc_tree_invocation_kind");
+
+   procedure Tree_Call_Operation
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Call_Operation, "_psc_tree_call_operation");
 
    procedure Tree_Iterator_Kind
      (Context : in out Exec_Context;
@@ -1479,7 +1491,7 @@ package body PSC.Trees.Semantics.Translator is
    function To_Word_Type (Op : Optional_Tree) return Word_Type is
    --  Return "small" ParaSail object representation of a tree pointer
    begin
-      if Op = Null_Optional_Tree then
+      if Is_Null(Op) then
          return Null_Value;
       else
          declare
@@ -2539,11 +2551,15 @@ package body PSC.Trees.Semantics.Translator is
       --    is import(#region_num_trees)
       Region : constant Symbols.Region_Ptr :=
         To_Region_Ptr (Fetch_Word (Params, 1));
-      Statements : constant Trees.Lists.List := Region.Stmt_List;
+      use type Symbols.Region_Ptr;
    begin
-      Store_Word
-        (Params, 0,
-         Word_Type (Trees.Lists.Length (Statements)));
+      if Region = null then   
+         Store_Word (Params, 0, 0);
+      else
+         Store_Word
+           (Params, 0,
+            Word_Type (Trees.Lists.Length (Region.Stmt_List)));
+      end if;
    end Region_Num_Trees;
 
    procedure Region_Nth_Tree
@@ -2575,7 +2591,7 @@ package body PSC.Trees.Semantics.Translator is
         To_Optional_Tree (Fetch_Word (Params, 1));
    begin
       --  Determine kind of tree
-      if Not_Null(Op) then
+      if Not_Null (Op) then
          declare
             Op_Tree : constant Tree'Class := Tree_Of (Op);
          begin
@@ -2709,16 +2725,11 @@ package body PSC.Trees.Semantics.Translator is
       --    is import(#tree_resolved_type)
       Op : constant Optional_Tree :=
         To_Optional_Tree (Fetch_Word (Params, 1));
-      Op_Sem : constant Root_Sem_Ptr := Sem_Info (Op);
    begin
-      if Op_Sem /= null and then 
-        Op_Sem.all in Operand_Semantic_Info'Class
-      then
+      if Not_Null(Op) then
          declare
-            Opnd_Sem : constant Operand_Sem_Ptr :=
-              Operand_Sem_Ptr (Op_Sem);
             Res_Type : constant Type_Sem_Ptr :=
-              Opnd_Sem.Resolved_Type;
+              Resolved_Type (Op);
          begin
             if Res_Type /= null then
                Store_Word
@@ -2733,6 +2744,41 @@ package body PSC.Trees.Semantics.Translator is
       Store_Word
         (Params, 0, Null_Value);
    end Tree_Resolved_Type;
+
+   procedure Tree_Resolved_Interp
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Resolved_Interp(Tree) -> optional Tree
+      --    is import(#tree_resolved_interp)
+      Op : constant Optional_Tree :=
+        To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Sem : constant Root_Sem_Ptr := Sem_Info (Op);
+         begin
+            if Op_Sem /= null and then Op_Sem.all in
+              Operand_Semantic_Info'Class
+            then
+               declare
+                  Operand_Sem : constant Operand_Sem_Ptr :=
+                    Operand_Sem_Ptr (Op_Sem);
+                  Resolved_Tree : constant Optional_Tree :=
+                    Operand_Sem.Resolved_Interp;
+               begin
+                  Store_Word
+                    (Params, 0,
+                     To_Word_Type (Resolved_Tree));
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0, Null_Value);
+   end Tree_Resolved_Interp;
 
    procedure Tree_Decl_Of
      (Context : in out Exec_Context;
@@ -3005,6 +3051,41 @@ package body PSC.Trees.Semantics.Translator is
       Store_Word
         (Params, 0, Null_Value);
    end Tree_Invocation_Kind;
+
+   procedure Tree_Call_Operation
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Call_Operation(Tree) -> optional Decl
+      --    is import(#tree_call_operation)
+      Op : constant Optional_Tree :=
+        To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Sem : constant Root_Sem_Ptr := Sem_Info (Op);
+         begin
+            if Op_Sem /= null and then Op_Sem.all in
+              Computation_Semantic_Info'Class
+            then
+               declare
+                  Operation_Sem : constant Operation_Sem_Ptr :=
+                    Computation_Sem_Ptr (Op_Sem).Op_Sem;
+                  Sem_Ptr : constant Root_Sem_Ptr :=
+                    Root_Sem_Ptr (Operation_Sem);
+               begin
+                  Store_Word
+                    (Params, 0,
+                     To_Word_Type (Sem_Ptr));
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0, Null_Value);
+   end Tree_Call_Operation;
 
    procedure Tree_Iterator_Kind
      (Context : in out Exec_Context;
@@ -7184,6 +7265,10 @@ begin  --  PSC.Trees.Semantics.Translator;
       Tree_Resolved_Type'Access);
 
    Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_resolved_interp"),
+      Tree_Resolved_Interp'Access);
+
+   Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_decl_of"),
       Tree_Decl_Of'Access);
 
@@ -7218,6 +7303,10 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_invocation_kind"),
       Tree_Invocation_Kind'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_call_operation"),
+      Tree_Call_Operation'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_iterator_kind"),
