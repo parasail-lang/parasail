@@ -276,6 +276,8 @@ interface PSC::Reflection<> is
         is import(#tree_source_pos)
       func Resolved_Type(Tree) -> optional Type_Descriptor
         is import(#tree_resolved_type)
+      func Resolved_Interp(Tree) -> optional Tree
+        is import(#tree_resolved_interp)
       func Decl_Of(Tree) -> optional Decl
         is import(#tree_decl_of)
 
@@ -323,6 +325,9 @@ interface PSC::Reflection<> is
         is import(#tree_obj_decl_is_move)
       func Obj_Decl_Is_Global(Tree {Kind(Tree) == #obj_decl}) -> Boolean
         is import(#tree_obj_decl_is_global)
+
+      func Call_Operation(Tree) -> optional Decl
+        is import(#tree_call_operation)
 
       func Qualifier_Is_Ref(Tree {Kind(Tree) == #qualifier}) -> Boolean
         is import(#tree_qualifier_is_ref)
