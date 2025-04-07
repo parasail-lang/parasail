@@ -951,13 +951,18 @@ package body PSC.Trees.Semantics.Info is
 
       function Unassignable return String is
       --  Return suffix to identify unassignable types
+         APK : constant String :=
+           (if not Expr_Type.All_Parameters_Known then
+              (if Expr_Type.All_Parameters_Checked then "" else " ?!APK")
+            elsif Expr_Type.All_Parameters_Checked then " APK"
+            else " ?APK");
       begin
          if Expr_Type /= null
            and then not Expr_Type.Known_To_Be_Assignable
          then
-            return " (unassignable)";
+            return " (unassignable" & APK & ')';
          else
-            return "";
+            return APK;
          end if;
       end Unassignable;
 

@@ -443,6 +443,8 @@ private package PSC.Trees.Semantics.Info is
       --  that operations may be called directly.  This will always
       --  be false for formal types, since at compile time we don't
       --  even know the particular module of the actual type.
+      All_Parameters_Checked : Boolean := False;
+      --  This is set True once we have computed All_Parameters_Known.
       Outermost_Module_Where_Used : Module_Sem_Ptr := null;
       --  Outermost module where this type is used, and if nested or an
       --  actual-of-formal, is the module where Actual_Of_Formal_Index

@@ -66,6 +66,9 @@ package PSC.Vectors is
    --  Set the vector back to the initial, empty state.
    --  Release any heap storage in use.
 
+   function Move (From : in out Vector) return Vector;
+   --  Move contents of vector to a new vector, leaving "From" empty
+
 private
 
    type Vector_Rec;  --  completed in package body

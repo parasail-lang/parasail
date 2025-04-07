@@ -734,7 +734,13 @@ package body PSC.Trees.Semantics is
          return Sem_Error_Count;
       end if;
 
-      --  Process the decls of the interfaces first
+      --  Process the params of the interfaces first
+      Static.Second_Pass_List
+        (Symbols.Library_Region,
+         Library,
+         Context => Standalone_Item_Context,
+         Mode => Static.Interface_Params);
+      --  Now process the decls of the interfaces
       Static.Second_Pass_List
         (Symbols.Library_Region,
          Library,

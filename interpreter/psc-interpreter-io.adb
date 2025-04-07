@@ -708,11 +708,12 @@ package body PSC.Interpreter.IO is
 
       procedure ReadC (Ch : out Character) is
       --  Work around GNAT bug; stream read exception not handleable locally
+      --  in some versions of GNAT.
       begin
          Character'Read (Stream (Info_Ptr.File), Ch);
       exception
          when others =>
-            Put_Line ("Excep in ReadC");  --  Never triggered!  GNAT bug
+            --  Put_Line ("Excep in ReadC");  --  Not triggered in some GNATs
             raise;
       end ReadC;
 

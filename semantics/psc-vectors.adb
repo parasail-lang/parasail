@@ -345,4 +345,13 @@ package body PSC.Vectors is
       Vec.Count := 0;
    end Set_Empty;
 
+   function Move (From : in out Vector) return Vector is
+   --  Return contents of vector moved to a new vector, leaving "From" empty
+   begin
+      return Result : Vector := From do
+         From.Count := 0;
+         From.Data := null;
+      end return;
+   end Move;
+
 end PSC.Vectors;

@@ -98,11 +98,18 @@ private package PSC.Trees.Semantics.Static is
 
    --------- Analysis mode for second pass of semantic analysis --------
 
-   type Analysis_Mode is (Decls_Only, Decls_And_Exprs, Exprs_Only);
+   type Analysis_Mode is
+     (Interface_Params, Decls_Only, Decls_And_Exprs, Exprs_Only);
    subtype Analyze_Decls is Analysis_Mode range Decls_Only .. Decls_And_Exprs;
    subtype Analyze_Exprs is Analysis_Mode range Decls_And_Exprs .. Exprs_Only;
+   subtype Analyze_Module_Params is Analysis_Mode
+     range Interface_Params .. Decls_And_Exprs;
 
-   --  NOTE: Analysis mode is used to allow forward references in expressions
+   --  NOTE: Interface_Params mode is used to analyze parameters of
+   --        module interface before doing anything else, so
+   --        can make forward references to modules while also
+   --        supplying module parameters.
+   --        Analysis mode is used to allow forward references in expressions
    --        to declarations that come later.
    --        Also, Analysis mode is used to ensure we analyze interfaces
    --        before we analyze classes.

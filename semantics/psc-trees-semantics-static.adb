@@ -1488,7 +1488,7 @@ package body PSC.Trees.Semantics.Static is
       Num_Comp : constant Natural := Num_Components (Mod_Sem);
       --  Call num_components to initialize Num_Components field
       pragma Assert (N <= Num_Comp);
-      Module_Syms : constant Symbols.Symbol_List :=
+      Module_Syms : Symbols.Symbol_List renames
         Mod_Sem.Nested_Region.Syms.Local_Symbols;
    begin
       --  Iterate over all of the symbols of the module
@@ -3221,6 +3221,8 @@ package body PSC.Trees.Semantics.Static is
                  --  All (actual) parameters are known if there are
                  --  no formal parameters in this module, or any encloser
                  --  or ancestor.
+                 All_Parameters_Checked => True,
+                 --  No more checking needed for All_Parameters_Known
                  Outermost_Module_Where_Used => Mod_Sem,
                  Is_Formal_Type => False,
                  --  NOTE: The Cur_Inst_Sem is not considered a formal type
@@ -3286,6 +3288,17 @@ package body PSC.Trees.Semantics.Static is
                   end if;
             end case;
 
+            --  Enter into module tables of types.
+            Cur_Inst_Sem.U_Base_Type := Find_U_Base_Type (Cur_Inst_Sem);
+            Cur_Inst_Sem.U_Type := Find_U_Type (Cur_Inst_Sem);
+            if Cur_Inst_Sem.U_Base_Type /= Cur_Inst_Sem then
+                Sem_Error
+                  (Mod_Sem.Definition, "Cur inst should be first base type");
+            end if;
+            if Cur_Inst_Sem.U_Type /= Cur_Inst_Sem then
+                Sem_Error
+                  (Mod_Sem.Definition, "Cur inst should be first type");
+            end if;
             Mod_Sem.Cur_Inst_Sem := Cur_Inst_Sem;
 
             if Debug_First_Pass then
@@ -6809,10 +6822,13 @@ package body PSC.Trees.Semantics.Static is
       Qualified_Type : Type_Sem_Ptr;
    begin
       if Original_Type /= null then
-         if Original_Type.U_Base_Type = null then
+         if Original_Type.U_Base_Type = null
+           or else Original_Type.Root_Type = null
+         then
             --  Finish original type before copying it
             Finish_Type_Sem_Info (Original_Type, Decl_Region);
          end if;
+         pragma Assert (Original_Type.Root_Type /= null);
          Qualified_Type := new Type_Semantic_Info'(Original_Type.all);
          if Not_Null (Definition) then
             Qualified_Type.Definition := Definition;
@@ -6831,6 +6847,7 @@ package body PSC.Trees.Semantics.Static is
          if Any_Type /= null then
             Qualified_Type.Associated_Module := Any_Type.Associated_Module;
             Qualified_Type.U_Base_Type := Any_Type;
+            Qualified_Type.Root_Type := Any_Type;
          end if;
          Qualified_Type.Definition := Definition;
       end if;
@@ -7162,8 +7179,9 @@ package body PSC.Trees.Semantics.Static is
          end if;
       end if;
 
-      if Debug_Types then
-         Put_Line (" Get_Type returning " & Type_Image (Result));
+      if Debug_Types or Debug_Substitution then
+         Put_Line (" Get_Type returning " &
+           Type_Image (Result, Use_Short_Form => False));
       end if;
       return Result;
 
@@ -13129,49 +13147,35 @@ package body PSC.Trees.Semantics.Static is
             --       This would be appropriate for implementing something
             --       like the "and then" operation, where right operand
             --       could be declared "func RHS()->Boolean".
-            declare
-               Extra_Sub_For_Interp : Type_Sem_Ptr := null;
-               Extra_Sub_For_Sig_To_Use : Type_Sem_Ptr :=
-                 Extra_Sub_For_Signature;
-            begin
-               if Assoc_Type_Region /= null then
-                  --  Get Module for this interp
-                  Extra_Sub_For_Interp := Type_Sem_Ptr (Assoc_Type_Region);
-               end if;
-               if Require_Exact_Type_Match then
-                  Extra_Sub_For_Sig_To_Use := Extra_Sub_For_Interp;
-               end if;
-               if Signatures_And_Modes_Match
-                   (Op_Sem1 => Operation_Sem_Ptr (Interp_Sem),
-                    Op_Sem2 => Signature, Extra_Subst1 => Extra_Sub_For_Interp,
-                    Extra_Subst2 => Extra_Sub_For_Sig_To_Use,
-                    Substitute_Using1 => Assoc_Type_Region,
-                    Substitute_Using2 => Signature_Type_Region)
-               then
-                  --  Signatures match, see if ambiguous
-                  if Is_Null (Chosen_Interp) then
-                     --  First match, remember it,
-                     --  and whether it is internally ambiguous (unlikely!)
-                     Chosen_Interp := Interp;
-                     Chosen_Assoc_Type_Region := Assoc_Type_Region;
-                     Ambiguity := Sem_Info (Interp).Ambiguity;
-                  elsif Interps_Equivalent (Chosen_Interp, Interp) then
-                     --  Ignore this one as it is equivalent to an earlier one
-                     if Debug_Second_Pass then
-                        Put_Line
-                          (" Find_Interp_Of_Signature: interps equivalent");
-                     end if;
-                  else
-                     --  Not first match, this is ambiguous.
-                     if Debug_Second_Pass then
-                        Put_Line
-                          (" Find_Interp_Of_Signature: ambiguous, " &
-                           "found more than one match");
-                     end if;
-                     Add_Ambiguity (Interp);
+            if Signatures_And_Modes_Match
+                (Op_Sem1 => Operation_Sem_Ptr (Interp_Sem),
+                 Op_Sem2 => Signature,
+                 Substitute_Using1 => Assoc_Type_Region,
+                 Substitute_Using2 => Signature_Type_Region)
+            then
+               --  Signatures match, see if ambiguous
+               if Is_Null (Chosen_Interp) then
+                  --  First match, remember it,
+                  --  and whether it is internally ambiguous (unlikely!)
+                  Chosen_Interp := Interp;
+                  Chosen_Assoc_Type_Region := Assoc_Type_Region;
+                  Ambiguity := Sem_Info (Interp).Ambiguity;
+               elsif Interps_Equivalent (Chosen_Interp, Interp) then
+                  --  Ignore this one as it is equivalent to an earlier one
+                  if Debug_Second_Pass then
+                     Put_Line
+                       (" Find_Interp_Of_Signature: interps equivalent");
                   end if;
+               else
+                  --  Not first match, this is ambiguous.
+                  if Debug_Second_Pass then
+                     Put_Line
+                       (" Find_Interp_Of_Signature: ambiguous, " &
+                        "found more than one match");
+                  end if;
+                  Add_Ambiguity (Interp);
                end if;
-            end;
+            end if;
          end if;
       end Check_One_Interp;
       procedure Check_For_Matching_Signature is new Interpretations
@@ -16638,6 +16642,12 @@ package body PSC.Trees.Semantics.Static is
             return False;
          end if;
 
+         if not Diagnose
+           and then not Assoc_Type.All_Parameters_Checked
+         then
+            --  Finish up the type now
+            Finish_Type_Sem_Info (Assoc_Type);
+         end if;
          if Diagnose and then not Assoc_Type.All_Parameters_Known then
             Give_Reason
               (Prefix & Canonical_Type_Name (Assoc_Type) &
@@ -17055,6 +17065,7 @@ package body PSC.Trees.Semantics.Static is
          Type_Sem.Root_Type := Type_Sem;
       elsif Type_Sem /= Type_Sem.U_Base_Type then
          Type_Sem.Root_Type := Type_Sem.U_Base_Type.Root_Type;
+         pragma Assert (Type_Sem.Root_Type /= null);
       elsif not Type_Sem.Is_Polymorphic then
          --  Non-polymorphic base type should point to self
          Type_Sem.Root_Type := Type_Sem;
@@ -17072,6 +17083,8 @@ package body PSC.Trees.Semantics.Static is
          --  Copy various other info from base type
          Type_Sem.All_Parameters_Known :=
            Type_Sem.U_Base_Type.All_Parameters_Known;
+         Type_Sem.All_Parameters_Checked :=
+           Type_Sem.U_Base_Type.All_Parameters_Checked;
          Type_Sem.Known_To_Be_Assignable :=
            Type_Sem.U_Base_Type.Known_To_Be_Assignable;
          Type_Sem.Known_To_Be_Small := Type_Sem.U_Base_Type.Known_To_Be_Small;
@@ -17121,6 +17134,16 @@ package body PSC.Trees.Semantics.Static is
             then
                --  Nothing to do
                null;
+            elsif Type_Sem.All_Parameters_Checked then
+               if not Type_Sem.Is_Formal_Type
+                 and then Type_Sem.Actual_Sem_Infos /= null
+               then
+                  if Debug_Second_Pass then
+                     Put_Line ("For new non-formal base type defined by " &
+                       Subtree_Image (Type_Sem.Definition) &
+                       " all params checked but not all params known.");
+                  end if;
+               end if;
             elsif Type_Sem.Func_Type_Op_Sem /= null then
                --  See whether all parameter types are known
                declare
@@ -17131,6 +17154,7 @@ package body PSC.Trees.Semantics.Static is
                   Type_Sem.All_Parameters_Known :=
                     Param_Types_Are_All_Known (T.Operation_Inputs)
                     and then Param_Types_Are_All_Known (T.Operation_Outputs);
+                  Type_Sem.All_Parameters_Checked := True;
                end;
             elsif Type_Sem.U_Base_Structure = null then
                if Debug_Second_Pass then
@@ -17217,6 +17241,7 @@ package body PSC.Trees.Semantics.Static is
                            Natural'Image (Type_Sem.Actual_Sem_Infos'Length));
                      end if;
                   end if;
+                  Type_Sem.All_Parameters_Checked := True;
                end;
             end if;
 
@@ -19362,6 +19387,8 @@ package body PSC.Trees.Semantics.Static is
       Saved_Current_Module : constant Module_Sem_Ptr := Current_Module;
       Parent_Module : constant Module_Sem_Ptr := Mod_Sem.Parent_Module;
 
+      use type Type_Sem_Vectors.Elem_Index;
+
       procedure Abstract_Ops_Must_Be_Overridden (Decl_List : Lists.List) is
       --  Make sure that all abstract operations on Decl_List are overridden
       begin
@@ -19398,7 +19425,7 @@ package body PSC.Trees.Semantics.Static is
 
    begin  --  Module_Action
 
-      if Visitor.Mode = Decls_Only and then not T.Is_Interface
+      if Visitor.Mode <= Decls_Only and then not T.Is_Interface
         and then not T.Treat_As_Type
       then
          --  "Decls_Only" means don't do module classes.
@@ -19406,6 +19433,16 @@ package body PSC.Trees.Semantics.Static is
       end if;
 
       Current_Module := Mod_Sem;  --  Fall back for Find_Enclosing_Module.
+
+      if T.Is_Interface and then Mod_Sem.Cur_Inst_Sem.U_Type = null then
+         --  Fill in the U_Type, U_Base_Type, and Root_Type temporarily
+         --  (Finish_Type_Sem_Info will re-assign as appropriate).
+         Mod_Sem.Cur_Inst_Sem.U_Type := Mod_Sem.Cur_Inst_Sem;
+         Mod_Sem.Cur_Inst_Sem.U_Base_Type := Mod_Sem.Cur_Inst_Sem;
+      end if;
+
+      --  Make sure Root_Type of Cur_Inst_Sem always points to itself.
+      Mod_Sem.Cur_Inst_Sem.Root_Type := Mod_Sem.Cur_Inst_Sem;
 
       if Visitor.Context /= No_Context then
          Mod_Sem.Context := Visitor.Context;
@@ -19450,11 +19487,14 @@ package body PSC.Trees.Semantics.Static is
             Analysis_Mode'Image (Visitor.Mode));
       end if;
 
-      if Visitor.Mode in Analyze_Decls
-        and then not Lists.Is_Empty (T.Import_Clauses)
-      then
-         --  Make sure import clauses are OK
-         Check_Import_Clauses (T.Import_Clauses);
+      if not Lists.Is_Empty (T.Import_Clauses) then
+         if Visitor.Mode = Interface_Params
+            or else
+           (not T.Is_Interface and then Visitor.Mode in Analyze_Decls)
+         then
+            --  Make sure import clauses are OK
+            Check_Import_Clauses (T.Import_Clauses);
+         end if;
       end if;
 
       if Visitor.Mode in Analyze_Decls and then T.Is_Interface
@@ -19532,26 +19572,54 @@ package body PSC.Trees.Semantics.Static is
          --  in case any of the parameter types in the inherited
          --  operations are nested types.
          --  NOTE: Additional nested types might be added to the parent if
-         --  the
-         --       parent module's "class" hasn't been analyzed yet,
+         --       the parent module's "class" hasn't been analyzed yet,
          --       but those types wouldn't appear in the inherited
          --       declarations.
-         for I in 1 .. Num_Elements (Mod_Sem.Parent_Module.Nested_Types) loop
+         if Num_Elements (Mod_Sem.Parent_Module.Nested_Types) > 0 then
             declare
-               J : Type_Sem_Vectors.Elem_Index;
-               use type Type_Sem_Vectors.Elem_Index;
+               --  Move any current contents of Mod_Sem.Nested_Types
+               --  into Current_Nested.
+               Current_Nested : Type_Sem_Vector := Move (Mod_Sem.Nested_Types);
             begin
-               Add_Element
-                 (Mod_Sem.Nested_Types,
-                  Nth_Element (Mod_Sem.Parent_Module.Nested_Types, I), J);
-               --  Indices should match up
-               pragma Assert (J = I);
-            end;
-         end loop;
+               for I in 1 .. Num_Elements (Mod_Sem.Parent_Module.Nested_Types)
+               loop
+                  declare
+                     J : Type_Sem_Vectors.Elem_Index;
+                  begin
+                     Add_Element
+                       (Mod_Sem.Nested_Types,
+                        Nth_Element (Mod_Sem.Parent_Module.Nested_Types, I),
+                        J);
+                     --  Indices should match since we emptied out any
+                     --  pre-existing nested types:
+                     pragma Assert (J = I);
+                  end;
+               end loop;
 
-         Mod_Sem.Num_Inherited_Nested_Types :=
-           Natural (Num_Elements (Mod_Sem.Nested_Types));
-         --  Remember how many come from parent.
+               Mod_Sem.Num_Inherited_Nested_Types :=
+                 Natural (Num_Elements (Mod_Sem.Nested_Types));
+               --  Remember how many come from parent.
+
+               --  Now copy over any pre-existing nested types.
+               if Num_Elements (Current_Nested) > 0 then
+                  for I in 1 .. Num_Elements (Current_Nested)
+                  loop
+                     declare
+                        Existing_Nested_Type : constant Type_Sem_Ptr :=
+                          Nth_Element (Current_Nested, I);
+                     begin
+                        Add_Element
+                          (Mod_Sem.Nested_Types,
+                           Existing_Nested_Type,
+                           Existing_Nested_Type.Nested_Type_Index);
+                              --  Reassign nested type index.
+                     end;
+                  end loop;
+                  --  Recover storage.
+                  Set_Empty (Current_Nested);
+               end if;
+            end;
+         end if;  -- Whether parent module has any nested types
 
       end if;  --  If has a parent module
 
@@ -19566,19 +19634,27 @@ package body PSC.Trees.Semantics.Static is
            (Mod_Region, T.Module_Formals, Context => Module_Formal_Context,
             Mode => Visitor.Mode);
 
-         --  Having processed the formals, we can
-         --  now walk the list of implemented interfaces.
-         --  TBD: We also inherit the "implements_interface" list
-         --      from the parent module, if any.
-         Second_Pass_List
-           (Mod_Region, T.Implements_Interfaces,
-            Context => Module_Implements_Interfaces_Context,
-            Mode => Visitor.Mode);
+         if Visitor.Mode /= Interface_Params then
+            --  Having processed the formals, we can
+            --  now walk the list of implemented interfaces.
+            --  TBD: We also inherit the "implements_interface" list
+            --      from the parent module, if any.
+            Second_Pass_List
+              (Mod_Region, T.Implements_Interfaces,
+               Context => Module_Implements_Interfaces_Context,
+               Mode => Visitor.Mode);
+         end if;
 
       end if;
 
       --  Determine number of formals from Interface
       Num_Formals := Num_Module_Parameters (Mod_Sem);
+
+      if Visitor.Mode = Interface_Params then
+         --  End of processing of Interface_Params Mode
+         Current_Module := Saved_Current_Module;
+         return;  --------  ***  ----------
+      end if;
 
       if Visitor.Mode in Analyze_Decls and then T.Is_Interface
         and then Parent_Module /= null
@@ -19659,12 +19735,6 @@ package body PSC.Trees.Semantics.Static is
                   Context => Module_Extends_Interface_Context,
                   Mode => Visitor.Mode);
             end if;
-
-            --  Fill in the U_Type, U_Base_Type, and Root_Type temporarily
-            --  (Finish_Type_Sem_Info will re-assign as appropriate).
-            Mod_Sem.Cur_Inst_Sem.U_Type := Mod_Sem.Cur_Inst_Sem;
-            Mod_Sem.Cur_Inst_Sem.U_Base_Type := Mod_Sem.Cur_Inst_Sem;
-            Mod_Sem.Cur_Inst_Sem.Root_Type := Mod_Sem.Cur_Inst_Sem;
 
             if Num_Formals = 0
               and then
@@ -21157,7 +21227,7 @@ package body PSC.Trees.Semantics.Static is
       Param_Sem.Context := Context;
 
       --  Second pass for parameter
-      if Visitor.Mode in Analyze_Decls then
+      if Visitor.Mode in Analyze_Module_Params then
          --  Set context to Type_Context
          Visitor.Context := Type_Context;
 
@@ -21227,22 +21297,25 @@ package body PSC.Trees.Semantics.Static is
          end if;
       end if;
 
-      if (Context = Operation_Input_Context) = (Visitor.Mode in Analyze_Decls)
-      then
-         --  NOTE: We resolve the parameter default in Analyze_Decls
-         --        if and only if processing operation param,
-         --        so enclosing operation declaration
-         --        can be inherited if necessary, with appropriate
-         --        substitutions.  Otherwise, we postpone until
-         --        analyzing decls.
-         if Not_Null (T.Param_Default) then
-            Visitor.Context := Operand_Context;
-            Visit (T.Param_Default, Visitor);
+      if Visitor.Mode /= Interface_Params then
+         if (Context = Operation_Input_Context) =
+              (Visitor.Mode in Analyze_Decls)
+         then
+            --  NOTE: We resolve the parameter default in Analyze_Decls
+            --        if and only if processing operation param,
+            --        so enclosing operation declaration
+            --        can be inherited if necessary, with appropriate
+            --        substitutions.  Otherwise, we postpone until
+            --        analyzing bodies.
+            if Not_Null (T.Param_Default) then
+               Visitor.Context := Operand_Context;
+               Visit (T.Param_Default, Visitor);
 
-            Resolve_Expression
-              (Visitor, T.Param_Default, Param_Sem.Resolved_Type);
+               Resolve_Expression
+                 (Visitor, T.Param_Default, Param_Sem.Resolved_Type);
+            end if;
+
          end if;
-
       end if;
 
       Visitor.Decl_For_Annotations := Null_Optional_Tree;
@@ -21389,6 +21462,9 @@ package body PSC.Trees.Semantics.Static is
                   All_Parameters_Known =>
                     Def_Sem.All_Parameters_Known
                     and then Context /= Module_Formal_Context,
+                  All_Parameters_Checked =>
+                    Def_Sem.All_Parameters_Checked
+                    or else Context = Module_Formal_Context,
                   Outermost_Module_Where_Used =>
                     Def_Sem.Outermost_Module_Where_Used,
                   Is_Formal_Type =>
@@ -22910,7 +22986,7 @@ package body PSC.Trees.Semantics.Static is
 
                            if Resolved_Type = null then
                               Sem_Error (Formal, "Formal type not defined");
-                           else
+                           elsif Visitor.Mode /= Interface_Params then
                               if Resolved_Type.Func_Type_Op_Sem /= null then
                                  --  We want an operation name, not
                                  --  a normal object value.
@@ -23029,13 +23105,16 @@ package body PSC.Trees.Semantics.Static is
                                 Sem_Ptr (Actual_Type);
 
                               if Actual_Type = null
-                                or else not Type_Implements_Type
-                                  (Actual_Type => Actual_Type,
-                                   Formal_Type =>
-                                     Type_Sem_Ptr
-                                       (Underlying_Sem_Info (Formal)),
-                                   Allow_Abstract =>
-                                     Enclosing_Construct_Is_Abstract)
+                                or else
+                                 (Visitor.Mode /= Interface_Params
+                                     and then
+                                  not Type_Implements_Type
+                                   (Actual_Type => Actual_Type,
+                                    Formal_Type =>
+                                      Type_Sem_Ptr
+                                        (Underlying_Sem_Info (Formal)),
+                                    Allow_Abstract =>
+                                      Enclosing_Construct_Is_Abstract))
                               then
                                  Sem_Error
                                    (Actual,
@@ -23092,7 +23171,10 @@ package body PSC.Trees.Semantics.Static is
                            Sem_Error
                              (Formal, "Unrecognized kind of module formal");
                         end if;
-                        if Actual_Sem_Infos (Formal_Index) = null then
+                        if Actual_Sem_Infos (Formal_Index) = null
+                          and then
+                           Visitor.Mode /= Interface_Params
+                        then
                            if Is_Default then
                               Sem_Error
                                 (T,
