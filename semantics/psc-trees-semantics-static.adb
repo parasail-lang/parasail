@@ -19424,6 +19424,34 @@ package body PSC.Trees.Semantics.Static is
          end loop;
       end Abstract_Ops_Must_Be_Overridden;
 
+      procedure Process_Nested_Interfaces
+        (R : Symbols.Region_Ptr; Decl_List : Lists.List) is
+      --  Apply Second_Pass in Interface_Params mode
+      --  to each Interface in Decl_List
+      begin
+         for I in 1 .. Lists.Length (Decl_List) loop
+            declare
+               Item : constant Optional_Tree :=
+                 Lists.Nth_Element (Decl_List, I);
+            begin
+               if Not_Null (Item)
+                 and then Tree_Ptr_Of (Item).all in Module.Tree
+               then
+                  Second_Pass
+                    (R, Item,
+                     Context => Interface_Item_Context,
+                     Mode => Interface_Params);
+               end if;
+            exception
+               when E : others =>
+                  Sem_Error
+                    (Lists.Nth_Element (Decl_List, I),
+                     "Internal: " & Ada.Exceptions.Exception_Name (E) &
+                     " raised in");
+            end;
+         end loop;
+      end Process_Nested_Interfaces;
+
    begin  --  Module_Action
 
       if Visitor.Mode <= Decls_Only and then not T.Is_Interface
@@ -19652,6 +19680,11 @@ package body PSC.Trees.Semantics.Static is
       Num_Formals := Num_Module_Parameters (Mod_Sem);
 
       if Visitor.Mode = Interface_Params then
+         --  Walk any nested interfaces
+         Process_Nested_Interfaces (Mod_Region, T.Module_Exports);
+         Process_Nested_Interfaces (Mod_Region, T.Module_New_Exports);
+         Process_Nested_Interfaces (Mod_Region, T.Module_Implements);
+
          --  End of processing of Interface_Params Mode
          Current_Module := Saved_Current_Module;
          return;  --------  ***  ----------
