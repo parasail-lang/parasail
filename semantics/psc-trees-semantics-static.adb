@@ -17133,7 +17133,7 @@ package body PSC.Trees.Semantics.Static is
             if Type_Sem.All_Parameters_Known or else Type_Sem.Is_Polymorphic
             then
                --  Nothing to do
-               null;
+               Type_Sem.All_Parameters_Checked := True;
             elsif Type_Sem.All_Parameters_Checked then
                if not Type_Sem.Is_Formal_Type
                  and then Type_Sem.Actual_Sem_Infos /= null
@@ -17170,6 +17170,7 @@ package body PSC.Trees.Semantics.Static is
                      Subtree_Image (Type_Sem.Definition) &
                      " type is a formal type.");
                end if;
+               Type_Sem.All_Parameters_Checked := True;
             elsif Type_Sem.Enclosing_Type /= null
               and then not Type_Sem.Enclosing_Type.All_Parameters_Known
             then
