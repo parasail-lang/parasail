@@ -302,7 +302,17 @@ package body PSC.Trees.Semantics.Info is
                      " vs. " &
                      Type_Image (Base_Type2));
                end if;
-               return All_Nulls (Actuals1) = All_Nulls (Actuals2);
+
+               --  Check for a "null" match.
+               if Actuals1 = null then
+                  return Actuals2 = null or else Actuals2'Length = 0;
+               elsif Actuals2 = null then
+                  return Actuals1'Length = 0;
+               else
+                  return Actuals1'Length = Actuals2'Length
+                    and then All_Nulls (Actuals1)
+                    and then All_Nulls (Actuals2);
+               end if;
             elsif Actuals1'Length /= Actuals2'Length then
                if Debug_Second_Pass then
                   Put_Line

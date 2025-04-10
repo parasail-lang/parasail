@@ -17241,8 +17241,8 @@ package body PSC.Trees.Semantics.Static is
                            Natural'Image (Num_Formals) & ", Actuals'Length =" &
                            Natural'Image (Type_Sem.Actual_Sem_Infos'Length));
                      end if;
+                     Type_Sem.All_Parameters_Checked := True;
                   end if;
-                  Type_Sem.All_Parameters_Checked := True;
                end;
             end if;
 
