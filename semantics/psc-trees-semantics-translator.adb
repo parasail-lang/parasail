@@ -2731,7 +2731,12 @@ package body PSC.Trees.Semantics.Translator is
             Res_Type : constant Type_Sem_Ptr :=
               Resolved_Type (Op);
          begin
-            if Res_Type /= null then
+            if Res_Type /= null and then Res_Type.U_Base_Type /= null
+              and then
+                Res_Type.U_Base_Type.Type_Descriptor_Location.Base = Zero_Base
+              and then
+                Res_Type.U_Base_Type.Type_Descriptor_Location.Offset /= 0
+            then
                Store_Word
                  (Params, 0,
                   To_Word_Type (Get_Type_Desc
