@@ -565,6 +565,8 @@ interface PSC::Reflection<> is
 
         func Tree_Of(Decl) -> Tree
           is import(#decl_tree_of)
+        func Associated_Module(Decl {Kind(Decl) == #type}) -> optional Decl
+          is import(#decl_associated_module)
 
         func Location(Decl) -> Object_Locator  //  Rename routine
           is in Object_Locator
