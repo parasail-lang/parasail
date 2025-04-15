@@ -183,7 +183,7 @@ interface PSC::Reflection<> is
          #times_assign_op, #divide_assign_op, #power_assign_op,
          #combine_assign_op, #ampersand_assign_op, #and_assign_op,
          #or_assign_op, #xor_assign_op, #left_shift_assign_op,
-         #right_shift_assign_op, #swap_op, #move_op, #combine_move_o4p]>
+         #right_shift_assign_op, #swap_op, #move_op, #combine_move_op]>
       type Literal_Kind_Enum is Enum<
         [#integer_literal, #real_literal, #string_literal,
          #char_literal, #enum_literal, #null_literal]>;
@@ -565,6 +565,8 @@ interface PSC::Reflection<> is
 
         func Tree_Of(Decl) -> Tree
           is import(#decl_tree_of)
+        func Associated_Module(Decl {Kind(Decl) == #type}) -> optional Decl
+          is import(#decl_associated_module)
 
         func Location(Decl) -> Object_Locator  //  Rename routine
           is in Object_Locator

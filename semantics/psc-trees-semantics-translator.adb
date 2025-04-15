@@ -207,6 +207,12 @@ package body PSC.Trees.Semantics.Translator is
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Decl_Tree_Of, "_psc_decl_tree_of");
 
+   procedure Decl_Associated_Module
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Decl_Associated_Module, "_psc_decl_associated_module");
+
    procedure Decl_Component_Index
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -1947,6 +1953,31 @@ package body PSC.Trees.Semantics.Translator is
         (Params, 0, To_Word_Type (Result_Op));
    end Decl_Tree_Of;
 
+   procedure Decl_Associated_Module
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Associated_Module(Decl {Kind(Decl) == #type}) -> optional Decl
+      --    is import(#decl_associated_module)
+      Decl_Sem : Root_Semantic_Info'Class renames
+        To_Root_Sem_Ptr (Fetch_Word (Params, 1)).all;
+      Result_Op : constant Optional_Tree := Decl_Sem.Definition;
+   begin
+      if Decl_Sem in Type_Semantic_Info'Class then
+         declare
+            Type_Sem : Type_Semantic_Info'Class renames
+              Type_Semantic_Info'Class (Decl_Sem);
+         begin
+            Store_Word
+              (Params, 0, To_Word_Type
+               (Root_Sem_Ptr (Type_Sem.Associated_Module)));
+         end;
+      else
+         Store_Word
+           (Params, 0, To_Word_Type (Result_Op));
+      end if;
+   end Decl_Associated_Module;
+
    procedure Decl_Location
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -2731,7 +2762,12 @@ package body PSC.Trees.Semantics.Translator is
             Res_Type : constant Type_Sem_Ptr :=
               Resolved_Type (Op);
          begin
-            if Res_Type /= null then
+            if Res_Type /= null and then Res_Type.U_Base_Type /= null
+              and then
+                Res_Type.U_Base_Type.Type_Descriptor_Location.Base = Zero_Base
+              and then
+                Res_Type.U_Base_Type.Type_Descriptor_Location.Offset /= 0
+            then
                Store_Word
                  (Params, 0,
                   To_Word_Type (Get_Type_Desc
@@ -6925,6 +6961,10 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#decl_tree_of"),
       Decl_Tree_Of'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#decl_associated_module"),
+      Decl_Associated_Module'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#decl_location"),
