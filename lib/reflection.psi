@@ -154,6 +154,25 @@ interface PSC::Reflection<> is
  
     end interface Environment
 
+    interface Symbol<> is
+      type Symbol_Kind_Enum is Enum<[#no_sym_kind, #module_sym_kind,
+        #module_ancestor_sym_kind, #type_sym_kind, #param_sym_kind,
+        #loop_param_sym_kind, #loop_key_param_sym_kind, #object_sym_kind,
+        #component_sym_kind, #operation_sym_kind, #literal_sym_kind,
+        #statement_sym_kind]>
+
+      func Kind(Symbol) -> Symbol_Kind_Enum
+        is import(#symbol_kind)
+      func Definition(Symbol) -> Tree
+        is import(#symbol_definition)
+      func Source_Pos(Symbol) -> optional Source_Position
+        is import(#symbol_source_pos)
+      func Str(Symbol) -> Univ_String
+        is import(#symbol_str)
+      func Full_Name(Symbol) -> Univ_String
+        is import(#symbol_full_name)
+    end interface Symbol
+
     // Raw access to ParaSail's AST
     interface Tree<> is
       type Tree_Kind_Enum is Enum<
@@ -331,6 +350,8 @@ interface PSC::Reflection<> is
 
       func Call_Operation(Tree) -> optional Decl
         is import(#tree_call_operation)
+      func Symbol(Tree) -> optional Symbol
+        is import(#tree_symbol)
 
       func Qualifier_Is_Ref(Tree {Kind(Tree) == #qualifier}) -> Boolean
         is import(#tree_qualifier_is_ref)
