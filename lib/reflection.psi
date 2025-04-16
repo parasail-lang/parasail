@@ -154,6 +154,7 @@ interface PSC::Reflection<> is
  
     end interface Environment
 
+    // Raw access to ParaSail's AST
     interface Tree<> is
       type Tree_Kind_Enum is Enum<
         [#annotation, #assign_stmt, #binary,
@@ -276,6 +277,8 @@ interface PSC::Reflection<> is
         is import(#tree_source_pos)
       func Resolved_Type(Tree) -> optional Type_Descriptor
         is import(#tree_resolved_type)
+      func Sem_Info(Tree) -> optional Decl
+        is import(#tree_sem_info)
       func Resolved_Interp(Tree) -> optional Tree
         is import(#tree_resolved_interp)
       func Decl_Of(Tree) -> optional Decl

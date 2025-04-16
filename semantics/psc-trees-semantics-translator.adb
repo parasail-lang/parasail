@@ -394,6 +394,12 @@ package body PSC.Trees.Semantics.Translator is
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Resolved_Type, "_psc_tree_resolved_type");
 
+   procedure Tree_Sem_Info
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Sem_Info, "_psc_tree_sem_info");
+
    procedure Tree_Resolved_Interp
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -1719,13 +1725,20 @@ package body PSC.Trees.Semantics.Translator is
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Id(Decl) -> Univ_String
       --    is import(#decl_id);
+      use Symbols;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Decl_Sem : Semantic_Info'Class renames
         Sem_Ptr (To_Root_Sem_Ptr (Fetch_Word (Params, 1))).all;
    begin
-      Store_Word
-        (Params, 0,
-         To_Univ_String_Word (Decl_Sem.Associated_Symbol.Str, Target));
+      if Decl_Sem.Associated_Symbol /= null then
+         Store_Word
+           (Params, 0,
+            To_Univ_String_Word (Decl_Sem.Associated_Symbol.Str, Target));
+      else
+         Store_Word
+           (Params, 0,
+            To_Univ_String_Null (Target));
+      end if;
    end Decl_Id;
 
    procedure Decl_Module_Name
@@ -2780,6 +2793,30 @@ package body PSC.Trees.Semantics.Translator is
       Store_Word
         (Params, 0, Null_Value);
    end Tree_Resolved_Type;
+
+   procedure Tree_Sem_Info
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Sem_Info(Tree) -> optional Decl
+      --    is import(#tree_sem_info)
+      Op : constant Optional_Tree :=
+        To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null(Op) then
+         declare
+            Res_Type : constant Type_Sem_Ptr :=
+              Resolved_Type (Op);
+         begin
+            if Res_Type /= null then
+               Store_Word
+                 (Params, 0, To_Word_Type (Root_Sem_Ptr (Res_Type)));
+            else
+               Store_Word (Params, 0, Null_Value);
+            end if;
+         end;
+      end if;
+   end Tree_Sem_Info;
 
    procedure Tree_Resolved_Interp
      (Context : in out Exec_Context;
@@ -7303,6 +7340,10 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_resolved_type"),
       Tree_Resolved_Type'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_sem_info"),
+      Tree_Sem_Info'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_resolved_interp"),
