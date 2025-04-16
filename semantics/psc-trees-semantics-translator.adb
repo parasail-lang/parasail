@@ -1589,7 +1589,7 @@ package body PSC.Trees.Semantics.Translator is
      Components_Kind, Nested_Types_Kind, Nested_Objs_Kind, Operations_Kind,
      Type_Desc_Stream_Kind, Op_Map_Kind, Routine_Parameters_Kind,
      Routine_Uplevel_Refs_Kind, String_Stream_Kind, Const_Value_Stream_Kind,
-     Large_Const_Component_Values);
+     Large_Const_Component_Values, Trees_Of_Actuals_Kind);
 
    package PFS renames Per_File_Strings;
 
@@ -6381,6 +6381,20 @@ package body PSC.Trees.Semantics.Translator is
             end case;
          end;
 
+      when Trees_Of_Actuals_Kind =>
+         declare
+            Root_Sem : constant Root_Sem_Ptr := To_Root_Sem_Ptr (Entity);
+         begin
+            if Root_Sem /= null and then Root_Sem.all in
+              Type_Semantic_Info'Class and then Type_Sem_Ptr
+               (Root_Sem).Actual_Sem_Infos /= null
+            then
+               Result := Type_Sem_Ptr (Root_Sem).Actual_Sem_Infos'Length;
+            else
+               Result := 0;
+            end if;
+         end;
+
       when String_Stream_Kind =>
          declare
             Univ_Str : constant Univ_Strings.Univ_String :=
@@ -6821,6 +6835,15 @@ package body PSC.Trees.Semantics.Translator is
 
                end;
             end case;
+         end;
+
+      when Trees_Of_Actuals_Kind =>
+         declare
+            Root_Sem : constant Root_Sem_Ptr := To_Root_Sem_Ptr (Entity);
+            Actuals : constant Sem_Info_Array_Ptr :=
+               Type_Sem_Ptr (Root_Sem).Actual_Sem_Infos;
+         begin
+            Result := To_Word_Type (Actuals (Index).Definition);
          end;
 
       when String_Stream_Kind =>

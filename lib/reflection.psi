@@ -15,7 +15,7 @@ interface PSC::Info_Array<Elem_Type is Assignable<>;
         #type_desc_stream, #op_map,
         #routine_parameters, #routine_uplevel_refs,
         #string_stream, #const_value_stream,
-        #large_const_component_values]>
+        #large_const_component_values, #trees_of_actuals]>
       //  Kinds of info-arrays available for a Type_Descriptor, Routine, 
       //  Univ_String, or Element_Info.
 
@@ -600,6 +600,10 @@ interface PSC::Reflection<> is
           {Base(Location(Decl)) == Object_Locator::Const_Area}
           -> optional Streamable_Value
           is import(#global_const_value)
+
+        func Trees_Of_Actuals(Decl {Kind(Decl) == #type})
+          -> Info_Array<Tree, Decl, Indexed_By => Univ_Integer>
+          is (Decl, #trees_of_actuals)
 
         //  Operations needed to be Hashable
         func Hash(Val : Decl) -> Unsigned_64 is import(#identity)
