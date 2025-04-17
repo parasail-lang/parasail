@@ -394,6 +394,12 @@ package body PSC.Trees.Semantics.Translator is
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Resolved_Type, "_psc_tree_resolved_type");
 
+   procedure Tree_Sem_Info
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Sem_Info, "_psc_tree_sem_info");
+
    procedure Tree_Resolved_Interp
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -459,6 +465,12 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Tree_Call_Operation, "_psc_tree_call_operation");
+
+   procedure Tree_Symbol
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Tree_Symbol, "_psc_tree_symbol");
 
    procedure Tree_Iterator_Kind
      (Context : in out Exec_Context;
@@ -627,6 +639,36 @@ package body PSC.Trees.Semantics.Translator is
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
    pragma Export (Ada, Body_Region, "_psc_body_region");
+
+   procedure Symbol_Kind
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Symbol_Kind, "_psc_symbol_kind");
+
+   procedure Symbol_Definition
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Symbol_Definition, "_psc_symbol_definition");
+
+   procedure Symbol_Source_Pos
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Symbol_Source_Pos, "_psc_symbol_source_pos");
+
+   procedure Symbol_Str
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Symbol_Str, "_psc_symbol_str");
+
+   procedure Symbol_Full_Name
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Symbol_Full_Name, "_psc_symbol_full_name");
 
    procedure Source_Position_Create
      (Context : in out Exec_Context;
@@ -1524,6 +1566,33 @@ package body PSC.Trees.Semantics.Translator is
       end if;
    end To_Optional_Tree;
 
+   function To_Word_Type (Sym : Symbols.Sym_Ptr) return Word_Type is
+   --  Return "small" ParaSail object representation of a symbol pointer
+      use Symbols;
+   begin
+      if Sym = null then
+         return Null_Value;
+      else
+         return From_Unsigned_Word (Unsigned_Word_Type
+           (System.Storage_Elements.To_Integer (Sym.all'Address)));
+      end if;
+   end To_Word_Type;
+
+   function To_Sym_Ptr is new Ada.Unchecked_Conversion
+     (System.Address, Symbols.Sym_Ptr);
+
+   function To_Sym_Ptr (Val : Word_Type) return Symbols.Sym_Ptr is
+   --  Convert ParaSail "small" obj representation back into a symbol pointer.
+   begin
+      if Val = Null_Value then
+         return null;
+      else
+         return To_Sym_Ptr (System.Storage_Elements.To_Address
+           (System.Storage_Elements.Integer_Address
+              (To_Unsigned_Word (Val))));
+      end if;
+   end To_Sym_Ptr;
+
    function To_Word_Type (Src : PSC.Source_Positions.Source_Position) return Word_Type is
    begin
       return Word_Type (Src.File) * 2**32 +
@@ -1583,7 +1652,7 @@ package body PSC.Trees.Semantics.Translator is
      Components_Kind, Nested_Types_Kind, Nested_Objs_Kind, Operations_Kind,
      Type_Desc_Stream_Kind, Op_Map_Kind, Routine_Parameters_Kind,
      Routine_Uplevel_Refs_Kind, String_Stream_Kind, Const_Value_Stream_Kind,
-     Large_Const_Component_Values);
+     Large_Const_Component_Values, Trees_Of_Actuals_Kind);
 
    package PFS renames Per_File_Strings;
 
@@ -1719,13 +1788,20 @@ package body PSC.Trees.Semantics.Translator is
       Static_Link : Non_Op_Map_Type_Ptr) is
       --  func Id(Decl) -> Univ_String
       --    is import(#decl_id);
+      use Symbols;
       Target : constant Word_Type := Fetch_Word (Params, 0);
       Decl_Sem : Semantic_Info'Class renames
         Sem_Ptr (To_Root_Sem_Ptr (Fetch_Word (Params, 1))).all;
    begin
-      Store_Word
-        (Params, 0,
-         To_Univ_String_Word (Decl_Sem.Associated_Symbol.Str, Target));
+      if Decl_Sem.Associated_Symbol /= null then
+         Store_Word
+           (Params, 0,
+            To_Univ_String_Word (Decl_Sem.Associated_Symbol.Str, Target));
+      else
+         Store_Word
+           (Params, 0,
+            To_Univ_String_Null (Target));
+      end if;
    end Decl_Id;
 
    procedure Decl_Module_Name
@@ -2781,6 +2857,30 @@ package body PSC.Trees.Semantics.Translator is
         (Params, 0, Null_Value);
    end Tree_Resolved_Type;
 
+   procedure Tree_Sem_Info
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Sem_Info(Tree) -> optional Decl
+      --    is import(#tree_sem_info)
+      Op : constant Optional_Tree :=
+        To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null(Op) then
+         declare
+            Res_Type : constant Type_Sem_Ptr :=
+              Resolved_Type (Op);
+         begin
+            if Res_Type /= null then
+               Store_Word
+                 (Params, 0, To_Word_Type (Root_Sem_Ptr (Res_Type)));
+            else
+               Store_Word (Params, 0, Null_Value);
+            end if;
+         end;
+      end if;
+   end Tree_Sem_Info;
+
    procedure Tree_Resolved_Interp
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -3122,6 +3222,38 @@ package body PSC.Trees.Semantics.Translator is
       Store_Word
         (Params, 0, Null_Value);
    end Tree_Call_Operation;
+
+   procedure Tree_Symbol
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Symbol(Tree) -> optional Symbol
+      --    is import(#tree_symbol)
+      Op : constant Optional_Tree :=
+        To_Optional_Tree (Fetch_Word (Params, 1));
+   begin
+      if Not_Null (Op) then
+         declare
+            Op_Sem : constant Root_Sem_Ptr := Sem_Info (Op);
+         begin
+            if Op_Sem /= null and then Op_Sem.all in
+              Semantic_Info'Class
+            then
+               declare
+                  Sym : constant Symbols.Sym_Ptr :=
+                    Sem_Ptr (Op_Sem).Associated_Symbol;
+               begin
+                  Store_Word
+                    (Params, 0, To_Word_Type (Sym));
+                  return;
+               end;
+            end if;
+         end;
+      end if;
+
+      Store_Word
+        (Params, 0, Null_Value);
+   end Tree_Symbol;
 
    procedure Tree_Iterator_Kind
      (Context : in out Exec_Context;
@@ -3837,6 +3969,97 @@ package body PSC.Trees.Semantics.Translator is
 
       Store_Word (Params, 0, To_Word_Type (Region));
    end Body_Region;
+
+   procedure Symbol_Kind
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Kind(Symbol) -> Symbol_Kind_Enum
+      --    is import(#symbol_kind)
+      use Symbols;
+      Sym : constant Symbols.Sym_Ptr :=
+        To_Sym_Ptr (Fetch_Word (Params, 1));
+      Sym_Kind : Symbols.Sym_Kind_Enum := Symbols.No_Sym_Kind;
+   begin
+      if Sym /= null then
+         Sym_Kind := Sym.Kind;
+      end if;
+
+      Store_Word (Params, 0, Word_Type
+        (Symbols.Sym_Kind_Enum'Pos (Sym_Kind)));
+   end Symbol_Kind;
+
+   procedure Symbol_Definition
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Definition(Symbol) -> Tree
+      --    is import(#symbol_definition)
+      use Symbols;
+      Sym : constant Symbols.Sym_Ptr :=
+        To_Sym_Ptr (Fetch_Word (Params, 1));
+   begin
+      if Sym /= null then
+         Store_Word (Params, 0, To_Word_Type (Sym.Definition));
+      else
+         Store_Word (Params, 0, Null_Value);
+      end if;
+   end Symbol_Definition;
+
+   procedure Symbol_Source_Pos
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Source_Pos(Symbol) -> optional Source_Position
+      --    is import(#symbol_source_pos)
+      use Symbols;
+      Sym : constant Symbols.Sym_Ptr :=
+        To_Sym_Ptr (Fetch_Word (Params, 1));
+   begin
+      if Sym /= null then
+         Store_Word (Params, 0, To_Word_Type (Sym.Source_Pos));
+      else
+         Store_Word (Params, 0, Null_Value);
+      end if;
+   end Symbol_Source_Pos;
+
+   procedure Symbol_Str
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Str(Symbol) -> Univ_String
+      --    is import(#symbol_str)
+      use Symbols;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Sym : constant Symbols.Sym_Ptr :=
+        To_Sym_Ptr (Fetch_Word (Params, 1));
+   begin
+      if Sym /= null then
+         Store_Word (Params, 0,
+           To_Univ_String_Word (Sym.Str, Target));
+      else
+         Store_Word (Params, 0, Null_Value);
+      end if;
+   end Symbol_Str;
+
+   procedure Symbol_Full_Name
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Full_Name(Symbol) -> Univ_String
+      --    is import(#symbol_full_name)
+      use Symbols;
+      Target : constant Word_Type := Fetch_Word (Params, 0);
+      Sym : Symbols.Sym_Ptr := To_Sym_Ptr (Fetch_Word (Params, 1));
+   begin
+      if Sym /= null then
+         Compute_Sym_Full_Name (Sym);
+         Store_Word (Params, 0,
+           To_Univ_String_Word (Sym.Full_Name, Target));
+      else
+         Store_Word (Params, 0, Null_Value);
+      end if;
+   end Symbol_Full_Name;
 
    procedure Source_Position_Create
      (Context : in out Exec_Context;
@@ -6344,6 +6567,20 @@ package body PSC.Trees.Semantics.Translator is
             end case;
          end;
 
+      when Trees_Of_Actuals_Kind =>
+         declare
+            Root_Sem : constant Root_Sem_Ptr := To_Root_Sem_Ptr (Entity);
+         begin
+            if Root_Sem /= null and then Root_Sem.all in
+              Type_Semantic_Info'Class and then Type_Sem_Ptr
+               (Root_Sem).Actual_Sem_Infos /= null
+            then
+               Result := Type_Sem_Ptr (Root_Sem).Actual_Sem_Infos'Length;
+            else
+               Result := 0;
+            end if;
+         end;
+
       when String_Stream_Kind =>
          declare
             Univ_Str : constant Univ_Strings.Univ_String :=
@@ -6786,6 +7023,15 @@ package body PSC.Trees.Semantics.Translator is
             end case;
          end;
 
+      when Trees_Of_Actuals_Kind =>
+         declare
+            Root_Sem : constant Root_Sem_Ptr := To_Root_Sem_Ptr (Entity);
+            Actuals : constant Sem_Info_Array_Ptr :=
+               Type_Sem_Ptr (Root_Sem).Actual_Sem_Infos;
+         begin
+            Result := To_Word_Type (Actuals (Index).Definition);
+         end;
+
       when String_Stream_Kind =>
          declare
             Univ_Str : constant Univ_Strings.Univ_String :=
@@ -7225,6 +7471,26 @@ begin  --  PSC.Trees.Semantics.Translator;
       Body_Region'Access);
 
    Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#symbol_kind"),
+      Symbol_Kind'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#symbol_definition"),
+      Symbol_Definition'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#symbol_source_pos"),
+      Symbol_Source_Pos'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#symbol_str"),
+      Symbol_Str'Access);
+
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#symbol_full_name"),
+      Symbol_Full_Name'Access);
+
+   Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#decl_source_pos"),
       Decl_Source_Pos'Access);
 
@@ -7305,6 +7571,10 @@ begin  --  PSC.Trees.Semantics.Translator;
       Tree_Resolved_Type'Access);
 
    Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_sem_info"),
+      Tree_Sem_Info'Access);
+
+   Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_resolved_interp"),
       Tree_Resolved_Interp'Access);
 
@@ -7347,6 +7617,10 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_call_operation"),
       Tree_Call_Operation'Access);
+   
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#tree_symbol"),
+      Tree_Symbol'Access);
 
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#tree_iterator_kind"),

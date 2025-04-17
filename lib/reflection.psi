@@ -15,7 +15,7 @@ interface PSC::Info_Array<Elem_Type is Assignable<>;
         #type_desc_stream, #op_map,
         #routine_parameters, #routine_uplevel_refs,
         #string_stream, #const_value_stream,
-        #large_const_component_values]>
+        #large_const_component_values, #trees_of_actuals]>
       //  Kinds of info-arrays available for a Type_Descriptor, Routine, 
       //  Univ_String, or Element_Info.
 
@@ -154,6 +154,26 @@ interface PSC::Reflection<> is
  
     end interface Environment
 
+    interface Symbol<> is
+      type Symbol_Kind_Enum is Enum<[#no_sym_kind, #module_sym_kind,
+        #module_ancestor_sym_kind, #type_sym_kind, #param_sym_kind,
+        #loop_param_sym_kind, #loop_key_param_sym_kind, #object_sym_kind,
+        #component_sym_kind, #operation_sym_kind, #literal_sym_kind,
+        #statement_sym_kind]>
+
+      func Kind(Symbol) -> Symbol_Kind_Enum
+        is import(#symbol_kind)
+      func Definition(Symbol) -> Tree
+        is import(#symbol_definition)
+      func Source_Pos(Symbol) -> optional Source_Position
+        is import(#symbol_source_pos)
+      func Str(Symbol) -> Univ_String
+        is import(#symbol_str)
+      func Full_Name(Symbol) -> Univ_String
+        is import(#symbol_full_name)
+    end interface Symbol
+
+    // Raw access to ParaSail's AST
     interface Tree<> is
       type Tree_Kind_Enum is Enum<
         [#annotation, #assign_stmt, #binary,
@@ -276,6 +296,8 @@ interface PSC::Reflection<> is
         is import(#tree_source_pos)
       func Resolved_Type(Tree) -> optional Type_Descriptor
         is import(#tree_resolved_type)
+      func Sem_Info(Tree) -> optional Decl
+        is import(#tree_sem_info)
       func Resolved_Interp(Tree) -> optional Tree
         is import(#tree_resolved_interp)
       func Decl_Of(Tree) -> optional Decl
@@ -328,6 +350,8 @@ interface PSC::Reflection<> is
 
       func Call_Operation(Tree) -> optional Decl
         is import(#tree_call_operation)
+      func Symbol(Tree) -> optional Symbol
+        is import(#tree_symbol)
 
       func Qualifier_Is_Ref(Tree {Kind(Tree) == #qualifier}) -> Boolean
         is import(#tree_qualifier_is_ref)
@@ -597,6 +621,10 @@ interface PSC::Reflection<> is
           {Base(Location(Decl)) == Object_Locator::Const_Area}
           -> optional Streamable_Value
           is import(#global_const_value)
+
+        func Trees_Of_Actuals(Decl {Kind(Decl) == #type})
+          -> Info_Array<Tree, Decl, Indexed_By => Univ_Integer>
+          is (Decl, #trees_of_actuals)
 
         //  Operations needed to be Hashable
         func Hash(Val : Decl) -> Unsigned_64 is import(#identity)
