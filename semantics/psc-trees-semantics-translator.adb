@@ -2953,7 +2953,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Unary.Tree then
+            if Op_Tree in Trees.Unary.Tree'Class then
                declare
                   Un_Tree : constant Trees.Unary.Tree :=
                     Trees.Unary.Tree (Op_Tree);
@@ -3389,7 +3389,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Identifier.Tree then
+            if Op_Tree in Trees.Identifier.Tree'Class then
                declare
                   Ident_Tree : Trees.Identifier.Tree :=
                     Trees.Identifier.Tree (Op_Tree);
@@ -3422,7 +3422,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Case_Construct.Tree then
+            if Op_Tree in Trees.Case_Construct.Tree'Class then
                Case_Is_Expr := Trees.Case_Construct.Tree
                  (Op_Tree).Is_Case_Expr;
             end if;
@@ -3449,7 +3449,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Obj_Decl.Tree then
+            if Op_Tree in Trees.Obj_Decl.Tree'Class then
                Is_Var := Trees.Obj_Decl.Tree
                  (Op_Tree).Is_Var;
             end if;
@@ -3476,7 +3476,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Obj_Decl.Tree then
+            if Op_Tree in Trees.Obj_Decl.Tree'Class then
                Is_Const := Trees.Obj_Decl.Tree
                  (Op_Tree).Is_Const;
             end if;
@@ -3503,7 +3503,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Obj_Decl.Tree then
+            if Op_Tree in Trees.Obj_Decl.Tree'Class then
                Is_Ref := Trees.Obj_Decl.Tree
                  (Op_Tree).Is_Ref;
             end if;
@@ -3530,7 +3530,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Obj_Decl.Tree then
+            if Op_Tree in Trees.Obj_Decl.Tree'Class then
                Is_Optional := Trees.Obj_Decl.Tree
                  (Op_Tree).Is_Optional;
             end if;
@@ -3557,7 +3557,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Obj_Decl.Tree then
+            if Op_Tree in Trees.Obj_Decl.Tree'Class then
                Is_Move := Trees.Obj_Decl.Tree
                  (Op_Tree).Is_Move;
             end if;
@@ -3584,7 +3584,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Obj_Decl.Tree then
+            if Op_Tree in Trees.Obj_Decl.Tree'Class then
                Is_Global := Trees.Obj_Decl.Tree
                  (Op_Tree).Is_Global;
             end if;
@@ -3611,7 +3611,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Qualifier.Tree then
+            if Op_Tree in Trees.Qualifier.Tree'Class then
                Is_Ref := Trees.Qualifier.Tree
                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Ref);
             end if;
@@ -3638,7 +3638,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Qualifier.Tree then
+            if Op_Tree in Trees.Qualifier.Tree'Class then
                Is_Abstract := Trees.Qualifier.Tree
                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Abstract);
             end if;
@@ -3665,7 +3665,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Qualifier.Tree then
+            if Op_Tree in Trees.Qualifier.Tree'Class then
                Is_Optional := Trees.Qualifier.Tree
                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Optional);
             end if;
@@ -3692,7 +3692,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Qualifier.Tree then
+            if Op_Tree in Trees.Qualifier.Tree'Class then
                Is_Not_Null := Trees.Qualifier.Tree
                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Not_Null);
             end if;
@@ -3719,7 +3719,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Qualifier.Tree then
+            if Op_Tree in Trees.Qualifier.Tree'Class then
                Is_Mutable := Trees.Qualifier.Tree
                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Mutable);
             end if;
@@ -3746,7 +3746,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Qualifier.Tree then
+            if Op_Tree in Trees.Qualifier.Tree'Class then
                Is_Concurrent := Trees.Qualifier.Tree
                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Concurrent);
             end if;
@@ -3773,7 +3773,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Qualifier.Tree then
+            if Op_Tree in Trees.Qualifier.Tree'Class then
                Is_Var := Trees.Qualifier.Tree
                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Var);
             end if;
@@ -3800,7 +3800,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Qualifier.Tree then
+            if Op_Tree in Trees.Qualifier.Tree'Class then
                Is_Const := Trees.Qualifier.Tree
                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Const);
             end if;
@@ -3827,7 +3827,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Qualifier.Tree then
+            if Op_Tree in Trees.Qualifier.Tree'Class then
                Is_Polymorphic := Trees.Qualifier.Tree
                  (Op_Tree).Qualifiers (Trees.Qualifier.Is_Polymorphic);
             end if;
@@ -3854,7 +3854,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.Case_Construct.Tree then
+            if Op_Tree in Trees.Case_Construct.Tree'Class then
                Alt_Count := Trees.Lists.Length (Trees.Case_Construct.Tree
                  (Op_Tree).Case_Alt_List);
             end if;
@@ -3881,7 +3881,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.For_Loop_Construct.Tree then
+            if Op_Tree in Trees.For_Loop_Construct.Tree'Class then
                Iter_Count := Trees.Lists.Length (Trees.For_Loop_Construct.Tree
                  (Op_Tree).Iterators);
             end if;
@@ -3908,7 +3908,7 @@ package body PSC.Trees.Semantics.Translator is
          declare
             Op_Tree : Tree'Class renames Tree_Ptr_Of (Op).all;
          begin
-            if Op_Tree in Trees.For_Loop_Construct.Tree then
+            if Op_Tree in Trees.For_Loop_Construct.Tree'Class then
                Iter_Count := Trees.Lists.Length (Trees.For_Loop_Construct.Tree
                  (Op_Tree).Prologue);
             end if;
