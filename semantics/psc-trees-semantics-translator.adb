@@ -428,7 +428,7 @@ package body PSC.Trees.Semantics.Translator is
      (Context : in out Exec_Context;
       Params : Word_Ptr;
       Static_Link : Non_Op_Map_Type_Ptr);
-   pragma Export (Ada, Tree_Assignment_Op, "_psc_tree_assignnent_op");
+   pragma Export (Ada, Tree_Assignment_Op, "_psc_tree_assignment_op");
 
    procedure Tree_Conditional_Kind
      (Context : in out Exec_Context;
