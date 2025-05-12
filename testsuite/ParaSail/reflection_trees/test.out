@@ -1,0 +1,468 @@
+[
+  {
+    "Kind": "#decl",
+    "Id": "Test_Area",
+    "Src": "reflection_test.psl:3:11",
+    "Decl_Kind": "#module",
+    "Items": [
+      {
+        "Kind": "#tree",
+        "Tree_Kind": "#type_decl",
+        "Src": "reflection_test.psl:4:10",
+        "Operands": []
+      },
+      {
+        "Kind": "#decl",
+        "Id": "Test_Area::My_Struct",
+        "Src": "reflection_test.psl:6:15",
+        "Decl_Kind": "#module",
+        "Items": [
+          {
+            "Kind": "#tree",
+            "Tree_Kind": "#obj_decl",
+            "Operands": [
+              {
+                "Kind": "#tree",
+                "Tree_Kind": "#identifier",
+                "Src": "reflection_test.psl:7:19",
+                "Identifier": "Univ_String",
+                "Operands": []
+              },
+              null
+            ]
+          },
+          {
+            "Kind": "#tree",
+            "Tree_Kind": "#obj_decl",
+            "Operands": [
+              {
+                "Kind": "#tree",
+                "Tree_Kind": "#identifier",
+                "Src": "reflection_test.psl:8:19",
+                "Identifier": "Univ_Integer",
+                "Operands": []
+              },
+              null
+            ]
+          }
+        ]
+      },
+      {
+        "Kind": "#decl",
+        "Id": "Test_Area::My_Proc",
+        "Src": "reflection_test.psl:11:5",
+        "Decl_Kind": "#operation",
+        "Params": [
+          {
+            "Kind": "#tree",
+            "Tree_Kind": "#param_decl",
+            "Param_Decl_Kind": "#default_param",
+            "Operands": [
+              {
+                "Kind": "#tree",
+                "Tree_Kind": "#identifier",
+                "Src": "reflection_test.psl:11:22",
+                "Identifier": "Univ_Integer",
+                "Operands": []
+              },
+              null
+            ]
+          },
+          {
+            "Kind": "#tree",
+            "Tree_Kind": "#param_decl",
+            "Param_Decl_Kind": "#default_param",
+            "Operands": [
+              {
+                "Kind": "#tree",
+                "Tree_Kind": "#identifier",
+                "Src": "reflection_test.psl:11:40",
+                "Identifier": "My_Struct",
+                "Operands": []
+              },
+              null
+            ]
+          }
+        ],
+        "Body": [
+          {
+            "Kind": "#tree",
+            "Tree_Kind": "#conditional",
+            "Src": "reflection_test.psl:17:9",
+            "Conditional_Kind": "#if_stmt",
+            "Operands": [
+              {
+                "Kind": "#tree",
+                "Tree_Kind": "#binary",
+                "Src": "reflection_test.psl:17:25",
+                "Binary": "#equal_op",
+                "Operands": [
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#invocation",
+                    "Invocation_Kind": "#operation_call",
+                    "Operands": [
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:17:12",
+                        "Identifier": "To_String",
+                        "Operands": []
+                      },
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:17:22",
+                        "Identifier": "A",
+                        "Operands": []
+                      }
+                    ]
+                  },
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#selection",
+                    "Operands": [
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:17:28",
+                        "Identifier": "B",
+                        "Operands": []
+                      },
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:17:30",
+                        "Identifier": "A",
+                        "Operands": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Kind": "#tree",
+                "Tree_Kind": "#invocation",
+                "Invocation_Kind": "#operation_call",
+                "Operands": [
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#identifier",
+                    "Src": "reflection_test.psl:18:13",
+                    "Identifier": "Println",
+                    "Operands": []
+                  },
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#identifier",
+                    "Src": "reflection_test.psl:18:21",
+                    "Identifier": "\"A == B.A\"",
+                    "Lit_Kind": "#string_literal",
+                    "Operands": []
+                  }
+                ]
+              },
+              {
+                "Kind": "#tree",
+                "Tree_Kind": "#conditional",
+                "Src": "reflection_test.psl:19:9",
+                "Conditional_Kind": "#elsif_stmt",
+                "Operands": [
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#binary",
+                    "Src": "reflection_test.psl:19:17",
+                    "Binary": "#equal_op",
+                    "Operands": [
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:19:15",
+                        "Identifier": "A",
+                        "Operands": []
+                      },
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#selection",
+                        "Operands": [
+                          {
+                            "Kind": "#tree",
+                            "Tree_Kind": "#identifier",
+                            "Src": "reflection_test.psl:19:20",
+                            "Identifier": "B",
+                            "Operands": []
+                          },
+                          {
+                            "Kind": "#tree",
+                            "Tree_Kind": "#identifier",
+                            "Src": "reflection_test.psl:19:22",
+                            "Identifier": "B",
+                            "Operands": []
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#invocation",
+                    "Invocation_Kind": "#operation_call",
+                    "Operands": [
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:20:13",
+                        "Identifier": "Println",
+                        "Operands": []
+                      },
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:20:21",
+                        "Identifier": "\"A == B.B\"",
+                        "Lit_Kind": "#string_literal",
+                        "Operands": []
+                      }
+                    ]
+                  },
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#invocation",
+                    "Src": "reflection_test.psl:22:13",
+                    "Invocation_Kind": "#operation_call",
+                    "Operands": [
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:22:13",
+                        "Identifier": "Println",
+                        "Operands": []
+                      },
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:22:21",
+                        "Identifier": "\"None\"",
+                        "Lit_Kind": "#string_literal",
+                        "Operands": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "Kind": "#decl",
+        "Id": "Test_Area::My_Proc",
+        "Src": "reflection_test.psl:16:5",
+        "Decl_Kind": "#operation",
+        "Params": [
+          {
+            "Kind": "#tree",
+            "Tree_Kind": "#param_decl",
+            "Src": "reflection_test.psl:16:18",
+            "Param_Decl_Kind": "#default_param",
+            "Operands": [
+              {
+                "Kind": "#tree",
+                "Tree_Kind": "#identifier",
+                "Src": "reflection_test.psl:16:22",
+                "Identifier": "Univ_Integer",
+                "Operands": []
+              },
+              null
+            ]
+          },
+          {
+            "Kind": "#tree",
+            "Tree_Kind": "#param_decl",
+            "Src": "reflection_test.psl:16:36",
+            "Param_Decl_Kind": "#default_param",
+            "Operands": [
+              {
+                "Kind": "#tree",
+                "Tree_Kind": "#identifier",
+                "Src": "reflection_test.psl:16:40",
+                "Identifier": "My_Struct",
+                "Operands": []
+              },
+              null
+            ]
+          }
+        ],
+        "Body": [
+          {
+            "Kind": "#tree",
+            "Tree_Kind": "#conditional",
+            "Src": "reflection_test.psl:17:9",
+            "Conditional_Kind": "#if_stmt",
+            "Operands": [
+              {
+                "Kind": "#tree",
+                "Tree_Kind": "#binary",
+                "Src": "reflection_test.psl:17:25",
+                "Binary": "#equal_op",
+                "Operands": [
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#invocation",
+                    "Invocation_Kind": "#operation_call",
+                    "Operands": [
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:17:12",
+                        "Identifier": "To_String",
+                        "Operands": []
+                      },
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:17:22",
+                        "Identifier": "A",
+                        "Operands": []
+                      }
+                    ]
+                  },
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#selection",
+                    "Operands": [
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:17:28",
+                        "Identifier": "B",
+                        "Operands": []
+                      },
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:17:30",
+                        "Identifier": "A",
+                        "Operands": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "Kind": "#tree",
+                "Tree_Kind": "#invocation",
+                "Invocation_Kind": "#operation_call",
+                "Operands": [
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#identifier",
+                    "Src": "reflection_test.psl:18:13",
+                    "Identifier": "Println",
+                    "Operands": []
+                  },
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#identifier",
+                    "Src": "reflection_test.psl:18:21",
+                    "Identifier": "\"A == B.A\"",
+                    "Lit_Kind": "#string_literal",
+                    "Operands": []
+                  }
+                ]
+              },
+              {
+                "Kind": "#tree",
+                "Tree_Kind": "#conditional",
+                "Src": "reflection_test.psl:19:9",
+                "Conditional_Kind": "#elsif_stmt",
+                "Operands": [
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#binary",
+                    "Src": "reflection_test.psl:19:17",
+                    "Binary": "#equal_op",
+                    "Operands": [
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:19:15",
+                        "Identifier": "A",
+                        "Operands": []
+                      },
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#selection",
+                        "Operands": [
+                          {
+                            "Kind": "#tree",
+                            "Tree_Kind": "#identifier",
+                            "Src": "reflection_test.psl:19:20",
+                            "Identifier": "B",
+                            "Operands": []
+                          },
+                          {
+                            "Kind": "#tree",
+                            "Tree_Kind": "#identifier",
+                            "Src": "reflection_test.psl:19:22",
+                            "Identifier": "B",
+                            "Operands": []
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#invocation",
+                    "Invocation_Kind": "#operation_call",
+                    "Operands": [
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:20:13",
+                        "Identifier": "Println",
+                        "Operands": []
+                      },
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:20:21",
+                        "Identifier": "\"A == B.B\"",
+                        "Lit_Kind": "#string_literal",
+                        "Operands": []
+                      }
+                    ]
+                  },
+                  {
+                    "Kind": "#tree",
+                    "Tree_Kind": "#invocation",
+                    "Src": "reflection_test.psl:22:13",
+                    "Invocation_Kind": "#operation_call",
+                    "Operands": [
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:22:13",
+                        "Identifier": "Println",
+                        "Operands": []
+                      },
+                      {
+                        "Kind": "#tree",
+                        "Tree_Kind": "#identifier",
+                        "Src": "reflection_test.psl:22:21",
+                        "Identifier": "\"None\"",
+                        "Lit_Kind": "#string_literal",
+                        "Operands": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
