@@ -201,6 +201,8 @@ fi
 case $LANGUAGE in
    "ParaSail") if ! test -L aaa.psi; then
                   ln -s ../../lib/aaa.psi
+                  ln -s ../../lib/reflection.psi
+                  ln -s ../../lib/reflection.psl
                fi
                ;;
     "Sparkel") if ! test -L aaa.ski; then

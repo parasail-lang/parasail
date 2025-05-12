@@ -6,6 +6,8 @@ find . -name "errors.err" -exec rm -v \{\} \;
 find . -name "*psl.*" -a '!' -name "*.svn-base" -exec rm -v \{\} \;
 
 rm -fv aaa.psi
+rm -fv reflection.psi
+rm -fv reflection.psl
 rm -fv aaa.ski
 rm -rf aaa.jli
 rm -rf aaa.pri
