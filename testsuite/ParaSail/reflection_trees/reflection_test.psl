@@ -1,0 +1,191 @@
+import PSC::Reflection, *;
+
+interface Test_Area<> is
+    type My_Type is new Univ_Integer;
+
+    interface My_Struct<> is
+        const A : Univ_String;
+        const B : Univ_Integer;
+    end interface My_Struct
+
+    func My_Proc(A : Univ_Integer; B : My_Struct);
+end interface Test_Area
+
+class Test_Area is
+exports
+    func My_Proc(A : Univ_Integer; B : My_Struct) is
+        if To_String(A) == B.A then
+            Println("A == B.A");
+        elsif A == B.B then
+            Println("A == B.B");
+        else
+            Println("None");
+        end if
+    end func My_Proc
+end class Test_Area
+
+interface Reflection_Test<> is
+    func Test();
+end interface Reflection_Test
+
+class Reflection_Test is
+    func Full_Name(D : PSC::Reflection::Decl) -> Univ_String is
+        return (Module_Name(D) is null ? "" : Module_Name(D) | "::") | Id(D);
+    end func Full_Name
+
+    func Starts_With(Str : Univ_String; Prefix : Univ_String) -> Boolean is
+        if Str is null then
+            return #false;
+        end if
+        const Prefix_Size := |Prefix|;
+        return Length(Str) >= Prefix_Size and then
+            Str[1..Prefix_Size] == Prefix;
+    end func Starts_With
+
+    func Gen_Tree(T : Reflection::Tree) -> JSON_Value+ is
+        if T is null then
+            return JSON_Null_Value::Create();
+        end if
+
+        var Tree_Obj : JSON_Value+ := JSON_Object_Value::Create();
+        Tree_Obj["Kind"] := "#tree";
+        Tree_Obj["Tree_Kind"] := To_String(Kind(T));
+
+        if Pre_Annotation(T) not null then
+            Tree_Obj["Pre_Annotation"] := Gen_Tree(Pre_Annotation(T));
+        end if
+
+        if Post_Annotation(T) not null then
+            Tree_Obj["Post_Annotation"] := Gen_Tree(Post_Annotation(T));
+        end if
+
+        const Loc := Source_Pos(T);
+        if Loc not null then
+            Tree_Obj["Src"] := To_String(Loc);
+        end if
+
+        case Kind(T) of
+            [#unary] =>
+                Tree_Obj["Unary"] := To_String(Unary_Op(T));
+            [#binary] =>
+                Tree_Obj["Binary"] := To_String(Binary_Op(T));
+            [#assign_stmt] =>
+                Tree_Obj["Assignment"] := To_String(Assignment_Op(T));
+            [#identifier] =>
+                Tree_Obj["Identifier"] := Identifier(T);
+                const Lit_Kind := Lit_Kind(T);
+                if Lit_Kind not null then
+                    Tree_Obj["Lit_Kind"] := To_String(Lit_Kind);
+                end if
+            [#conditional] =>
+                Tree_Obj["Conditional_Kind"] := To_String(Conditional_Kind(T));
+            [#control_stmt] =>
+                Tree_Obj["Control_Stmt_Kind"] := To_String(Control_Stmt_Kind(T));
+                Tree_Obj["Applies_To"] := To_String(Applies_To(T));
+            [#for_loop] =>
+                Tree_Obj["For_Loop_Kind"] := To_String(For_Loop_Kind(T));
+            [#invocation] =>
+                Tree_Obj["Invocation_Kind"] := To_String(Invocation_Kind(T));
+            [#iterator] =>
+                Tree_Obj["Iterator_Kind"] := To_String(Iterator_Kind(T));
+            [#operation] =>
+                Tree_Obj["Operation_Kind"] := To_String(Operation_Kind(T));
+            [#param_decl] =>
+                Tree_Obj["Param_Decl_Kind"] := To_String(Param_Decl_Kind(T));
+        end case
+
+        var Operand_Objs : Vector<JSON_Value+> := [];
+        for I in 1..Num_Operands(T) forward loop
+            const Op := Nth_Operand(T, I);
+            Operand_Objs |= Gen_Tree(Op);
+        end loop
+        Tree_Obj["Operands"] := JSON_Array_Value::Create(Operand_Objs);
+
+        return Tree_Obj;
+    end func Gen_Tree
+
+    func Gen_Module(D : Reflection::Decl {Kind(D) == #module}) -> JSON_Value+ is
+        var Items : Vector<JSON_Value+> := [];
+
+        const DR := Decl_Region(D);
+        if DR not null then
+            for I in 2..Num_Items(DR) forward loop
+                Items |= Gen_Decl(Nth_Item(DR, I));
+            end loop
+        end if
+
+        var Decl_Obj : JSON_Value+ := JSON_Object_Value::Create();
+        Decl_Obj["Kind"] := "#decl";
+        Decl_Obj["Id"] := Full_Name(D);
+        Decl_Obj["Src"] := To_String(Decl_Source_Pos(D));
+        Decl_Obj["Decl_Kind"] := To_String(Kind(D));
+        Decl_Obj["Items"] := JSON_Array_Value::Create(Items);
+        return Decl_Obj;
+    end func Gen_Module
+
+    func Gen_Operation(D : Reflection::Decl {Kind(D) == #operation}) -> JSON_Value+ is
+        var Params : Vector<JSON_Value+> := [];
+        var Body : Vector<JSON_Value+> := [];
+
+        const Op_Tree := Tree_Of(D);
+        for I in 1..Num_Operands(Op_Tree) forward loop
+            const Op := Nth_Operand(Op_Tree, I);
+            Params |= Gen_Tree(Op);
+        end loop
+
+        const BR := Body_Region(D);
+        if BR not null then
+            for I in 1..Num_Trees(BR) forward loop
+                Body |= Gen_Tree(Nth_Tree(BR, I));
+            end loop
+        end if
+
+        var Decl_Obj : JSON_Value+ := JSON_Object_Value::Create();
+        Decl_Obj["Kind"] := "#decl";
+        Decl_Obj["Id"] := Full_Name(D);
+        Decl_Obj["Src"] := To_String(Decl_Source_Pos(D));
+        Decl_Obj["Decl_Kind"] := To_String(Kind(D));
+        Decl_Obj["Params"] := JSON_Array_Value::Create(Params);
+        Decl_Obj["Body"] := JSON_Array_Value::Create(Body);
+        return Decl_Obj;
+    end func Gen_Operation
+
+    func Gen_Decl(D : Reflection::Decl) -> JSON_Value+ is
+        if D is null then
+            return JSON_Null_Value::Create();
+        end if
+
+        case Kind(D) of
+            [#module] =>
+                return Gen_Module(D);
+            [#operation] =>
+                return Gen_Operation(D);
+            [..] =>
+                return Gen_Tree(Tree_Of(D));
+        end case
+    end func Gen_Decl
+
+    func Can_Traverse(D : Reflection::Decl) -> Boolean is
+        const Name := Full_Name(D);
+        return (Name == "Test_Area" or else
+            Starts_With(Name, "Test_Area::"))
+            and then Is_Spec(D);
+    end func Can_Traverse
+exports
+    func Test() is
+        var Env := PSC::Reflection::Environment::Get_Current_Env();
+        var Decls : Vector<JSON_Value+> := [];
+        for I in 1..Num_Library_Items(Env) forward loop
+            const Item := Nth_Library_Item(Env, I);
+            if Can_Traverse(Item) then
+                Decls |= Gen_Decl(Item);
+            end if
+        end loop
+        const Decls_Json := JSON_Array_Value::Create(Decls);
+        Println(To_String(Decls_Json));
+    end func Test
+end class Reflection_Test
+
+func main() is
+    Reflection_Test::Test();
+end func main

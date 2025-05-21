@@ -26,6 +26,8 @@ install/**
 parser/build/bin/**
 testsuite/tmp/**
 testsuite/tmp/ParaSail/aaa.psi
+testsuite/ParaSail/aaa.psi
+testsuite/ParaSail/reflection.ps?
 interpreter/psc-interpreter-locks.ad?
 semantics/psc-link_names.ads
 ada202x_parser/build/bin/**
