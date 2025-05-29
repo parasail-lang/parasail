@@ -137,8 +137,11 @@ private package PSC.Trees.Semantics.Dynamic is
 
    ------------- Converters to run-time representation ------------
 
-   function Literal_Value (Lit : String) return Interpreter.Word_Type;
+   function Literal_Value (Lit : String; Lit_Type : Type_Sem_Ptr)
+     return Interpreter.Word_Type;
    --  Return value used to represent given literal
+   --  If Lit_Type is non-null, use that to distinguish signed vs. unsigned vs.
+   --  univ_integer.
 
    function String_Is_Convertible
      (Lit : String;

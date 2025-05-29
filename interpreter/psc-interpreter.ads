@@ -59,6 +59,141 @@ package PSC.Interpreter is
    Virt_Is_Phys : constant Boolean := True;
    --  Set to True to make virtual addrs = physical addrs
 
+   ---------------------------------------
+   --  PSVM Values:
+   --
+   --  The ParaSail Virtual Machine manipulates values that come in
+   --  three varieties:
+   --  * Small values -- fully contained within a single 64-bit word.
+   --    Examples include:
+   --    * 64-bit (signed and unsigned) Integers,
+   --    * 64-bit IEEE Floats,
+   --    * Unicode characters
+   --    * Infinite precision integers, represented either by their value
+   --      or an index into a big-int table.
+   --    * Enumeration values, represented by an index into a string table.
+   --
+   --    Each "small" type has a special representation for the "null"
+   --    value of the type:
+   --    * Signed integer: -2**63
+   --    * IEEE float: 16#FFFF_FFFF_FFFF_FFFF# (NaN)
+   --    * Unicode characters: -2**63
+   --    * Infinite precision integer: -2**63
+   --    * Enum value: -2**63
+   --    * Unsigned integer: 16#BAD1_FEED_DEAD_BEEF#
+   --      ("X is null" returns #true for this value but it
+   --       is still usable for arithmetic, unlike other types
+   --       where attempting to do arithmetic with a null value
+   --       will fail at runtime).
+   --
+   --  * Large values -- represented by a pointer into a storage region.
+   --    Examples include:
+   --    * Arrays of up to 2**16 words in length
+   --    * Objects of up to 2**16 words in length
+   --
+   --    Each large object has a 64-bit header:
+   --      Size      : Offset_Within_Area := 0; --  up to 64K 64-bit words
+   --      Stg_Rgn   : Stg_Rgn_Index      := 0; --  16 bit unique region index
+   --      Type_Info : Type_Index         := 0; --  16 bit unique type index
+   --      Lock_Obj  : Lock_Obj_Index     := 0; --  15 bit unique lock index
+   --      On_Stack  : Boolean            := False;  --  1 bit on-stack flag
+   --
+   --  * Special large values -- uses a specially formatted 64-bit word
+   --    * "large" null: 16#FE00_0000_0000_0001# + 2*(stg_rgn index)
+   --    * "short" string (0-3 characters):
+   --               16#F900_0000_0000_0001# + 2*(stg_rgn index) +
+   --               (3-Length)*2**56 + (char1 + char2*256 + char3*2**16)*2**32
+   --
+   --    * "indexed" string: 16#FD00_0000_0000_0001# + 2*(stg_rgn index) +
+   --                       (U-string index)*2**32
+   --
+   --  PSVM Instruction format:
+   --
+   --  The ParaSail Virtual Machine uses an instruction
+   --  set that combines a stack machine such as the old Pascal P-Machine,
+   --  with a virtual-register-based machine such as LLVM.
+   --
+   --  The PSVM stack machine:
+   --
+   --  The PSVM stack machine has various data areas
+   --  (all "offsets" within a data area are in units of 64-bit words):
+   --  * Local area and outgoing parameters
+   --    This is where local variables reside, and outgoing parameter lists.
+   --
+   --  * Incoming Parameter area
+   --    This refers to the incoming parameters.
+   --    Offset 0 is used for the return value, if any.
+   --    Offsets 1-N, or 0-N-1, are used for the incoming
+   --    parameters, depending on whether the function does or
+   --    does not have a return value.
+   --
+   --  * Type area
+   --    The type area is where the information associated with the
+   --    current type is stored, where a "type" in the PSVM is an instance
+   --    of a (generic) module.
+   --    The type area includes:
+   --    * The (generic) module parameters, if any;
+   --    * Other type-specific constant values ("nested objects");
+   --      * For languages (like Ada) that have global variables,
+   --        the type-specific variables are stored here as well;
+   --    * A table of the primary operations for the type;
+   --    * The type areas for nested types, if any.
+
+   --  * (Global) Constant area
+   --    The Constant area is where global constants are stored.
+   --    These are constants defined in a module whose value does not
+   --    vary between instances of the modules (i.e. are *not* type-specific).
+
+   --  * Enclosing Local/Parameter/Type areas
+   --    These are used for up-level references to the local/parameter/type
+   --    areas of an enclosing function.
+   --
+   --
+   --  The PSVM virtual-register-based machine (VR machine):
+   --  * As in LLVM, the VR machine uses virtual registers
+   --    with static single assignment, meaning that the value
+   --    of a virtual register is defined forever by its initial value.
+   --    We call these virtual registers "VM Obj-Ids", and they
+   --    are represented by a value of VM_Obj_Id_Type.
+   --  * The only way to create a variable is to allocate space
+   --    for it, with a virtual register pointing to this space,
+   --    and future references using derefences of this register,
+   --    possibly with an offset.
+   --  * There are various different kinds of VM Obj-Ids, analagous to the
+   --    stack areas.
+   --    * Locals and outgoing parameters, created by Assign_VM_Obj_Id;
+   --    * Incoming parameters, created by Param_VM_Obj_Id;
+   --    * Result value, created by Result_VM_Obj_Id;
+   --    * Pointed-to data, created by Indir_VM_Obj_Id
+   --      (or by specifying Is_Var to Assign_VM_Obj_Id).
+   --
+   --
+   --  These two ways of looking at the same piece of data
+   --  are combined into an "Object_Locator":
+   --    Base : Area_Base_Indicator;
+   --    Offset : Offset_Within_Area;
+   --    VM_Obj_Id : VM_Obj_Id_Type;
+   --
+   --  The representation of a VM_Obj_Id_Type is:
+   --    Is_Var : Boolean := False;
+   --       --  Indicates whether object can be updated after initialization
+   --    Level  : Code_Nesting_Level := 0;
+   --       --  Level of (base) of object
+   --    Indir  : VM_Obj_Indir_Count := 0;
+   --       --  Indicate whether getting address, or dereference, or just value
+   --    Num    : VM_Obj_Unique_Num := 0;
+   --       --  VM register for object value (Indir=0) or address (Indir=1)
+   --    case Kind is
+   --       when Param_Kind | Component_Kind =>
+   --          Offset : Offset_Within_Area := 0;
+   --          --  Offset within parameter area or composite object
+   --       when Local_Kind =>
+   --          First_Call_Param_Num : VM_Obj_Unique_Num := 0;
+   --          --  Only used on a call, indicates first VM register for params.
+   --       when others =>
+   --          null;
+   --    end case;
+
    type Opcode_Enum is (
      Skip_Op,
      Call_Op,
@@ -650,7 +785,7 @@ package PSC.Interpreter is
    --  periodically
 
    function Integer_Value (Img : String) return Word_Type;
-   --  Convert image to a value.
+   --  Convert image to a 64-bit integer value.
    --  Allow 0xFF, 0b01, 16#ff#, etc.
    --  Recognize "null" and return Null_Value
 
@@ -658,7 +793,7 @@ package PSC.Interpreter is
    --  Return Val as an image, removing leading blank from Ada 'image.
 
    function Unsigned_Value (Img : String) return Unsigned_Word_Type;
-   --  Convert image to an unsigned value.
+   --  Convert image to a 64-bit unsigned value.
    --  Allow 0xFF, 0b01, 16#ff#, etc.
 
    function Real_Image (Val : Univ_Real) return String;
@@ -1457,6 +1592,9 @@ package PSC.Interpreter is
                               case Op is
                                  when Select_Ancestor_Part_Op =>
                                     Ancestor_Lvalue : Boolean;
+                                 when Unwrap_Polymorphic_Obj_Op =>
+                                    Unwrap_Lvalue : Boolean;
+                                    --  Whether a "value" or a "ref"
                                  when others =>
                                     null;
                               end case;
@@ -2396,9 +2534,9 @@ package PSC.Interpreter is
       Is_Large   : Boolean := False;  --  Known to be large
       Is_Wrapper : Boolean := False;
       Is_Polymorphic : Boolean := False;
-      Null_Value : Word_Type := Null_Virtual_Address;
+      Null_Value : Word_Type := Interpreter.Null_Value;
       --  Null value if Is_Small.
-      --  (If large, must use region-specific null.)
+      --  (If large, should use region-specific null.)
 
       case Has_Op_Map is
          when False =>
@@ -3261,6 +3399,7 @@ package PSC.Interpreter is
       --  Execute the Unwrap_Polymorphic_Obj instruction
       --  by checking if underlying type matches Type_Info,
       --  and return a ref to underlying obj if so, or null ref otherwise.
+      --  Caller should deref the result unless Unwrap_Lvalue is True.
    pragma Export
       (Ada, Unwrapped_Polymorphic_Obj, "_psc_unwrapped_polymorphic_obj");
 

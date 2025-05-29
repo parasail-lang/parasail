@@ -931,6 +931,13 @@ package body PSC.Trees.Semantics.Translator is
    pragma Export (Ada, Instruction_Ancestor_Lvalue,
       "_psc_instruction_Ancestor_Lvalue");
 
+   procedure Instruction_Unwrap_Lvalue
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr);
+   pragma Export (Ada, Instruction_Unwrap_Lvalue,
+      "_psc_instruction_Unwrap_Lvalue");
+
    procedure Instruction_Polymorphic_Ancestor_Lvalue
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -4915,6 +4922,29 @@ package body PSC.Trees.Semantics.Translator is
       end case;
    end Instruction_Ancestor_Lvalue;
 
+   procedure Instruction_Unwrap_Lvalue
+     (Context : in out Exec_Context;
+      Params : Word_Ptr;
+      Static_Link : Non_Op_Map_Type_Ptr) is
+      --  func Unwrap_Lvalue(Instruction) -> Boolean
+      --    is import(#instruction_Unwrap_Lvalue)
+      Instr_Index : constant Word_Type :=
+        Fetch_Word (Params, 1);
+      Instr : Instruction renames Nth_Instruction
+        (Routine_Index (Instr_Index / 2**32),
+         Code_Index (Instr_Index mod 2**32));
+   begin
+      --  Handle Unwrap_Polymorphic_Obj_Op
+      case Instr.Op is
+         when Unwrap_Polymorphic_Obj_Op =>
+            Store_Word
+              (Params, 0,
+               Boolean'Pos (Instr.Unwrap_Lvalue));
+         when others =>
+            raise Program_Error;
+      end case;
+   end Instruction_Unwrap_Lvalue;
+
    procedure Instruction_Polymorphic_Ancestor_Lvalue
      (Context : in out Exec_Context;
       Params : Word_Ptr;
@@ -7374,6 +7404,9 @@ begin  --  PSC.Trees.Semantics.Translator;
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#instruction_Ancestor_Lvalue"),
       Instruction_Ancestor_Lvalue'Access);
+   Interpreter.Builtins.Register_Builtin
+     (Strings.String_Lookup ("#instruction_Unwrap_Lvalue"),
+      Instruction_Unwrap_Lvalue'Access);
    Interpreter.Builtins.Register_Builtin
      (Strings.String_Lookup ("#instruction_Polymorphic_Ancestor_Lvalue"),
       Instruction_Polymorphic_Ancestor_Lvalue'Access);

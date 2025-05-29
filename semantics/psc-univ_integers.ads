@@ -66,7 +66,11 @@ package PSC.Univ_Integers is
 
    function From_Univ_Integer (Val : Univ_Integer)
      return Interpreter.Word_Type;
-   --  Convert Univ_Integer to a Word
+   --  Convert Univ_Integer to a Word, raise exception if too big
+
+   function To_Word_Type (Val : Univ_Integer)
+     return Interpreter.Word_Type;
+   --  Unchecked convert Univ_Integer to a Word; never complain.
 
    function "+" (Right : Univ_Integer) return Interpreter.Word_Type
      renames From_Univ_Integer;
@@ -188,6 +192,10 @@ private
      (Addr : Word_Ptr;
       Offset : Offset_Within_Area;
       Value : Univ_Integer) renames Store_Word;
+
+   function To_Word_Type (Val : Univ_Integer)
+     return Interpreter.Word_Type is (Interpreter.Word_Type (Val));
+   --  Unchecked convert Univ_Integer to a Word; never complain.
 
    pragma Export (Ada, "**", "_psc_univ_exp_op");
 

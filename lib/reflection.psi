@@ -815,6 +815,8 @@ interface PSC::Reflection<> is
           is import(#instruction_Source_Type_Info)
         func Ancestor_Lvalue(Instruction) -> Boolean
           is import(#instruction_Ancestor_Lvalue)
+        func Unwrap_Lvalue(Instruction) -> Boolean
+          is import(#instruction_Unwrap_Lvalue)
         func Polymorphic_Ancestor_Lvalue(Instruction) -> Boolean
           is import(#instruction_Polymorphic_Ancestor_Lvalue)
         func If_Source(Instruction) -> Object_Locator

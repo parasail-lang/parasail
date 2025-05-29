@@ -62,6 +62,7 @@ with PSC.Trees.Semantics.Debug; use PSC.Trees.Semantics.Debug;
 with PSC.Trees.Semantics.Static;
 pragma Elaborate (PSC.Trees.Semantics.Static);
 
+with PSC.Univ_Integers;
 with PSC.Univ_Strings;
 with PSC.Vectors;
 
@@ -70,6 +71,22 @@ pragma Elaborate (PSC.Strings);
 package body PSC.Trees.Semantics.Dynamic is
 
    --  Dynamic Semantics and PSVM Code Generation
+   --
+   --  Broken into Pre-Code-Gen (using a Pre_CG_Visitor)
+   --  and Code-Gen proper (using a Code_Gen_Visitor).
+   --
+   --  Pre-Code-Gen looks for Read/Write and Write/Write conflicts
+   --  in code that might be executed in parallel.
+   --  It also finishes the static semantic analysis of precondition
+   --  and postconditions.
+   --
+   --  Code-Gen actually generates the PSVM instructions.
+   --
+   --  General Strategy for emitting PSVM instructions:
+   --  * In general, the caller specifies, in the Code_Gen_Visitor:
+   --    * the "target" object locator (area, offset, vm-obj-id)
+   --    * if appropriate, the target "object" whose stg_rgn is
+   --      to be used if the result is a "large" object.
 
    Checking_Preconditions : Boolean := True;
    --  Whether we are emitting precondition checks.
@@ -569,20 +586,20 @@ package body PSC.Trees.Semantics.Dynamic is
                return 0;
             elsif Opnd_Sem.all in Computation_Semantic_Info'Class then
                --  Computation, retrieve num-finalizable-temps from there,
-               --  plus include temp potentially needed for conv to poly type.
+               --  plus include temp possibly used for conv to/from poly type.
                declare
                   Comp_Sem : Computation_Semantic_Info renames
                      Computation_Semantic_Info (Opnd_Sem.all);
                begin
                   return Comp_Sem.Num_Finalizable_Temps +
-                      Boolean'Pos (Comp_Sem.Target_Polymorphic_Type /= null);
+                      Boolean'Pos (Comp_Sem.Target_Result_Type /= null);
                end;
             elsif Opnd_Sem.all in Operand_Semantic_Info'Class
               and then
                   Operand_Semantic_Info
-                    (Opnd_Sem.all).Target_Polymorphic_Type /= null
+                    (Opnd_Sem.all).Target_Result_Type /= null
             then
-               --  A conversion to a polymorphic type might require a
+               --  A conversion to/from a polymorphic type might require a
                --  finalizable temp.
                return 1;
             else
@@ -3687,11 +3704,11 @@ package body PSC.Trees.Semantics.Dynamic is
 
       function Result_Type_To_Use (Operand_Sem : Operand_Sem_Ptr)
         return Type_Sem_Ptr is
-      --  Return Operand_Sem.Target_Polymorphic_Type if non-null,
+      --  Return Operand_Sem.Target_Result_Type if non-null,
       --  else return Operand_Sem.Resolved_Type
       begin
-         if Operand_Sem.Target_Polymorphic_Type /= null then
-            return Operand_Sem.Target_Polymorphic_Type;
+         if Operand_Sem.Target_Result_Type /= null then
+            return Operand_Sem.Target_Result_Type;
          else
             return Operand_Sem.Resolved_Type;
          end if;
@@ -3710,7 +3727,7 @@ package body PSC.Trees.Semantics.Dynamic is
          Resolved_Type => Result_Type,
          Resolved_Interp => Null_Optional_Tree,
          Hash_Value => 0,
-         Target_Polymorphic_Type => null,
+         Target_Result_Type => null,
          Entry_Exit_Info => Null_Entry_Exit_Info,
          Entry_Temp_Info => null,
          Prefix_Type_Region => null,
@@ -3993,7 +4010,8 @@ package body PSC.Trees.Semantics.Dynamic is
 
                Value := To_Univ_String_Word (Strings.U_String_Index
                            (Literal_Value
-                              (Sym_Name (Identifier.Tree (Expr_Tree)))),
+                              (Sym_Name (Identifier.Tree (Expr_Tree)),
+                               Operand_Sem.Resolved_Type)),
                            Null_For_Stg_Rgn (Global_Data_Stg_Rgn));
 
             when Integer_Literal |
@@ -4001,7 +4019,8 @@ package body PSC.Trees.Semantics.Dynamic is
               Char_Literal |
               Enum_Literal =>
                --  Get the value of the non-null, non-string literal
-               Value := Literal_Value (Sym_Name (Identifier.Tree (Expr_Tree)));
+               Value := Literal_Value (Sym_Name (Identifier.Tree (Expr_Tree)),
+                                       Operand_Sem.Resolved_Type);
 
             when Not_A_Literal =>
                Sem_Error (Operand_Sem.Definition,
@@ -4040,9 +4059,9 @@ package body PSC.Trees.Semantics.Dynamic is
       end if;
 
       --  Initialize Type_Desc
-      if Operand_Sem.Target_Polymorphic_Type /= null then
+      if Operand_Sem.Target_Result_Type /= null then
          Type_Desc :=
-            Get_Known_Type_Descriptor (Operand_Sem.Target_Polymorphic_Type);
+            Get_Known_Type_Descriptor (Operand_Sem.Target_Result_Type);
       else
          Type_Desc :=
             Get_Known_Type_Descriptor (Operand_Sem.Resolved_Type);
@@ -4211,7 +4230,7 @@ package body PSC.Trees.Semantics.Dynamic is
       --  If T has Sem_Info that has a Resolved_Interp, then
       --  generate code by visiting that instead of T itself.
 
-      --  Also, handle the Target_Polymorphic_Type flag in
+      --  Also, handle the Target_Result_Type flag in
       --  Operand_Semantic_Info, if any, unless the Visitor indicates
       --  Gen_Parallel_Invocations_Only or Is_Lvalue_Context.
 
@@ -4263,7 +4282,8 @@ package body PSC.Trees.Semantics.Dynamic is
             end if;
          end;
       elsif not Visitor.Gen_Parallel_Invocations_Only
-        and then Operand_Sem_Ptr (Tree_Sem).Target_Polymorphic_Type /= null
+        and then Operand_Sem_Ptr (Tree_Sem).Target_Result_Type /= null
+        and then Operand_Sem_Ptr (Tree_Sem).Target_Result_Type.Is_Polymorphic
       then
          --  We have a target polymorphic type, so we need
          --  to wrap the result in a 2-word object with an
@@ -4359,7 +4379,7 @@ package body PSC.Trees.Semantics.Dynamic is
                       Run_Time_Type_Info
                         (Opnd_Sem.Resolved_Type,
                          Referring_Module => Enc_Module,
-                         Formal_Type => Opnd_Sem.Target_Polymorphic_Type,
+                         Formal_Type => Opnd_Sem.Target_Result_Type,
                          Source_Pos => Find_Source_Pos (T),
                          Is_Polymorphic_Type_Id => True)));
             end if;
@@ -4390,6 +4410,65 @@ package body PSC.Trees.Semantics.Dynamic is
                     (Visitor, Target_Offset_For_Initial_Value);
                end if;
             end if;
+         end;
+
+      elsif not Visitor.Gen_Parallel_Invocations_Only
+        and then Operand_Sem_Ptr (Tree_Sem).Target_Result_Type /= null
+        and then
+          not Operand_Sem_Ptr (Tree_Sem).Target_Result_Type.Is_Polymorphic
+      then
+         --  We have a target monomorphic type, so we need
+         --  to unwrap the result and check if its underlying
+         --  type matches the target type, and if not, return null.
+         declare
+            use Interpreter;
+
+            --  Save state of visitor on entry
+            Orig_Target_Offset : constant Offset_Within_Area :=
+              Visitor.Target_Local_Offset;
+            Orig_Lvalue_Context : constant Boolean :=
+              Visitor.Is_Lvalue_Context;
+            Target_Offset_For_Initial_Value : Offset_Within_Area :=
+              Orig_Target_Offset;
+            Opnd_Sem : constant Operand_Sem_Ptr := Operand_Sem_Ptr (Tree_Sem);
+            pragma Assert (Opnd_Sem.Resolved_Type /= null);
+            Enc_Module : constant Module_Sem_Ptr :=
+              Static.Find_Enclosing_Module_Interface (Visitor.Decl_Region);
+            Orig_Target_VM_Info : constant VM_Obj_Id_Type :=
+              Visitor.Target_VM_Info;
+            Poly_Target_VM_Info  : VM_Obj_Id_Type :=
+              Assign_VM_Obj_Id (Visitor);
+         begin
+            Visitor.Is_Lvalue_Context := False;
+            Visitor.Target_VM_Info := Poly_Target_VM_Info;
+
+            --  Compute the polymorphic value using new target VM info
+            --  and existing Target_Object, if any.
+            Visit (T_Copy, Visitor);
+
+            --  Unwrap polymorphic obj, return null if not of expected type
+            Emit
+              (Visitor,
+               (Unwrap_Polymorphic_Obj_Op,
+                Source_Pos => Find_Source_Pos (T_Copy),
+                Destination => (Local_Area, Orig_Target_Offset,
+                                Orig_Target_VM_Info),
+                Dest_Name => Visitor.Dest_Name,
+                Source => (Local_Area, Orig_Target_Offset,
+                           Poly_Target_VM_Info),
+                Might_Be_Null => True,
+                Type_Info => Run_Time_Type_Info
+                  (Opnd_Sem.Target_Result_Type,
+                   Referring_Module => Enc_Module),
+                Source_Type_Info => Run_Time_Type_Info
+                  (Opnd_Sem.Resolved_Type,
+                   Referring_Module => Enc_Module),
+                Unwrap_Lvalue => False));  --  Don't want a ref
+
+            --  Restore state of Visitor
+            Visitor.Is_Lvalue_Context := Orig_Lvalue_Context;
+            Visitor.Target_VM_Info := Orig_Target_VM_Info;
+
          end;
 
       else
@@ -4571,7 +4650,7 @@ package body PSC.Trees.Semantics.Dynamic is
 
             if Const_Sem.all in Sym_Reference_Info'Class
               and then
-               Sym_Ref_Ptr (Const_Sem).Target_Polymorphic_Type = null
+               Sym_Ref_Ptr (Const_Sem).Target_Result_Type = null
             then
                --  These will be handled later
                null;
@@ -4687,11 +4766,12 @@ package body PSC.Trees.Semantics.Dynamic is
          begin
             if Const_Sem.all not in Sym_Reference_Info'Class
               or else
-               Sym_Ref_Ptr (Const_Sem).Target_Polymorphic_Type /= null
+               Sym_Ref_Ptr (Const_Sem).Target_Result_Type /= null
             then
                --  Compute constants that are needed and not yet computed.
                --  This includes cases where the original constant is
-               --  monomorphic, but the new constant is polymorphic.
+               --  monomorphic, but the new constant is polymorphic,
+               --  or vice-versa.
                declare
                   CTK_Info : constant Computable_Const_Info_Ptr :=
                     Nth_Element (Compile_Time_Known_Consts,
@@ -4740,7 +4820,7 @@ package body PSC.Trees.Semantics.Dynamic is
          begin
             if Const_Sem.all in Sym_Reference_Info'Class
               and then
-               Sym_Ref_Ptr (Const_Sem).Target_Polymorphic_Type = null
+               Sym_Ref_Ptr (Const_Sem).Target_Result_Type = null
             then
                --  This is a case where we want a copy of the
                --  original constant as is (i.e. *without* having to first
@@ -8099,13 +8179,14 @@ package body PSC.Trees.Semantics.Dynamic is
       --  or a non-polymorphic object that is about to be wrapped
       --  by a Create_Polymorphic_Obj operation
       begin
-         if Opnd_Sem.Target_Polymorphic_Type /= null
+         if Opnd_Sem.Target_Result_Type /= null
+           and then Opnd_Sem.Target_Result_Type.Is_Polymorphic
            and then not Visitor.Create_Polymorphic_Obj
          then
-            --  Target_Polymorphic_Type is set, but Create_Polymorphic_Obj
+            --  Target_Result_Type is set, but Create_Polymorphic_Obj
             --  is False, so we must be copying a pre-computed
             --  polymorphic object.
-            return Opnd_Sem.Target_Polymorphic_Type;
+            return Opnd_Sem.Target_Result_Type;
          else
             --  The normal case -- just use resolved type of operand.
             return Type_Of_Obj;
@@ -9060,7 +9141,8 @@ package body PSC.Trees.Semantics.Dynamic is
                         Formal_Param.Locking);
 
                   if Visitor.Is_Lvalue_Context
-                    and then Actual_Sem.Target_Polymorphic_Type /= null
+                    and then Actual_Sem.Target_Result_Type /= null
+                    and then Actual_Sem.Target_Result_Type.Is_Polymorphic
                   then
                      --  We can't easily create a polymorphic wrapper for
                      --  a by-ref parameter so give up now.
@@ -11775,7 +11857,8 @@ package body PSC.Trees.Semantics.Dynamic is
 
    end Emit_Container_Agg;
 
-   function Literal_Value (Lit : String) return Interpreter.Word_Type is
+   function Literal_Value (Lit : String; Lit_Type : Type_Sem_Ptr)
+     return Interpreter.Word_Type is
    --  Return value used to represent given literal
    begin
       case Lit (Lit'First) is
@@ -11788,6 +11871,17 @@ package body PSC.Trees.Semantics.Dynamic is
                            (Interpreter.Real_Value (Lit));
                end if;
             end loop;
+
+            if Lit_Type /= null then
+               if Lit_Type.Root_Type = Info.Univ_Integer_Type then
+                  return Univ_Integers.To_Word_Type
+                           (Univ_Integers.Value (Lit));
+               elsif Lit_Type.Root_Type = Info.Unsigned_64_Type then
+                  return Interpreter.From_Unsigned_Word
+                           (Interpreter.Unsigned_Value (Lit));
+               end if;
+            end if;
+
             return Interpreter.Integer_Value (Lit);
 
          when '#' => --  Enumeration literal
@@ -11923,7 +12017,10 @@ package body PSC.Trees.Semantics.Dynamic is
             if Lit (Lit'First) = '"' then
                --  Strip off the '"'s and convert to U_String
                Lit_Str := Strings.To_U_String
-                            (Strings.U_String_Index (Literal_Value (Lit)));
+                            (Strings.U_String_Index
+                               (Literal_Value
+                                  (Lit, Info.Type_Sem_Ptr
+                                          (Param_Type_Desc.Type_Sem))));
             else
                Lit_Str := Strings.String_Lookup (Lit);
             end if;
@@ -11934,7 +12031,8 @@ package body PSC.Trees.Semantics.Dynamic is
          end;
       elsif Param_Type_Desc.Is_Small then
          --  Small representation
-         return Literal_Value (Lit);
+         return Literal_Value (Lit, Info.Type_Sem_Ptr
+                                      (Param_Type_Desc.Type_Sem));
       else
          --  Fall back to returning a "null" value.
          --  TBD: Caller will complain, hopefully
@@ -12299,7 +12397,8 @@ package body PSC.Trees.Semantics.Dynamic is
                    Referring_Module => Enc_Module),
                 Source_Type_Info => Run_Time_Type_Info
                   (Case_Sem.Case_Selector_Type,
-                   Referring_Module => Enc_Module)));
+                   Referring_Module => Enc_Module),
+                Unwrap_Lvalue => True));
 
             --  Check whether result is null.
             Emit
@@ -13762,10 +13861,10 @@ package body PSC.Trees.Semantics.Dynamic is
                   Opnd_Sem.Entry_Temp_Info.Obj_Location.VM_Obj_Id :=
                     Assign_VM_Obj_Id (Visitor, Needs_Var => True);
 
-                  --  Use polymorphic type if will be converted to
-                  --  polymorphic type when expression is evaluated.
-                  if Opnd_Sem.Target_Polymorphic_Type /= null then
-                     Resolved_Type := Opnd_Sem.Target_Polymorphic_Type;
+                  --  Use target result type if will be converted to
+                  --  target type when expression is evaluated.
+                  if Opnd_Sem.Target_Result_Type /= null then
+                     Resolved_Type := Opnd_Sem.Target_Result_Type;
                   end if;
 
                   --  Declare it
@@ -14001,7 +14100,7 @@ package body PSC.Trees.Semantics.Dynamic is
                 Destination => (Local_Area, Visitor.Target_Local_Offset,
                                 Visitor.Target_VM_Info),
                 Dest_Name => Visitor.Dest_Name,
-                Int_Value => Literal_Value (Id)));
+                Int_Value => Literal_Value (Id, Lit_Sem.Resolved_Type)));
          when Real_Literal =>
             --  Store value of literal
             Emit
@@ -14011,7 +14110,8 @@ package body PSC.Trees.Semantics.Dynamic is
                 Destination => (Local_Area, Visitor.Target_Local_Offset,
                                 Visitor.Target_VM_Info),
                 Dest_Name => Visitor.Dest_Name,
-                Real_Value => Interpreter.To_Univ_Real (Literal_Value (Id))));
+                Real_Value => Interpreter.To_Univ_Real
+                  (Literal_Value (Id, Lit_Sem.Resolved_Type))));
          when Char_Literal =>
             --  Store value of literal
             Emit
@@ -14021,7 +14121,7 @@ package body PSC.Trees.Semantics.Dynamic is
                 Destination => (Local_Area, Visitor.Target_Local_Offset,
                                 Visitor.Target_VM_Info),
                 Dest_Name => Visitor.Dest_Name,
-                Char_Value => Literal_Value (Id)));
+                Char_Value => Literal_Value (Id, Lit_Sem.Resolved_Type)));
          when String_Literal =>
             --  Store value of literal
             --  Create the string literal in the region of
@@ -14034,7 +14134,8 @@ package body PSC.Trees.Semantics.Dynamic is
                                 Visitor.Target_VM_Info),
                 Dest_Name => Visitor.Dest_Name,
                 Str_Value =>
-                  Strings.Index (To_U_String (Literal_Value (Id))),
+                  Strings.Index (To_U_String
+                    (Literal_Value (Id, Lit_Sem.Resolved_Type))),
                 Existing_Str_In_Stg_Rgn => Visitor.Target_Object));
          when Enum_Literal =>
             --  Store value of literal
@@ -14046,7 +14147,8 @@ package body PSC.Trees.Semantics.Dynamic is
                                 Visitor.Target_VM_Info),
                 Dest_Name => Visitor.Dest_Name,
                 Enum_Value =>
-                  Strings.Index (To_U_String (Literal_Value (Id)))));
+                  Strings.Index (To_U_String
+                    (Literal_Value (Id, Lit_Sem.Resolved_Type)))));
          when Null_Literal =>
             --  Store a Null_Value
             --  TBD: This is type-specific, should probably be

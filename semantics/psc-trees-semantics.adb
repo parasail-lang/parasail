@@ -81,7 +81,9 @@ package body PSC.Trees.Semantics is
             Strings.To_String
                (Param_Type_Desc.Name));
          if Param_Type_Desc.Is_Small then
-            Value := Dynamic.Literal_Value (Argument);
+            Value := Dynamic.Literal_Value
+                       (Argument, Info.Type_Sem_Ptr
+                                     (Param_Type_Desc.Type_Sem));
             Put_Line
               (" passing in " & Hex_Image (Value));
          else

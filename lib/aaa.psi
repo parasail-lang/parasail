@@ -9426,6 +9426,8 @@ end interface PSL::Core::Unsigned_64
 func PSL::Test::Test_Unsigned_64() is
     type Uns is Unsigned_64<>
 
+    const Null_Unsigned_64 : Uns := 16#BAD1_FEED_DEAD_BEEF#;
+
     Println("Testing unsigned 64")
     Println("0xA - 0xB = 0x" | Hex_Image (Uns::0xA - Uns::0xB))
     Println("0xA + 0xA = " | Uns::0xA + Uns::0xA)
@@ -9440,6 +9442,10 @@ func PSL::Test::Test_Unsigned_64() is
     end loop
     Println("");
     Println("-2**62 * 2 = " | Hex_Image (-Uns::2**62 * 2));
+
+    Println("Null_Unsigned_64 = `(Null_Unsigned_64), 0x" |
+      Hex_Image(Null_Unsigned_64));
+    Println("  N_U_64 is null = `(Null_Unsigned_64 is null)");
 end func PSL::Test::Test_Unsigned_64
 
 interface PSL::Core::Modular<Modulus : Unsigned_64> is

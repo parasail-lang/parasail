@@ -102,8 +102,12 @@ package body PSC.Trees.Semantics.Info is
       end if;
    end Type_Is_Parameterized;
 
-   function Types_Match (Type1, Type2 : Type_Sem_Ptr) return Boolean is
+   function Types_Match
+     (Type1, Type2 : Type_Sem_Ptr; Allow_Ancestor_Poly : Boolean := False)
+     return Boolean is
    --  Return True if Type1 and Type2 are value-equivalent
+   --  If Allow_Ancestor_Poly is True, then allow Type2 to be
+   --  a polymorphic ancestor of Type1.
    begin
       if Type1 = Type2 then
          return True;
@@ -115,6 +119,13 @@ package body PSC.Trees.Semantics.Info is
         and then Type1.Root_Type /= null
       then
          --  Root types match, one must be polymorphic
+         return True;
+      elsif Allow_Ancestor_Poly
+        and then Type2.Is_Polymorphic
+        and then Static.Is_Ancestor
+          (Type2.Associated_Module, Type1.Associated_Module)
+      then
+         --  Allow_Ancestor_Poly and Type2 is polymorphic ancestor of Type1
          return True;
       elsif Type1.External_View /= null
         and then Type2.External_View /= null
@@ -735,6 +746,20 @@ package body PSC.Trees.Semantics.Info is
       end if;
       return null;
    end Resolved_Type;
+
+   function Target_Result_Type (OT : Optional_Tree) return Type_Sem_Ptr is
+      --  Return Target_Result_Type for given optional tree, if determined
+      Tree_Sem : constant Root_Sem_Ptr := Sem_Info (OT);
+      --  NOTE: We do *not* want the Underlying_Sem_Info in this case
+      --        because that would bypass the Target_Result_Type info.
+   begin
+      if Tree_Sem /= null then
+         if Tree_Sem.all in Operand_Semantic_Info'Class then
+            return Operand_Sem_Ptr (Tree_Sem).Target_Result_Type;
+         end if;
+      end if;
+      return null;
+   end Target_Result_Type;
 
    function Resolved_Tree (T : Optional_Tree) return Optional_Tree is
       --  Return Resolved interp if present, else return original tree

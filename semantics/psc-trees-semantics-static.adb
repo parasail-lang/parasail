@@ -5488,10 +5488,10 @@ package body PSC.Trees.Semantics.Static is
 
       elsif Left_Orig_Sem.all in Operand_Semantic_Info'Class
         and then Right_Orig_Sem.all in Operand_Semantic_Info'Class
-        and then Operand_Sem_Ptr (Left_Orig_Sem).Target_Polymorphic_Type /=
-          Operand_Sem_Ptr (Right_Orig_Sem).Target_Polymorphic_Type
+        and then Operand_Sem_Ptr (Left_Orig_Sem).Target_Result_Type /=
+          Operand_Sem_Ptr (Right_Orig_Sem).Target_Result_Type
       then
-         --  Target_Polymorphic_Type info doesn't match on orig sems
+         --  Target_Result_Type info doesn't match on orig sems
          return False;
 
       elsif Left_Sem.all in Literal_Semantic_Info then
@@ -6636,7 +6636,7 @@ package body PSC.Trees.Semantics.Static is
                                  Interps => null, Resolved_Type => null,
                                  Resolved_Interp => Null_Optional_Tree,
                                  Hash_Value => 0,
-                                 Target_Polymorphic_Type => null,
+                                 Target_Result_Type => null,
                                  Entry_Exit_Info => Null_Entry_Exit_Info,
                                  Entry_Temp_Info => null,
                                  Prefix_Type_Region => null,
@@ -7410,7 +7410,9 @@ package body PSC.Trees.Semantics.Static is
       Param_Type : Type_Sem_Ptr; Generic_Param_Map : in out Param_Mapping_Ptr;
       Chosen_Interp : out Optional_Tree; Ambiguity : out Ambiguity_List;
       Associated_Operation : Sym_Ptr := null; Formal_Is_Var : Boolean := False;
-      Stmt_Context : Boolean := False; Diagnose : Boolean := False);
+      Stmt_Context : Boolean := False;
+      Allow_Ancestor_Poly : Boolean := False;
+      Diagnose : Boolean := False);
    --  Walk interp tree of Opnd and find one that
    --  matches given Param_Type.  If Param_Type is null,
    --  then return first Interp.
@@ -7422,6 +7424,8 @@ package body PSC.Trees.Semantics.Static is
    --  Set Ambiguity if multiple interps.
    --  If Formal_Is_Var is true, then prefer var_indexing to indexing.
    --  If Stmt_Context is true, then we are not expecting a result.
+   --  If Allow_Ancesor_Poly is True, then allow an interp that is
+   --  of a polymorphic type that is an ancestor of Param_Type.
    --  If Diagnose is True, then produce messages indicating why
    --  expression does not resolve.
 
@@ -9758,12 +9762,20 @@ package body PSC.Trees.Semantics.Static is
       end if;
    end Compare_Interps;
 
+   procedure Diagnose_Unresolved_Expr
+     (Expr : Optional_Tree; Resolved_Type : Type_Sem_Ptr;
+      Allow_Ancestor_Poly : Boolean := False);
+      --  Try to give more information about expression that does
+      --  not resolve.
+
    procedure Find_Interp_Of_Type
      (Assoc_Type_Region : Type_Region_Ptr; Opnd : Optional_Tree;
       Param_Type : Type_Sem_Ptr; Generic_Param_Map : in out Param_Mapping_Ptr;
       Chosen_Interp : out Optional_Tree; Ambiguity : out Ambiguity_List;
       Associated_Operation : Sym_Ptr := null; Formal_Is_Var : Boolean := False;
-      Stmt_Context : Boolean := False; Diagnose : Boolean := False) is
+      Stmt_Context : Boolean := False;
+      Allow_Ancestor_Poly : Boolean := False;
+      Diagnose : Boolean := False) is
       --  Walk interp tree of Opnd and find one that
       --  matches given Param_Type.  If Param_Type is null,
       --  then return first Interp.
@@ -9774,6 +9786,8 @@ package body PSC.Trees.Semantics.Static is
       --  Set Chosen_Interp to Null_Optional_Tree if no matching interp.
       --  Set Ambiguity if multiple interps.
       --  If Formal_Is_Var is true, then prefer var_indexing to indexing.
+      --  If Allow_Ancesor_Poly is True, then allow an interp that is
+      --  of a polymorphic type that is an ancestor of Param_Type.
       --  If Diagnose is True, then produce messages indicating why
       --  expression does not resolve.
 
@@ -10165,7 +10179,9 @@ package body PSC.Trees.Semantics.Static is
                         Diagnose_One (Opnd_Interp, Param_Type);
                      end if;
                   end if;
-               elsif Types_Match (Param_Type, Opnd_Type) then
+               elsif Types_Match (Param_Type, Opnd_Type,
+                                  Allow_Ancestor_Poly => Allow_Ancestor_Poly)
+               then
                   --  Exact match
                   Something_Matches := True;
                   if Is_Null (Result)
@@ -10438,7 +10454,7 @@ package body PSC.Trees.Semantics.Static is
             Result := Copy_Resolved_Tree (Result);
             pragma Assert (Sem_Info (Result) /= Root_Sem_Ptr (Opnd_Sem));
 
-            Operand_Sem_Ptr (Sem_Info (Result)).Target_Polymorphic_Type :=
+            Operand_Sem_Ptr (Sem_Info (Result)).Target_Result_Type :=
               Param_Type;
 
             if not Opnd_Type.All_Parameters_Known then
@@ -10489,11 +10505,32 @@ package body PSC.Trees.Semantics.Static is
 
             if Debug_Second_Pass then
                Put_Line
-                 (" Find_Interp_Of_Type: Set Target_Polymorphic_Type for " &
+                 (" Find_Interp_Of_Type: Set Target_Result_Type for " &
                   Subtree_Image (Resolved_Tree (Opnd_Interp)) & " to " &
                   Type_Image (Param_Type));
             end if;
 
+         elsif Allow_Ancestor_Poly
+           and then Param_Type /= null
+           and then Opnd_Sem.all in Operand_Semantic_Info'Class
+           and then Opnd_Type.Is_Polymorphic
+           and then not Param_Type.Is_Polymorphic
+         then
+            --  We have a coercion from a polymorphic type to a monomorphic
+            --  type.
+            --  But first, make a copy of operand so we don't destroy it.
+            Result := Copy_Resolved_Tree (Result);
+            pragma Assert (Sem_Info (Result) /= Root_Sem_Ptr (Opnd_Sem));
+
+            Operand_Sem_Ptr (Sem_Info (Result)).Target_Result_Type :=
+              Param_Type;
+
+            if Debug_Second_Pass then
+               Put_Line
+                 (" Find_Interp_Of_Type: Set Target_Result_Type for " &
+                  Subtree_Image (Resolved_Tree (Opnd_Interp)) & " to " &
+                  Type_Image (Param_Type));
+            end if;
          end if;
       end Check_One;
 
@@ -10740,8 +10777,19 @@ package body PSC.Trees.Semantics.Static is
                   when Class_Aggregate =>
                      if Is_Parenthesized_Expression (Opnd_Interp) then
                         --  Skip over the parens
-                        Diagnose_One
-                          (Remove_Parentheses (Opnd_Interp), Param_Type);
+                        declare
+                           Unparen : constant Optional_Tree :=
+                             Remove_Parentheses (Opnd_Interp);
+                        begin
+                           if Is_Null (Opnd_Invoc_Tree.Prefix) then
+                              Diagnose_One (Unparen, Param_Type);
+                           else
+                              Diagnose_Unresolved_Expr
+                                (Expr => Unparen,
+                                 Resolved_Type => Param_Type,
+                                 Allow_Ancestor_Poly => True);
+                           end if;
+                        end;
                      else
                         --  Re-analyze with Diagnose True
                         Create_Class_Agg_Interp
@@ -12438,12 +12486,12 @@ package body PSC.Trees.Semantics.Static is
                            end if;
                         end if;
 
-                        --  Substitute into Target_Polymorphic_Type
+                        --  Substitute into Target_Result_Type
                         Operand_Sem_Ptr (New_Sem_Info)
-                          .Target_Polymorphic_Type :=
+                          .Target_Result_Type :=
                           Substitute_Actuals
                             (Operand_Sem_Ptr (New_Sem_Info)
-                               .Target_Polymorphic_Type,
+                               .Target_Result_Type,
                              Assoc_Type_Region,
                              Instantiation_Info => Instantiation_Info,
                              Extra_Subst => Extra_Subst);
@@ -14054,7 +14102,8 @@ package body PSC.Trees.Semantics.Static is
                                         Locked_Param
                                       and then Is_Unlocked_Concurrent_Operand
                                         (Opnd_Sem)
-                                      and then not Is_Unlocked_Concurrent_Operand
+                                      and then
+                                        not Is_Unlocked_Concurrent_Operand
                                         (Operand_Sem_Ptr (Formal_Sem))
                                     then
                                        --  Found a case where we need to lock
@@ -15201,7 +15250,7 @@ package body PSC.Trees.Semantics.Static is
 
    procedure Diagnose_Unresolved_Expr
      (Expr : Optional_Tree; Resolved_Type : Type_Sem_Ptr;
-      Expr_Opnd_Sem : Operand_Sem_Ptr) is
+      Allow_Ancestor_Poly : Boolean := False) is
       --  Try to give more information about expression that does
       --  not resolve.
 
@@ -15234,13 +15283,17 @@ package body PSC.Trees.Semantics.Static is
    procedure Resolve_Expression
      (Visitor : in out Sem_Second_Pass_Visitor'Class; Expr : Optional_Tree;
       Resolved_Type : in out Type_Sem_Ptr; Call_Ref : Boolean := False;
-      Stmt_Context : Boolean := False) is
+      Stmt_Context : Boolean := False;
+      Allow_Ancestor_Poly : Boolean := False) is
       --  Resolve type of expression
       --  If Resolved_Type is non-null coming in, it determines the type.
       --  In any case, upon return, Resolved_Type contains
       --  the final type after resolution.
       --  If Resolved_Type is null coming in, and Call_Ref is True, then
       --  insert a call on "ref" if result is a ref-object.
+      --  If Allow_Ancestor_Poly is True, then allow Expr to be a polymorphic
+      --  type that *could* be of the Resolved_Type at run time
+      --  (i.e. must be an ancestor of Resolved_Type).
       Expr_Sem : constant Sem_Ptr := Sem_Ptr (Sem_Info (Expr));
       use type Interpretations.Interp_Tree;
 
@@ -15312,7 +15365,8 @@ package body PSC.Trees.Semantics.Static is
                      Find_Interp_Of_Type
                        (null, Expr, Resolved_Type, Generic_Param_Map,
                         Resolved_Interp, Ambiguity,
-                        Stmt_Context => Stmt_Context);
+                        Stmt_Context => Stmt_Context,
+                        Allow_Ancestor_Poly => Allow_Ancestor_Poly);
 
                      --  No "generic" type matches allowed here
                      pragma Assert (Generic_Param_Map = null);
@@ -15325,8 +15379,21 @@ package body PSC.Trees.Semantics.Static is
                         Expr_Opnd_Sem.Resolved_Type :=
                           Info.Resolved_Type (Resolved_Interp);
 
+                        if Expr_Opnd_Sem.Target_Result_Type = null then
+                           Expr_Opnd_Sem.Target_Result_Type :=
+                             Info.Target_Result_Type (Resolved_Interp);
+                        end if;
+
                         if Resolved_Type = null then
-                           Resolved_Type := Expr_Opnd_Sem.Resolved_Type;
+                           --  Return Resolved_Type/Target_Result_Type
+                           --  back to caller in Resolved_Type parameter.
+                           if Expr_Opnd_Sem.Target_Result_Type /= null then
+                              --  Use Target_Result_Type if non-null
+                              Resolved_Type :=
+                                Expr_Opnd_Sem.Target_Result_Type;
+                           else
+                              Resolved_Type := Expr_Opnd_Sem.Resolved_Type;
+                           end if;
                         elsif Expr_Opnd_Sem.Resolved_Type = Optional_Type then
                            --  Fill in resolved type for "null"
                            Expr_Opnd_Sem.Resolved_Type := Resolved_Type;
@@ -15352,8 +15419,7 @@ package body PSC.Trees.Semantics.Static is
                            Put_Line ("  Not resolved");
                         end if;
                         Sem_Error (Expr, "not resolved");
-                        Diagnose_Unresolved_Expr
-                          (Expr, Resolved_Type, Expr_Opnd_Sem);
+                        Diagnose_Unresolved_Expr (Expr, Resolved_Type);
                      end if;
                   end;
                else
@@ -15378,16 +15444,14 @@ package body PSC.Trees.Semantics.Static is
                        (Expr,
                         "use of " & Unresolved_Operation (Expr) &
                         " not resolved");
-                     Diagnose_Unresolved_Expr
-                       (Expr, Resolved_Type, Expr_Opnd_Sem);
+                     Diagnose_Unresolved_Expr (Expr, Resolved_Type);
                   elsif Resolved_Type /= null
                     and then Expr_Opnd_Sem.all not in Call_Semantic_Info
                   then
                      Sem_Error
                        (Expr,
                         "does not resolve to " & Type_Image (Resolved_Type));
-                     Diagnose_Unresolved_Expr
-                       (Expr, Resolved_Type, Expr_Opnd_Sem);
+                     Diagnose_Unresolved_Expr (Expr, Resolved_Type);
                   end if;
                end if;
 
@@ -16152,7 +16216,7 @@ package body PSC.Trees.Semantics.Static is
                 (Root_Semantic_Info with Associated_Symbol => Id_Sym,
                  Nested_Region => null, Context => Context, Interps => null,
                  Resolved_Type => null, Resolved_Interp => Null_Optional_Tree,
-                 Hash_Value => 0, Target_Polymorphic_Type => null,
+                 Hash_Value => 0, Target_Result_Type => null,
                  Entry_Exit_Info => Null_Entry_Exit_Info,
                  Entry_Temp_Info => null,
                  Prefix_Type_Region => Prefix_Type_Region,
@@ -16195,7 +16259,7 @@ package body PSC.Trees.Semantics.Static is
                                      .Cur_Inst_Sem,
                                  Resolved_Interp => Null_Optional_Tree,
                                  Hash_Value => 0,
-                                 Target_Polymorphic_Type => null,
+                                 Target_Result_Type => null,
                                  Entry_Exit_Info => Null_Entry_Exit_Info,
                                  Entry_Temp_Info => null,
                                  Prefix_Type_Region => null,
@@ -16228,7 +16292,7 @@ package body PSC.Trees.Semantics.Static is
                                      (Enclosing_Region_Sym.Sem_Info),
                                  Resolved_Interp => Null_Optional_Tree,
                                  Hash_Value => 0,
-                                 Target_Polymorphic_Type => null,
+                                 Target_Result_Type => null,
                                  Entry_Exit_Info => Null_Entry_Exit_Info,
                                  Entry_Temp_Info => null,
                                  Prefix_Type_Region => null,
@@ -16430,7 +16494,7 @@ package body PSC.Trees.Semantics.Static is
                                    Interps => null, Resolved_Type => null,
                                    Resolved_Interp => Null_Optional_Tree,
                                    Hash_Value => 0,
-                                   Target_Polymorphic_Type => null,
+                                   Target_Result_Type => null,
                                    Entry_Exit_Info => Null_Entry_Exit_Info,
                                    Entry_Temp_Info => null,
                                    Prefix_Type_Region => Prefix_Type_Region,
@@ -16822,13 +16886,16 @@ package body PSC.Trees.Semantics.Static is
                   return False;
 
                when Class_Aggregate =>
-                  declare
-                     Agg_Sem : constant Class_Agg_Sem_Ptr :=
-                       Class_Agg_Sem_Ptr (Sem);
-                  begin
-                     --  TBD: Anything else to check?
-                     return True;
-                  end;
+                  if not Is_Parenthesized_Expression (Operand) then
+                     declare
+                        Agg_Sem : constant Class_Agg_Sem_Ptr :=
+                          Class_Agg_Sem_Ptr (Sem);
+                     begin
+                        --  TBD: Anything else to check?
+                        null;
+                     end;
+                  end if;
+                  return True;
 
                when Container_Aggregate | Map_Set_Aggregate =>
                   --  Need these for declaring enum types
@@ -21422,7 +21489,7 @@ package body PSC.Trees.Semantics.Static is
               (Root_Semantic_Info with Associated_Symbol => New_Type,
                Nested_Region => null, Context => Context, Interps => null,
                Resolved_Type => null, Resolved_Interp => Null_Optional_Tree,
-               Hash_Value => 0, Target_Polymorphic_Type => null,
+               Hash_Value => 0, Target_Result_Type => null,
                Entry_Exit_Info => Null_Entry_Exit_Info,
                Entry_Temp_Info => null, Prefix_Type_Region => null,
                Underlying_Sem_Info => Sem_Ptr (T.Sem_Info)));
@@ -22791,11 +22858,33 @@ package body PSC.Trees.Semantics.Static is
                           Get_Type (Visitor.Decl_Region, T.Prefix);
                      begin
                         if Expr_Type /= null then
-                           Resolve_Expression (Visitor, Expr, Expr_Type);
+                           Resolve_Expression (Visitor, Expr, Expr_Type,
+                                               Allow_Ancestor_Poly => True);
+                        end if;
+                        if Info.Target_Result_Type (Expr) /= null then
+                           --  Create a new sem info
+                           --  that preserves a separate node
+                           --  for the parenthesized expression,
+                           --  with the type specified by the prefix.
+                           declare
+                              New_Sem_Info : constant Operand_Sem_Ptr :=
+                                new Operand_Semantic_Info;
+                           begin
+                              New_Sem_Info.Definition := Optional (T'Access);
+                              New_Sem_Info.Resolved_Type := Expr_Type;
+                              New_Sem_Info.Resolved_Interp :=
+                                New_Sem_Info.Definition;
+                              T.Sem_Info := Root_Sem_Ptr (New_Sem_Info);
+                           end;
+                        else
+                           --  Can share sem info
+                           T.Sem_Info := Sem_Info (Expr);
                         end if;
                      end;
+                  else
+                     --  Can share sem info
+                     T.Sem_Info := Sem_Info (Expr);
                   end if;
-                  T.Sem_Info := Sem_Info (Expr);
                end;
             else
                --  Not just simple parentheses
@@ -23105,7 +23194,7 @@ package body PSC.Trees.Semantics.Static is
                                           Resolved_Interp =>
                                             Null_Optional_Tree,
                                           Hash_Value => 0,
-                                          Target_Polymorphic_Type => null,
+                                          Target_Result_Type => null,
                                           Entry_Exit_Info =>
                                             Null_Entry_Exit_Info,
                                           Entry_Temp_Info => null,

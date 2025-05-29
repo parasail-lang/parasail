@@ -673,8 +673,9 @@ private package PSC.Trees.Semantics.Info is
       --  the type associated with this particular interpretation.
       Resolved_Interp : Optional_Tree := Null_Optional_Tree;
       Hash_Value : Hash_Type := 0;
-      Target_Polymorphic_Type : Type_Sem_Ptr := null;
-      --  If non-null, then this operand is to be "wrapped" to
+      Target_Result_Type : Type_Sem_Ptr := null;
+      --  If non-null, then this operand is to be coerced to be the
+      --  given type, which might mean it needs to be "wrapped" or "unwrapped"
       --  produce the given target type.
       Entry_Exit_Info : Entry_Exit_Info_Type;
          --  Keeps track of nature of pre/postcondition computation
@@ -1072,8 +1073,12 @@ private package PSC.Trees.Semantics.Info is
 
    --------------- Utility operations on Sem info --------------
 
-   function Types_Match (Type1, Type2 : Type_Sem_Ptr) return Boolean;
+   function Types_Match
+     (Type1, Type2 : Type_Sem_Ptr; Allow_Ancestor_Poly : Boolean := False)
+     return Boolean;
    --  Return True if Type1 and Type2 are value-equivalent
+   --  If Allow_Ancestor_Poly is True, then allow Type2 to be
+   --  a polymorphic ancestor of Type1.
 
    function U_Base_Type_Region
      (Obj_Type : Type_Sem_Ptr)
@@ -1110,6 +1115,9 @@ private package PSC.Trees.Semantics.Info is
 
    function Resolved_Type (OT : Optional_Tree) return Type_Sem_Ptr;
    --  Return resolved type for given optional tree, if determined
+
+   function Target_Result_Type (OT : Optional_Tree) return Type_Sem_Ptr;
+      --  Return Target_Result_Type for given optional tree, if determined
 
    function Resolved_Tree (T : Optional_Tree) return Optional_Tree;
    --  Return Resolved interp if present, else return original tree

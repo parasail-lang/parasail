@@ -4650,6 +4650,7 @@ class PSC::Translate is
 
          [#Unwrap_Polymorphic_Obj_Op] =>
             const Dest           := "%_dest"           | UI;
+            const Dest_As_Addr   := "%_dest_as_addr"   | UI;
             const Dest_Ptr       := "%_dest_ptr"       | UI;
             const TDesc          := "%_tdesc" | UI;
             const Source_TDesc   := "%_source_tdesc"   | UI;
@@ -4665,10 +4666,20 @@ class PSC::Translate is
 
             //  Pass to out-of-line function to unwrap object
             const Unwrap := "@_psc_unwrapped_polymorphic_obj";
-            TLO.Declare(Unwrap, "i64 `(Unwrap)(i64*, i64*, i64)");
-            TLO |= "`(Dest) = call i64 `(Unwrap)(i64* " |
+            TLO.Declare(Unwrap, "i64* `(Unwrap)(i64*, i64*, i64)");
+            TLO |= "`(Dest_As_Addr) = call i64* `(Unwrap)(i64* " |
                Source_TDesc | ", i64* `(TDesc), i64 `(Source))";
 
+            if Instr.Unwrap_Lvalue() then
+               //  Result is a "ref"
+               Store_Via_Locator(Instr.Destination(), Dest_Ptr, Dest_As_Addr,
+                 Ptr_Level => 1);
+            else
+               //  Result is to be dereferenced
+               //  Check for null
+               
+               Store_Via_Locator(Instr.Destination(), Dest_Ptr, Dest);
+            end if;
             //  Store result
             Store_Via_Locator(Instr.Destination(), Dest_Ptr, Dest);
 

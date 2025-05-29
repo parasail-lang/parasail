@@ -2249,7 +2249,6 @@ package body PSC.Interpreter is
       --  Convert image to a value.
       --  Allow 0xFF, 0b01, 16#ff#, etc.
       --  Recognize "null" and return Null_Value
-      --  TBD: Handle bases > 16
 
       function Obj_Address_Image (Addr : Object_Address) return String;
       --  Return image of given object-address as a pair
@@ -14055,6 +14054,11 @@ package body PSC.Interpreter is
                                          (", Ancestor_Lvalue => " &
                                           Boolean'Image
                                             (Instr.Ancestor_Lvalue));
+                                    when Unwrap_Polymorphic_Obj_Op =>
+                                       Put
+                                         (", Unwrap_Lvalue => " &
+                                          Boolean'Image
+                                            (Instr.Unwrap_Lvalue));
                                     when others =>
                                        null;
                                  end case;
@@ -14904,18 +14908,18 @@ package body PSC.Interpreter is
             case Img (Img'First + 1) is
                when 'x' | 'X' =>
                   --  Base 16
-                  return Word_Type'Value
+                  return Integer_Value  --  recurse
                            ("16#" & Img (Img'First + 2 .. Img'Last) & '#');
                when 'b' | 'B' =>
                   --  Base 2
-                  return Word_Type'Value
+                  return Integer_Value  --  recurse
                            ("2#" & Img (Img'First + 2 .. Img'Last) & '#');
                when others =>
                   null;
             end case;
          end if;
 
-         return Word_Type'Value (Img);
+         return Univ_Integers.From_Univ_Integer (Univ_Integers.Value (Img));
       exception
          when others =>
             return Null_Value;
@@ -16734,6 +16738,7 @@ package body PSC.Interpreter is
       --  Execute the Unwrap_Polymorphic_Obj instruction
       --  by checking if underlying type matches Type_Info,
       --  and return a ref to underlying obj if so, or null ref otherwise.
+      --  Caller should deref the result unless Unwrap_Lvalue is True.
 
       Source_Type_Desc : constant Non_Op_Map_Type_Ptr :=
          Skip_Over_Op_Map (Source_Type_Info);
@@ -17877,14 +17882,31 @@ package body PSC.Interpreter is
                --  Source : Object_Locator;
                --  Type_Info : Object_Locator;
                --  Source_Type_Info : Object_Locator;
-               Store_Word
-                 (Locator_To_Physical_Address
-                    (Context, Instr.Destination),
-                  0,
-                  Unwrapped_Polymorphic_Obj
-                    (Get_Type_Desc (Context, Instr.Source_Type_Info),
-                     Get_Type_Desc (Context, Instr.Type_Info),
-                     Fetch_Word (Context, Instr.Source)));
+               declare
+                  Result : Word_Type :=
+                    Unwrapped_Polymorphic_Obj
+                      (Get_Type_Desc (Context, Instr.Source_Type_Info),
+                       Get_Type_Desc (Context, Instr.Type_Info),
+                       Fetch_Word (Context, Instr.Source));
+               begin
+                  if not Instr.Unwrap_Lvalue then
+                     --  We want a "value" rather than a "ref"/"lvalue"
+                     if Result = 0 then
+                        --  Really want a "large" null here
+                        --  but this works just as well.
+                        Result := Null_Value;
+                     else
+                        --  Fetch the word at Result
+                        Result := Fetch_Word (Result, 0);
+                     end if;
+                  end if;
+
+                  Store_Word
+                    (Locator_To_Physical_Address
+                       (Context, Instr.Destination),
+                     0,
+                     Result);
+               end;
 
             when If_Op =>
                declare
@@ -22289,8 +22311,8 @@ package body PSC.Interpreter is
       return Unsigned_Word_Type'Value (Img);
    exception
       when others =>
-         --  There is no "null" for unsigned so return something silly
-         return 16#0BAD_FEED_DEAD_BEEF#;
+         --  Return the unsigned "null"
+         return To_Unsigned_Word (Null_Unsigned_64);
    end Unsigned_Value;
 
    ------------------
