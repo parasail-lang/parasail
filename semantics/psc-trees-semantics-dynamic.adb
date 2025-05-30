@@ -4463,7 +4463,7 @@ package body PSC.Trees.Semantics.Dynamic is
                 Source_Type_Info => Run_Time_Type_Info
                   (Opnd_Sem.Resolved_Type,
                    Referring_Module => Enc_Module),
-                Unwrap_Lvalue => False));  --  Don't want a ref
+                Unwrap_Lvalue => Orig_Lvalue_Context));
 
             --  Restore state of Visitor
             Visitor.Is_Lvalue_Context := Orig_Lvalue_Context;
@@ -7032,7 +7032,9 @@ package body PSC.Trees.Semantics.Dynamic is
                   Sym_Name (Def_Module.Associated_Symbol) &
                   " not enclosing referring module " &
                   Sym_Name (Referring_Module.Associated_Symbol),
-                  Source_Pos);
+                  (if Source_Pos.Line /= 0
+                   then Source_Pos
+                   else Find_Source_Pos (Obj_Type.Definition)));
                return (Type_Area, Type_Area_Offset, No_VM_Obj_Id);
             end;
          end if;
@@ -12590,6 +12592,14 @@ package body PSC.Trees.Semantics.Dynamic is
                   Invoc_Sem : constant Root_Sem_Ptr := Sem_Info (Obj);
                   use Invocation;
                begin
+                  if Is_Parenthesized_Expression (Invoc_Tree) then
+                     --  Recurse with operand
+                     Check_Is_Part_Of_Ref
+                       (Lists.Nth_Element (Invoc_Tree.Operands, 1),
+                        Decl_Region, Orig_T => T_Err);
+                     return;
+                  end if;
+                     
                   if Invoc_Tree.Kind /= Operation_Call
                     or else Invoc_Sem.all not in Call_Semantic_Info
                   then

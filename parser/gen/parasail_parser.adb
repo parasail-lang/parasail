@@ -7602,13 +7602,28 @@ yy.value_stack(yy.tos).Tree));
     
 
 when  665 =>
---#line  4467
+--#line  4464
+
+	-- Type of aggregate specified
+	
+yyval := (One_Tree, Invocation.Make(
+	  Kind => Invocation.Class_Aggregate,
+	  Prefix => 
+yy.value_stack(yy.tos-4).Tree,
+	  Operands => 
+yy.value_stack(yy.tos-1).List,
+          Source_Pos => 
+yy.value_stack(yy.tos-2).Source_Pos));
+    
+
+when  666 =>
+--#line  4475
  
 yyval := 
 yy.value_stack(yy.tos); 
 
-when  666 =>
---#line  4468
+when  667 =>
+--#line  4476
 
         declare
            --  Substitute '@' for '#'
@@ -7626,13 +7641,13 @@ yy.value_stack(yy.tos).Source_Pos)));
         end;
     
 
-when  667 =>
---#line  4483
+when  668 =>
+--#line  4491
  
 yyval := (Optional, True); 
 
-when  668 =>
---#line  4484
+when  669 =>
+--#line  4492
 
 	yyerror("Use ""#"" instead of ""'"" to query property in ParaSail",
           At_Token => 
@@ -7641,21 +7656,21 @@ yy.value_stack(yy.tos-1));
 yyval := (Optional, True);
     
 
-when  669 =>
---#line  4489
+when  670 =>
+--#line  4497
  
 yyval := (Optional, False); 
 
-when  670 =>
---#line  4493
+when  671 =>
+--#line  4501
 
 	
 yyval := (One_List, Lists.Make((1 => 
 yy.value_stack(yy.tos).Tree)));
     
 
-when  671 =>
---#line  4496
+when  672 =>
+--#line  4504
 
 	
 yyval := 
@@ -7665,14 +7680,14 @@ yyval.List,
 yy.value_stack(yy.tos).Tree);
     
 
-when  672 =>
---#line  4503
+when  673 =>
+--#line  4511
  
 yyval := 
 yy.value_stack(yy.tos); 
 
-when  673 =>
---#line  4504
+when  674 =>
+--#line  4512
 
 	
 yyval := (One_Tree, Reference.Make(
@@ -7682,216 +7697,216 @@ yy.value_stack(yy.tos-2).Tree,
 yy.value_stack(yy.tos).Tree));
     
 
-when  674 =>
---#line  4511
+when  675 =>
+--#line  4519
  
 yyval := 
 yy.value_stack(yy.tos); 
 
-when  675 =>
---#line  4514
+when  676 =>
+--#line  4522
  
 yyval := (One_Unary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Unary.Plus_Op); 
 
-when  676 =>
---#line  4515
+when  677 =>
+--#line  4523
  
 yyval := (One_Unary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Unary.Minus_Op); 
 
-when  677 =>
---#line  4516
+when  678 =>
+--#line  4524
  
 yyval := (One_Unary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Unary.Abs_Op); 
 
-when  678 =>
---#line  4517
+when  679 =>
+--#line  4525
  
 yyval := (One_Unary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Unary.Not_Op); 
 
-when  679 =>
---#line  4518
+when  680 =>
+--#line  4526
  
 yyval := (One_Unary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Unary.Plus_Op); 
 
-when  680 =>
---#line  4519
+when  681 =>
+--#line  4527
  
 yyval := (One_Unary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Unary.Minus_Op); 
 
-when  681 =>
---#line  4523
+when  682 =>
+--#line  4531
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Minus_Op); 
 
-when  682 =>
---#line  4524
+when  683 =>
+--#line  4532
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Plus_Op); 
 
-when  683 =>
---#line  4525
+when  684 =>
+--#line  4533
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Minus_Op); 
 
-when  684 =>
---#line  4529
+when  685 =>
+--#line  4537
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Times_Op); 
 
-when  685 =>
---#line  4530
+when  686 =>
+--#line  4538
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Divide_Op); 
 
-when  686 =>
---#line  4531
+when  687 =>
+--#line  4539
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Mod_Op); 
 
-when  687 =>
---#line  4532
+when  688 =>
+--#line  4540
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Rem_Op); 
 
-when  688 =>
---#line  4535
+when  689 =>
+--#line  4543
  
 	
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Power_Op); 
     
 
-when  689 =>
---#line  4539
+when  690 =>
+--#line  4547
  
 yyval := 
 yy.value_stack(yy.tos); 
 
-when  690 =>
---#line  4540
+when  691 =>
+--#line  4548
  
 	
 yyval := (One_Assign_Op, 
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Divide_Assign_Op); 
     
 
-when  691 =>
---#line  4546
+when  692 =>
+--#line  4554
 
 	
 yyval := (One_Assign_Op, 
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Assign_Op); 
      
 
-when  692 =>
---#line  4549
+when  693 =>
+--#line  4557
  
 	
 yyval := (One_Assign_Op, 
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Plus_Assign_Op); 
     
 
-when  693 =>
---#line  4552
+when  694 =>
+--#line  4560
  
 	
 yyval := (One_Assign_Op, 
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Minus_Assign_Op); 
     
 
-when  694 =>
---#line  4555
+when  695 =>
+--#line  4563
  
 	
 yyval := (One_Assign_Op, 
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Times_Assign_Op); 
     
 
-when  695 =>
---#line  4558
+when  696 =>
+--#line  4566
  
 	
 yyval := (One_Assign_Op, 
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Power_Assign_Op); 
     
 
-when  696 =>
---#line  4561
+when  697 =>
+--#line  4569
  
 	
 yyval := (One_Assign_Op, 
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Combine_Assign_Op); 
     
 
-when  697 =>
---#line  4564
+when  698 =>
+--#line  4572
  
 	
 yyval := (One_Assign_Op, 
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.And_Assign_Op); 
     
 
-when  698 =>
---#line  4567
+when  699 =>
+--#line  4575
  
 	
 yyval := (One_Assign_Op, 
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Or_Assign_Op); 
     
 
-when  699 =>
---#line  4570
+when  700 =>
+--#line  4578
  
 	
 yyval := (One_Assign_Op, 
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Xor_Assign_Op); 
     
 
-when  700 =>
---#line  4573
+when  701 =>
+--#line  4581
 
 	
 yyval := (One_Assign_Op, 
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Left_Shift_Assign_Op);
     
 
-when  701 =>
---#line  4576
+when  702 =>
+--#line  4584
 
 	
 yyval := (One_Assign_Op, 
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Right_Shift_Assign_Op);
     
 
-when  702 =>
---#line  4581
+when  703 =>
+--#line  4589
  
 	
 yyval := (One_Assign_Op, 
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Assign_Op); 
     
 
-when  703 =>
---#line  4584
+when  704 =>
+--#line  4592
  
 yyval := 
 yy.value_stack(yy.tos); 
 
-when  704 =>
---#line  4587
+when  705 =>
+--#line  4595
 
 	yyerror("Use "":="" rather than ""="" in ParaSail");
 	
@@ -7899,62 +7914,62 @@ yyval := (One_Assign_Op,
 yy.value_stack(yy.tos).Source_Pos, Assign_Stmt.Assign_Op); 
     
 
-when  705 =>
---#line  4594
+when  706 =>
+--#line  4602
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Compare_Op); 
 
-when  706 =>
---#line  4595
+when  707 =>
+--#line  4603
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Equal_Op); 
 
-when  707 =>
---#line  4596
+when  708 =>
+--#line  4604
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.NEQ_Op); 
 
-when  708 =>
---#line  4597
+when  709 =>
+--#line  4605
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Less_Op); 
 
-when  709 =>
---#line  4598
+when  710 =>
+--#line  4606
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.LEQ_Op); 
 
-when  710 =>
---#line  4599
+when  711 =>
+--#line  4607
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Greater_Op); 
 
-when  711 =>
---#line  4600
+when  712 =>
+--#line  4608
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.GEQ_Op); 
 
-when  712 =>
---#line  4601
+when  713 =>
+--#line  4609
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Left_Shift_Op ); 
 
-when  713 =>
---#line  4602
+when  714 =>
+--#line  4610
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos-1).Source_Pos, Binary.Right_Shift_Op); 
 
-when  714 =>
---#line  4603
+when  715 =>
+--#line  4611
  
 	yyerror("Use ""=="" rather than ""="" in ParaSail");
 	
@@ -7962,88 +7977,88 @@ yyval := (One_Binary_Op,
 yy.value_stack(yy.tos).Source_Pos, Binary.Equal_Op);
     
 
-when  715 =>
---#line  4610
+when  716 =>
+--#line  4618
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.And_Op); 
 
-when  716 =>
---#line  4611
+when  717 =>
+--#line  4619
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Or_Op); 
 
-when  717 =>
---#line  4612
+when  718 =>
+--#line  4620
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Xor_Op); 
 
-when  718 =>
---#line  4614
+when  719 =>
+--#line  4622
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos-1).Source_Pos, Binary.And_Then_Op); 
 
-when  719 =>
---#line  4616
+when  720 =>
+--#line  4624
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos-1).Source_Pos, Binary.Or_Else_Op); 
 
-when  720 =>
---#line  4617
+when  721 =>
+--#line  4625
  
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Implies_Op); 
 
-when  721 =>
---#line  4621
+when  722 =>
+--#line  4629
  
 	
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Closed_Interval_Op); 
     
 
-when  722 =>
---#line  4624
+when  723 =>
+--#line  4632
  
 	
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Open_Interval_Op); 
     
 
-when  723 =>
---#line  4627
+when  724 =>
+--#line  4635
  
 	
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Closed_Open_Interval_Op); 
     
 
-when  724 =>
---#line  4630
+when  725 =>
+--#line  4638
  
 	
 yyval := (One_Binary_Op, 
 yy.value_stack(yy.tos).Source_Pos, Binary.Open_Closed_Interval_Op); 
     
 
-when  725 =>
---#line  4636
- 
-yyval := 
-yy.value_stack(yy.tos); 
-
 when  726 =>
---#line  4637
+--#line  4644
  
 yyval := 
 yy.value_stack(yy.tos); 
 
 when  727 =>
---#line  4641
+--#line  4645
+ 
+yyval := 
+yy.value_stack(yy.tos); 
+
+when  728 =>
+--#line  4649
 
 	
 yyval := (One_Tree, Invocation.Make(
@@ -8055,8 +8070,8 @@ yy.value_stack(yy.tos-1).List,
 yy.value_stack(yy.tos-2).Source_Pos));
     
 
-when  728 =>
---#line  4648
+when  729 =>
+--#line  4656
 
 	-- Error recovery
 	yyerror("Use ""!="" rather than ""/="" in ParaSail",
@@ -8076,21 +8091,6 @@ yy.value_stack(yy.tos-1).Tree,
 yy.value_stack(yy.tos-2).Source_Pos))),
           Source_Pos => 
 yy.value_stack(yy.tos-4).Source_Pos));
-     
-
-when  729 =>
---#line  4662
-
-	-- Type of aggregate specified
-	
-yyval := (One_Tree, Invocation.Make(
-	  Kind => Invocation.Class_Aggregate,
-	  Prefix => 
-yy.value_stack(yy.tos-4).Tree,
-	  Operands => 
-yy.value_stack(yy.tos-1).List,
-          Source_Pos => 
-yy.value_stack(yy.tos-2).Source_Pos));
     
 
 when  730 =>

@@ -4461,6 +4461,14 @@ name :
 	  Prefix => $1.Tree,
 	  Selector => $3.Tree));
     }
+  | qualified_name DOUBLE_COLON '(' opt_class_component_list ')' {
+	-- Type of aggregate specified
+	$$ := (One_Tree, Invocation.Make(
+	  Kind => Invocation.Class_Aggregate,
+	  Prefix => $1.Tree,
+	  Operands => $4.List,
+          Source_Pos => $3.Source_Pos));
+    }
   ;
 
 qualified_name_and_property :
@@ -4658,14 +4666,6 @@ class_aggregate :
 	    Right_Operand => $4.Tree,
             Source_Pos => $3.Source_Pos))),
           Source_Pos => $1.Source_Pos));
-     }
-  | qualified_name DOUBLE_COLON '(' opt_class_component_list ')' {
-	-- Type of aggregate specified
-	$$ := (One_Tree, Invocation.Make(
-	  Kind => Invocation.Class_Aggregate,
-	  Prefix => $1.Tree,
-	  Operands => $4.List,
-          Source_Pos => $3.Source_Pos));
     }
   ;
 
