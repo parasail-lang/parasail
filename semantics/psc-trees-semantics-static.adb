@@ -17248,6 +17248,10 @@ package body PSC.Trees.Semantics.Static is
                      " Enclosing_Type is not compile-time known: " &
                      Type_Image (Type_Sem.Enclosing_Type));
                end if;
+               --  No need to do this again presuming enclosing type
+               --  is finished.
+               Type_Sem.All_Parameters_Checked :=
+                 Type_Sem.Enclosing_Type.All_Parameters_Checked;
             else
                --  See whether all module actual parameters are known
                declare
