@@ -12143,10 +12143,21 @@ interface PSL::Containers::Sequenced_Set<Element_Type is Hashable<>> is
     op "index_set"(Sequenced_Set) -> Countable_Range<Integer>
       //  Return set of Ids of all elements in the Sequenced_Set
 
+    func Remove_First(var S : Sequenced_Set) -> optional Element_Type
+        // Remove first element of set (first inserted)
+
+    func Remove_Last(var S : Sequenced_Set) -> optional Element_Type
+        // Remove last element of set (last inserted)
+
+    func Remove_Any(var S : Sequenced_Set) -> optional Element_Type
+        // Remove an arbitrary element of set
+
 end interface PSL::Containers::Sequenced_Set
 
 class PSL::Containers::Sequenced_Set is
     var Items : Indexed_Set<Element_Type, Integer<>> := [];
+    var First : Integer<> := 1;
+    var Last : optional Integer<> := null;
   exports
     op "[]"() -> Sequenced_Set is
         return (Items => [])
@@ -12181,6 +12192,7 @@ class PSL::Containers::Sequenced_Set is
     end op "|"
 
     op "|="(var Left : Sequenced_Set; Right : Element_Type) is
+        {Left.First == 1 and then Left.Last is null}
         const Ignore := Get_Unique_Id (Left.Items, Right);
     end op "|="
 
@@ -12192,6 +12204,7 @@ class PSL::Containers::Sequenced_Set is
 
     op "<|="(var Left : Sequenced_Set; var Right : optional Element_Type) is
         // Move element into set, leaving Right null afterward.
+        {Left.First == 1 and then Left.Last is null}
         Left.Items <|= Right
     end op "<|="
 
@@ -12243,6 +12256,7 @@ class PSL::Containers::Sequenced_Set is
         // Return #less if Left is a proper subset of Right
         // Return #greater if Left is a proper superset of Right
         // Return #unordered otherwise
+        {Left.First == 1 and then Left.Last is null}
         var Overlaps := 0
         var Missing := 0
         for each Elem of Left loop
@@ -12274,19 +12288,39 @@ class PSL::Containers::Sequenced_Set is
 
     func Count(S : Sequenced_Set) -> Result : Univ_Integer is
         // Return count of items in set
-        return Count(S.Items);
+        Result := Count(S.Items);
+        if S.Last not null then
+           Result := S.Last;
+        else
+           Result := Count(S.Items);
+        end if;
+        if S.First not null then
+           Result -= [[S.First - 1]]
+        end if;
     end func Count
 
     func Is_Empty(S : Sequenced_Set) -> Boolean is
-        return Count(S.Items) == 0;
+        return Count(S) == 0;
     end func Is_Empty
 
     func First(S : Sequenced_Set) -> optional Element_Type is
-        return S.Items[1];
+        if Count (S) == 0 then
+            return null;
+        elsif S.First not null then
+           return S.Items[S.First];
+        else
+           return S.Items[1];
+        end if;
     end func First
 
     func Last(S : Sequenced_Set) -> optional Element_Type is
-        return S.Items[Count(S.Items)];
+        if Count (S) == 0 then
+           return null;
+        elsif S.Last not null then
+           return S.Items[S.Last];
+        else
+           return S.Items[Count(S.Items)];
+        end if;
     end func Last
 
     op "indexing"(ref const Sequenced_Set; Id : Integer)
@@ -12300,6 +12334,40 @@ class PSL::Containers::Sequenced_Set is
        return "index_set"(Sequenced_Set.Items);
     end op "index_set";
 
+    func Remove_First(var S : Sequenced_Set)
+      -> Result : optional Element_Type is
+        // Remove first element of set (first inserted)
+        if Is_Empty(S) then
+           return null;
+        else
+           Result := First (S);
+           S.First += 1;
+        end if;
+    end func Remove_First;
+
+    func Remove_Last(var S : Sequenced_Set)
+      -> Result : optional Element_Type is
+        // Remove last element of set (last inserted)
+        if Is_Empty(S) then
+           return null;
+        else
+           Result := Last (S);
+           if S.Last is null then
+              S.Last := Count(S.Items);
+           end if;
+           S.Last -= 1;
+        end if;
+    end func Remove_Last;
+
+    func Remove_Any(var S : Sequenced_Set) -> optional Element_Type is
+        // Remove an arbitrary element of set
+        if Count(S) mod 2 == 0 then
+           return Remove_First(S);
+        else
+           return Remove_Last(S);
+        end if;
+    end func Remove_Any;
+
 end class PSL::Containers::Sequenced_Set
 
 interface PSL::Containers::Sequenced_Map
@@ -12311,15 +12379,21 @@ interface PSL::Containers::Sequenced_Map
 
     op "[]"() -> Sequenced_Map
 
-    op "|="(var Left : Sequenced_Map; Right : Pair)
+    op "+="(var Left : Sequenced_Map; Right : Pair)
         // Add Key=>Value to Map, replacing pre-existing mapping
         // for Key, if any.
 
-    op "|"(Left : Sequenced_Map; Right : Pair) -> Sequenced_Map
+    op "+"(Left : Sequenced_Map; Right : Pair) -> Sequenced_Map
         // Add Key=>Value to Map, replacing pre-existing mapping
         // for Key, if any in result.
 
-    op "+="(var Left : Sequenced_Map; Right : Pair) is "|="
+    op "|="(var Left : Sequenced_Map; Right : Sequenced_Map);
+        // Add each element of Right into Left.
+
+    op "|"(Left, Right : Sequenced_Map) -> Sequenced_Map
+        // Add each element of Right into Left to produce the result.
+
+    -- op "+="(var Left : Sequenced_Map; Right : Pair) is "|="
         // A synonym for adding a key=>value pair
 
     op "in"(Left : Key_Type; Right : Sequenced_Map) -> Boolean
@@ -12357,7 +12431,7 @@ class PSL::Containers::Sequenced_Map is
   exports
     op "[]"() -> Sequenced_Map is ();
 
-    op "|="(var Left : Sequenced_Map; Right : Pair) is
+    op "+="(var Left : Sequenced_Map; Right : Pair) is
         // Add Key=>Value to Map, replacing pre-existing mapping
         // for Key, if any.
         const Id := Get_Unique_Id (Left.Index, Right.Key);
@@ -12367,14 +12441,27 @@ class PSL::Containers::Sequenced_Map is
         else
            Left.Values[Id] := Right.Value;
         end if;
-    end op "|="
+    end op "+="
 
-    op "|"(Left : Sequenced_Map; Right : Pair) -> Result : Sequenced_Map is
+    op "+"(Left : Sequenced_Map; Right : Pair) -> Result : Sequenced_Map is
         // Add Key=>Value to Map, replacing pre-existing mapping
         // for Key, if any in result.
         Result := Left
-        Result |= Right
-    end op "|"
+        Result += Right
+    end op "+"
+
+    op "|="(var Left : Sequenced_Map; Right : Sequenced_Map) is
+        // Add each element of Right into Left.
+        for X in 1 .. Count(Right.Index) forward loop
+           Left |= [Right.Index[X] => Right.Values[X]];
+        end loop;
+    end op "|=";
+
+    op "|"(Left, Right : Sequenced_Map) -> Result : Sequenced_Map is
+        // Add each element of Right into Left to produce the result.
+        Result := Left;
+        Result |= Right;
+    end op "|";
 
     op "in"(Left : Key_Type; Right : Sequenced_Map) -> Boolean is
         // Return True if given key has a mapping in the Map
@@ -12404,7 +12491,7 @@ class PSL::Containers::Sequenced_Map is
 
         if Key not in M then
             //  Insert new item with Value null
-            M |= (Key => Key, Value => null);
+            M += (Key => Key, Value => null);
         end if
 
         //  Return reference to item
