@@ -12393,9 +12393,6 @@ interface PSL::Containers::Sequenced_Map
     op "|"(Left, Right : Sequenced_Map) -> Sequenced_Map
         // Add each element of Right into Left to produce the result.
 
-    -- op "+="(var Left : Sequenced_Map; Right : Pair) is "|="
-        // A synonym for adding a key=>value pair
-
     op "in"(Left : Key_Type; Right : Sequenced_Map) -> Boolean
         // Return True if given key has a mapping in the Map
 
@@ -12453,7 +12450,7 @@ class PSL::Containers::Sequenced_Map is
     op "|="(var Left : Sequenced_Map; Right : Sequenced_Map) is
         // Add each element of Right into Left.
         for X in 1 .. Count(Right.Index) forward loop
-           Left |= [Right.Index[X] => Right.Values[X]];
+           Left += (Key => Right.Index[X], Value => Right.Values[X]);
         end loop;
     end op "|=";
 
@@ -12512,9 +12509,13 @@ end class PSL::Containers::Sequenced_Map
 func PSL::Test::Test_Sequenced_Map() is
     var M : Sequenced_Map<Univ_Integer, Univ_String> := []
     
+    Println("Creating sequenced map Int => Str");
+
     M |= [3 => "three"]
     M |= [1 => "one"]
     M |= [5 => "five"]
+
+    Println("Map now has `(Count(M)) elements");
 
     Println("M = [" |
      (for (each K of Keys(M) forward ; Sep := "" then ", ") =>

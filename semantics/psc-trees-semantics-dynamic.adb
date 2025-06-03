@@ -3069,6 +3069,10 @@ package body PSC.Trees.Semantics.Dynamic is
 
    ------------- Code gen actions ------------
 
+   function Indir_VM_Obj_Id (VM_Info : Interpreter.VM_Obj_Id_Type)
+     return Interpreter.VM_Obj_Id_Type;
+      --  Just add a level of indirection to an existing VM_Obj_Id
+
    type Block_Info is record    --  nested block info
       Code : Interpreter.Code_Ptr := null;
       Invokers : Instr_Loc_Array_Ptr := Empty_Instr_Loc_Array;
@@ -4436,6 +4440,8 @@ package body PSC.Trees.Semantics.Dynamic is
               Static.Find_Enclosing_Module_Interface (Visitor.Decl_Region);
             Orig_Target_VM_Info : constant VM_Obj_Id_Type :=
               Visitor.Target_VM_Info;
+            Unwrap_Target_VM_Info : VM_Obj_Id_Type :=
+              Orig_Target_VM_Info;
             Poly_Target_VM_Info  : VM_Obj_Id_Type :=
               Assign_VM_Obj_Id (Visitor);
          begin
@@ -4446,13 +4452,17 @@ package body PSC.Trees.Semantics.Dynamic is
             --  and existing Target_Object, if any.
             Visit (T_Copy, Visitor);
 
+            if Unwrap_Target_VM_Info.Kind = No_VM_Obj_Kind then
+               Unwrap_Target_VM_Info := Assign_VM_Obj_Id (Visitor);
+            end if;
+        
             --  Unwrap polymorphic obj, return null if not of expected type
             Emit
               (Visitor,
                (Unwrap_Polymorphic_Obj_Op,
                 Source_Pos => Find_Source_Pos (T_Copy),
                 Destination => (Local_Area, Orig_Target_Offset,
-                                Orig_Target_VM_Info),
+                                Unwrap_Target_VM_Info),
                 Dest_Name => Visitor.Dest_Name,
                 Source => (Local_Area, Orig_Target_Offset,
                            Poly_Target_VM_Info),
@@ -4464,6 +4474,15 @@ package body PSC.Trees.Semantics.Dynamic is
                   (Opnd_Sem.Resolved_Type,
                    Referring_Module => Enc_Module),
                 Unwrap_Lvalue => Orig_Lvalue_Context));
+
+            if Orig_Lvalue_Context then
+               --  Initialize Lvalue_Location to indicate
+               --  we already have an address.
+               Visitor.Lvalue_Location :=
+                 (Phys_Base_Register (Orig_Target_Offset),
+                  0,
+                  Indir_VM_Obj_Id (Unwrap_Target_VM_Info));
+            end if;
 
             --  Restore state of Visitor
             Visitor.Is_Lvalue_Context := Orig_Lvalue_Context;
