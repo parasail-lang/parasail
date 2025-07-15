@@ -105,6 +105,7 @@ package body LWT.Generic_Parallel_Work_Lists is
          end if;
       end Add_Work_Item;
 
+      overriding
       procedure LWT_Body (Extended_Data : LWT_Data_Extension) is
          --  Invoke the user-provided Loop_Body on the Item within
          --  the Extended_Data
@@ -115,6 +116,7 @@ package body LWT.Generic_Parallel_Work_Lists is
               Add_Work_Item => Add_Work_Item'Access);
       end LWT_Body;
 
+      overriding
       procedure Reclaim_Storage
         (Extended_Data : access LWT_Data_Extension;
          Server_Index : LWT.Scheduler.LWT_Server_Index) is

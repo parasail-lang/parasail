@@ -118,9 +118,11 @@ package LWT.Scheduler is
          Has_Been_Awaited : Boolean := False;
       end record;
 
+      overriding
       procedure Initialize (Group : in out LWT_Group) is null;
       --  The LWT_Sched_Group is filled in by default initialization
 
+      overriding
       procedure Finalize (Group : in out LWT_Group);
       --  If the group has been awaited, just finish the LWT_Sched_Group.
       --  If not, cancel the group, await the group, and then finish it.

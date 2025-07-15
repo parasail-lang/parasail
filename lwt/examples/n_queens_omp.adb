@@ -68,9 +68,9 @@ procedure N_Queens_OMP is
 
    type Board_Config is record
       Num_Cols_Filled : Row_Col_Count := 0;
-      Placed_Queens : Queen_Config := (others => No_Queen);
-      Sum_Diags_Used : Sum_Config := (others => False);
-      Diff_Diags_Used : Diff_Config := (others => False);
+      Placed_Queens : Queen_Config := [others => No_Queen];
+      Sum_Diags_Used : Sum_Config := [others => False];
+      Diff_Diags_Used : Diff_Config := [others => False];
    end record;
 
    package Inst is new LWT.Generic_Parallel_Work_Lists (Board_Config);

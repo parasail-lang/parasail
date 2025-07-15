@@ -224,7 +224,9 @@ is
                  ((for all K in
                      Index_Type'Succ (Left_Last) ..
                        Index_Type'Pred (Right_First) =>
-                         not (Mid_Val < Arr (K)) and not (Arr (K) < Mid_Val)))
+                         not (Mid_Val < Arr (K))
+                           and then
+                         not (Arr (K) < Mid_Val)))
                then
                   Put_Line ("** assertion failed for middle values");
                end if;

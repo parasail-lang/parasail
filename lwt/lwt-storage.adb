@@ -66,6 +66,7 @@ package body LWT.Storage is
    Free_List : Univ_Data_Ptr := null
      with Thread_Local_Storage;
 
+   overriding
    procedure Allocate
      (Pool : in out LWT_Storage_Pool;
       Storage_Address : out System.Address;
@@ -101,6 +102,7 @@ package body LWT.Storage is
       end if;
    end Allocate;
 
+   overriding
    procedure Deallocate
      (Pool : in out LWT_Storage_Pool;
       Storage_Address : System.Address;
@@ -129,6 +131,7 @@ package body LWT.Storage is
       end if;
    end Deallocate;
 
+   overriding
    function Storage_Size (Pool : LWT_Storage_Pool)
      return System.Storage_Elements.Storage_Count is
    begin

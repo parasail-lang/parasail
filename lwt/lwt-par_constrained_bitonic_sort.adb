@@ -30,7 +30,6 @@
 
 --  This algorithm is a parallel variant of bitonic sort
 
-with System;
 with LWT.Parallelism;
 
 with Ada.Text_IO; use Ada.Text_IO;

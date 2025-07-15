@@ -42,7 +42,7 @@ procedure Simple_Par_Taskloop is
 
    Arr : constant Int_Arr_Access := new Int_Arr (1 .. 1_000_000_000);
 
-   Partial_Sums : array (1 .. Max_Chunks) of Longest_Integer := (others => 0);
+   Partial_Sums : array (1 .. Max_Chunks) of Longest_Integer := [others => 0];
 
    Total : Longest_Integer := 0;
 

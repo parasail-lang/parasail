@@ -411,7 +411,7 @@ package body LWT.Scheduler.Work_Stealing is
          E_Wait_For_Work,
          E_Shut_Down);
 
-      Num_Prot_Ops : array (Prot_Op_Enum) of Natural := (others => 0);
+      Num_Prot_Ops : array (Prot_Op_Enum) of Natural := [others => 0];
 
    end LWT_Management_Data;
 

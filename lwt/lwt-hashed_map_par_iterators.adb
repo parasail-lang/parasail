@@ -42,7 +42,7 @@ package body LWT.Hashed_Map_Par_Iterators is
    type Seq_Iter_Ptr is
      access Maps.Map_Iterator_Interfaces.Forward_Iterator'Class;
 
-   type Map_Par_Iterator 
+   type Map_Par_Iterator
      (Container : not null access constant Maps.Map;
       Seq_Iter : not null Seq_Iter_Ptr) is
         new Ada.Finalization.Limited_Controlled
@@ -51,30 +51,39 @@ package body LWT.Hashed_Map_Par_Iterators is
       Chunks : Chunk_Info_Record_Ptr := null;
    end record;
 
+   overriding
    procedure Finalize (Iterator : in out Map_Par_Iterator);
 
+   overriding
    function First (Object : Map_Par_Iterator) return Cursor;
+   overriding
    function Next (Object : Map_Par_Iterator; Position : Cursor)
      return Cursor;
 
+   overriding
    function Is_Split (Object : Map_Par_Iterator)
      return Boolean;
 
+   overriding
    procedure Split_Into_Chunks (Object     : in out Map_Par_Iterator;
                                 Max_Chunks : Chunk_Index);
 
+   overriding
    function Chunk_Count (Object : Map_Par_Iterator)
       return Chunk_Index;
 
+   overriding
    function First (Object : Map_Par_Iterator;
                    Chunk  : Chunk_Index) return Cursor;
 
+   overriding
    function Next (Object   : Map_Par_Iterator;
                   Position : Cursor;
                   Chunk    : Chunk_Index) return Cursor;
 
    -----
 
+   overriding
    procedure Finalize (Iterator : in out Map_Par_Iterator) is
       procedure Free is new Ada.Unchecked_Deallocation
         (Maps.Map_Iterator_Interfaces.Forward_Iterator'Class, Seq_Iter_Ptr);
@@ -88,23 +97,27 @@ package body LWT.Hashed_Map_Par_Iterators is
       Free (Iterator.Chunks);
    end Finalize;
 
+   overriding
    function First (Object : Map_Par_Iterator) return Cursor is
    begin
       return Object.Seq_Iter.First;
    end First;
 
+   overriding
    function Next (Object : Map_Par_Iterator; Position : Cursor)
      return Cursor is
    begin
-      return Object.Seq_Iter.Next(Position);
+      return Object.Seq_Iter.Next (Position);
    end Next;
 
+   overriding
    function Is_Split (Object : Map_Par_Iterator)
      return Boolean is
    begin
       return Object.Chunks /= null;
    end Is_Split;
 
+   overriding
    procedure Split_Into_Chunks (Object     : in out Map_Par_Iterator;
                                 Max_Chunks : Chunk_Index) is
       --  Use user-requested chunk count unless is > Map length
@@ -117,7 +130,7 @@ package body LWT.Hashed_Map_Par_Iterators is
         Map_Len / Count_Type (Num_Chunks);
       Num_Extra : constant Count_Type :=
         Map_Len - Items_Per_Small_Chunk * Count_Type (Num_Chunks);
-        
+
       --  Compute how many chunks should be of size Items_Per_Small_Chunk
       --  (the others will have one additional item).
       Num_Small_Chunks : constant Chunk_Index'Base :=
@@ -156,6 +169,7 @@ package body LWT.Hashed_Map_Par_Iterators is
       end if;
    end Split_Into_Chunks;
 
+   overriding
    function Chunk_Count (Object : Map_Par_Iterator)
       return Chunk_Index is
    begin
@@ -165,6 +179,7 @@ package body LWT.Hashed_Map_Par_Iterators is
       return Object.Chunks.Num_Chunks;
    end Chunk_Count;
 
+   overriding
    function First (Object : Map_Par_Iterator;
                    Chunk  : Chunk_Index) return Cursor is
    --  Return cursor to first element of chunk
@@ -175,6 +190,7 @@ package body LWT.Hashed_Map_Par_Iterators is
       return Object.Chunks.Data (Chunk).First_Cursor;
    end First;
 
+   overriding
    function Next (Object   : Map_Par_Iterator;
                   Position : Cursor;
                   Chunk    : Chunk_Index) return Cursor is

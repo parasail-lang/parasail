@@ -14,6 +14,7 @@ abstract project Shared is
       for Default_Switches ("ada") use ("-g", "-L/usr/lib/",
         --  "-L/usr/lib/x86_64-linux-gnu/",
         --  "/usr/lib/x86_64-linux-gnu/libreadline.so.8",
+        "-L/usr/local/opt/readline/lib",
         "-lreadline",
         "-L.",
         "-ltermcap",

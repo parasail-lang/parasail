@@ -82,7 +82,9 @@ private
       Team_Info : access LWT.Scheduler.Work_Stealing.Server_Team_Info;
    end record;
 
+   overriding
    procedure Initialize (Obj : in out WS_Parallel);
+   overriding
    procedure Finalize (Obj : in out WS_Parallel);
 
 end LWT.Work_Stealing;

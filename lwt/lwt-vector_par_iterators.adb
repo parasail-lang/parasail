@@ -44,30 +44,39 @@ package body LWT.Vector_Par_Iterators is
       Chunks : Chunk_Info_Record_Ptr := null;
    end record;
 
+   overriding
    procedure Finalize (Iterator : in out Vector_Par_Iterator);
 
+   overriding
    function First (Object : Vector_Par_Iterator) return Cursor;
+   overriding
    function Next (Object : Vector_Par_Iterator; Position : Cursor)
      return Cursor;
 
+   overriding
    function Is_Split (Object : Vector_Par_Iterator)
      return Boolean;
 
+   overriding
    procedure Split_Into_Chunks (Object     : in out Vector_Par_Iterator;
                                 Max_Chunks : Chunk_Index);
 
+   overriding
    function Chunk_Count (Object : Vector_Par_Iterator)
       return Chunk_Index;
 
+   overriding
    function First (Object : Vector_Par_Iterator;
                    Chunk  : Chunk_Index) return Cursor;
 
+   overriding
    function Next (Object   : Vector_Par_Iterator;
                   Position : Cursor;
                   Chunk    : Chunk_Index) return Cursor;
 
    -----
 
+   overriding
    procedure Finalize (Iterator : in out Vector_Par_Iterator) is
       procedure Free is new Ada.Unchecked_Deallocation
         (Chunk_Info_Record, Chunk_Info_Record_Ptr);
@@ -76,6 +85,7 @@ package body LWT.Vector_Par_Iterators is
       Free (Iterator.Chunks);
    end Finalize;
 
+   overriding
    function First (Object : Vector_Par_Iterator) return Cursor is
    begin
       if Object.Vector_Len = 0 then
@@ -86,6 +96,7 @@ package body LWT.Vector_Par_Iterators is
       end if;
    end First;
 
+   overriding
    function Next (Object : Vector_Par_Iterator; Position : Cursor)
      return Cursor is
       Index : constant Index_Type := To_Index (Position);
@@ -98,12 +109,14 @@ package body LWT.Vector_Par_Iterators is
       end if;
    end Next;
 
+   overriding
    function Is_Split (Object : Vector_Par_Iterator)
      return Boolean is
    begin
       return Object.Chunks /= null;
    end Is_Split;
 
+   overriding
    procedure Split_Into_Chunks (Object     : in out Vector_Par_Iterator;
                                 Max_Chunks : Chunk_Index) is
       --  Use user-requested chunk count unless is > vector length
@@ -119,6 +132,7 @@ package body LWT.Vector_Par_Iterators is
       --  Note that it is further initialized by each call on First
    end Split_Into_Chunks;
 
+   overriding
    function Chunk_Count (Object : Vector_Par_Iterator)
       return Chunk_Index is
    begin
@@ -128,6 +142,7 @@ package body LWT.Vector_Par_Iterators is
       return Object.Chunks.Num_Chunks;
    end Chunk_Count;
 
+   overriding
    function First (Object : Vector_Par_Iterator;
                    Chunk  : Chunk_Index) return Cursor is
    --  Return cursor to first element of chunk
@@ -157,6 +172,7 @@ package body LWT.Vector_Par_Iterators is
       end if;
    end First;
 
+   overriding
    function Next (Object   : Vector_Par_Iterator;
                   Position : Cursor;
                   Chunk    : Chunk_Index) return Cursor is

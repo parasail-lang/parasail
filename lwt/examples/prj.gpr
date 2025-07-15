@@ -2,6 +2,26 @@ with "../common.gpr";
 project Prj is
     for Source_Dirs use (".","..");
     for Object_Dir use "obj";
+    for Main use
+     ("cxai017_bitonic.adb",
+      "cxai017_con_par.adb",
+      "cxai017_con_seq.adb",
+      "excep_loop.adb",
+      "excep_seq_loop.adb",
+      "excep_ws_loop.adb",
+      "map_par_loop.adb",
+      "n_queens.adb",
+      "n_queens_omp.adb",
+      "n_queens_proc_iter.adb",
+      "n_queens_proc_iter_b.adb",
+      "n_queens_ws.adb",
+      "simple_par_loop.adb",
+      "simple_par_taskloop.adb",
+      "simple_par_ws_loop.adb",
+      "simple_seq_loop.adb",
+      "test_deque.adb",
+      "test_par_qsort.adb",
+      "vector_par_loop.adb");
     package Linker is
        for Default_Switches ("ada") use ("-Wl,-ld_classic"); 
     end Linker;

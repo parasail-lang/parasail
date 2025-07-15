@@ -22,6 +22,7 @@ with LWT.Scheduler.Work_Stealing;
 package body LWT.Work_Stealing is
    use LWT.Scheduler.Work_Stealing;
 
+   overriding
    procedure Initialize (Obj : in out WS_Parallel) is
       --  Create info about the new server team
       New_Team : constant Server_Team_Ptr := new Server_Team_Info;
@@ -33,6 +34,7 @@ package body LWT.Work_Stealing is
    procedure Free is new Ada.Unchecked_Deallocation
      (Server_Team_Info, Server_Team_Ptr);
 
+   overriding
    procedure Finalize (Obj : in out WS_Parallel) is
       Team : Server_Team_Ptr := Obj.Team_Info;
    begin

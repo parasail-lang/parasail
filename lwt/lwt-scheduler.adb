@@ -95,6 +95,7 @@ package body LWT.Scheduler is
          Group.Sched_Group.Cancel_Group (Success);
       end Cancel_Group;
 
+      overriding
       procedure Finalize (Group : in out LWT_Group) is
       --  If the group has been awaited, just finish the LWT_Sched_Group.
       --  If not, cancel the group, await the group, and then finish it.

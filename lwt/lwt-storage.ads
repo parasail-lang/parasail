@@ -29,18 +29,21 @@ package LWT.Storage is
      with null record;
       --  Free lists are kept as globals
 
+   overriding
    procedure Allocate
      (Pool : in out LWT_Storage_Pool;
       Storage_Address : out System.Address;
       Size_In_Storage_Elements : System.Storage_Elements.Storage_Count;
       Alignment : System.Storage_Elements.Storage_Count);
 
+   overriding
    procedure Deallocate
      (Pool : in out LWT_Storage_Pool;
       Storage_Address : System.Address;
       Size_In_Storage_Elements : System.Storage_Elements.Storage_Count;
       Alignment : System.Storage_Elements.Storage_Count);
 
+   overriding
    function Storage_Size (Pool : LWT_Storage_Pool)
      return System.Storage_Elements.Storage_Count;
 
