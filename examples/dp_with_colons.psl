@@ -113,7 +113,7 @@ class Drinking_Philosophers:
       -> Result : Phil_To_Bottle_Map
         {(for all P1 in Philosopher_Index =>
              for all P2 in Philosopher_Index => 
-                if P1 != P2: Result[P1] * Result[P2] == [])}
+                (if P1 != P2: (Result[P1] and Result[P2]) == []))}
         # Ensure that there are no duplicates in resulting mapping
         {(for all B in Bottle_Index => 
 	     for some P in Philosopher_Index => B in Result[P])}:
@@ -145,7 +145,7 @@ class Drinking_Philosophers:
           {(for all P1 in Philosopher_Index =>
              for all P2 in Philosopher_Index => 
                 P1 != P2 ==>
-                  Initial_Bottles[P1] * Initial_Bottles[P2] == [])}
+                  (Initial_Bottles[P1] and Initial_Bottles[P2]) == [])}
       -> Result : Bottle_To_Phil_Mapping:
         # Invert the mapping from Philospher to Bottles
         Result := Create(1..Num_Bottles, 1)
