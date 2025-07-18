@@ -22,7 +22,4 @@ project Prj is
       "test_deque.adb",
       "test_par_qsort.adb",
       "vector_par_loop.adb");
-    package Linker is
-       for Default_Switches ("ada") use ("-Wl,-ld_classic"); 
-    end Linker;
 end Prj;
