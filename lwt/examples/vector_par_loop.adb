@@ -58,10 +58,13 @@ procedure Vector_Par_Loop is
    --  ** This loop-body procedure should be created automatically **
    procedure Loop_Body
      (Iterator : Vector_Par_Iterator_Interfaces.Parallel_Iterator'Class;
-      Chunk_Index : Positive);
+      Chunk_Index : Positive;
+      PID : Par_Loop_Id);
    procedure Loop_Body
      (Iterator : Vector_Par_Iterator_Interfaces.Parallel_Iterator'Class;
-      Chunk_Index : Positive) is
+      Chunk_Index : Positive;
+      PID : Par_Loop_Id) is
+      pragma Unreferenced (PID);
       Position : Cursor := Iterator.First (Chunk_Index);
    begin
       while Has_Element (Position) loop

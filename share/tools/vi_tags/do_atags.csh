@@ -1,6 +1,6 @@
 #!/bin/csh -f
 rm -f tags
-share/tools/vi_tags/adatags -r semantics/*.ad? interpreter/*.ad? parser/*.ad? ada2020_library/*.ad?
+share/tools/vi_tags/adatags -r semantics/*.ad? interpreter/*.ad? parser/*.ad? ada2020_library/*.ad? lwt/*.ad?
 
 cd semantics
 rm -f tags
@@ -27,5 +27,8 @@ rm -f ../design/tags; ln -s ../semantics/tags ../design/tags
 rm -f ../documentation/tags; ln -s ../semantics/tags ../documentation/tags
 if (-x ../ada2020_library) then
    rm -f ../ada2020_library/tags; ln -s ../semantics/tags ../ada2020_library/tags
+endif
+if (-x ../lwt) then
+   rm -f ../lwt/tags; ln -s ../semantics/tags ../lwt/tags
 endif
 

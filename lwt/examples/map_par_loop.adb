@@ -54,7 +54,8 @@ procedure Map_Par_Loop is
 
    procedure Loop_Body
      (Iterator : Map_Par_Iterator_Interfaces.Parallel_Iterator'Class;
-      Chunk_Index : Positive);
+      Chunk_Index : Positive;
+      PID : Par_Loop_Id);
    --  Given the following Ada 202X syntax:
    --
    --  parallel (Chunk_Index in 1 .. Num_Chunks)
@@ -67,7 +68,9 @@ procedure Map_Par_Loop is
 
    procedure Loop_Body
      (Iterator : Map_Par_Iterator_Interfaces.Parallel_Iterator'Class;
-      Chunk_Index : Positive) is
+      Chunk_Index : Positive;
+      PID : Par_Loop_Id) is
+      pragma Unreferenced (PID);
       Position : Cursor := Iterator.First (Chunk_Index);
    begin
       while Has_Element (Position) loop

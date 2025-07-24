@@ -22,6 +22,8 @@ with Ada.Iterator_Interfaces;
 with LWT.Aspects;
 with System;
 
+private with LWT.Scheduler;
+
 package LWT.Parallelism is
 
    --  This provides "higher level" interfaces that are implemented
@@ -45,6 +47,32 @@ package LWT.Parallelism is
    --  with Parallel_Iterator;  --  it can call Loop_Body in parallel
 
    --  Parallel "for" loop over discrete range
+
+   type Par_Loop_Id is private;
+   --  Identifies the thread group associated with a parallel loop
+
+   function Early_Exit (PID : Par_Loop_Id) return Boolean;
+   --  Call this function to attempt an early exit.
+   --  If it returns True, the calling thread "won" the race to
+   --  perform an early exit.
+   --  If it returns False, the calling thread should quit, as some
+   --  other thread has canceled the thread group.
+
+   procedure Par_Range_Loop_With_Early_Exit
+     (Low, High : Longest_Integer;
+      Num_Chunks : Natural := 0;    --  0 means no chunk specification present
+      Aspects : access LWT.Aspects.Root_Aspect'Class := null;
+                                    --  null means no aspects specified
+      Loop_Body : access procedure
+        (Low, High : Longest_Integer; Chunk_Index : Positive;
+         PID : Par_Loop_Id));
+   --  with Parallel_Iterator;  --  it can call Loop_Body in parallel
+
+   --  Parallel "for" loop over discrete range, where loop might contain
+   --  an "early exit" construct that leaves the loop before it completes,
+   --  such as a goto to a label outside the loop, a return from an enclosing
+   --  function or procedure, or an exit from the loop or an enclosing loop.
+   --  Call on Early_Exit (PID) is used to attempt an early exit.
 
    function Chunk_Index return Positive
       with Convention => Intrinsic;
@@ -102,12 +130,17 @@ package LWT.Parallelism is
                                     --  null means no aspects specified
       Loop_Body : access procedure
         (Iterator : Inst.Parallel_Iterator'Class;
-         Chunk_Index : Positive));
+         Chunk_Index : Positive;
+         PID : Par_Loop_Id));
    --  with Parallel_Iterator;  --  it can call Loop_Body in parallel
 
    --  Parallel "for loop" over a container or generalized iterator
    --  TBD: No need to pass in Num_Chunks or use "in out" mode
    --       if we call Split_Into_Chunks *before* calling this routine
    --       (i.e. Iterator.Is_Split would be true before the call).
+
+private
+
+   type Par_Loop_Id is access constant LWT.Scheduler.Root_Data'Class;
 
 end LWT.Parallelism;

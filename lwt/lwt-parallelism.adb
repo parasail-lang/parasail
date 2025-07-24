@@ -29,13 +29,29 @@ package body LWT.Parallelism is
 
    Debug_Par : constant Boolean := False;
 
-   procedure Par_Range_Loop
+   function Early_Exit (PID : Par_Loop_Id) return Boolean is
+   --  Attempt an early exit from associated thread group
+   --  Return True if this thread won the race and determines final outcome.
+      Success : Boolean := True;
+   begin
+      if PID /= null then
+         PID.Spawning_Group.Cancel_Group (Success);
+         if Debug_Par then
+            Put_Line (" Tried to cancel group due to early exit, " &
+              "Success = " & Success'Image);
+         end if;
+      end if;
+      return Success;
+   end Early_Exit;
+
+   procedure Par_Range_Loop_With_Early_Exit
      (Low, High : Longest_Integer;
       Num_Chunks : Natural := 0;    --  0 means no chunk specification present
       Aspects : access LWT.Aspects.Root_Aspect'Class := null;
                                     --  null means no aspects specified
       Loop_Body : access procedure
-        (Low, High : Longest_Integer; Chunk_Index : Positive))
+        (Low, High : Longest_Integer; Chunk_Index : Positive;
+         PID : Par_Loop_Id))
    is
       Count : constant Longest_Integer := High - Low + 1;
       Num_Chunks_Longest : constant Longest_Integer :=
@@ -81,7 +97,8 @@ package body LWT.Parallelism is
       begin
          Loop_Body (Low => Longest_Integer (Extended_Data.First),
                     High => Longest_Integer (Extended_Data.Last),
-                    Chunk_Index => Extended_Data.Chunk_Index);
+                    Chunk_Index => Extended_Data.Chunk_Index,
+                    PID => Extended_Data'Unchecked_Access);
       exception
          when E : others =>
             --  An exception was raised.  Save it if it is the first
@@ -108,15 +125,20 @@ package body LWT.Parallelism is
             end;
       end LWT_Body;
 
-   begin  --  Par_Range_Loop
-      if Num_Chunks_Longest = 1 then
+   begin  --  Par_Range_Loop_With_Early_Exit
+      if Count <= 0 then
+         null;  --  Nothing to do
+
+      elsif Num_Chunks_Longest = 1 then
          --  Chunk count = 1, so don't spawn anything
          if Debug_Par then
             Put_Line ("Par_Range_Loop, Num_Chunks =" &
               Num_Chunks_Longest'Image);
          end if;
 
-         Loop_Body (Low => Low, High => High, Chunk_Index => 1);
+         --  Execute in line, and indicate Early_Exit is always allowed.
+         Loop_Body (Low => Low, High => High, Chunk_Index => 1,
+                    PID => null);
       else
          --  Spawn LW threads to execute loop, with chunking
          --  determined implicitly.
@@ -136,6 +158,30 @@ package body LWT.Parallelism is
          --  Propagate saved exception, if any
          Ada.Exceptions.Reraise_Occurrence (Canceling_Exception);
       end if;
+   end Par_Range_Loop_With_Early_Exit;
+
+   procedure Par_Range_Loop
+     (Low, High : Longest_Integer;
+      Num_Chunks : Natural := 0;    --  0 means no chunk specification present
+      Aspects : access LWT.Aspects.Root_Aspect'Class := null;
+                                    --  null means no aspects specified
+      Loop_Body : access procedure
+        (Low, High : Longest_Integer; Chunk_Index : Positive))
+   is
+      procedure Loop_Body_With_Early_Exit
+        (Low, High : Longest_Integer; Chunk_Index : Positive;
+         PID : Par_Loop_Id) is
+         pragma Unreferenced (PID);
+      begin
+         --  Pass parameters to Loop_Body omitting PID param.
+         Loop_Body (Low, High, Chunk_Index);
+      end Loop_Body_With_Early_Exit;
+
+   begin  --  Par_Range_Loop
+
+      --  Pass the buck to the version that handles early exit
+      Par_Range_Loop_With_Early_Exit
+        (Low, High, Num_Chunks, Aspects, Loop_Body_With_Early_Exit'Access);
    end Par_Range_Loop;
 
    function Chunk_Index return Positive is
@@ -152,7 +198,8 @@ package body LWT.Parallelism is
                                     --  null means no aspects specified
       Loop_Body : access procedure
         (Iterator : Inst.Parallel_Iterator'Class;
-         Chunk_Index : Positive))
+         Chunk_Index : Positive;
+         PID : Par_Loop_Id))
    is
       pragma Unreferenced (Aspects);  --  ??? looks unexpected
 
@@ -179,8 +226,9 @@ package body LWT.Parallelism is
       procedure LWT_Body (Extended_Data : LWT_Data_Extension);
 
       overriding
-      procedure Reclaim_Storage (Extended_Data : access LWT_Data_Extension;
-                                 Server_Index : LWT_Server_Index);
+      procedure Reclaim_Storage
+        (Extended_Data : access LWT_Data_Extension;
+         Server_Index : LWT_Server_Index);
 
       type LWT_Data_Ptr is access all LWT_Data_Extension
         with Storage_Pool => LWT.Storage.LWT_Storage_Pool_Obj;
@@ -214,7 +262,8 @@ package body LWT.Parallelism is
 
          --  Now do this chunk
          Loop_Body (Iterator => Iterator,
-                    Chunk_Index => This_Chunk);
+                    Chunk_Index => This_Chunk,
+                    PID => Extended_Data'Unchecked_Access);
       exception
          when E : others =>
             --  An exception was raised.  Save it if it is the first
@@ -248,7 +297,7 @@ package body LWT.Parallelism is
 
       if Num_Splits = 1 then
          --  Iterator is not split at all; just do the one and only chunk
-         Loop_Body (Iterator => Iterator, Chunk_Index => 1);
+         Loop_Body (Iterator => Iterator, Chunk_Index => 1, PID => null);
       else
          --  Spawn the chunks
          for I in 1 .. Num_Splits loop
