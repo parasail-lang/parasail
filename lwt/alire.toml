@@ -9,3 +9,8 @@ licenses = "Apache-2.0 WITH LLVM-exception"
 website = "https://github.com/parasail-lang/parasail/tree/main/lwt"
 tags = ["ada2022", "parallel", "openmp"]
 project-files = ["lwt.gpr","examples/prj.gpr"]
+
+[[depends-on]]
+[depends-on."case(os)".windows]
+libgomp = "*"
+
