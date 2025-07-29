@@ -4316,11 +4316,10 @@ package body PSC.Trees.Semantics.Dynamic is
             Poly_Target_Needs_Decl : Boolean := False;
          begin
             if Static.Known_To_Be_Small (Opnd_Sem.Resolved_Type)
-              and then Orig_Target_Object.Base = Local_Area
-              and then Orig_Target_Object.Offset = Orig_Target_Offset
+              or else not Opnd_Sem.Resolved_Type.Known_To_Be_Large
             then
                --  Protect the (large) target object
-               --  because initial value is small.
+               --  because initial value might be small.
 
                Visitor.Target_Local_Offset := Visitor.Target_Local_Offset + 1;
                Target_Offset_For_Initial_Value := Visitor.Target_Local_Offset;
