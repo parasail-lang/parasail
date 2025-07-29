@@ -15,11 +15,15 @@ abstract project Shared_Compiled is
    end Compiler;
 
    package Linker is
-      for Default_Switches ("ada") use (
-        "-O0", "-g", "-L/usr/lib", "-L.", "-ltermcap",
-        --  "-Wl,-ld_classic",  -- for some MacOS versions
-        "-latomic"
-      );
+      for Default_Switches ("ada") use ("-g", "-L/usr/lib/",
+        --  "-L/usr/lib/x86_64-linux-gnu/",
+        --  "/usr/lib/x86_64-linux-gnu/libreadline.so.8",
+        "-L/opt/homebrew/opt/readline/lib",
+        "-L/usr/local/opt/readline/lib",
+        "-lreadline",
+        "-L.",
+        "-ltermcap",
+	"-latomic");
    end Linker;
 
 end Shared_Compiled;

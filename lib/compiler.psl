@@ -4670,6 +4670,7 @@ class PSC::Translate is
             TLO |= "`(Dest_As_Addr) = call i64* `(Unwrap)(i64* " |
                Source_TDesc | ", i64* `(TDesc), i64 `(Source))";
 
+            //  Store result
             if Instr.Unwrap_Lvalue() then
                //  Result is a "ref"
                Store_Via_Locator(Instr.Destination(), Dest_Ptr, Dest_As_Addr,
@@ -4677,11 +4678,9 @@ class PSC::Translate is
             else
                //  Result is to be dereferenced
                //  Check for null
-               
+
                Store_Via_Locator(Instr.Destination(), Dest_Ptr, Dest);
             end if;
-            //  Store result
-            Store_Via_Locator(Instr.Destination(), Dest_Ptr, Dest);
 
          [#Select_Polymorphic_Ancestor_Part_Op |
           #Select_Ancestor_Part_Op] =>
