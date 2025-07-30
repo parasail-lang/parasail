@@ -1041,6 +1041,25 @@ package body PSC.Trees.Semantics.Dynamic is
             Object_Access.Not_Combined);
       end if;
 
+      for I in 1 .. Lists.Length (T.Module_Formals) loop
+         declare
+            Formal_Tree : constant Tree_Ptr :=
+              Tree_Ptr_Of (Lists.Nth_Element (T.Module_Formals, I));
+         begin
+            if Not_Null (Formal_Tree.Post_Annotation) then
+               if Debug_Pre_Cg then
+                  Put_Line
+                    ("  Pre codegen for annotation for param " &
+                     Subtree_Image (Formal_Tree.all) & ':');
+               end if;
+
+               Pre_Cg
+                 (Formal_Tree.Post_Annotation, Read_Write,
+                  Object_Access.Not_Combined);
+            end if;
+         end;
+      end loop;
+
       if Debug_Pre_Cg then
          Put_Line ("End of pre codegen for module " & Sym_Name (New_Mod));
       end if;
@@ -6185,6 +6204,34 @@ package body PSC.Trees.Semantics.Dynamic is
                         Value => Result_Value,
                         Addr => Result_Addr,
                         Type_Desc => Result_Type_Desc);
+
+                     if Not_Null(Tree_Of(Formal_Tree).Post_Annotation) then
+                        declare
+                           Param_Annotation : constant Optional_Tree :=
+                             Tree_Of(Formal_Tree).Post_Annotation;
+                           Result : Word_Type;
+                           Addr_Of_Result : Object_Virtual_Address;
+                           Type_Of_Result : Type_Descriptor_Ptr;
+
+                        begin
+                           Put_Line("resolved : " & Subtree_Image (Resolved_Tree (Param_Annotation)));
+                           Evaluate_Tree
+                             (Resolved_Tree (Param_Annotation),
+                              Obj_Type.Generic_Param_Region,
+                              Enclosing_Type => Type_Desc.Parent_Type,
+                              Value => Result,
+                              Addr => Addr_Of_Result,
+                              Type_Desc => Type_Of_Result);
+                           Put_Line ("Back from Evaluate_Tree, Result =" & Result'Image);
+                           if Result = 0 then
+                              Sem_Error
+                                (Subtree_Image (Param_Annotation) &
+                                 " failed",
+                                 Src_Pos => Source_Pos(Param_Annotation));
+                              exit;
+                           end if;
+                        end;
+                     end if;
 
                      --  Fill in info
                      Type_Desc.Parameters (I) :=
