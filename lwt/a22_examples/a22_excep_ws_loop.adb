@@ -16,16 +16,15 @@
 -- documentation/COPYING3 and documentation/GCC_RUNTIME3_1 for details.     --
 ------------------------------------------------------------------------------
 
---  Example using Prototype LWT.Parallelism package for Ada 202X
+--  Example using Ada 2022
+pragma Ada_2022;
 --  Testing exceptions and Task_Id
 
-with LWT.Parallelism; use LWT.Parallelism;
-with LWT.Scheduler;
 with LWT.Work_Stealing; use LWT.Work_Stealing;
 with Ada.Task_Identification; use Ada.Task_Identification;
 with Ada.Exceptions;
 with Ada.Text_IO; use Ada.Text_IO;
-procedure Excep_WS_Loop is
+procedure A22_Excep_WS_Loop is
    pragma Warnings (Off);
    Num_Chunks : constant := 10;
 
@@ -36,46 +35,13 @@ procedure Excep_WS_Loop is
 
    Arr : access Int_Arr := new Int_Arr (1 .. 100_000_000);
 
-   Partial_Sums : array (1 .. Num_Chunks) of Longest_Integer := (others => 0);
+   Partial_Sums : array (1 .. Num_Chunks) of Long_Integer := (others => 0);
 
    Task_Identities : array (1 .. Num_Chunks) of Task_Id;
 
    Early_Death : exception;
 
-   Total : Longest_Integer := 0;
-
-   --  Given the following Ada 202X syntax:
-   --
-   --  parallel (Chunk_Index in 1 .. Num_Chunks)
-   --                      --  or "pragma Par_Loop (Num_Chunks);"
-   --  for I in Arr'Range loop
-   --     Partial_Sums (Chunk_Index) := Partial_Sums (Chunk_Index) + Arr (I);
-   --  end loop;
-   --
-   --  ** This loop-body procedure should be created automatically **
-   procedure Loop_Body
-     (Low, High : Longest_Integer; Chunk_Index : Positive);
-   procedure Loop_Body
-     (Low, High : Longest_Integer; Chunk_Index : Positive) is
-   begin
-      if Task_Identities (Chunk_Index) = Null_Task_Id then
-         Put_Line (" Loop_Body doing chunk" & Chunk_Index'Image);
-      end if;
-      --  Record the task identity
-      Task_Identities (Chunk_Index) := LWT.Scheduler.Ada_Task_Identity;
-
-      if Chunk_Index = 2 or else Chunk_Index = Num_Chunks - 1 then
-         --  Test raising an exception
-         Put_Line (" About to raise Early_Death exception.");
-         raise Early_Death with "Exception during parallel iteration";
-         --  Put_Line (" [not really!]");
-      end if;
-
-      for I in Positive (Low) .. Positive (High) loop
-         Partial_Sums (Chunk_Index) := Partial_Sums (Chunk_Index) +
-           Integer'Pos (Arr (I));
-      end loop;
-   end Loop_Body;
+   Total : Long_Integer := 0;
 
    Task_Id_Mismatch : Boolean := False;
 
@@ -97,11 +63,25 @@ begin
 
    begin
       --  Now sum the array in parallel
-      --  ** Here is where the user's parallel for loop would have appeared **
-      Par_Range_Loop (Low => Longest_Integer (Arr'First),
-                      High => Longest_Integer (Arr'Last),
-                      Num_Chunks => Partial_Sums'Length,
-                      Loop_Body => Loop_Body'Access);
+
+      parallel (Chunk in Partial_Sums'Range)
+      for I in Arr'Range loop
+         if Task_Identities (Chunk) = Null_Task_Id then
+            Put_Line (" Loop_Body doing chunk" & Chunk'Image);
+         end if;
+
+         --  Record the task identity
+         Task_Identities (Chunk) := Current_Task;
+
+         if Chunk = 2 or else Chunk = Num_Chunks - 1 then
+            --  Test raising an exception
+            Put_Line (" About to raise Early_Death exception.");
+            raise Early_Death with "Exception during parallel iteration";
+            --  Put_Line (" [not really!]");
+         end if;
+
+         Partial_Sums (Chunk) := Partial_Sums (Chunk) + Integer'Pos (Arr (I));
+      end loop;
    exception
       when E : others =>
          Put_Line ("Exception Information: " &
@@ -138,4 +118,4 @@ begin
    Put_Line ("Final total = " & Total'Image);
 
    pragma Warnings (On);
-end Excep_WS_Loop;
+end A22_Excep_WS_Loop;
