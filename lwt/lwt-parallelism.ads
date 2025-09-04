@@ -117,30 +117,31 @@ package LWT.Parallelism is
 
       type Parallel_Reversible_Iterator is limited interface
          and Parallel_Iterator and Iter.Reversible_Iterator;
+
+      --  Parallel "for loop" over a container or generalized iterator
+      --  This function is meant to be called by the compiler only
+      --  and unlike the other operations in this nested generic
+      --  package, it is *not* abstract.
+      procedure Par_Iterator_Loop
+        (Iterator :
+           in out Parallel_Iterator_Interfaces.Parallel_Iterator'Class;
+         Num_Chunks : Natural := 0;    --  0 means no chunk spec present
+         Aspects : access LWT.Aspects.Root_Aspect'Class := null;
+                                       --  null means no aspects specified
+         Loop_Body : access procedure
+           (Iterator : Parallel_Iterator_Interfaces.Parallel_Iterator'Class;
+            Chunk_Index : Positive;
+            PID : Par_Loop_Id));       --  PID used for early exit
+   --  with Parallel_Iterator;  --  Par_Iterator calls Loop_Body in parallel
+      --  TBD: No need to pass in Num_Chunks or use "in out" mode
+      --       if we call Split_Into_Chunks *before* calling this routine
+      --       (i.e. Iterator.Is_Split would be true before the call).
+
    end Parallel_Iterator_Interfaces;
-
-   generic
-      with package Inst is
-        new Parallel_Iterator_Interfaces (<>);
-         --  In Ada 2022, will be "new Ada.Iterator_Interfaces (<>);"
-   procedure Generic_Par_Iterator_Loop
-     (Iterator : in out Inst.Parallel_Iterator'Class;
-      Num_Chunks : Natural := 0;    --  0 means no chunk specification present
-      Aspects : access LWT.Aspects.Root_Aspect'Class := null;
-                                    --  null means no aspects specified
-      Loop_Body : access procedure
-        (Iterator : Inst.Parallel_Iterator'Class;
-         Chunk_Index : Positive;
-         PID : Par_Loop_Id));
-   --  with Parallel_Iterator;  --  it can call Loop_Body in parallel
-
-   --  Parallel "for loop" over a container or generalized iterator
-   --  TBD: No need to pass in Num_Chunks or use "in out" mode
-   --       if we call Split_Into_Chunks *before* calling this routine
-   --       (i.e. Iterator.Is_Split would be true before the call).
 
 private
 
+   --  Used by early exit to identify thread group
    type Par_Loop_Id is access constant LWT.Scheduler.Root_Data'Class;
 
 end LWT.Parallelism;

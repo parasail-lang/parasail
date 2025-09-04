@@ -100,16 +100,12 @@ begin
    --  Now sum the map elements in parallel
    --  ** Here is where the user's parallel for loop would have appeared **
    declare
-      procedure Par_Iterator_Loop is
-        new Generic_Par_Iterator_Loop
-          (Map_Par_Iterator_Interfaces);
-
       Iterator : Map_Par_Iterator_Interfaces.Parallel_Iterator'Class :=
         Par_Iterate (Map);
    begin
-      Par_Iterator_Loop (Iterator => Iterator,
-                         Num_Chunks => Partial_Sums'Last,
-                         Loop_Body => Loop_Body'Access);
+      Iterator.Par_Iterator_Loop
+        (Num_Chunks => Partial_Sums'Last,
+         Loop_Body => Loop_Body'Access);
    end;
 
    Put_Line ("Final summation of map");

@@ -191,130 +191,140 @@ package body LWT.Parallelism is
       return 1;
    end Chunk_Index;
 
-   procedure Generic_Par_Iterator_Loop
-     (Iterator   : in out Inst.Parallel_Iterator'Class;
-      Num_Chunks : Natural := 0;    --  0 means no chunk specification present
-      Aspects    : access LWT.Aspects.Root_Aspect'Class := null;
-                                    --  null means no aspects specified
-      Loop_Body : access procedure
-        (Iterator : Inst.Parallel_Iterator'Class;
-         Chunk_Index : Positive;
-         PID : Par_Loop_Id))
-   is
-      pragma Unreferenced (Aspects);  --  ??? looks unexpected
+   package body Parallel_Iterator_Interfaces is
 
-   --  Parallel "for loop" over a container or generalized iterator
-   --  ??? No need to pass in Num_Chunks or use "in out" mode
-   --  if we call Split_Into_Chunks *before* calling this routine
-   --  (i.e. Iterator.Is_Split would be true before the call).
+      --  Parallel "for loop" over a container or generalized iterator
+      --  This function is meant to be called by the compiler only
+      --  and unlike the other operations in this nested generic
+      --  package, it is *not* abstract.
+      procedure Par_Iterator_Loop
+        (Iterator :
+           in out Parallel_Iterator_Interfaces.Parallel_Iterator'Class;
+         Num_Chunks : Natural := 0;    --  0 means no chunk spec present
+         Aspects : access LWT.Aspects.Root_Aspect'Class := null;
+                                       --  null means no aspects specified
+         Loop_Body : access procedure
+           (Iterator : Parallel_Iterator_Interfaces.Parallel_Iterator'Class;
+            Chunk_Index : Positive;
+            PID : Par_Loop_Id))        --  PID used for early exit
 
-      Group : aliased LWT_Group;
+      is
+         pragma Unreferenced (Aspects);  --  TBD: Should use Aspects some day.
 
-      Canceling_Exception : Ada.Exceptions.Exception_Occurrence;
-      --  If group is canceled due to propagation of an exception
-      --  from Loop_Body, this will be initialized to the exception
-      --  to be re-raised after waiting for all LWTs to complete.
+      --  Parallel "for loop" over a container or generalized iterator
+      --  Note: No need to pass in Num_Chunks or use "in out" mode
+      --  if we call Split_Into_Chunks *before* calling this routine
+      --  (i.e. Iterator.Is_Split would be true before the call).
 
-      Num_Splits : Positive;
+         Group : aliased LWT_Group;
 
-      type LWT_Data_Extension is new Root_Data with record
-         --  Extend the root data type with data needed by LWT_Body
-         Chunk_Index : Positive;
-      end record;
+         Canceling_Exception : Ada.Exceptions.Exception_Occurrence;
+         --  If group is canceled due to propagation of an exception
+         --  from Loop_Body, this will be initialized to the exception
+         --  to be re-raised after waiting for all LWTs to complete.
 
-      overriding
-      procedure LWT_Body (Extended_Data : LWT_Data_Extension);
+         Num_Splits : Positive;
 
-      overriding
-      procedure Reclaim_Storage
-        (Extended_Data : access LWT_Data_Extension;
-         Server_Index : LWT_Server_Index);
+         type LWT_Data_Extension is new Root_Data with record
+            --  Extend the root data type with data needed by LWT_Body
+            Chunk_Index : Positive;
+         end record;
 
-      type LWT_Data_Ptr is access all LWT_Data_Extension
-        with Storage_Pool => LWT.Storage.LWT_Storage_Pool_Obj;
-         --  Local access type needed because extension is local.
-         --  Use global storage pool designed for re-using LWT data.
+         overriding
+         procedure LWT_Body (Extended_Data : LWT_Data_Extension);
 
-      procedure Free is new Ada.Unchecked_Deallocation
-        (LWT_Data_Extension, LWT_Data_Ptr);
-         --  This will call the deallocate routine for LWT_Storage_Pool
+         overriding
+         procedure Reclaim_Storage
+           (Extended_Data : access LWT_Data_Extension;
+            Server_Index : LWT_Server_Index);
 
-      overriding
-      procedure Reclaim_Storage
-        (Extended_Data : access LWT_Data_Extension;
-         Server_Index : LWT_Server_Index) is
-      --  Reclaim storage at end of LWT's life
-         Ptr : LWT_Data_Ptr := LWT_Data_Ptr (Extended_Data);
-      begin
-         Free (Ptr);
-      end Reclaim_Storage;
+         type LWT_Data_Ptr is access all LWT_Data_Extension
+           with Storage_Pool => LWT.Storage.LWT_Storage_Pool_Obj;
+            --  Local access type needed because extension is local.
+            --  Use global storage pool designed for re-using LWT data.
 
-      overriding
-      procedure LWT_Body (Extended_Data : LWT_Data_Extension) is
-         --  Just call through to the Loop_Body, after dealing
-         --  with cancellation before the call, or as a result
-         --  of an exception.
-         This_Chunk : constant Positive := Extended_Data.Chunk_Index;
-      begin
-         if Group.Cancellation_Point then
-            return;
+         procedure Free is new Ada.Unchecked_Deallocation
+           (LWT_Data_Extension, LWT_Data_Ptr);
+            --  This will call the deallocate routine for LWT_Storage_Pool
+
+         overriding
+         procedure Reclaim_Storage
+           (Extended_Data : access LWT_Data_Extension;
+            Server_Index : LWT_Server_Index) is
+         --  Reclaim storage at end of LWT's life
+            Ptr : LWT_Data_Ptr := LWT_Data_Ptr (Extended_Data);
+         begin
+            Free (Ptr);
+         end Reclaim_Storage;
+
+         overriding
+         procedure LWT_Body (Extended_Data : LWT_Data_Extension) is
+            --  Just call through to the Loop_Body, after dealing
+            --  with cancellation before the call, or as a result
+            --  of an exception.
+            This_Chunk : constant Positive := Extended_Data.Chunk_Index;
+         begin
+            if Group.Cancellation_Point then
+               return;
+            end if;
+
+            --  Now do this chunk
+            Loop_Body (Iterator => Iterator,
+                       Chunk_Index => This_Chunk,
+                       PID => Extended_Data'Unchecked_Access);
+         exception
+            when E : others =>
+               --  An exception was raised.  Save it if it is the first
+               --  canceling event in the group.
+               --  In any case, do not propagate it.
+               declare
+                  Success : Boolean := False;
+               begin
+                  Group.Cancel_Group (Success);
+                  if Success then
+                     Ada.Exceptions.Save_Occurrence (Canceling_Exception, E);
+                  end if;
+               end;
+         end LWT_Body;
+
+         Canceled : Boolean := False;
+
+         --  If no chunk specification, then use 2 * Num servers available
+         Num_Chunks_To_Use : constant Positive :=
+           (if Num_Chunks = 0
+            then 2 * Positive (LWT.Scheduler.Num_Servers_Available)
+            else Num_Chunks);
+
+      begin  --  Par_Iterator_Loop
+
+         --  Split the iterator
+         Iterator.Split_Into_Chunks (Num_Chunks_To_Use);
+
+         --  Find out how many chunks the Iterator was actually split into.
+         Num_Splits := Iterator.Chunk_Count;
+
+         if Num_Splits = 1 then
+            --  Iterator is not split at all; just do the one and only chunk
+            Loop_Body (Iterator => Iterator, Chunk_Index => 1, PID => null);
+         else
+            --  Spawn the chunks
+            for I in 1 .. Num_Splits loop
+               Spawn_LWT (Group,
+                  LWT_Data_Ptr'(new LWT_Data_Extension'
+                       (Root_Data with
+                          Chunk_Index => I)));
+            end loop;
+
+            --  Wait for all chunks to complete
+            Group.Wait_For_Group (Canceled);
+
+            if Canceled then
+               --  Propagate saved exception, if any
+               Ada.Exceptions.Reraise_Occurrence (Canceling_Exception);
+            end if;
          end if;
+      end Par_Iterator_Loop;
 
-         --  Now do this chunk
-         Loop_Body (Iterator => Iterator,
-                    Chunk_Index => This_Chunk,
-                    PID => Extended_Data'Unchecked_Access);
-      exception
-         when E : others =>
-            --  An exception was raised.  Save it if it is the first
-            --  canceling event in the group.
-            --  In any case, do not propagate it.
-            declare
-               Success : Boolean := False;
-            begin
-               Group.Cancel_Group (Success);
-               if Success then
-                  Ada.Exceptions.Save_Occurrence (Canceling_Exception, E);
-               end if;
-            end;
-      end LWT_Body;
-
-      Canceled : Boolean := False;
-
-      --  If no chunk specification, then use 2 * Num servers available
-      Num_Chunks_To_Use : constant Positive :=
-        (if Num_Chunks = 0
-         then 2 * Positive (LWT.Scheduler.Num_Servers_Available)
-         else Num_Chunks);
-
-   begin  --  Generic_Par_Iterator_Loop
-
-      --  Split the iterator
-      Iterator.Split_Into_Chunks (Num_Chunks_To_Use);
-
-      --  Find out how many chunks the Iterator was actually split into.
-      Num_Splits := Iterator.Chunk_Count;
-
-      if Num_Splits = 1 then
-         --  Iterator is not split at all; just do the one and only chunk
-         Loop_Body (Iterator => Iterator, Chunk_Index => 1, PID => null);
-      else
-         --  Spawn the chunks
-         for I in 1 .. Num_Splits loop
-            Spawn_LWT (Group,
-               LWT_Data_Ptr'(new LWT_Data_Extension'
-                    (Root_Data with
-                       Chunk_Index => I)));
-         end loop;
-
-         --  Wait for all chunks to complete
-         Group.Wait_For_Group (Canceled);
-
-         if Canceled then
-            --  Propagate saved exception, if any
-            Ada.Exceptions.Reraise_Occurrence (Canceling_Exception);
-         end if;
-      end if;
-   end Generic_Par_Iterator_Loop;
+   end Parallel_Iterator_Interfaces;
 
 end LWT.Parallelism;
