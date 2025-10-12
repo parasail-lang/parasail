@@ -18,7 +18,7 @@
 
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Command_Line; use Ada.Command_Line;
-with LWT.Work_Stealing;
+with LWT.Work_Stealing; use LWT.Work_Stealing;
 procedure N_Queens is
 
    Control : WS_Parallel (Num_Servers => 6, Options => null);

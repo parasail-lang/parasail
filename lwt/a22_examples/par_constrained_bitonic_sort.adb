@@ -159,8 +159,8 @@ is
                    (Index_Type'Pos (Arr'First) + Uns'Pos (I + Pow_Offset))),
                   Ascending => Ascending);
             end;
-         end loop;
-      end Loop_Body;
+         end if;
+      end loop;
 
       if Debug then
          for I in First .. Index_Type'Pred (Last) loop
