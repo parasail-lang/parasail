@@ -34,7 +34,7 @@ pragma Ada_2022;
 
 with Ada.Text_IO; use Ada.Text_IO;
 
-procedure LWT.Par_Constrained_Bitonic_Sort
+procedure Par_Constrained_Bitonic_Sort
   (Container : in out Array_Type)
 is
    --  See: "Bitonic sorting network for n not a power of 2"
@@ -205,4 +205,4 @@ begin  --  LWT.Par_Constrained_Bitonic_Sort
    end loop;
 
    --  pragma Warnings (On);
-end LWT.Par_Constrained_Bitonic_Sort;
+end Par_Constrained_Bitonic_Sort;
