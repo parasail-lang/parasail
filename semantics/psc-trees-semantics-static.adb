@@ -2885,6 +2885,27 @@ package body PSC.Trees.Semantics.Static is
       Mod_Region : Symbols.Region_Ptr :=
         new Symbols.Region (Module_Region_Kind);
 
+      procedure First_Pass_Formals (Formals : Lists.List) is
+      begin
+         First_Pass_List (Mod_Region, Formals);
+
+         -- Handle formal annotations
+         for I in 1 .. Lists.Length (Formals) loop
+            Put_Line (Subtree_Image (Lists.Nth_Element (Formals, I)));
+            Put_Line (Tree_Kind_Enum'Image (Kind (Tree_Of (Lists.Nth_Element (Formals, I)))));
+
+            declare
+               Formal_Tree : constant Tree_Ptr :=
+                 Tree_Ptr_Of (Lists.Nth_Element (Formals, I));
+            begin
+               if Not_Null (Formal_Tree.Post_Annotation) then
+                  First_Pass (Mod_Region, Formal_Tree.Post_Annotation);
+                  Put_Line (Subtree_Image (Formal_Tree.Post_Annotation));
+               end if;
+            end;
+         end loop;
+      end First_Pass_Formals;
+
       Name_Tree : Trees.Tree'Class renames Tree_Ptr_Of (T.Name).all;
 
       Module_Prefix : constant Optional_Tree := Semantics.Prefix (T.Name);
@@ -3323,10 +3344,10 @@ package body PSC.Trees.Semantics.Static is
          --  Walk the module formals, inherited and explicit
 
          --  Walk the inherited formals, if any.
-         First_Pass_List (Mod_Region, Mod_Sem.Ancestor_Module_Formals);
+         First_Pass_Formals (Mod_Sem.Ancestor_Module_Formals);
 
          --  Walk the new ones, if any.
-         First_Pass_List (Mod_Region, T.Module_Formals);
+         First_Pass_Formals (T.Module_Formals);
       end if;
 
       --  Now walk the locals and visible declarations,
@@ -19020,6 +19041,7 @@ package body PSC.Trees.Semantics.Static is
             if Debug_Second_Pass then
                Put_Line (" Resolving annotations: " & Subtree_Image (T));
             end if;
+            Put_Line (" Resolving annotations: " & Subtree_Image (T));
 
             Annotation_Visitor.Decl_Region := Annotation_Sem.Nested_Region;
             Annotation_Visitor.Decl_For_Annotations :=
@@ -19050,6 +19072,7 @@ package body PSC.Trees.Semantics.Static is
                      Visit_And_Resolve_Expr
                        (Annotation, Annotation_Visitor,
                         Resolved_Type => Boolean_Type);
+                     Put_Line (" Visiting: " & Subtree_Image (Annotation));
                   end if;
                end;
             end loop;
@@ -19461,6 +19484,33 @@ package body PSC.Trees.Semantics.Static is
 
       use type Type_Sem_Vectors.Elem_Index;
 
+
+      procedure Second_Pass_Formals (Formals : Lists.List) is
+      begin
+         Second_Pass_List
+           (Mod_Region, Formals, Context => Module_Formal_Context,
+            Mode => Visitor.Mode);
+
+         -- Handle formal annotations
+         for I in 1 .. Lists.Length (Formals) loop
+            Put_Line (Subtree_Image (Lists.Nth_Element (Formals, I)));
+            Put_Line (Tree_Kind_Enum'Image (Kind (Tree_Of (Lists.Nth_Element (Formals, I)))));
+
+            declare
+               Formal_Tree : constant Tree_Ptr :=
+                 Tree_Ptr_Of (Lists.Nth_Element (Formals, I));
+            begin
+               if Not_Null (Formal_Tree.Post_Annotation) then
+                  Second_Pass
+                    (Mod_Region, Formal_Tree.Post_Annotation,
+                     Context => Module_Formal_Context,
+                     Mode => Visitor.Mode, Resolve_Expr => True);
+                  Put_Line (Subtree_Image (Formal_Tree.Post_Annotation));
+               end if;
+            end;
+         end loop;
+      end Second_Pass_Formals;
+
       procedure Abstract_Ops_Must_Be_Overridden (Decl_List : Lists.List) is
       --  Make sure that all abstract operations on Decl_List are overridden
       begin
@@ -19727,12 +19777,8 @@ package body PSC.Trees.Semantics.Static is
       if T.Is_Interface then
          --  We only walk the formals of the interface.
          --  TBD: We should check for conformance of the formals on the body.
-         Second_Pass_List
-           (Mod_Region, Mod_Sem.Ancestor_Module_Formals,
-            Context => Module_Formal_Context, Mode => Visitor.Mode);
-         Second_Pass_List
-           (Mod_Region, T.Module_Formals, Context => Module_Formal_Context,
-            Mode => Visitor.Mode);
+         Second_Pass_Formals (Mod_Sem.Ancestor_Module_Formals);
+         Second_Pass_Formals (T.Module_Formals);
 
          if Visitor.Mode /= Interface_Params then
             --  Having processed the formals, we can
