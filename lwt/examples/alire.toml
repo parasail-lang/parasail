@@ -1,0 +1,35 @@
+name = "examples"
+description = "Examples"
+version = "0.1.0"
+
+authors = ["S. Tucker Taft"]
+maintainers = ["S. Tucker Taft <taft@adacore.com>"]
+maintainers-logins = ["sttaft"]
+licenses = "Apache-2.0 WITH LLVM-exception"
+
+project-files = ["prj.gpr"]
+
+executables = [
+      "cxai017_bitonic",
+      "cxai017_con_par",
+      "cxai017_con_seq",
+      "excep_loop",
+      "excep_seq_loop",
+      "excep_ws_loop",
+      "map_par_loop",
+      "n_queens",
+      "n_queens_omp",
+      "n_queens_proc_iter",
+      "n_queens_proc_iter_b",
+      "n_queens_ws",
+      "simple_par_loop",
+      "simple_par_taskloop",
+      "simple_par_ws_loop",
+      "simple_seq_loop",
+      "test_deque",
+      "test_par_qsort",
+      "vector_par_loop"
+]
+
+[configuration]
+disabled = true
