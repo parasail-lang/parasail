@@ -4,7 +4,7 @@ project Lwt is
    for Library_Name use "lwt";
    for Library_Version use Project'Library_Name & ".so." & Lwt_Config.Crate_Version;
 
-   for Source_Dirs use (".", "config/", "examples");
+   for Source_Dirs use (".", "config/");
    for Object_Dir use "obj/" & Lwt_Config.Build_Profile;
    for Create_Missing_Dirs use "True";
    for Library_Dir use "lib";
