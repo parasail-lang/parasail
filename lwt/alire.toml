@@ -1,6 +1,6 @@
 name = "lwt"
 description = "Light-weight Threading Library implementing Ada 2022 parallel features"
-version = "1.1.0"
+version = "1.2.0"
 
 authors = ["S. Tucker Taft"]
 maintainers = ["S. Tucker Taft <taft@adacore.com>"]
