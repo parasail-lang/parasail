@@ -18,17 +18,35 @@
 --  Provide version of Iterate for Vectors that returns a parallel iterator.
 
 with Ada.Containers.Vectors;
-with LWT.Parallelism;
+with LWT.Generic_Par_Iterators;
 generic
    with package Vectors is
      new Ada.Containers.Vectors (<>);
 package LWT.Vector_Par_Iterators is
-   package Vector_Par_Iterator_Interfaces is
-     new LWT.Parallelism.Parallel_Iterator_Interfaces
-        (Vectors.Vector_Iterator_Interfaces);
+   use Vectors;
 
-   function Par_Iterate (Container : Vectors.Vector)
-     return Vector_Par_Iterator_Interfaces.Parallel_Iterator'Class;
+   package Par_Iterators is new
+     Generic_Par_Iterators
+       (Container => Vector,
+        Cursor => Cursor,
+        Element_Type => Element_Type,
+        Seq_Iterator_Interfaces => Vector_Iterator_Interfaces,
+        Default_Iterator_Type =>
+          Vector_Iterator_Interfaces.Reversible_Iterator'Class,
+        Constant_Reference_Type => Constant_Reference_Type);
+
+   package Par_Iterator_Interfaces
+     renames Par_Iterators.Par_Iterator_Interfaces;
+
+   subtype Par_Iterable_Vector is Par_Iterators.Par_Iterable_Container;
+
+   function Par_Iterable (Container : Vector)
+     return Par_Iterable_Vector
+     renames Par_Iterators.Par_Iterable;
+
+   function Iterate (Container : Par_Iterable_Vector)
+     return Par_Iterator_Interfaces.Parallel_Iterator'Class
+     renames Par_Iterators.Iterate;
    --  Return iterator over Container that can be split into chunks
 
 end LWT.Vector_Par_Iterators;

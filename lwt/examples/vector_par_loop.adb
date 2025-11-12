@@ -43,6 +43,8 @@ procedure Vector_Par_Loop is
 
    Vec : Vec_Ints.Vector := To_Vector (1_000_000);
 
+   Par_Vec : Par_Iterable_Vector renames Par_Iterable (Vec);
+
    Partial_Sums : array (1 .. Num_Chunks) of Longest_Integer := (others => 0);
 
    Total : Longest_Integer := 0;
@@ -57,11 +59,11 @@ procedure Vector_Par_Loop is
    --
    --  ** This loop-body procedure should be created automatically **
    procedure Loop_Body
-     (Iterator : Vector_Par_Iterator_Interfaces.Parallel_Iterator'Class;
+     (Iterator : Par_Iterator_Interfaces.Parallel_Iterator'Class;
       Chunk_Index : Positive;
       PID : Par_Loop_Id);
    procedure Loop_Body
-     (Iterator : Vector_Par_Iterator_Interfaces.Parallel_Iterator'Class;
+     (Iterator : Par_Iterator_Interfaces.Parallel_Iterator'Class;
       Chunk_Index : Positive;
       PID : Par_Loop_Id) is
       pragma Unreferenced (PID);
@@ -69,7 +71,7 @@ procedure Vector_Par_Loop is
    begin
       while Has_Element (Position) loop
          declare
-            E : Integer renames Vec (Position);
+            E : Integer renames Par_Vec (Position);
          begin
             Partial_Sums (Chunk_Index) :=
               Partial_Sums (Chunk_Index) + Longest_Integer (E);
@@ -89,8 +91,8 @@ begin
    --  Now sum the vector in parallel
    --  ** Here is where the user's parallel for loop would have appeared **
    declare
-      Iterator : Vector_Par_Iterator_Interfaces.Parallel_Iterator'Class :=
-        Par_Iterate (Vec);
+      Iterator : Par_Iterator_Interfaces.Parallel_Iterator'Class :=
+        Iterate (Par_Vec);
    begin
       Iterator.Par_Iterator_Loop
         (Num_Chunks => Partial_Sums'Last,

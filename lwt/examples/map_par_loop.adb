@@ -48,12 +48,15 @@ procedure Map_Par_Loop is
 
    Map : String_Int_Maps.Map;
 
+   Par_Map : Par_Iterable_Map renames Par_Iterable (Map);
+
    Partial_Sums : array (1 .. Num_Chunks) of Longest_Integer := (others => 0);
 
    Total : Longest_Integer := 0;
 
    procedure Loop_Body
-     (Iterator : Map_Par_Iterator_Interfaces.Parallel_Iterator'Class;
+     (Iterator :
+        Par_Iterator_Interfaces.Parallel_Iterator'Class;
       Chunk_Index : Positive;
       PID : Par_Loop_Id);
    --  Given the following Ada 202X syntax:
@@ -67,15 +70,16 @@ procedure Map_Par_Loop is
    --  ** This loop-body procedure should be created automatically **
 
    procedure Loop_Body
-     (Iterator : Map_Par_Iterator_Interfaces.Parallel_Iterator'Class;
+     (Iterator : Par_Iterator_Interfaces.Parallel_Iterator'Class;
       Chunk_Index : Positive;
       PID : Par_Loop_Id) is
+
       pragma Unreferenced (PID);
       Position : Cursor := Iterator.First (Chunk_Index);
    begin
       while Has_Element (Position) loop
          declare
-            E : Integer renames Map (Position);
+            E : Integer renames Par_Map (Position);
          begin
             Partial_Sums (Chunk_Index) :=
               Partial_Sums (Chunk_Index) + Longest_Integer (E);
@@ -100,8 +104,8 @@ begin
    --  Now sum the map elements in parallel
    --  ** Here is where the user's parallel for loop would have appeared **
    declare
-      Iterator : Map_Par_Iterator_Interfaces.Parallel_Iterator'Class :=
-        Par_Iterate (Map);
+      Iterator : Par_Iterator_Interfaces.Parallel_Iterator'Class :=
+        Iterate (Par_Map);
    begin
       Iterator.Par_Iterator_Loop
         (Num_Chunks => Partial_Sums'Last,

@@ -18,17 +18,36 @@
 --  Provide Iterate for Hashed_Maps that returns a parallel iterator.
 
 with Ada.Containers.Hashed_Maps;
-with LWT.Parallelism;
+with LWT.Generic_Par_Iterators;
 generic
    with package Maps is
      new Ada.Containers.Hashed_Maps (<>);
 package LWT.Hashed_Map_Par_Iterators is
-   package Map_Par_Iterator_Interfaces is
-     new LWT.Parallelism.Parallel_Iterator_Interfaces
-        (Maps.Map_Iterator_Interfaces);
+   use Maps;
 
-   function Par_Iterate (Container : Maps.Map)
-     return Map_Par_Iterator_Interfaces.Parallel_Iterator'Class;
+   package Par_Iterators is
+     new LWT.Generic_Par_Iterators
+       (Container => Map,
+        Cursor => Cursor,
+        Element_Type => Element_Type,
+        Seq_Iterator_Interfaces => Map_Iterator_Interfaces,
+        Default_Iterator_Type =>
+          Map_Iterator_Interfaces.Forward_Iterator'Class,
+        Iterate => Maps.Iterate,
+        Constant_Reference_Type => Constant_Reference_Type);
+
+   package Par_Iterator_Interfaces
+     renames Par_Iterators.Par_Iterator_Interfaces;
+
+   subtype Par_Iterable_Map is Par_Iterators.Par_Iterable_Container;
+
+   function Par_Iterable (Container : Map)
+     return Par_Iterable_Map
+     renames Par_Iterators.Par_Iterable;
+
+   function Iterate (Container : Par_Iterable_Map)
+     return Par_Iterator_Interfaces.Parallel_Iterator'Class
+     renames Par_Iterators.Iterate;
    --  Return iterator over Container that can be split into chunks
 
 end LWT.Hashed_Map_Par_Iterators;

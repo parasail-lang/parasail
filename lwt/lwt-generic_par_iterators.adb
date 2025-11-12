@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------------
 --                            Ada 202X Parallelism                          --
 --                                                                          --
---                     Copyright (C) 2012-2023, AdaCore                     --
+--                     Copyright (C) 2012-2025, AdaCore                     --
 --                                                                          --
 -- This is free software;  you can redistribute it  and/or modify it  under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -15,78 +15,70 @@
 -- version 3.1, as published by the Free Software Foundation. See           --
 -- documentation/COPYING3 and documentation/GCC_RUNTIME3_1 for details.     --
 ------------------------------------------------------------------------------
---  Provide Iterate for Hashed_Maps that returns a parallel iterator.
+--  Provide Iterate for container that returns a parallel iterator.
 
-with Ada.Finalization;
 with Ada.Unchecked_Deallocation;
+with Ada.Finalization;
+package body LWT.Generic_Par_Iterators is
 
-package body LWT.Hashed_Map_Par_Iterators is
-   use Maps;
-   use Map_Par_Iterator_Interfaces;
-   use Ada.Containers;  --  for Count_Type
+   subtype Chunk_Index is Par_Iterator_Interfaces.Chunk_Index;
 
-   type Chunk_Info is record
-      First_Cursor : Cursor;
-      --  First cursor of each chunk
-      --  Also represents cursor for where to stop for prior chunk.
-   end record;
-
-   type Chunk_Info_Array is array (Positive range <>) of Chunk_Info;
+   type Cursor_Array is array (Positive range <>) of Cursor;
 
    type Chunk_Info_Record (Num_Chunks : Positive) is record
-      Data : Chunk_Info_Array (1 .. Num_Chunks);
+      First_Cursors : Cursor_Array (1 .. Num_Chunks);
    end record;
 
    type Chunk_Info_Record_Ptr is access Chunk_Info_Record;
 
-   type Seq_Iter_Ptr is
-     access Maps.Map_Iterator_Interfaces.Forward_Iterator'Class;
+   type Seq_Iter_Ptr is access Default_Iterator_Type;
 
-   type Map_Par_Iterator
-     (Container : not null access constant Maps.Map;
-      Seq_Iter : not null Seq_Iter_Ptr) is
-        new Ada.Finalization.Limited_Controlled
-          and Map_Par_Iterator_Interfaces.Parallel_Iterator
+   type Par_Iterator
+    (Con : not null access constant Container;
+     Seq_Iter : not null Seq_Iter_Ptr) is
+       new Ada.Finalization.Limited_Controlled
+         and Par_Iterator_Interfaces.Parallel_Iterator
      with record
       Chunks : Chunk_Info_Record_Ptr := null;
+      No_Element : Cursor;
    end record;
 
    overriding
-   procedure Finalize (Iterator : in out Map_Par_Iterator);
+   procedure Finalize (Iterator : in out Par_Iterator);
 
    overriding
-   function First (Object : Map_Par_Iterator) return Cursor;
+   function First
+     (Object : Par_Iterator) return Cursor;
    overriding
-   function Next (Object : Map_Par_Iterator; Position : Cursor)
-     return Cursor;
+   function Next
+     (Object   : Par_Iterator;
+      Position : Cursor) return Cursor;
 
    overriding
-   function Is_Split (Object : Map_Par_Iterator)
+   function Is_Split (Object : Par_Iterator)
      return Boolean;
-
+   
    overriding
-   procedure Split_Into_Chunks (Object     : in out Map_Par_Iterator;
+   procedure Split_Into_Chunks (Object     : in out Par_Iterator;
                                 Max_Chunks : Chunk_Index);
-
+      
    overriding
-   function Chunk_Count (Object : Map_Par_Iterator)
+   function Chunk_Count (Object : Par_Iterator)
       return Chunk_Index;
-
+         
    overriding
-   function First (Object : Map_Par_Iterator;
+   function First (Object : Par_Iterator;
                    Chunk  : Chunk_Index) return Cursor;
 
    overriding
-   function Next (Object   : Map_Par_Iterator;
+   function Next (Object   : Par_Iterator;
                   Position : Cursor;
                   Chunk    : Chunk_Index) return Cursor;
 
-   -----
-
    overriding
-   procedure Finalize (Iterator : in out Map_Par_Iterator) is
+   procedure Finalize (Iterator : in out Par_Iterator) is
       procedure Free is new Ada.Unchecked_Deallocation
-        (Maps.Map_Iterator_Interfaces.Forward_Iterator'Class, Seq_Iter_Ptr);
+        (Default_Iterator_Type, Seq_Iter_Ptr);
       procedure Free is new Ada.Unchecked_Deallocation
         (Chunk_Info_Record, Chunk_Info_Record_Ptr);
 
@@ -98,38 +90,41 @@ package body LWT.Hashed_Map_Par_Iterators is
    end Finalize;
 
    overriding
-   function First (Object : Map_Par_Iterator) return Cursor is
+   function First (Object : Par_Iterator) return Cursor is
    begin
       return Object.Seq_Iter.First;
    end First;
 
    overriding
-   function Next (Object : Map_Par_Iterator; Position : Cursor)
+   function Next (Object : Par_Iterator; Position : Cursor)
      return Cursor is
    begin
       return Object.Seq_Iter.Next (Position);
    end Next;
 
    overriding
-   function Is_Split (Object : Map_Par_Iterator)
+   function Is_Split (Object : Par_Iterator)
      return Boolean is
    begin
       return Object.Chunks /= null;
    end Is_Split;
 
+   subtype Count_Type is Ada.Containers.Count_Type;
+   use type Count_Type;
+
    overriding
-   procedure Split_Into_Chunks (Object     : in out Map_Par_Iterator;
+   procedure Split_Into_Chunks (Object     : in out Par_Iterator;
                                 Max_Chunks : Chunk_Index) is
-      --  Use user-requested chunk count unless is > Map length
-      --  TBD: Might actually limit chunk count to Map_Len/2, say.
-      Map_Len : constant Count_Type := Object.Container.Length;
+      --  Use user-requested chunk count unless is > Container length
+      --  TBD: Might actually limit chunk count to Con_Len/2, say.
+      Con_Len : constant Count_Type := Length (Object.Con.all);
       Num_Chunks : constant Chunk_Index :=
         Chunk_Index'Max (1,
-          Chunk_Index'Min (Max_Chunks, Chunk_Index'Base (Map_Len)));
+          Chunk_Index'Min (Max_Chunks, Chunk_Index'Base (Con_Len)));
       Items_Per_Small_Chunk : constant Count_Type :=
-        Map_Len / Count_Type (Num_Chunks);
+        Con_Len / Count_Type (Num_Chunks);
       Num_Extra : constant Count_Type :=
-        Map_Len - Items_Per_Small_Chunk * Count_Type (Num_Chunks);
+        Con_Len - Items_Per_Small_Chunk * Count_Type (Num_Chunks);
 
       --  Compute how many chunks should be of size Items_Per_Small_Chunk
       --  (the others will have one additional item).
@@ -149,13 +144,13 @@ package body LWT.Hashed_Map_Par_Iterators is
       Object.Chunks := new Chunk_Info_Record (Num_Chunks);
       for I in 1 .. Num_Chunks loop
          --  Initialize I'th chunk info with chunk's first cursor position.
-         Object.Chunks.Data (I).First_Cursor := Next_Cursor;
+         Object.Chunks.First_Cursors (I) := Next_Cursor;
 
          for J in 1 .. (if I <= Num_Small_Chunks
                         then Items_Per_Small_Chunk
                         else Items_Per_Small_Chunk + 1)
          loop
-            if not Maps.Has_Element (Next_Cursor) then
+            if not Seq_Iterator_Interfaces.Has_Element (Next_Cursor) then
                --  Map must have been tampered with
                raise Program_Error;
             end if;
@@ -163,14 +158,17 @@ package body LWT.Hashed_Map_Par_Iterators is
             Next_Cursor := Object.Seq_Iter.Next (Next_Cursor);
          end loop;
       end loop;
-      if Maps.Has_Element (Next_Cursor) then
+      if Seq_Iterator_Interfaces.Has_Element (Next_Cursor) then
          --  Map must have been tampered with
          raise Program_Error;
       end if;
+
+      --  Record value of "No_Element" for future use.
+      Object.No_Element := Next_Cursor;
    end Split_Into_Chunks;
 
    overriding
-   function Chunk_Count (Object : Map_Par_Iterator)
+   function Chunk_Count (Object : Par_Iterator)
       return Chunk_Index is
    begin
       if Object.Chunks = null then
@@ -180,18 +178,18 @@ package body LWT.Hashed_Map_Par_Iterators is
    end Chunk_Count;
 
    overriding
-   function First (Object : Map_Par_Iterator;
+   function First (Object : Par_Iterator;
                    Chunk  : Chunk_Index) return Cursor is
    --  Return cursor to first element of chunk
    begin
       if Object.Chunks = null then
          raise Program_Error;
       end if;
-      return Object.Chunks.Data (Chunk).First_Cursor;
+      return Object.Chunks.First_Cursors (Chunk);
    end First;
 
    overriding
-   function Next (Object   : Map_Par_Iterator;
+   function Next (Object   : Par_Iterator;
                   Position : Cursor;
                   Chunk    : Chunk_Index) return Cursor is
       Result : Cursor;
@@ -202,24 +200,24 @@ package body LWT.Hashed_Map_Par_Iterators is
       --  Get next cursor using sequential iterator
       Result := Object.Seq_Iter.Next (Position);
       if Chunk < Object.Chunks.Num_Chunks
-        and then Result = Object.Chunks.Data (Chunk + 1).First_Cursor
+        and then Result = Object.Chunks.First_Cursors (Chunk + 1)
       then
          --  Reached end of chunk
-         return Maps.No_Element;
+         return Object.No_Element;
       else
          return Result;
       end if;
    end Next;
 
-   function Par_Iterate (Container : Maps.Map)
-     return Map_Par_Iterator_Interfaces.Parallel_Iterator'Class is
+   function Iterate (Container : Par_Iterable_Container)
+     return Par_Iterator_Interfaces.Parallel_Iterator'Class is
    --  Return iterator over Container that can be split into chunks
    begin
-      return Map_Par_Iterator'(Ada.Finalization.Limited_Controlled with
-                               Container => Container'Unchecked_Access,
-                               Seq_Iter => new Maps.Map_Iterator_Interfaces.
-                                 Forward_Iterator'Class'(Container.Iterate),
-                               others => <>);
-   end Par_Iterate;
+      return Par_Iterator'(Ada.Finalization.Limited_Controlled with
+                            Con => Container.Con,
+                            Seq_Iter => new Default_Iterator_Type'
+                              (Iterate (Container.Con.all)),
+                            others => <>);
+   end Iterate;
 
-end LWT.Hashed_Map_Par_Iterators;
+end LWT.Generic_Par_Iterators;
