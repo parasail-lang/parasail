@@ -7,6 +7,18 @@ for the new "parallel" loop or block syntax.  It supports two different
 light-weight-threading scheduler plug-ins, plus has a sequential fall-back
 that executes the features sequentially if no scheduler is plugged in.
 
+Note that there is now an implementation of the Ada 2022 parallel
+syntax, both parallel "for" loops and parallel "do" blocks, that makes
+use of this LWT library to provide the light-weight threading support.
+Current release can be
+found at: [ARG GitHub ada2022-parallel-release][ada2022-parallel-release]
+
+[ada2022-parallel-release]: https://github.com/Ada-Rapporteur-Group/gcc-mirror/tree/devel/arg-proto/ada2022-parallel-release
+
+This LWT library itself is available as an Alire crate under the name "lwt".
+
+## Introduction to the two scheduler plug-ins
+
 One of the two scheduler plug-ins is based on the GCC implementation of
 OpenMP, and the other is based on a work-stealing-based scheduler
 implemented entirely in Ada.  These are plugged in by mentioning
@@ -231,7 +243,7 @@ private
 end LWT.Scheduler;
 ```
 
-## Scheduler Plugins
+## Details on Scheduler Plugins
 
 There are two scheduler plug-ins, plus a default sequential scheduler that
 handles the light weight threads (by executing them in sequence!) in the absence of any other scheduler.
