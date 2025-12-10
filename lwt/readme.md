@@ -3,7 +3,26 @@
 
 This is a light-weight threading library that provides many of
 the features defined for Ada 2022, without depending on support
-for the new "parallel" loop or block syntax.
+for the new "parallel" loop or block syntax.  It supports two different
+light-weight-threading scheduler plug-ins, plus has a sequential fall-back
+that executes the features sequentially if no scheduler is plugged in.
+
+One of the two scheduler plug-ins is based on the GCC implementation of
+OpenMP, and the other is based on a work-stealing-based scheduler
+implemented entirely in Ada.  These are plugged in by mentioning
+in a "with" clause either LWT.OpenMP or LWT.Work_Stealing, and
+then declaring in the main subprogram (or in a task body), a control
+object of type LWT.OpenMP.OMP_Parallel or of type
+LWT.Work_Stealing.WS_Parallel to specify the number of "heavy-weight" (kernel)
+threads to devote to serving all of the light-weight threads spawned
+by the main subprogram or the given task body.
+
+Both the OpenMP- and work-stealing-based schedulers can make use of as
+many cores as the underlying machine provides, or
+can be limited to a smaller number of cores to limit
+the total resources devoted to the given program's
+execution.  More details are given below on how this plug-in-based
+architecture works, and on the two light-weight-threading schedulers.
 
 Here is some background on how this library was mapped to OpenMP (note that this LWT library is _not_ under the language-defined package "System" even though that might be its ultimate resting place in a full Ada 2022 implementation):
 - A powerpoint on the [Ada 2022 lightweight parallelism features and their implementation][ada2022_powerpoint], including on top of OpenMP
