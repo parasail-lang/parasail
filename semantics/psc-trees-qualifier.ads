@@ -29,7 +29,8 @@ package PSC.Trees.Qualifier is
      Is_Concurrent,
      Is_Var,
      Is_Const,
-     Is_Polymorphic);
+     Is_Polymorphic,
+     Is_Monomorphic);
 
    type Qualifier_Set is array (Qualifier_Enum) of Boolean;
 

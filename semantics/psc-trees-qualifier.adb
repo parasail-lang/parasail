@@ -129,6 +129,8 @@ package body PSC.Trees.Qualifier is
             return "const ";
          when Is_Polymorphic =>
             return "+";
+         when Is_Monomorphic =>
+            return ">";
       end case;
    end Qualifier_Image;
 
@@ -144,12 +146,17 @@ package body PSC.Trees.Qualifier is
    begin
       Put_Indent (On, Indent => Indent);
       for I in Qualifier_Enum loop
-         if I = Is_Polymorphic then
-            --  Display the actual operand before the "+"
-            --  for polymorphic type
-            Display_Subtree (T.Operand, On);
-         end if;
          if T.Qualifiers (I) then
+            if I = Is_Polymorphic then
+               --  Display the actual operand before the "+"
+               --  for polymorphic type
+               Display_Subtree (T.Operand, On);
+            elsif I = Is_Monomorphic then
+               --  Display "<" and the actual operand before the ">"
+               --  for polymorphic type
+               Put (On, "<");
+               Display_Subtree (T.Operand, On);
+            end if;
             Put (On, Qualifier_Image (I));
          end if;
       end loop;

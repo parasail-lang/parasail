@@ -418,6 +418,8 @@ private package PSC.Trees.Semantics.Info is
       --  Indicates that "concurrent" was specified.
       Is_Polymorphic : Boolean := False;
       --  Indicates that "+" suffix was given for type making it polymorphic.
+      Is_Monomorphic : Boolean := False;
+      --  Indicates that "-" suffix was given for type making it monomorphic.
       Root_Type : Type_Sem_Ptr := null;
       --  Type which is the "root" of the polymorphic type.
       --  Points at self if type is not polymorphic.

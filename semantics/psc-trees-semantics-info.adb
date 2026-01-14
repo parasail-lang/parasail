@@ -438,8 +438,10 @@ package body PSC.Trees.Semantics.Info is
                 Constrained_Type2.Obj_Is_Concurrent
         or else Constrained_Type1.Is_Polymorphic /=
                 Constrained_Type2.Is_Polymorphic
+        or else Constrained_Type1.Is_Monomorphic /=
+                Constrained_Type2.Is_Monomorphic
       then
-         --  Different optionality/concurrency/polymorphism
+         --  Different optionality/concurrency/polymorphism/monomorphism
          return False;
       elsif Lists.Length (Constrained_Type1.Constraint_Annotations) /=
             Lists.Length (Constrained_Type2.Constraint_Annotations)

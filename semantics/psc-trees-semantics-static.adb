@@ -292,7 +292,8 @@ package body PSC.Trees.Semantics.Static is
      (Original_Type : Type_Sem_Ptr; Decl_Region : Symbols.Region_Ptr;
       Definition : Optional_Tree := Null_Optional_Tree;
       Is_Optional : Boolean := False; Is_Concurrent : Boolean := False;
-      Is_Polymorphic : Boolean := False) return Type_Sem_Ptr;
+      Is_Polymorphic : Boolean := False;
+      Is_Monomorphic : Boolean := False) return Type_Sem_Ptr;
    --  Create a new type with the specified qualifiers added in
 
    function Type_Implements_Type
@@ -3202,7 +3203,7 @@ package body PSC.Trees.Semantics.Static is
                  --  Potentially updated in second pass
                  Constraint_Annotations => Lists.Empty_List,
                  Value_Is_Optional => False, Obj_Is_Concurrent => False,
-                 Is_Polymorphic => False, Root_Type => null,
+                 Is_Polymorphic | Is_Monomorphic  => False, Root_Type => null,
                  Corresponding_Polymorphic_Type => null, Is_Universal => False,
                  --  Default initialize to False, but may be updated in
                  --  Builtin_Type_Init
@@ -6816,7 +6817,8 @@ package body PSC.Trees.Semantics.Static is
      (Original_Type : Type_Sem_Ptr; Decl_Region : Symbols.Region_Ptr;
       Definition : Optional_Tree := Null_Optional_Tree;
       Is_Optional : Boolean := False; Is_Concurrent : Boolean := False;
-      Is_Polymorphic : Boolean := False) return Type_Sem_Ptr is
+      Is_Polymorphic : Boolean := False;
+      Is_Monomorphic : Boolean := False) return Type_Sem_Ptr is
       --  Create a new type with the specified qualifiers added in
 
       Qualified_Type : Type_Sem_Ptr;
@@ -6837,7 +6839,8 @@ package body PSC.Trees.Semantics.Static is
               Qualifier.Qualify
                 ((Qualifier.Is_Optional => Is_Optional,
                   Qualifier.Is_Concurrent => Is_Concurrent,
-                  Qualifier.Is_Polymorphic => Is_Polymorphic, others => False),
+                  Qualifier.Is_Polymorphic => Is_Polymorphic,
+                  Qualifier.Is_Monomorphic => Is_Monomorphic, others => False),
                  Original_Type.Definition);
          end if;
       else
@@ -6884,6 +6887,8 @@ package body PSC.Trees.Semantics.Static is
                end if;
             end if;
          end if;
+      elsif Is_Monomorphic then
+         Qualified_Type.Is_Monomorphic := True;
       end if;
 
       if Debug_Second_Pass then
@@ -7125,7 +7130,8 @@ package body PSC.Trees.Semantics.Static is
                  U_Base_Type_Region (Result)),
               Region,
               Is_Optional => Result.Value_Is_Optional or Value_Is_Optional,
-              Is_Polymorphic => Result.Is_Polymorphic);
+              Is_Polymorphic => Result.Is_Polymorphic,
+              Is_Monomorphic => Result.Is_Monomorphic);
       end if;
 
       if Result.External_View /= null
@@ -7139,12 +7145,14 @@ package body PSC.Trees.Semantics.Static is
            (not Result.External_View.Value_Is_Optional
             and then (Result.Value_Is_Optional or Value_Is_Optional))
            or else Result.External_View.Is_Polymorphic /= Result.Is_Polymorphic
+           or else Result.External_View.Is_Monomorphic /= Result.Is_Monomorphic
          then
-            --  Add Optional/Polymorphic to External_View
+            --  Add Optional/Polymorphic/Monomorphic to External_View
             Result :=
               Qualify_Type
                 (Result.External_View, Region, Is_Optional => True,
-                 Is_Polymorphic => Result.Is_Polymorphic);
+                 Is_Polymorphic => Result.Is_Polymorphic,
+                 Is_Monomorphic => Result.Is_Monomorphic);
          else
             --  External view as-is is fine
             Result := Result.External_View;
@@ -11105,6 +11113,12 @@ package body PSC.Trees.Semantics.Static is
               Qualify_Type
                 (Substituted_Nested_Type_Sem, Decl_Region => null,
                  Is_Polymorphic => True);
+         elsif Nested_Type.Is_Monomorphic then
+            --  Make substituted type monomorphic as well
+            Substituted_Nested_Type_Sem :=
+              Qualify_Type
+                (Substituted_Nested_Type_Sem, Decl_Region => null,
+                 Is_Monomorphic => True);
          end if;
 
          if Debug_Second_Pass then
@@ -11881,6 +11895,12 @@ package body PSC.Trees.Semantics.Static is
                           Qualify_Type
                             (Type_With_New_Enc, Decl_Region => null,
                              Is_Polymorphic => True);
+                     elsif Param_Type.Is_Monomorphic then
+                        --  Make new type Monomorphic as well
+                        Type_With_New_Enc :=
+                          Qualify_Type
+                            (Type_With_New_Enc, Decl_Region => null,
+                             Is_Monomorphic => True);
                      end if;
 
                      if Debug_Second_Pass then
@@ -12356,9 +12376,12 @@ package body PSC.Trees.Semantics.Static is
                begin
                   if Extra_Subst /= null and then Orig_Sem /= null
                     and then Orig_Sem.all in Type_Semantic_Info
-                    and then Type_Sem_Ptr (Orig_Sem).Is_Polymorphic
+                    and then
+                      (Type_Sem_Ptr (Orig_Sem).Is_Polymorphic
+                        or else
+                       Type_Sem_Ptr (Orig_Sem).Is_Monomorphic)
                   then
-                     --  We have a polymorphic type.
+                     --  We have a polymorphic or monomorphic type.
                      --  Prevent substitution of root type.
                      Extra_Subst_To_Use := null;
                   end if;
@@ -18328,6 +18351,7 @@ package body PSC.Trees.Semantics.Static is
                        Param_Sem_Ptr (Operand_Sem).Resolved_Type;
                   begin
                      if Resolved_Type /= null
+                       and then not Resolved_Type.Is_Monomorphic
                        and then Types_Match (Resolved_Type, Cur_Inst_Type)
                      then
                         if Resolved_Type.Is_Polymorphic then
@@ -18831,6 +18855,7 @@ package body PSC.Trees.Semantics.Static is
       --  If so, copy operation to that local type's module.
       begin
          if Resolved_Type /= null
+           and then not Resolved_Type.Is_Monomorphic
            and then Resolved_Type.Associated_Module /= null
            and then Types_Match (Resolved_Type.Enclosing_Type, Cur_Inst_Type)
            and then Types_Match
@@ -21554,6 +21579,8 @@ package body PSC.Trees.Semantics.Static is
                     Def_Sem.Obj_Is_Concurrent or Type_Sem.Obj_Is_Concurrent,
                   Is_Polymorphic =>
                     Def_Sem.Is_Polymorphic or Type_Sem.Is_Polymorphic,
+                  Is_Monomorphic =>
+                    Def_Sem.Is_Monomorphic or Type_Sem.Is_Monomorphic,
                   Root_Type => Def_Sem.Root_Type,
                   Corresponding_Polymorphic_Type =>
                     Def_Sem.Corresponding_Polymorphic_Type,
@@ -21702,7 +21729,7 @@ package body PSC.Trees.Semantics.Static is
    begin
       Visit (T.Operand, Visitor);
       if T.Qualifiers (Is_Polymorphic) or T.Qualifiers (Is_Optional) or
-        T.Qualifiers (Is_Concurrent)
+        T.Qualifiers (Is_Concurrent) or T.Qualifiers (Is_Monomorphic)
       then
          --  Worth creating a new type.
          declare
@@ -21714,6 +21741,7 @@ package body PSC.Trees.Semantics.Static is
                  Definition => Optional (T'Access),
                  Is_Optional => T.Qualifiers (Is_Optional),
                  Is_Polymorphic => T.Qualifiers (Is_Polymorphic),
+                 Is_Monomorphic => T.Qualifiers (Is_Monomorphic),
                  Is_Concurrent => T.Qualifiers (Is_Concurrent));
          begin
             T.Sem_Info := Root_Sem_Ptr (Qualified_Type);

@@ -775,12 +775,19 @@ id_list :
 type_name : 
     qualified_name { $$ := $1; }
   | polymorphic_type_name { $$ := $1; }
+  | monomorphic_type_name { $$ := $1; }
   ;
 
 polymorphic_type_name : qualified_name '+' {
 	$$ := (One_Tree, Qualifier.Qualify(
 	    Qualifiers => (Qualifier.Is_Polymorphic => True, others => False),
 	    Operand => $1.Tree));
+    };
+
+monomorphic_type_name : '<' qualified_name '>' {
+	$$ := (One_Tree, Qualifier.Qualify(
+	    Qualifiers => (Qualifier.Is_Monomorphic => True, others => False),
+	    Operand => $2.Tree));
     };
 
 qualified_name : 
