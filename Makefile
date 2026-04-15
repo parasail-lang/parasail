@@ -36,7 +36,7 @@ OBJS=
 EXE=compiled_main.exe
 A2X_EXE=compiled_a2x_main.exe
 OMPLIB=-lgomp
-MATHLIB=-lm
+MATHLIB=-lm -no-pie
 
 ifeq ($(OMP),on)
   EXTRALIBS=$(OMPLIB)
