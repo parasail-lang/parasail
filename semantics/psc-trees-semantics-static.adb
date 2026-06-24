@@ -3212,13 +3212,10 @@ package body PSC.Trees.Semantics.Static is
                  Known_To_Be_Small => False,
                  Known_To_Be_Large => False,
                  All_Parameters_Known =>
-                   T.Has_Formals
-                   and then  --  tbd why?
-
-                   (Num_Module_Parameters (Mod_Sem) = 0
-                    and then
-                      Num_Enclosing_Module_Parameters (Visitor.Decl_Region) =
-                      0),
+                   Num_Module_Parameters (Mod_Sem) = 0
+                   and then
+                     Num_Enclosing_Module_Parameters (Visitor.Decl_Region) =
+                     0,
                  --  All (actual) parameters are known if there are
                  --  no formal parameters in this module, or any encloser
                  --  or ancestor.
@@ -16690,12 +16687,17 @@ package body PSC.Trees.Semantics.Static is
 
    function Is_Compile_Time_Known
      (Operand : Optional_Tree; Disallow_Concurrent_Types : Boolean := False;
-      Diagnose : Boolean := False) return Boolean is
+      Diagnose : Boolean := False;
+      Decl_Region : Symbols.Region_Ptr := null) return Boolean is
       --  Return True if given operand is compile-time known.
       --  If Disallow_Concurrent_Types is true, then disallow having
       --  any parameters of a concurrent type.
       --  If Diagnose is True, then indicate what causes Is_Compile_Time_Known
       --  to return False.
+      --  If Decl_Region is non-null, it is passed on to Finish_Type_Sem_Info
+      --  so it can find the enclosing module even when called from a
+      --  context, such as code generation, where Current_Module is not
+      --  maintained.
       --  TBD: This is relatively simple for now.
       --      Could get more sophisticated eventually.
       Operand_Tree :
@@ -16733,7 +16735,7 @@ package body PSC.Trees.Semantics.Static is
            and then not Assoc_Type.All_Parameters_Checked
          then
             --  Finish up the type now
-            Finish_Type_Sem_Info (Assoc_Type);
+            Finish_Type_Sem_Info (Assoc_Type, Decl_Region);
          end if;
          if Diagnose and then not Assoc_Type.All_Parameters_Known then
             Give_Reason
@@ -16762,7 +16764,8 @@ package body PSC.Trees.Semantics.Static is
          return
            Is_Compile_Time_Known
              (Reference.Tree (Operand_Tree).Referent,
-              Disallow_Concurrent_Types, Diagnose => Diagnose);
+              Disallow_Concurrent_Types, Diagnose => Diagnose,
+              Decl_Region => Decl_Region);
       elsif Sem = null then
          if Diagnose then
             Give_Reason ("Semantic info is null");
@@ -16804,7 +16807,7 @@ package body PSC.Trees.Semantics.Static is
                   return
                     Is_Compile_Time_Known
                       (Obj_Tree.Obj_Value, Disallow_Concurrent_Types,
-                       Diagnose => True);
+                       Diagnose => True, Decl_Region => Decl_Region);
                end if;
                --  Not compile-time known for some reason, given above
                return False;
@@ -16814,7 +16817,8 @@ package body PSC.Trees.Semantics.Static is
                  and then Not_Null (Obj_Tree.Obj_Value)
                  and then Obj_Tree.Is_Const and then not Obj_Tree.Is_Ref
                  and then Is_Compile_Time_Known
-                   (Obj_Tree.Obj_Value, Disallow_Concurrent_Types);
+                   (Obj_Tree.Obj_Value, Disallow_Concurrent_Types,
+                    Decl_Region => Decl_Region);
             end if;
          end;
       elsif Operand_Tree in Invocation.Tree'Class then
@@ -16840,7 +16844,8 @@ package body PSC.Trees.Semantics.Static is
             for I in 1 .. Lists.Length (Invoc.Operands) loop
                if not Is_Compile_Time_Known
                    (Lists.Nth_Element (Invoc.Operands, I),
-                    Disallow_Concurrent_Types, Diagnose => Diagnose)
+                    Disallow_Concurrent_Types, Diagnose => Diagnose,
+                    Decl_Region => Decl_Region)
                then
                   return False;
                end if;
@@ -16967,7 +16972,8 @@ package body PSC.Trees.Semantics.Static is
          --  Retry on the underlying definition
          return
            Is_Compile_Time_Known
-             (Sem.Definition, Disallow_Concurrent_Types, Diagnose => Diagnose);
+             (Sem.Definition, Disallow_Concurrent_Types, Diagnose => Diagnose,
+              Decl_Region => Decl_Region);
       else
          --  NOTE: Already handled literals above
          if Diagnose then
@@ -17296,7 +17302,8 @@ package body PSC.Trees.Semantics.Static is
                         for I in 1 .. Lists.Length (T.Operands) loop
                            if Type_Sem.Actual_Sem_Infos (I) = null
                              or else not Is_Compile_Time_Known
-                               (Type_Sem.Actual_Sem_Infos (I).Definition)
+                               (Type_Sem.Actual_Sem_Infos (I).Definition,
+                                Decl_Region => Decl_Region)
                            then
                               if Debug_Second_Pass then
                                  Put_Line
@@ -21357,7 +21364,7 @@ package body PSC.Trees.Semantics.Static is
       Param_Sem.Context := Context;
 
       --  Second pass for parameter
-      if Visitor.Mode in Analyze_Module_Params then
+      if Visitor.Mode in Analyze_Decls then
          --  Set context to Type_Context
          Visitor.Context := Type_Context;
 

@@ -13766,7 +13766,8 @@ package body PSC.Trees.Semantics.Dynamic is
 
                if Static.Is_Compile_Time_Known
                     (Resolved_Annot,
-                     Disallow_Concurrent_Types => True)
+                     Disallow_Concurrent_Types => True,
+                     Decl_Region => Check_Visitor.Decl_Region)
                  and then
                   (Annotation_Tree not in Identifier.Tree
                      or else
@@ -15074,7 +15075,8 @@ package body PSC.Trees.Semantics.Dynamic is
                               if Not_Null (Val)
                                 and then
                                   Static.Is_Compile_Time_Known (Val,
-                                    Disallow_Concurrent_Types => True)
+                                    Disallow_Concurrent_Types => True,
+                                    Decl_Region => Visitor.Decl_Region)
                               then
                                  if Tree_Ptr_Of (Val).all in
                                    Identifier.Tree
@@ -16006,7 +16008,8 @@ package body PSC.Trees.Semantics.Dynamic is
                              or else
                             Static.Is_Compile_Time_Known
                                   (Resolved_Tree (T.Obj_Value),
-                                   Disallow_Concurrent_Types => True)))
+                                   Disallow_Concurrent_Types => True,
+                                   Decl_Region => Visitor.Decl_Region)))
                      then
                         --  Add to list of compile-time-known constants
                         Add_Element
@@ -16088,7 +16091,8 @@ package body PSC.Trees.Semantics.Dynamic is
               and then Is_Null (T.In_Region)
               and then Not_Null (T.Obj_Value)
               and then Static.Is_Compile_Time_Known (T.Obj_Value,
-                            Disallow_Concurrent_Types => True)
+                            Disallow_Concurrent_Types => True,
+                            Decl_Region => Visitor.Decl_Region)
             then
                --  Local constant with compile-time-known initial value.
                --  Create a global anon constant and use that.
@@ -17022,7 +17026,8 @@ package body PSC.Trees.Semantics.Dynamic is
                       or else
                     Num_Operands (Tree_Ptr_Of (Call_Sem.Definition).all) = 1)
                  and then Static.Is_Compile_Time_Known (Call_Sem.Definition,
-                            Disallow_Concurrent_Types => True)
+                            Disallow_Concurrent_Types => True,
+                            Decl_Region => Visitor.Decl_Region)
                then
                   --  We have a compile-time-known call with small/string
                   --  result (TBD: Handle other types) or no parameters.
