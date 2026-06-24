@@ -501,7 +501,6 @@ formal_type_declaration :
     }
   | TYPE_kw id IS_no_indent
       opt_LIMITED_or_SYNCHRONIZED_kw PRIVATE_kw {
-        -- TBD: discrims
         if $4.Is_Limited or else $4.Is_Concurrent then
            --  Not necessarily Assignable
            $$ := (One_Tree, Type_Decl.Make(
@@ -524,6 +523,33 @@ formal_type_declaration :
                  ("Assignable", Token_Src_Pos ($4)),
                Operands => Lists.Empty_List,
                Source_Pos => Token_Src_Pos ($4))));
+        end if;
+    }
+  | TYPE_kw id discriminant_part IS_no_indent
+      opt_LIMITED_or_SYNCHRONIZED_kw PRIVATE_kw {
+        --  TBD: Attach discriminant formals ($3.List) to formal type
+        if $5.Is_Limited or else $5.Is_Concurrent then
+           --  Not necessarily Assignable
+           $$ := (One_Tree, Type_Decl.Make(
+             Name => $2.Tree,
+             Is_New_Type => True,
+             Type_Definition => Invocation.Make(
+               Kind => Invocation.Module_Instantiation,
+               Prefix => PSC.Trees.Identifier.Make
+                 ("Any", Token_Src_Pos ($5)),
+               Operands => Lists.Empty_List,
+               Source_Pos => Token_Src_Pos ($5))));
+        else
+           --  Must be Assignable
+           $$ := (One_Tree, Type_Decl.Make(
+             Name => $2.Tree,
+             Is_New_Type => True,
+             Type_Definition => Invocation.Make(
+               Kind => Invocation.Module_Instantiation,
+               Prefix => PSC.Trees.Identifier.Make
+                 ("Assignable", Token_Src_Pos ($5)),
+               Operands => Lists.Empty_List,
+               Source_Pos => Token_Src_Pos ($5))));
         end if;
     }
   | TYPE_kw id IS_no_indent opt_not_null_qualifier access_type_def {
@@ -1973,7 +1999,7 @@ non_derived_type_declaration :
         end;
     }
   | TYPE_kw type_id IS_no_indent
-      opt_ABSTRACT_kw record_definition {  -- TBD: discrims
+      opt_ABSTRACT_kw record_definition {
         declare
            Rec_Mod : Module.Tree
              renames Module.Tree (Tree_Ptr_Of ($5.Tree).all);
@@ -1993,9 +2019,31 @@ non_derived_type_declaration :
                Operands => Lists.Empty_List)))));
         end;
     }
+  | TYPE_kw type_id discriminant_part IS_no_indent
+      opt_ABSTRACT_kw record_definition {
+        declare
+           Rec_Mod : Module.Tree
+             renames Module.Tree (Tree_Ptr_Of ($6.Tree).all);
+        begin
+           --  Fill in name, is-abstract, and discriminants
+           Rec_Mod.Name := $2.Tree;
+           Rec_Mod.Is_Abstract := $5.Is_Abstract;
+           Rec_Mod.Has_Formals := True;
+           Rec_Mod.Module_Formals := $3.List;
+
+           --  Now build a type-decl
+           $$ := (One_List, Lists.Make ((1 => Type_Decl.Make(
+             Name => $2.Tree,
+             Is_New_Type => True,
+             Type_Definition => Invocation.Make(
+               Kind => Invocation.Module_Instantiation,
+               --  NOTE: Private/Record type decl has module as Prefix of inst
+               Prefix => $6.Tree,
+               Operands => Lists.Empty_List)))));
+        end;
+    }
   | TYPE_kw type_id IS_no_indent
       opt_ABSTRACT_kw opt_LIMITED_or_SYNCHRONIZED_kw PRIVATE_kw {
-        -- TBD: discrims
         $$ := (One_List, Lists.Make ((1 => Type_Decl.Make(
 	  Name => $2.Tree,
 	  Is_New_Type => True,
@@ -2013,6 +2061,33 @@ non_derived_type_declaration :
               Has_Formals => False,
               Treat_As_Type => True,
               Module_Formals => Lists.Empty_List,
+              Extends_Interface => Null_Optional_Tree,
+              Implements_Interfaces => Lists.Empty_List,
+              Class_Locals => Lists.Empty_List,
+              Module_Exports => Lists.Empty_List,
+              Module_New_Exports => Lists.Empty_List,
+              Module_Implements => Lists.Empty_List),
+            Operands => Lists.Empty_List)))));
+    }
+  | TYPE_kw type_id discriminant_part IS_no_indent
+      opt_ABSTRACT_kw opt_LIMITED_or_SYNCHRONIZED_kw PRIVATE_kw {
+        $$ := (One_List, Lists.Make ((1 => Type_Decl.Make(
+	  Name => $2.Tree,
+	  Is_New_Type => True,
+	  Type_Definition => Invocation.Make(
+            Kind => Invocation.Module_Instantiation,
+            --  NOTE: Private/Record type decl has module as Prefix of inst
+            Prefix => Module.Make(
+              Name => $2.Tree,
+              Add_On_Label => Lists.Empty_List,
+              Is_Interface => True,
+              Is_Abstract => $5.Is_Abstract,
+              Is_Private => True,
+              Is_Concurrent => $6.Is_Concurrent,
+              Is_Limited => $6.Is_Limited,
+              Has_Formals => True,
+              Treat_As_Type => True,
+              Module_Formals => $3.List,
               Extends_Interface => Null_Optional_Tree,
               Implements_Interfaces => Lists.Empty_List,
               Class_Locals => Lists.Empty_List,
@@ -2201,7 +2276,6 @@ opt_ALL_or_CONSTANT_kw :
 type_derivation :
     TYPE_kw type_id IS_no_indent opt_ABSTRACT_kw opt_LIMITED_or_SYNCHRONIZED_kw
       parent_type_specifier opt_aspect_spec {
-        -- TBD: discrims
         if $4.Is_Abstract then
            yyerror ("Only tagged types can be declared abstract",
                     At_Token => $4);
@@ -2212,9 +2286,22 @@ type_derivation :
            Type_Definition =>
              Param_Decl.Tree (Tree_Ptr_Of ($6.Tree).all).Param_Type))));
     }
+  | TYPE_kw type_id discriminant_part IS_no_indent
+      opt_ABSTRACT_kw opt_LIMITED_or_SYNCHRONIZED_kw
+      parent_type_specifier opt_aspect_spec {
+        --  TBD: Attach discriminant formals ($3.List) to derived type
+        if $5.Is_Abstract then
+           yyerror ("Only tagged types can be declared abstract",
+                    At_Token => $5);
+        end if;
+	$$ := (One_List, Lists.Make ((1 => Type_Decl.Make
+	  (Name => $2.Tree,
+	   Is_New_Type => True,
+           Type_Definition =>
+             Param_Decl.Tree (Tree_Ptr_Of ($7.Tree).all).Param_Type))));
+    }
   | TYPE_kw type_id IS_no_indent opt_ABSTRACT_kw opt_LIMITED_or_SYNCHRONIZED_kw
       parent_type_specifier WITH_kw PRIVATE_kw opt_aspect_spec {
-        -- TBD: discrims
 	$$ := (One_List, Lists.Make ((1 => Type_Decl.Make
 	  (Name => $2.Tree,
 	   Is_New_Type => True,
@@ -2240,9 +2327,37 @@ type_derivation :
                Module_Implements => Lists.Empty_List),
              Operands => Lists.Empty_List)))));
     }
+  | TYPE_kw type_id discriminant_part IS_no_indent
+      opt_ABSTRACT_kw opt_LIMITED_or_SYNCHRONIZED_kw
+      parent_type_specifier WITH_kw PRIVATE_kw opt_aspect_spec {
+	$$ := (One_List, Lists.Make ((1 => Type_Decl.Make
+	  (Name => $2.Tree,
+	   Is_New_Type => True,
+           Type_Definition => Invocation.Make
+            (Kind => Invocation.Module_Instantiation,
+             --  NOTE: type decl has module as Prefix of inst
+             Prefix => PSC.Trees.Module.Make(
+               Name => $2.Tree,
+               Add_On_Label => Lists.Empty_List,
+               Is_Interface => True,
+               Is_Abstract => $5.Is_Abstract,
+               Is_Private => True,
+               Is_Concurrent => $6.Is_Concurrent,
+               Is_Limited => $6.Is_Limited,
+               Has_Formals => True,
+               Treat_As_Type => True,
+               Module_Formals => $3.List,
+               Extends_Interface => $7.Tree,
+               Implements_Interfaces => Lists.Empty_List,
+               Class_Locals => Lists.Empty_List,
+               Module_Exports => Lists.Empty_List,
+               Module_New_Exports => Lists.Empty_List,
+               Module_Implements => Lists.Empty_List),
+             Operands => Lists.Empty_List)))));
+    }
   | TYPE_kw type_id IS_no_indent opt_ABSTRACT_kw opt_LIMITED_or_SYNCHRONIZED_kw
       parent_type_specifier
-      WITH_kw record_definition opt_aspect_spec {  -- TBD: discrims
+      WITH_kw record_definition opt_aspect_spec {
         declare
            Rec_Mod : Module.Tree
              renames Module.Tree (Tree_Ptr_Of ($8.Tree).all);
@@ -2262,6 +2377,34 @@ type_derivation :
                Kind => Invocation.Module_Instantiation,
                --  NOTE: type decl has module as Prefix of inst
                Prefix => $8.Tree,
+               Operands => Lists.Empty_List)))));
+        end;
+    }
+  | TYPE_kw type_id discriminant_part IS_no_indent
+      opt_ABSTRACT_kw opt_LIMITED_or_SYNCHRONIZED_kw
+      parent_type_specifier
+      WITH_kw record_definition opt_aspect_spec {
+        declare
+           Rec_Mod : Module.Tree
+             renames Module.Tree (Tree_Ptr_Of ($9.Tree).all);
+        begin
+           --  Fill in name, other info, and discriminants
+           Rec_Mod.Name := $2.Tree;
+           Rec_Mod.Is_Abstract := $5.Is_Abstract;
+           Rec_Mod.Is_Limited := $6.is_Limited;
+           Rec_Mod.Is_Concurrent := $6.is_Concurrent;
+           Rec_Mod.Extends_Interface := $7.Tree;
+           Rec_Mod.Has_Formals := True;
+           Rec_Mod.Module_Formals := $3.List;
+
+           --  Now build a type-decl
+           $$ := (One_List, Lists.Make ((1 => Type_Decl.Make (
+             Name => $2.Tree,
+             Is_New_Type => True,
+             Type_Definition => Invocation.Make(
+               Kind => Invocation.Module_Instantiation,
+               --  NOTE: type decl has module as Prefix of inst
+               Prefix => $9.Tree,
                Operands => Lists.Empty_List)))));
         end;
     }
@@ -2399,6 +2542,75 @@ subtype_indication :
   | type_specifier RANGE_kw simple_expression_component {
         $$ := $1;
 	Annotation.Add_Annotation($$.Tree, Lists.Make ((1 => $3.Tree)));
+    }
+  | type_specifier '(' discriminant_association_list ')' {
+        --  Discriminant constraint: T (D1 => val1, D2 => val2, ...)
+        $$ := (One_Tree, Invocation.Make(
+          Kind => Invocation.Module_Instantiation,
+          Prefix => $1.Tree,
+          Operands => $3.List,
+          Source_Pos => Find_Source_Pos ($1.Tree)));
+    }
+  ;
+
+--  Discriminant parts (RM 3.7) — non-nullable; use explicit alternatives in type rules
+discriminant_part :
+    '(' discriminant_spec_list ')' {
+        $$ := $2;
+    }
+  | '(' BOX ')' {
+        --  Unknown discriminant part (<>): indefinite type with no visible discriminants
+        $$ := (One_List, Lists.Empty_List);
+    }
+  ;
+
+discriminant_spec_list :
+    discriminant_spec {
+        $$ := $1;
+    }
+  | discriminant_spec_list ';' discriminant_spec {
+        $$ := $1;
+        Lists.Append ($$.List, $3.List);
+    }
+  ;
+
+discriminant_spec :
+    id_list ':' type_or_access_type_specifier
+      opt_ASSIGN_expression {
+        --  Each discriminant maps to a Param_Decl
+        $$ := (One_List, Lists.Empty_List);
+        for I in 1 .. Lists.Length ($1.List) loop
+            Lists.Append ($$.List, Param_Decl.Make(
+              Name => Lists.Nth_Element ($1.List, I),
+              Kind => Param_Decl.Default_Param,
+              Locking => Param_Decl.Not_Locked,
+              Is_Optional => False,
+              Param_Type => Copy_If_Not_First ($3.Tree, I),
+              Param_Default => Copy_If_Not_First ($4.Tree, I)));
+        end loop;
+    }
+  ;
+
+--  Discriminant constraints (RM 3.7.1)
+discriminant_association_list :
+    discriminant_association {
+        $$ := (One_List, Lists.Make ((1 => $1.Tree)));
+    }
+  | discriminant_association_list ',' discriminant_association {
+        $$ := $1;
+        Lists.Append ($$.List, $3.Tree);
+    }
+  ;
+
+discriminant_association :
+    simple_type_specifier_or_expression {
+        $$ := $1;
+    }
+  | id REFERS_TO simple_type_specifier_or_expression {
+        --  Named discriminant association: Discriminant_Name => value
+        $$ := (One_Tree, Reference.Make(
+          Key => $1.Tree,
+          Referent => $3.Tree));
     }
   ;
 

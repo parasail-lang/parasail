@@ -513,10 +513,16 @@ private package PSC.Trees.Semantics.Static is
 
    function Is_Compile_Time_Known (Operand : Optional_Tree;
      Disallow_Concurrent_Types : Boolean := False;
-     Diagnose : Boolean := False) return Boolean;
+     Diagnose : Boolean := False;
+     Decl_Region : Symbols.Region_Ptr := null) return Boolean;
       --  Return True if given operand is compile-time known.
       --  If Disallow_Concurrent_Types is true, then disallow having
       --  any parameters of a concurrent type.
+      --  If Decl_Region is non-null, it is used to help determine
+      --  the enclosing module when finishing the semantic info of
+      --  the operand's type, needed when called from a context, such
+      --  as code generation, where the Current_Module fallback
+      --  is not maintained.
       --  TBD: This is relatively simple for now.
       --      Could get more sophisticated eventually.
 
