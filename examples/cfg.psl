@@ -1,0 +1,830 @@
+// ParaScope: Control Flow Graph module
+
+// Copyright (C) 2011-2016, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+class CFG is
+   var Nodes : Vector<Node> := []
+   var Edges : Vector<Edge> := []
+   var Roots : Node_Set := [1]
+   var Dom_Tree : optional Dominator_Tree := null
+
+   const Debug_CFG : Boolean := #false
+   const Debug_CFG_Verbose : Boolean := #false
+
+   func Contains(Str, Substr : Univ_String) -> Boolean is
+     //  Return #true if Substr appears within Str somewhere
+     //  TBD: This should be in Univ_String module, perhaps as "in"
+      const Str_Len := |Str|
+      const Sub_Len := |Substr|
+      for I in 1 .. Str_Len - Sub_Len + 1 loop
+         if Str[I ..< I + Sub_Len] == Str then
+            return #true
+         end if
+      end loop
+   end func Contains
+
+  exports
+
+   op "[]"() -> CFG is
+   //  Create an empty control-flow graph
+      return ()
+   end op "[]"
+
+   func Add_Node(var CFG) -> Node_Id is
+   //  Add node to control-flow graph
+      CFG.Nodes |= (Incoming_Edges => [], Outgoing_Edges => [])
+      CFG.Dom_Tree := null  //  Reset dominator tree to null
+      return Node_Id::(|CFG.Nodes|)
+   end func Add_Node
+
+   func Last_Node_Id(CFG) -> Node_Id is
+      return Node_Id::(|CFG.Nodes|)
+   end func Last_Node_Id
+
+   func Add_Edge(var CFG; From, To : Node_Id) -> Result : Edge_Id is
+   //  Add edge to control-flow graph
+      CFG.Edges |= (From => From, To => To)
+      Result := Edge_Id::(|CFG.Edges|)
+
+      //  Keep track of incoming and outgoing edges
+      CFG.Nodes[From].Outgoing_Edges |= Result
+      CFG.Nodes[To].Incoming_Edges |= Result
+
+      CFG.Dom_Tree := null  //  Reset dominator tree to null
+   end func Add_Edge
+
+   func Remove_Edge(var CFG; E : Edge_Id) is
+   //  Remove edge from Incoming_Edges and Outgoing_Edges of To/From nodes
+      ref Edge => CFG.Edges[E]
+
+      //  Replace Outgoing_Edges vector with all but those matching E
+      var Old_Outgoing <== CFG.Nodes[Edge.From].Outgoing_Edges
+      CFG.Nodes[Edge.From].Outgoing_Edges :=
+        [for each Old_Edge of Old_Outgoing {Old_Edge != E} forward => Old_Edge]
+
+      //  Replace Incoming_Edges vector with all but those matching E
+      var Old_Incoming <== CFG.Nodes[Edge.To].Incoming_Edges
+      CFG.Nodes[Edge.To].Incoming_Edges :=
+        [for each Old_Edge of Old_Incoming {Old_Edge != E} forward => Old_Edge]
+   end func Remove_Edge
+
+   func Last_Edge_Id(CFG) -> Edge_Id is
+      return Edge_Id::(|CFG.Edges|)
+   end func Last_Edge_Id
+
+   func Nth_Node(ref CFG; Node_Id) -> ref Node is
+   //  Return reference to Node given Node_Id
+      return CFG.Nodes[Node_Id]
+   end func Nth_Node
+
+   func Nth_Edge(ref CFG; Edge_Id) -> ref Edge is
+   //  Return reference to Edge given Edge_Id
+      return CFG.Edges[Edge_Id]
+   end func Nth_Edge
+
+   func Add_Root(var CFG; Root : Node_Id) is
+   //  Add another Node to the set of roots
+      CFG.Roots |= Root
+   end func Add_Root
+
+   func Roots(ref CFG) -> ref Node_Set is
+   //  Return reference to set of root nodes
+      return CFG.Roots
+   end func Roots
+
+   func Successors(CFG; Node_Id) -> Vector<Node_Id> is
+      return [for each E of CFG[Node_Id].Outgoing_Edges => CFG.Edges[E].To]
+   end func Successors
+
+   func Predecessors(CFG; Node_Id) -> Vector<Node_Id> is
+      return [for each E of CFG[Node_Id].Incoming_Edges => CFG.Edges[E].From]
+   end func Predecessors
+
+   func Reverse_Postorder
+     (CFG; Connected_Nodes_Only : Boolean := #false)
+     -> Result : optional Node_List is
+     //  Return list of all nodes (or Connected_Nodes_Only if #true)
+     //  in a reverse postorder 
+      var Visited : Bit_Set<Node_Id> := Create(CFG.All_Nodes(), #false)
+      var Visiting : Array<Node_Id, Indexed_By => Univ_Integer> :=
+        Create(1 .. Last_Node_Id(CFG), 0)
+      var Num_Edges_To_Traverse : Array<Univ_Integer,
+                                    Indexed_By => Univ_Integer> :=
+        Create(1 .. Last_Node_Id(CFG), 0)
+      var Num_Visiting := 0
+
+      func Push_Node(Id : Node_Id) is
+         //  Add node to stack, unless already visited
+         if Id not in Visited then
+            //  Remember we have visited this node
+            Visited |= Id
+            //  Add Id to top of stack, along with its count of edges
+            Num_Visiting += 1
+            Visiting[Num_Visiting] := Id
+            Num_Edges_To_Traverse[Num_Visiting] := |CFG[Id].Outgoing_Edges|
+         end if
+      end func Push_Node
+
+      Result := null
+
+      const Nodes_To_Visit := Connected_Nodes_Only? CFG.Roots() :
+                                All_Nodes(CFG).First .. All_Nodes(CFG).Last
+         //  If Connected_Nodes_Only is #false, then make sure to visit
+         //  each node, even if graph is not fully connected
+
+      for N in Nodes_To_Visit forward loop
+
+         Push_Node(N)
+
+         //  Loop until stack is empty
+         while Num_Visiting > 0 loop
+            ref Edge_Index => Num_Edges_To_Traverse[Num_Visiting]
+            const Top_Node := Visiting[Num_Visiting]
+
+            if Edge_Index == 0 then
+               //  Done walking successors of top node.
+               //  Add top node to front of reverse post-order
+               Result := (Id => Top_Node, Next <== Result)
+
+               //  Pop the stack
+               Num_Visiting -= 1
+
+            else
+               //  Add another successor of Top_Node to stack
+               //  NOTE: We traverse the edges of a node in reverse order
+               //        so that in reverse post-order nodes typically end
+               //        up in forward order.
+               Push_Node
+                 (CFG.Nth_Edge
+                   (CFG[Top_Node].Outgoing_Edges[Edge_Index]).To)
+
+               //  One less edge to traverse
+               Edge_Index -= 1
+            end if
+         end loop
+
+      end loop
+
+      {|CFG| > 0 ==> Result not null}
+   end func Reverse_Postorder
+
+   func Dump_Graph(var File : Output_Stream+; CFG;
+     Label : Univ_String;
+     Node_Attrib_Map : Map<CFG::Node_Id, Univ_String> := [];
+     Edge_Attrib_Map : Map<CFG::Edge_Id, Univ_String> := [];
+     DT : optional Dominator_Tree) is
+
+      func Node_Name(N : Node_Id) -> Univ_String is
+         //  Return node name to uniquely identify node with given Node_Id
+         ref N_Node => CFG[N]
+         return "BB" | N
+      end func Node_Name
+
+      func Node_Label(N : Node_Id) -> Univ_String is
+         //  Return label to be displayed for node with given Node_Id
+         ref N_Node => CFG[N]
+         return "BB`(N): I`(N_Node.First)-I`(N_Node.Last),\n"
+          // | "L`(Source_Pos(Routine.Nth_Instr(N_Node.First)).Line())-L" |
+          //    Source_Pos(Routine.Nth_Instr(N_Node.Last)).Line()
+      end func Node_Label
+
+      File.Println
+        ("digraph G {\n label = \"`(Label.Replace('"', With => '$'))\";")
+      //  Indicate the root node
+      File.Println(" root = " |
+        Node_Name(DT not null? DT.Primary_Root() : CFG::First_Node_Id) | ";")
+
+      for E in CFG.All_Edges() loop
+         ref Edge => CFG.Nth_Edge(E)
+         var Style : Univ_String := ""
+         if E in Edge_Attrib_Map then
+            Style := "[label=E`(E),`(Edge_Attrib_Map[E])]"
+         else
+            Style := "[label=E`(E)]"
+         end if
+         File.Println(" `(Node_Name(Edge.From)) -> " |
+                            Node_Name(Edge.To) | Style | ";")
+      end loop
+
+      for N in CFG.All_Nodes() forward loop
+         var Style := ""
+         if N in Node_Attrib_Map then
+            Style := "," | Node_Attrib_Map[N]
+         end if
+
+         File.Println(" " | Node_Name(N) |
+           "[label=\"`(Node_Label(N))\"`(Style)];")
+      end loop
+
+      //  Add edges to represent the dominator tree, if DT not null
+      if DT not null then
+         for N in CFG.All_Nodes() {DT.Is_Connected(N)} forward loop
+            ref DF => DT.Dominance_Frontier(N)
+            const Idom := DT.Immediate_Dominator(N)
+            const Encl_Loop := DT.Enclosing_Loop(N)
+
+            ref BB => CFG[N]
+            const BB_Graph_Id := Node_Name(N)
+
+            const DF_Image := "[" |
+              (for (F in DF; Sep := "" then ", ") => <""> | Sep | F) | "]"
+
+            if Idom != N then
+               //  Use bold, blue arrows for dominator relationship;
+               //  Suppress any self-dominators as they are not interesting.
+               File.Println(" " | Node_Name(Idom) |
+                 " -> `(BB_Graph_Id)[style=bold,color=blue];")
+            end if
+
+            //  Use dashed, light blue arrors for dominance frontier
+            for F in DF loop
+               File.Println(BB_Graph_Id | " -> " | Node_Name(F) |
+                 "[style=dashed,color=lightblue];")
+            end loop
+
+            if DT.Is_Loop_Header(N) then
+               if N not in Node_Attrib_Map
+                 or else not Contains(Node_Attrib_Map[N], "fillcolor")
+               then
+                  //  Make loop headers pink (unless overridden)
+                  File.Println(BB_Graph_Id |
+                    "[style=filled,fillcolor=pink];")
+               end if;
+
+               //  Make each loop into a cluster
+               File.Println("subgraph cluster_`(BB_Graph_Id){")
+               File.Println("  label=\"Loop header: `(BB_Graph_Id)\";")
+               for In_Loop in CFG.All_Nodes() {DT.Is_Within_Loop(In_Loop, N)}
+               loop
+                  File.Print(" " | Node_Name(In_Loop))
+               end loop
+               File.Println("\n}")
+            end if
+
+            if #false and then Encl_Loop not null then
+               //  Add arrows for enclosing loop
+               //  TBD: Suppressed for now
+               ref Encl_Loop_Node => CFG[Encl_Loop]
+               File.Println(BB_Graph_Id | " -> BB`(Encl_Loop)_" |
+                 Encl_Loop_Node.First | "_" | Encl_Loop_Node.Last |
+                 "[style=dashed,color=pink];")
+            end if
+            
+         end loop
+      end if
+      File.Println("}")
+      File.Flush()
+   end func Dump_Graph
+
+   class Dominator_Tree is
+      interface Dominator_Info<> is
+         // Dominator tree information
+         type Order is new Integer<1 .. 100_000>  // reverse-postorder position
+
+         var Immediate_Dominator : optional Node_Id := null
+         var Immediate_Postdominator : optional Node_Id := null
+         var Dominance_Frontier : Set<Node_Id> := []
+         var Position : optional Order := null
+         var Is_Loop_Header : Boolean := #false
+         var Enclosing_Loop : optional Node_Id := null
+           //  For a loop header, this is the enclosing loop, or null
+           //  if this is an outermost loop.
+
+      end interface Dominator_Info
+
+      const Primary_Root : optional Node_Id
+      const Tree_Roots : Node_Set
+      const RP_Order : optional Node_List
+      var Dom_Info : Array<Dominator_Info, Indexed_By => Node_Id>
+      var Is_Back_Edge : Array<Boolean, Indexed_By => Edge_Id>
+      var Postorder : optional Node_List := null
+      
+     exports
+
+      func Dominates (Dominator_Tree; Dominator, Dominated : Node_Id)
+        -> Boolean is
+      //  Return true if Dominator dominates Dominated
+         for Dom := Dominated
+           then Dominator_Tree.Dom_Info[Dom].Immediate_Dominator
+           while Dom != Dominator loop
+            //  Look up the immediate-dominator chain
+            if Dom in Dominator_Tree.Tree_Roots then
+               //  Reached the end of the chain
+               return #false
+            end if
+         end loop
+         //  Found the dominator in the immediate-dominator chain
+         return #true
+      end func Dominates
+
+      func Postdominates (Dominator_Tree;
+                          Postdominator, Postdominated : Node_Id)
+        -> Boolean is
+      //  Return true if Postdominator postdominates Postdominated
+         for Pdom := Postdominated
+           then Dominator_Tree.Dom_Info[Pdom].Immediate_Postdominator
+           while Pdom != Postdominator loop
+            //  Look up the immediate-postdominator chain
+            if Pdom ==
+              Dominator_Tree.Dom_Info[Pdom].Immediate_Postdominator
+            then
+               //  Reached the end of the chain
+               return #false
+            end if
+         end loop
+         //  Found the postdominator in the immediate-postdominator chain
+         return #true
+      end func Postdominates
+
+      func Primary_Root (Dominator_Tree) -> Node_Id
+        is (Dominator_Tree.Primary_Root)
+      //  Return the primary "root" of the dominator tree
+
+      func Roots (Dominator_Tree) -> Node_Set
+        is (Dominator_Tree.Tree_Roots)
+      //  Return the set of roots of the dominator tree
+
+      func Is_Connected (Dominator_Tree; Node_Id) -> Boolean is
+      //  Return #true if Node is connected to the root
+         return Dominator_Tree.Dom_Info[Node_Id].Position not null
+      end func Is_Connected
+
+      func Immediate_Dominator (Dominator_Tree; Node_Id) -> Node_Id is
+      //  Return immediate dominator of given node.  Returns
+      //  self only if node is the entry node of the CFG.
+         return Dominator_Tree.Dom_Info[Node_Id].Immediate_Dominator
+      end func Immediate_Dominator
+
+      func Immediate_Postdominator (Dominator_Tree; Node_Id) -> Node_Id is
+      //  Return immediate postdominator of given node.  Returns
+      //  self only if node is the exit node of the CFG.
+         return Dominator_Tree.Dom_Info[Node_Id].Immediate_Postdominator
+      end func Immediate_Postdominator
+
+      func Dominance_Frontier (ref const Dominator_Tree; Node_Id)
+        -> ref const Set<Node_Id> is
+         return Dominator_Tree.Dom_Info[Node_Id].Dominance_Frontier
+      end func Dominance_Frontier
+
+      func Reverse_Postorder(ref const Dominator_Tree)
+        -> ref const Node_List is
+      //  Return Node_List in Reverse Postorder for the CFG from which the
+      //  control-flow graph was computed.
+         return Dominator_Tree.RP_Order
+      end func Reverse_Postorder
+
+      func Postorder(ref const Dominator_Tree)
+        -> ref const Node_List is
+      //  Return Node_List in Postorder for the CFG from which the
+      //  control-flow graph was computed.
+         return Dominator_Tree.Postorder
+      end func Postorder
+
+      func Is_Loop_Header (Dominator_Tree; Node_Id) -> Boolean is
+      //  Return #true if the specified node is a loop header
+      //  (which is defined to be a node that has itself in its
+      //  dominance frontier).
+         return Dominator_Tree.Dom_Info[Node_Id].Is_Loop_Header
+      end func Is_Loop_Header
+
+      func Enclosing_Loop (Dominator_Tree; Node_Id) -> optional Node_Id is
+      //  Return Node_Id of innermost loop header that (strictly) dominates
+      //  the given node.  If Node_Id is itself a loop header, this is the
+      //  enclosing loop, if any.  It is null if this is an outermost
+      //  loop header, or the block is not inside any loop.
+         return Dominator_Tree.Dom_Info[Node_Id].Enclosing_Loop
+      end func Enclosing_Loop
+
+      func Is_Within_Loop(DT : Dominator_Tree; Member, Loop_Header : Node_Id)
+        -> Boolean is
+      //  Return #true if Member is inside the loop headed by Loop_Header,
+      //  directly or indirectly.
+      //  Loop_Header is within its own loop, presuming it is a loop header.
+      //  This returns false if Loop_Header is not in fact a loop header.
+
+         return DT.Dom_Info[Loop_Header].Is_Loop_Header
+           and then (for some LH := Member
+                     then DT.Dom_Info[LH].Enclosing_Loop
+                     while LH not null => LH == Loop_Header)
+      end func Is_Within_Loop
+
+      func Is_Back_Edge (Dominator_Tree; Edge_Id) -> Boolean is
+      //  Return #true if the specified edge is a back edge
+      //  (meaning its "From" is dominated by its "To" node).
+         return Dominator_Tree.Is_Back_Edge[Edge_Id]
+      end func Is_Back_Edge
+
+      func Compute(var CFG) -> DT : Dominator_Tree is
+        //  Compute the dominator tree for the given control-flow graph.
+        //  Eliminate edges from disconnected nodes from the graph.
+        //  This is based on the paper:
+        //    A Simple, Fast Dominance Algorithm
+        //  by: Keith D. Cooper, Timothy J. Harvey, and Ken Kennedy
+        //      Rice University
+
+        //  NOTE: we use a reverse-postorder numbering while the above paper
+        //        uses a (forward) postorder numbering.
+
+         {|CFG| > 0}
+   
+         func Common_Dominator (N1, N2 : Node_Id) -> Node_Id is
+           //  Compute common dominator of N1 and N2
+            var N1_Dom := N1
+            var N2_Dom := N2
+            while N1_Dom != N2_Dom loop
+               
+               //  Keep walking up N1's dominator chain as long as we haven't
+               //  passed N2
+               while DT.Dom_Info[N1_Dom].Position >
+                 DT.Dom_Info[N2_Dom].Position loop
+                  N1_Dom := DT.Dom_Info[N1_Dom].Immediate_Dominator
+               end loop
+
+               //  Keep walking up N2's dominator chain as long as we haven't
+               //  passed N1
+               while DT.Dom_Info[N2_Dom].Position >
+                 DT.Dom_Info[N1_Dom].Position loop
+                  N2_Dom := DT.Dom_Info[N2_Dom].Immediate_Dominator
+               end loop
+            end loop
+
+            //  We found a common dominator
+            return N1_Dom
+         end func Common_Dominator
+
+         func Common_Postdominator (N1, N2 : Node_Id) -> Node_Id is
+           //  Compute common postdominator of N1 and N2
+            var N1_Pdom := N1
+            var N2_Pdom := N2
+            while N1_Pdom != N2_Pdom loop
+               
+               //  Keep walking up N1's postdominator chain as long as
+               //  we haven't passed N2
+               while DT.Dom_Info[N1_Pdom].Position <
+                 DT.Dom_Info[N2_Pdom].Position loop
+                  N1_Pdom := DT.Dom_Info[N1_Pdom].Immediate_Postdominator
+               end loop
+
+               //  Keep walking up N2's postdominator chain as long as
+               //  we haven't passed N1
+               while DT.Dom_Info[N2_Pdom].Position <
+                 DT.Dom_Info[N1_Pdom].Position loop
+                  N2_Pdom := DT.Dom_Info[N2_Pdom].Immediate_Postdominator
+               end loop
+            end loop
+
+            //  We found a common postdominator
+            return N1_Pdom
+         end func Common_Postdominator
+
+         if Debug_CFG then
+            Println(" Compute reverse-postorder for connected nodes only")
+         end if
+         const RP_Order := CFG.Reverse_Postorder(Connected_Nodes_Only => #true)
+         if Debug_CFG then
+            Println(" Done computing RPO")
+         end if
+
+         {RP_Order not null}
+
+         //  Create initial dominator-tree info
+         DT := (Primary_Root => CFG::First_Node_Id,
+                Tree_Roots => CFG.Roots(),
+                RP_Order => RP_Order,
+                Dom_Info => Create(CFG.All_Nodes(), ()),
+                Is_Back_Edge => Create(CFG.All_Edges(), #false))
+
+         var Num_Connected := 0
+
+         //  Initialize reverse-postorder Position in Dom_Info array
+         for (N => RP_Order then N.Next while N not null;
+              I in Dominator_Info::Order forward) loop
+            DT.Dom_Info[N.Id].Position := I
+            Num_Connected += 1
+
+            //  Build up postorder as we go
+            DT.Postorder := (Id => N.Id, Next <== DT.Postorder)
+         end loop
+
+         if Num_Connected < |CFG| then
+            //  We have some disconnected nodes.
+            //  Eliminate them from the graph
+            var Edges_To_Remove : Ordered_Set<CFG::Edge_Id> := []
+
+            if Debug_CFG then
+               Println
+                (" Removing edges from disconnected nodes to connected nodes")
+            end if
+            for N in CFG.All_Nodes()
+              {DT.Dom_Info[N].Position is null}
+            loop
+               for each E of CFG[N].Outgoing_Edges loop
+                  ref Edge_Info => CFG.Nth_Edge(E)
+                  if DT.Dom_Info[Edge_Info.To].Position not null then
+                     //  Found an edge from disconnected to connected.
+                     Edges_To_Remove |= E
+                  end if
+               end loop
+            end loop
+
+            //  Remove troublesome edges
+            for E in Edges_To_Remove loop
+               CFG.Remove_Edge(E)
+            end loop
+         end if
+
+         //  Root nodes have no predecessors, so we mark them as their own
+         //  immediate dominator -- TBD: not clear this is a good idea,
+         //  but the published algorithm does that!
+         for R in DT.Tree_Roots loop
+            DT.Dom_Info[R].Immediate_Dominator := R
+         end loop
+
+         if Debug_CFG then
+            Println(" Find immediate dominators")
+         end if
+
+        *Find_Immediate_Dominators*
+         loop
+            var Changed : Boolean := #false
+
+            //  Walk nodes in reverse post-order, skipping the root node(s)
+            for N => RP_Order.Next then N.Next while N not null
+              {N.Id not in DT.Tree_Roots}
+            loop
+               //  Compute a new dominator for N.Id
+               var New_Idom : optional Node_Id := null
+
+               for each Pred of Predecessors(CFG, N.Id) forward loop
+                  const Pred_Idom := DT.Dom_Info[Pred].Immediate_Dominator
+                  if Pred_Idom not null then
+                     //  Found a predecessor that has been processed
+                     if New_Idom is null then
+                        //  This is the first predecessor already processed.
+                        //  Start with this as the new dominator.
+                        New_Idom := Pred
+                     else
+                        //  Second or subsequent predecessor.
+                        //  Find a common dominator.
+                        New_Idom := Common_Dominator(New_Idom, Pred)
+                     end if
+                  end if
+               end loop 
+
+               if DT.Dom_Info[N.Id].Immediate_Dominator is null
+                 or else
+                   New_Idom != DT.Dom_Info[N.Id].Immediate_Dominator
+               then
+                  //  We have a new dominator for this node
+                  DT.Dom_Info[N.Id].Immediate_Dominator := New_Idom
+                  Changed := #true  //  Need to iterate further
+               end if
+            end loop
+
+            if not Changed then
+               //  We are all done
+               exit loop
+            end if
+
+         end loop Find_Immediate_Dominators
+
+         //  Compute the postdominators starting at the end
+
+         var Num_Null_Ipdoms := 0
+
+         if Debug_CFG then
+            Println(" Find immediate post-dominators")
+         end if
+
+        *Find_Immediate_Postdominators*
+         for Num_Postdom_Iterations in 1 .. CFG.Last_Node_Id() forward loop
+            var Changed : Boolean := #false
+
+            //  Walk nodes in post-order, skipping exit nodes
+            for N => DT.Postorder then N.Next while N not null loop
+               //  Compute a new postdominator for N.Id
+               const Succs := Successors(CFG, N.Id)
+
+               if Debug_CFG_Verbose then
+                  Print(" `(N.Id)(`(|Succs|))")
+               end if
+
+               var New_Ipdom : optional Node_Id := (|Succs| == 0? N.Id : null)
+                 //  If |Succs| == 0 this is an exit node,
+                 //  so make it its own immediate dominator
+
+               for each Succ of Succs forward loop
+                  const Succ_Ipdom := DT.Dom_Info[Succ].Immediate_Postdominator
+                  if Succ_Ipdom not null then
+                     //  Found a successor that has been processed
+                     if New_Ipdom is null then
+                        //  This is the first successor already processed.
+                        //  Start with this as the new postdominator.
+                        New_Ipdom := Succ
+                     else
+                        //  Second or subsequent successor.
+                        //  Find a common postdominator.
+                        New_Ipdom := Common_Postdominator(New_Ipdom, Succ)
+                     end if
+                  end if
+               end loop 
+
+               if New_Ipdom is null then
+                  if Debug_CFG then
+                     Println("\n ** `(N.Id) post-dom is null")
+                  end if
+
+                  Changed := #true
+                  Num_Null_Ipdoms += 1
+               elsif DT.Dom_Info[N.Id].Immediate_Postdominator is null
+                 or else
+                   New_Ipdom != DT.Dom_Info[N.Id].Immediate_Postdominator
+               then
+                  //  We have a new postdominator for this node
+                  DT.Dom_Info[N.Id].Immediate_Postdominator := New_Ipdom
+                  Changed := #true  //  Need to iterate further
+               end if
+            end loop
+
+            if not Changed then
+               //  We are all done
+
+               if Debug_CFG then
+                  if Debug_CFG_Verbose then
+                     Print("\n")
+                  end if
+
+                  Println("Num Postdominator Iterations = " |
+                    Num_Postdom_Iterations | " with " | Num_Null_Ipdoms |
+                    " null Ipdoms.")
+               end if
+
+               exit loop
+            end if
+
+            if Debug_CFG_Verbose then
+               Println("\n finishing iteration " | Num_Postdom_Iterations)
+            end if
+
+            if Num_Postdom_Iterations == CFG.Last_Node_Id() then
+               Println(" *** Post-dominator computation halted after " |
+                 Num_Postdom_Iterations)
+            end if
+
+         end loop Find_Immediate_Postdominators
+
+         //  We will keep track of all of the loop headers
+         var Loop_Headers : Node_Set := []
+
+         if Debug_CFG then
+            Println(" Compute dominance frontier")
+         end if
+
+         //  Now compute the dominance frontiers for each node.
+         //  Algorithm: for each node with more than one predecessor,
+         //             add it to each predecessor's dominance frontier
+         //             unless the predecessor dominates the original node.
+         //             Keep doing this up the immediate dominator chain
+         //             until reaching the immediate dominator of the original
+         //             node.
+        *Compute_Dominance_Frontier*
+         for N in CFG.All_Nodes() {DT.Dom_Info[N].Position not null} loop
+            //  Walk connected nodes only
+            if |CFG[N].Incoming_Edges| > 1 then
+               //  Found a join point
+               const Join_Point_Idom := DT.Dom_Info[N].Immediate_Dominator
+
+               //  Add N to each node in dominator chain of each predecessor
+               //  until it reaches the Join_Point_Idom.
+               for each Pred of CFG.Predecessors(N) loop
+                  //  Walk up the dominator chain
+                  for Pred_Dom := Pred
+                    then DT.Dom_Info[Pred_Dom].Immediate_Dominator
+                    while Pred_Dom != Join_Point_Idom
+                      and then N not in
+                        DT.Dom_Info[Pred_Dom].Dominance_Frontier
+                  loop
+                     //  Add to dominance frontier of dominator of pred
+                     DT.Dom_Info[Pred_Dom].Dominance_Frontier |= N
+                     if Pred_Dom == N then
+                        //  This must be a loop header, as it is in its own
+                        //  dominance frontier
+                        DT.Dom_Info[N].Is_Loop_Header := #true
+                        Loop_Headers |= N
+                     end if
+                  end loop
+               end loop
+            end if
+         end loop Compute_Dominance_Frontier
+
+         if Debug_CFG then
+            Println(" Find natural loops")
+         end if
+
+         //  Walk loop headers and build up natural loops by walking
+         //  down all back edges.
+        *Find_Enclosing_Loops*
+         for LH in Loop_Headers loop
+            var Preds_Visited : Node_Set := []
+            var Preds_To_Be_Visited : Node_Set := []
+
+            //  Identify all back edges and initialize Preds_To_Be_Visited
+            for each Incoming of CFG[LH].Incoming_Edges loop
+               const Pred := CFG.Nth_Edge(Incoming).From
+
+               if DT.Dominates(LH, Pred) then
+                  //  This is a back edge because its "From" is dominated
+                  //  by its "To"
+                  DT.Is_Back_Edge[Incoming] := #true
+                  if Pred != LH then
+                     //  Add this predecessor to set to be visited
+                     Preds_To_Be_Visited |= Pred
+                  end if
+               end if
+            end loop
+
+            //  Keep visiting predecessors until Preds_To_Be_Visited is empty
+            for Pred := Remove_Any(Preds_To_Be_Visited)
+              then Remove_Any(Preds_To_Be_Visited)
+              while Pred not null
+            loop
+               //  Pred is a (strictly) dominated predecessor.
+               //  Set its Enclosing_Loop to LH if it is null or
+               //  if it points to a loop header that dominates LH.
+               ref Encl_Loop => DT.Dom_Info[Pred].Enclosing_Loop
+
+               if Encl_Loop is null
+                 or else DT.Dominates(Encl_Loop, LH)
+               then
+                  Encl_Loop := LH
+               end if
+
+               Preds_Visited |= Pred
+
+               //  Visit all of the interesting predecessors of this node
+               for each P of CFG.Predecessors(Pred) loop
+                  if P != LH
+                    and then P not in Preds_Visited
+                    and then DT.Dominates(LH, P)
+                  then
+                     //  We have a strictly dominated (indirect) predecessor
+                     //  that we have not already visited.
+                     Preds_To_Be_Visited |= P
+                  end if
+               end loop
+            end loop
+         end loop Find_Enclosing_Loops
+         
+      end func Compute
+
+   end class Dominator_Tree
+
+   func Compute_Dominator_Tree(var CFG) is
+   //  Compute dominator tree of CFG if not already computed;
+      if |CFG| > 0 and then CFG.Dom_Tree is null then
+         //  Compute the dominator tree
+         CFG.Dom_Tree := Compute(CFG)
+      end if
+   end func Compute_Dominator_Tree
+
+   func Get_Dominator_Tree(ref const CFG)
+     -> ref const optional Dominator_Tree is
+   //  Return reference to dominator tree.
+
+      {|CFG| > 0 ==> CFG.Dom_Tree not null}
+      return CFG.Dom_Tree
+   end func Get_Dominator_Tree
+
+end class CFG
+
+import CFG::*
+func Test_CFG(N : Univ_Integer) is
+   var Ran := Random::Start()
+   var CFG_A := CFG::[]
+   for I in 1 .. N loop
+      const Ignore := Add_Node(CFG_A)
+   end loop
+
+   for I in 1 .. N*10 loop
+      const Ran1 : Node_Id := Ran.Next() mod N + 1
+      const Ran2 : Node_Id := Ran.Next() mod N + 1
+      if (for all S of Successors(CFG_A, Ran1) => Ran2 != S) then
+         // Println("Adding edge `(Ran1) -> " | Ran2)
+         const Ignore := Add_Edge(CFG_A, From => Ran1, To => Ran2)
+      end if
+   end loop
+
+   Println("Last_Node_Id = " | Last_Node_Id(CFG_A))
+   Println("Last_Edge_Id = " | Last_Edge_Id(CFG_A))
+
+   Println("digraph CFG_A {");
+   for I in CFG_A.All_Edges() loop
+      ref const Edge => Nth_Edge(CFG_A, I)
+      Println("N`(Edge.From) -> N`(Edge.To);");
+   end loop
+   Println("}");
+
+end func Test_CFG
+

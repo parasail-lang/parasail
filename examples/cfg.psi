@@ -1,0 +1,181 @@
+// ParaScope: Control Flow Graph module
+
+// Copyright (C) 2011-2016, AdaCore, New York, NY
+// This program is provided "as is" with no warranty.
+// Report errors at http://groups.google.com/group/parasail-programming-language
+
+interface CFG<> is
+   // Control Flow graph of nodes connected by edges
+   type Node_Id is new Integer<0 .. 100_000>
+   type Edge_Id is new Integer<0 .. 100_000>
+
+   type Node_Set is Countable_Set<Node_Id>
+
+   const First_Node_Id := 1
+   const First_Edge_Id := 1
+
+   interface Edge<> is
+      const From : Node_Id
+      const To   : Node_Id
+   end interface Edge
+
+   type Code_Offset is new Integer<0 .. 100_000>
+
+   interface Node<> is
+      var First : optional Code_Offset := null
+      var Last  : optional Code_Offset := null
+      var Incoming_Edges : Vector<Edge_Id> := []
+      var Outgoing_Edges : Vector<Edge_Id> := []
+   end interface Node
+
+   interface Node_List<> is
+     // A list of nodes; used to represent an order for walking the graph.
+      const Id   : Node_Id
+      const Next : optional Node_List
+   end interface Node_List
+
+   op "[]"() -> CFG
+   //  Create an empty control-flow graph
+
+   func Add_Node(var CFG) -> Node_Id
+   //  Add node to control-flow graph
+
+   func Last_Node_Id(CFG) -> Node_Id
+
+   op "magnitude"(CFG) -> Univ_Integer is ([[Last_Node_Id(CFG)]])
+   //  Number of nodes in control-flow graph
+
+   func Add_Edge(var CFG; From, To : Node_Id) -> Edge_Id
+   //  Add edge to control-flow graph
+
+   func Remove_Edge(var CFG; E : Edge_Id)
+   //  Remove edge from Incoming_Edges and Outgoing_Edges of To/From nodes
+
+   func Last_Edge_Id(CFG) -> Edge_Id;
+
+   func Nth_Node(ref CFG; Node_Id) -> ref Node
+   //  Return reference to Node given Node_Id
+
+   op "indexing"(ref CFG; Node_Id) -> ref Node is Nth_Node
+
+   func Nth_Edge(ref CFG; Edge_Id) -> ref Edge
+   //  Return reference to Edge given Edge_Id
+
+   func Add_Root(var CFG; Root : Node_Id)
+   //  Add another Node to the set of roots
+
+   func Roots(ref CFG) -> ref Node_Set
+   //  Return reference to set of root nodes
+
+   func Successors(CFG; Node_Id) -> Vector<Node_Id>
+
+   func Predecessors(CFG; Node_Id) -> Vector<Node_Id>
+
+   func All_Nodes(CFG) -> Countable_Range<Node_Id>
+     is (1 .. Last_Node_Id(CFG))
+
+   func All_Edges(CFG) -> Countable_Range<Edge_Id>
+     is (1 .. Last_Edge_Id(CFG))
+
+   func Reverse_Postorder
+     (CFG; Connected_Nodes_Only : Boolean := #false)
+     -> Result : optional Node_List
+     {|CFG| > 0 ==> Result not null}
+     //  Return list of all nodes (or Connected_Nodes_Only if #true)
+     //  in a reverse postorder 
+
+   interface Dominator_Tree<> is
+      func Dominates (Dominator_Tree; Dominator, Dominated : Node_Id)
+        -> Boolean
+      //  Return true if Dominator dominates Dominated
+
+      func Postdominates (Dominator_Tree;
+                          Postdominator, Postdominated : Node_Id)
+        -> Boolean
+      //  Return true if Postdominator postdominates Postdominated
+
+      func Immediate_Dominator (Dominator_Tree; Node_Id) -> Node_Id
+      //  Return immediate dominator of given node.  Returns
+      //  self only if node is the entry node of the CFG.
+
+      func Immediate_Postdominator (Dominator_Tree; Node_Id) -> Node_Id
+      //  Return immediate postdominator of given node.  Returns
+      //  self only if node is the exit node of the CFG.
+
+      func Primary_Root (Dominator_Tree) -> Node_Id
+      //  Return the primary "root" of the dominator tree
+
+      func Roots (Dominator_Tree) -> Node_Set
+      //  Return the set of roots of the dominator tree
+
+      func Is_Connected (Dominator_Tree; Node_Id) -> Boolean
+      //  Return #true if Node is connected to the root
+
+      func Dominance_Frontier (ref const Dominator_Tree; Node_Id)
+        -> ref const Set<Node_Id>
+      //  Return the "dominance frontier" for the given node.  R. Cytron et al
+      //  defines this in "Efficiently computing static single assignment form
+      //  and the control dependence graph"(1991) as "...the set of all cfg
+      //  nodes, y, such that b dominates a predecessor of y but does not
+      //  strictly dominate y."
+      //  Dominance frontiers are useful in SSA -- an assignment occurring
+      //  in a node b generally needs a phi-node in all nodes in the
+      //  dominance frontier of node b.
+      //  NOTE: A node can be in its own dominance frontier (generally
+      //        this means the node is a loop header).
+
+      func Reverse_Postorder(ref const Dominator_Tree)
+        -> ref const Node_List
+      //  Return Node_List in Reverse Postorder for the CFG from which the
+      //  control-flow graph was computed.
+
+      func Postorder(ref const Dominator_Tree)
+        -> ref const Node_List
+      //  Return Node_List in Postorder for the CFG from which the
+      //  control-flow graph was computed.
+
+      func Is_Loop_Header (Dominator_Tree; Node_Id) -> Boolean
+      //  Return #true if the specified node is a loop header
+      //  (which is defined to be a node that has itself in its
+      //  dominance frontier).
+
+      func Enclosing_Loop (Dominator_Tree; Node_Id) -> optional Node_Id
+      //  Return Node_Id of innermost loop header that (strictly) dominates
+      //  the given node.  If Node_Id is itself a loop header, this is the
+      //  enclosing loop, if any.  It is null if this is an outermost
+      //  loop header, or the block is not inside any loop.
+
+      func Is_Within_Loop(Dominator_Tree; Member, Loop_Header : Node_Id)
+        -> Boolean
+      //  Return #true if Member is inside the loop headed by Loop_Header,
+      //  directly or indirectly.
+      //  Loop_Header is within its own loop, presuming it is a loop header.
+      //  This returns false if Loop_Header is not in fact a loop header.
+
+      func Is_Back_Edge (Dominator_Tree; Edge_Id) -> Boolean
+      //  Return #true if the specified edge is a back edge
+      //  (meaning its "From" is dominated by its "To" node).
+
+      func Compute(var CFG) {|CFG| > 0} -> Dominator_Tree
+      //  Compute the dominator tree for the given control-flow graph.
+      //  Eliminate edges from disconnected nodes from the graph.
+
+   end interface Dominator_Tree
+
+   func Compute_Dominator_Tree(var CFG)
+   //  Compute dominator tree of CFG if not already computed;
+
+   func Get_Dominator_Tree(ref const CFG) -> ref const optional Dominator_Tree
+     {|CFG| > 0 ==> Get_Dominator_Tree not null}
+   //  Return reference to dominator tree.
+
+   func Dump_Graph(var File : Output_Stream+; CFG;
+     Label : Univ_String;
+     Node_Attrib_Map : Map<CFG::Node_Id, Univ_String> := [];
+     Edge_Attrib_Map : Map<CFG::Edge_Id, Univ_String> := [];
+     DT : optional Dominator_Tree := null)
+   //  Dump the control-flow graph.  If DT is non-null, then include
+   //  the dominator tree and the dominance frontiers
+
+end interface CFG
+
