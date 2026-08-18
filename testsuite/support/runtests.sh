@@ -210,7 +210,7 @@ case $LANGUAGE in
                fi
                ;;
     "Ada202x") if ! test -L aaa.a2i; then
-                  ln -s ../../ada202x_examples/aaa.a2i
+                  ln -s ../../lib/aaa.a2i
                fi
                ;;
    "Parython") if ! test -L aaa.pri; then
