@@ -399,7 +399,7 @@ foreach i ($to_be_compiled)
       exit "$status"
    endif
 
-   clang -c $debug_asm $i.s -o $i.o
+   clang -c -fPIC $debug_asm $i.s -o $i.o
    if ("$status" != 0) then
       exit "$status"
    endif
