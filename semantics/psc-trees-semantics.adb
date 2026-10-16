@@ -33,6 +33,7 @@ with PSC.Trees.Lists;
 pragma Elaborate (PSC.Trees.Lists);
 
 with PSC.Trees.Identifier;
+with PSC.Trees.Invocation;
 with PSC.Trees.Module;
 with PSC.Trees.Operation;
 with PSC.Trees.Property;
@@ -1035,6 +1036,8 @@ package body PSC.Trees.Semantics is
          return Property.Tree (Name_Tree).Operand;
       elsif Name_Tree in Identifier.Tree then
          return Null_Optional_Tree;
+      elsif Name_Tree in Invocation.Tree then
+         return Invocation.Tree (Name_Tree).Prefix;
       else
          pragma Assert (False);
          return Null_Optional_Tree;

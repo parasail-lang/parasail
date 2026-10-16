@@ -366,18 +366,9 @@ imported_libunit_name_list :
   ;
 
 imported_libunit_name :
-    '*' {
-        $$ := (One_Tree, PSC.Trees.Identifier.Make ($1.Str, $1.Source_Pos)); 
-    }
-  | expanded_name {
+    expanded_name {
         $$ := $1;
     }
-  | expanded_name '.' '*' {
-	$$ := (One_Tree, Qualified_Name.Make (  -- TBD: Selection?
-	  Prefix => $1.Tree,
-	  Id => PSC.Trees.Identifier.Make ($3.Str, $3.Source_Pos))); 
-    }
-
   ;
 
 context_clause : context_clause_list {
@@ -561,16 +552,11 @@ formal_type_declaration :
              Operand => $5.Tree)));
     }
   | TYPE_kw id IS_no_indent
-      ARRAY_kw '(' index_subtype_list ')' OF_kw type_or_access_type_specifier {
+      array_type_def {
         $$ := (One_Tree, Type_Decl.Make(
 	  Name => $2.Tree,
 	  Is_New_Type => False,
-	  Type_Definition => Invocation.Make(
-            Kind => Invocation.Module_Instantiation,
-            Prefix => PSC.Trees.Identifier.Make
-              ("Array_Type", Token_Src_Pos ($4)),
-            Operands => Lists.Make
-                          (($9.Tree, Make_Array_Indexer ($6.List))))));
+	  Type_Definition => $4.Tree));
     }
   | TYPE_kw id IS_no_indent RANGE_kw BOX {
         $$ := (One_Tree, Type_Decl.Make(
@@ -806,20 +792,8 @@ package_formal_list :
   ;
 
 package_formal : 
-    type_formal {
-	$$ := (One_List, Lists.Make((1 => $1.Tree)));
-    }
-  | value_formal {
+    value_formal {
 	$$ := $1;
-    }
-  ;
-
-type_formal : 
-    type_instantiation { 
-	$$ := (One_Tree, Type_Decl.Make(
-	  Name => Null_Optional_Tree,
-	  Is_New_Type => False,
-	  Type_Definition => $1.Tree));
     }
   ;
 
@@ -832,42 +806,6 @@ IS_no_indent : IS_kw {
         Ada202x_Lex.Expecting_Indent := False;
         $$ := $1;
     };
-
--- operation_formal : 
---     basic_operation_declaration opt_operation_default { 
--- 	if Not_Null($2.Tree) then
--- 	    $$ := (One_Tree, Operation.Add_Op_Default(
--- 	      Op_Decl => $1.Tree, Op_Default => $2.Tree));
--- 	else
--- 	    $$ := $1; 
--- 	end if;
---     } 
---   | OPTIONAL_kw basic_operation_declaration opt_operation_default { 
--- 	if Not_Null($3.Tree) then
--- 	    $$ := (One_Tree, Operation.Add_Op_Default(
--- 	      Op_Decl => $2.Tree, Op_Default => $3.Tree));
--- 	else
--- 	    $$ := $2; 
--- 	end if;
--- 
--- 	Operation.Tree(Tree_Ptr_Of($$.Tree).all).Is_Optional := True;
---     } 
---   | QUEUED_kw basic_operation_declaration opt_operation_default { 
--- 	if Not_Null($3.Tree) then
--- 	    $$ := (One_Tree, Operation.Add_Op_Default(
--- 	      Op_Decl => $2.Tree, Op_Default => $3.Tree));
--- 	else
--- 	    $$ := $2; 
--- 	end if;
--- 
--- 	Operation.Tree(Tree_Ptr_Of($$.Tree).all).Is_Queued := True;
---     } 
---   ;
-
-opt_operation_default : 
-    IS_no_indent simple_expression { $$ := $2; }
-  | { $$ := (One_Tree, Null_Optional_Tree); }
-  ;
 
 value_formal : 
     id_list ':'
@@ -917,7 +855,7 @@ id_list :
   ;
 
 type_name : 
-    attributed_expanded_name {
+    name {
         if Tree_Of ($1.Tree) in Property.Tree then
            declare
               Prop_Tree : constant Property.Tree :=
@@ -970,37 +908,22 @@ type_name :
   ;
 
 expanded_name : 
-    id_or_string_literal { 
+    selector { 
 	$$ := $1;
     }
-  | '@' {
-	$$ := (One_Tree, PSC.Trees.Identifier.Make($1.Str, $1.Source_Pos)); 
-    }
-  | expanded_name '.' id_or_string_literal {
+  | expanded_name '.' selector {
 	$$ := (One_Tree, Selection.Make(
 	  Prefix => $1.Tree,
 	  Selector => $3.Tree));
     }
   ;
 
-attributed_expanded_name : 
-    expanded_name {
-	$$ := $1;
-    }
-  | attributed_expanded_name PRIME attribute_id {
-	$$ := (One_Tree, Property.Make(
-	  Operand => $1.Tree,
-	  Property_Id => $3.Tree,
-          Source_Pos => $2.Source_Pos));
-    }
-  ;
-
 id_or_string_literal :
     id { $$ := $1; }
-  | string_lit { $$ := $1; }
+  | operator_symbol { $$ := $1; }
   ;
 
-string_lit : String_Literal {
+operator_symbol : String_Literal {
         -- String_Literal can be used as a "name" when it is an operator
 	$$ := (One_Tree, PSC.Trees.Identifier.Make($1.Str, $1.Source_Pos)); 
     }
@@ -1008,6 +931,13 @@ string_lit : String_Literal {
   
 type_instantiation : 
     expanded_name boxed_package_actual_list {
+	$$ := (One_Tree, Invocation.Make(
+	  Kind => Invocation.Module_Instantiation,
+	  Prefix => $1.Tree,
+	  Operands => $2.List));
+    }
+  |
+    invocation '.' selector {
 	$$ := (One_Tree, Invocation.Make(
 	  Kind => Invocation.Module_Instantiation,
 	  Prefix => $1.Tree,
@@ -1057,21 +987,12 @@ simple_type_specifier_or_expression :
     qualified_type_specifier { 
 	$$ := $1;
     }
-  | adding_expression '+' {
-	-- This is a polymorphic type name, presumably.
-	-- We use adding_expression instead of expanded_name
-	-- to avoid reduce/reduce conflicts in the grammar.
-	$$ := (One_Tree, Qualifier.Qualify(
-	    Qualifiers => (Qualifier.Is_Polymorphic => True, others => False),
-	    Operand => $1.Tree));
-    }
   | simple_expression { $$ := $1; }             
 	-- simple_expr to avoid problems with '>'
-  | type_instantiation { $$ := $1; }
   ;
   
 type_or_access_type_specifier : 
-    type_specifier { $$ := $1; }
+    subtype_indication { $$ := $1; }
   | opt_not_null_qualifier access_type_def {
         if $1.Is_Not_Null then
            $$ := (One_Tree, Qualifier.Qualify
@@ -1084,6 +1005,12 @@ type_or_access_type_specifier :
     }
   ;
 
+type_or_array_or_access_type_specifier : 
+    type_or_access_type_specifier { $$ := $1; }
+  | array_type_def { $$ := $1; }
+  ;
+    
+
 type_specifier :
     basic_type_specifier { $$ := $1; }
   | qualified_type_specifier { $$ := $1; }
@@ -1091,9 +1018,6 @@ type_specifier :
 
 basic_type_specifier : 
     type_name { 
-	$$ := $1;
-    }
-  | type_instantiation { 
 	$$ := $1;
     }
   ;
@@ -1111,6 +1035,19 @@ opt_aliased_type_or_access_type_specifier :
     }
   ;
 
+opt_aliased_type_or_array_or_access_type_specifier : 
+    ALIASED_kw type_or_array_or_access_type_specifier { 
+	$$ := (One_Tree, Qualifier.Qualify(
+	  Qualifiers => (Qualifier.Is_Ref => True, others => False), 
+	  Operand => $2.Tree));
+    }
+  | type_or_array_or_access_type_specifier {
+	$$ := (One_Tree, Qualifier.Qualify(
+	  Qualifiers => (others => False), 
+	  Operand => $1.Tree));
+    }
+  ;
+
 qualified_type_specifier : 
     type_qualifier type_name { 
 	$$ := (One_Tree, Qualifier.Qualify(
@@ -1119,12 +1056,11 @@ qualified_type_specifier :
 	    others => False), 
 	  Operand => $2.Tree));
     }
-  | type_qualifier type_instantiation { 
+  | NULL_kw OR_kw type_name{
 	$$ := (One_Tree, Qualifier.Qualify(
-	  Qualifiers => (Is_Optional => $1.Is_Optional,
-	    Is_Concurrent => $1.Is_Concurrent,
+	  Qualifiers => (Is_Optional => True,
 	    others => False), 
-	  Operand => $2.Tree));
+	  Operand => $3.Tree));
     }
   ;
 
@@ -1296,14 +1232,6 @@ simple_pkg_spec_element :
   | pragma { $$ := (One_List, Lists.Make((1 => $1.Tree))); }
   ;
 
---  NOTE: These were originally allowed within an annotation_element
---  good_simple_pkg_spec_element :
---     operation_declaration { $$ := $1; }
---   | var_or_const_object_declaration { $$ := $1; }
---   | type_declaration { $$ := $1; }
---   | subtype_declaration { $$ := $1; }
---   ;
-
 IS_kw_ignore_INDENT :
     IS_no_indent {
         $$ := $1;
@@ -1320,7 +1248,7 @@ IS_kw_ignore_INDENT :
   ;
 
 operation_equiv :
-    basic_operation_declaration RENAMES_kw attributed_expanded_name {
+    basic_operation_declaration RENAMES_kw name {
 	$$ := (One_Tree, Operation.Add_Op_Equiv(
 	  Op_Decl => $1.Tree, Op_Equiv => $3.Tree));
     }
@@ -1462,16 +1390,6 @@ opt_PRIVATE_kw : {
   
 condition : expression { $$ := $1; } ;
 
-operator_designator : 
-    string_lit { 
-	$$ := $1;
-    }
-  | id {
-	yyerror("Operator designator must be in quotes");
-	$$ := $1;
-    }
-  ;
-  
 operation_declaration :
     basic_operation_declaration opt_aspect_spec {
 	$$ := $1;
@@ -1522,7 +1440,7 @@ aspect_def :
   ;
 
 basic_operation_declaration :
-    PROCEDURE_kw operation_designator operation_inputs {
+    PROCEDURE_kw expanded_name operation_inputs {
 	$$ := (One_Tree, Operation.Make(
 	  Name => $2.Tree,
 	  Operation_Kind => Operation.Procedure_Operation,
@@ -1572,8 +1490,15 @@ basic_operation_declaration :
   ;
 
 operation_designator : 
-    attributed_expanded_name {
+    expanded_name {
 	$$ := $1;
+    }
+  |
+    expanded_name PRIME attribute_id {
+	$$ := (One_Tree, Property.Make(
+	  Operand => $1.Tree,
+	  Property_Id => $3.Tree,
+          Source_Pos => $2.Source_Pos));
     }
   ;
   
@@ -1758,7 +1683,6 @@ opt_not_null_qualifier :
   
 simple_operand_type_specifier :
     type_name { $$ := $1; }
-  | type_instantiation { $$ := $1; }
   ;
 
 operand_type_specifier : 
@@ -1780,7 +1704,7 @@ not_null_qualifier :
 --  NOTE: The following returns a List rather than a Tree:
 object_declaration :
     id_list_with_colon
-      opt_aliased_type_or_access_type_specifier 
+      opt_aliased_type_or_array_or_access_type_specifier 
       opt_ASSIGN_expression opt_aspect_spec {
         $$ := (One_List, Lists.Empty_List);
         for I in 1 .. Lists.Length ($1.List) loop
@@ -1832,7 +1756,7 @@ object_declaration :
              Obj_Value => $3.Tree))));
     }
   | id_list_with_colon opt_aliased_CONSTANT_kw
-      type_or_access_type_specifier 
+      type_or_array_or_access_type_specifier 
       opt_ASSIGN_expression opt_aspect_spec {
         $$ := (One_List, Lists.Empty_List);
         for I in 1 .. Lists.Length ($1.List) loop
@@ -2097,16 +2021,11 @@ non_derived_type_declaration :
             Operands => Lists.Empty_List)))));
     }
   | TYPE_kw type_id IS_no_indent
-      ARRAY_kw '(' index_subtype_list ')' OF_kw type_or_access_type_specifier {
+      array_type_def {
         $$ := (One_List, Lists.Make ((1 => Type_Decl.Make(
 	  Name => $2.Tree,
 	  Is_New_Type => True,
-	  Type_Definition => Invocation.Make(
-            Kind => Invocation.Module_Instantiation,
-            Prefix => PSC.Trees.Identifier.Make
-              ("Array_Type", Token_Src_Pos ($4)),
-            Operands => Lists.Make
-                          (($9.Tree, Make_Array_Indexer ($6.List))))))));
+	  Type_Definition => $4.Tree))));
     }
   | TYPE_kw type_id IS_no_indent opt_not_null_qualifier access_type_def {
         $$ := (One_List, Lists.Make ((1 => Type_Decl.Make(
@@ -2137,6 +2056,30 @@ non_derived_type_declaration :
             Kind => Invocation.Module_Instantiation,
             Prefix => PSC.Trees.Identifier.Make
               ("Modular", Token_Src_Pos ($4)),
+            Operands => Lists.Make ((1 => $5.Tree)),
+            Source_Pos => $4.Source_Pos)))));
+    }
+  | TYPE_kw type_id IS_no_indent
+      DIGITS_kw expression {
+        $$ := (One_List, Lists.Make ((1 => Type_Decl.Make(
+	  Name => $2.Tree,
+	  Is_New_Type => True,
+	  Type_Definition => Invocation.Make(
+            Kind => Invocation.Module_Instantiation,
+            Prefix => PSC.Trees.Identifier.Make
+              ("Float", Token_Src_Pos ($4)),
+            Operands => Lists.Make ((1 => $5.Tree)),
+            Source_Pos => $4.Source_Pos)))));
+    }
+  | TYPE_kw type_id IS_no_indent
+      DELTA_kw expression {
+        $$ := (One_List, Lists.Make ((1 => Type_Decl.Make(
+	  Name => $2.Tree,
+	  Is_New_Type => True,
+	  Type_Definition => Invocation.Make(
+            Kind => Invocation.Module_Instantiation,
+            Prefix => PSC.Trees.Identifier.Make
+              ("Fixed", Token_Src_Pos ($4)),
             Operands => Lists.Make ((1 => $5.Tree)),
             Source_Pos => $4.Source_Pos)))));
     }
@@ -2184,13 +2127,26 @@ access_type_def :
   | operation_type_specifier { $$ := $1; }
   ;
 
+array_type_def :
+    ARRAY_kw '(' index_subtype_list ')'
+      OF_kw opt_aliased_type_or_access_type_specifier {
+        $$ := (One_Tree,
+	  Invocation.Make(
+            Kind => Invocation.Module_Instantiation,
+            Prefix => PSC.Trees.Identifier.Make
+              ("Array_Type", Token_Src_Pos ($1)),
+            Operands => Lists.Make
+                          (($6.Tree, Make_Array_Indexer ($3.List)))));
+    }
+  ;
+
 index_subtype_list :
     index_subtype {
         $$ := (One_List, Lists.Make ((1 => $1.Tree)));
     }
   | index_subtype_list ',' index_subtype {
         $$ := $1;
-        Lists.Append ($$.List, $3.List);
+        Lists.Append ($$.List, $3.Tree);
     }
   ;
 
@@ -2411,7 +2367,7 @@ type_derivation :
   ;
 
 parent_type_specifier :
-    NEW_kw basic_type_specifier {
+    NEW_kw subtype_indication {
         --  We use a param-decl for the parent type for uniformity
         $$ := (One_Tree, Tree => Param_Decl.Make
            (Name => Null_Optional_Tree,
@@ -2421,7 +2377,7 @@ parent_type_specifier :
             Param_Type => $2.Tree,
             Param_Default => Null_Optional_Tree));
     }
-  | basic_type_specifier {
+  | subtype_indication {
         --  We use a param-decl for the parent type for uniformity
         yyerror("""new"" required unless defining a subtype",
            At_Token => $1);
@@ -2491,7 +2447,7 @@ record_component_decl_list :
   ;
 
 record_component_decl :
-    id ':' type_or_access_type_specifier 
+    id ':' opt_aliased_type_or_access_type_specifier 
       opt_ASSIGN_expression {
 	$$ := (One_Tree, Obj_Decl.Make(
 	  Name => PSC.Trees.Identifier.Tree(Tree_Of($1.Tree)),
@@ -2536,30 +2492,32 @@ subtype_declaration :
   ;
 
 subtype_indication :
-    type_specifier {
+    basic_type_specifier {
         $$ := $1;
     }
-  | type_specifier RANGE_kw simple_expression_component {
+  | basic_type_specifier RANGE_kw simple_expression_component {
         $$ := $1;
 	Annotation.Add_Annotation($$.Tree, Lists.Make ((1 => $3.Tree)));
     }
-  | type_specifier '(' discriminant_association_list ')' {
-        --  Discriminant constraint: T (D1 => val1, D2 => val2, ...)
-        $$ := (One_Tree, Invocation.Make(
-          Kind => Invocation.Module_Instantiation,
-          Prefix => $1.Tree,
-          Operands => $3.List,
-          Source_Pos => Find_Source_Pos ($1.Tree)));
-    }
+--| basic_type_specifier '(' discriminant_association_list ')' {
+--      --  Discriminant constraint: T (D1 => val1, D2 => val2, ...)
+--      $$ := (One_Tree, Invocation.Make(
+--        Kind => Invocation.Module_Instantiation,
+--        Prefix => $1.Tree,
+--        Operands => $3.List,
+--        Source_Pos => Find_Source_Pos ($1.Tree)));
+--  }
   ;
 
---  Discriminant parts (RM 3.7) — non-nullable; use explicit alternatives in type rules
+--  Discriminant parts (RM 3.7) 
+--  non-nullable; use explicit alternatives in type rules
 discriminant_part :
     '(' discriminant_spec_list ')' {
         $$ := $2;
     }
   | '(' BOX ')' {
-        --  Unknown discriminant part (<>): indefinite type with no visible discriminants
+        --  Unknown discriminant part (<>):
+        --  indefinite type with no visible discriminants
         $$ := (One_List, Lists.Empty_List);
     }
   ;
@@ -2603,10 +2561,10 @@ discriminant_association_list :
   ;
 
 discriminant_association :
-    simple_type_specifier_or_expression {
+    simple_expression {
         $$ := $1;
     }
-  | id REFERS_TO simple_type_specifier_or_expression {
+  | id REFERS_TO simple_expression {
         --  Named discriminant association: Discriminant_Name => value
         $$ := (One_Tree, Reference.Make(
           Key => $1.Tree,
@@ -3199,10 +3157,6 @@ compound_statement_kind :
 --  NOTE: The following returns a List rather than a Tree:
 local_declaration : 
     operation_declaration { $$ := (One_List, Lists.Make ((1 => $1.Tree))); }
---   | type_declaration aspect_spec {
---         $$ := $1;
--- 	Annotation.Add_Annotation (Lists.Nth_Element($$.List, 1), $2.List);
---     }
   | type_declaration {
         $$ := $1;
     }
@@ -3891,13 +3845,6 @@ expression :
     expression_no_err {
 	$$ := $1;
     }
---   | expression_no_err divide_assign_as_not_equal expression_no_err { 
--- 	-- Treat "/=" equiv to "!=" in an expression
--- 	$$ := (One_Tree, Binary.Make(
--- 	  Operator => $2.Binary_Op,
--- 	  Left_Operand => $1.Tree,
--- 	  Right_Operand => $3.Tree));
---     }
   ;
 
 expression_no_err :
@@ -4108,14 +4055,11 @@ primary :
     }
   ;
   
-literal:  -- NOTE: See "name" for String_Literal
+literal:  -- NOTE: See "name" for String_Literal and Char_Literal
     Integer_Literal { 
 	$$ := (One_Tree, PSC.Trees.Identifier.Make($1.Str, $1.Source_Pos)); 
     }
   | Real_Literal { 
-	$$ := (One_Tree, PSC.Trees.Identifier.Make($1.Str, $1.Source_Pos)); 
-    }
-  | Char_Literal { 
 	$$ := (One_Tree, PSC.Trees.Identifier.Make($1.Str, $1.Source_Pos)); 
     }
   | Enum_Literal { 
@@ -4126,21 +4070,25 @@ literal:  -- NOTE: See "name" for String_Literal
     }
   ;
 
-name :
-    attributed_expanded_name {
-        $$ := $1;
-    }
-  | complex_name {
-        $$ := $1;
+invocation :
+    name '(' operation_actual_list  ')' {
+        --  This will be used for instantiation as well.
+	$$ := (One_Tree, Invocation.Make(
+	  Kind => Invocation.General_Invocation,
+	  Prefix => $1.Tree,
+	  Operands => $3.List));
     }
   ;
 
-complex_name :
-    name '(' opt_operation_actual_list ')' {
-	$$ := (One_Tree, Invocation.Make(
-	  Kind => Invocation.Operation_Call,
-	  Prefix => $1.Tree,
-	  Operands => $3.List));
+name :
+    selector {
+        $$ := $1;
+    }
+  | '@' {
+	$$ := (One_Tree, PSC.Trees.Identifier.Make($1.Str, $1.Source_Pos)); 
+    }
+  | invocation {
+        $$ := $1;
     }
   | name '[' opt_operation_actual_list ']' {
 	$$ := (One_Tree, Invocation.Make(
@@ -4154,12 +4102,12 @@ complex_name :
 	  Prefix => $1.Tree,
 	  Operands => Lists.Make((1 => $3.Tree))));
     }
-  | complex_name '.' selector {
+  | name '.' selector {
 	$$ := (One_Tree, Selection.Make(
 	  Prefix => $1.Tree,
 	  Selector => $3.Tree));
     }
-  | complex_name PRIME attribute_id {
+  | name PRIME attribute_id {
 	$$ := (One_Tree, Property.Make(
 	  Operand => $1.Tree,
 	  Property_Id => $3.Tree,
@@ -4186,7 +4134,13 @@ operation_actual :
     }
   ;
 
-selector : id { $$ := $1; };
+selector : id_or_string_literal {
+        $$ := $1;
+    }
+  | Char_Literal {
+	$$ := (One_Tree, PSC.Trees.Identifier.Make($1.Str, $1.Source_Pos)); 
+    }
+  ;
 
 unary_operator : 
     '+' { $$ := (One_Unary_Op, $1.Source_Pos, Unary.Plus_Op); }
@@ -4280,17 +4234,7 @@ record_aggregate :
 	  Operands => $2.List,
           Source_Pos => $1.Source_Pos));
     }
---   | '(' name DIVIDE_ASSIGN expression ')' {
--- 	-- Treat "/=" equiv to "!=" in an expression
--- 	$$ := (One_Tree, Invocation.Make(
--- 	  Kind => Invocation.Class_Aggregate,
--- 	  Prefix => Null_Optional_Tree,
--- 	  Operands => Lists.Make((1 => Binary.Make(
--- 	    Operator => Binary.NEQ_Op,
--- 	    Left_Operand => $2.Tree,
--- 	    Right_Operand => $4.Tree)))));
---      }
-  | attributed_expanded_name PRIME '(' opt_record_component_list ')' {
+  | name PRIME '(' opt_record_component_list ')' {
 	-- Type of aggregate specified
 	$$ := (One_Tree, Invocation.Make(
 	  Kind => Invocation.Class_Aggregate,
@@ -4388,7 +4332,7 @@ container_aggregate :
 	end if;
       end;
     }
-  | attributed_expanded_name PRIME '[' opt_container_element_list ']' {
+  | name PRIME '[' opt_container_element_list ']' {
 	-- Type of result specified
       declare
 	use type Invocation.Invocation_Kind_Enum;

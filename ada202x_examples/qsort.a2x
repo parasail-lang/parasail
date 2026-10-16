@@ -8,7 +8,7 @@
 generic
     type Elem_Type is new Comparable;
     type Index_Type is new Countable;
-    type Array_Type is new Indexable<Elem_Type, Index_Type>;
+    type Array_Type is new Indexable(Elem_Type, Index_Type).Indexable;
     with function Image(Index : Index_Type) return Univ_String;
 package Sorting is
     procedure Quicksort(Arr : in out Array_Type; Debug : Boolean := #False);

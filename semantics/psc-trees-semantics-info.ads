@@ -37,7 +37,7 @@ with PSC.Trees.Operation;
 
 with PSC.Trees.Lists;
 
-private package PSC.Trees.Semantics.Info is
+package PSC.Trees.Semantics.Info is
 
    subtype Static_Level is Interpreter.Code_Nesting_Level;
    --  Level 0 = level of static constants

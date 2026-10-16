@@ -26,7 +26,9 @@ with PSC.Strings; pragma Elaborate (PSC.Strings);
 with PSC.Trees;  use PSC.Trees;
 with PSC.Trees.Lists;
 with PSC.Trees.Identifier;
+with PSC.Trees.Invocation;
 with PSC.Trees.Semantics;
+with PSC.Trees.Semantics.Info;
 with PSC.Trees.Qualified_Name;
 package body PSC.Symbols is
 
@@ -804,6 +806,10 @@ package body PSC.Symbols is
             if Enc_Module = null then
                --  Not found
                return null;
+            elsif Name_Tree in Invocation.Tree then
+               --  Lookup in current instance of module
+               return Semantics.Info.Module_Sem_Ptr (Enc_Module.Sem_Info).
+                        Cur_Inst_Sem.Associated_Symbol;
             else
                --  Use enclosing module's region
                return Lookup_In_Region (Enc_Module.Nested_Region,

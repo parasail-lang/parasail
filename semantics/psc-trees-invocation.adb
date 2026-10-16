@@ -30,21 +30,22 @@ package body PSC.Trees.Invocation is
 
    Open_Char : constant array (Invocation_Kind_Enum) of Character :=
      (Operation_Call | Class_Aggregate | Is_Function_Of |
-        Tuple_Type_Definition => '(',
+        Tuple_Type_Definition | General_Invocation | Type_Conversion => '(',
       Container_Indexing | Container_Aggregate => '[',
       Map_Set_Aggregate => '{',
       Module_Instantiation => '<');
 
    Close_Char : constant array (Invocation_Kind_Enum) of Character :=
      (Operation_Call | Class_Aggregate | Is_Function_Of |
-        Tuple_Type_Definition => ')',
+        Tuple_Type_Definition | General_Invocation | Type_Conversion => ')',
       Container_Indexing | Container_Aggregate => ']',
       Map_Set_Aggregate => '}',
       Module_Instantiation => '>');
 
    Separator_Char : constant array (Invocation_Kind_Enum) of Character :=
      (Operation_Call | Aggregate_Kind_Enum | Is_Function_Of |
-      Container_Indexing | Module_Instantiation => ',',
+      Container_Indexing | Module_Instantiation |
+      General_Invocation | Type_Conversion => ',',
       Tuple_Type_Definition => ';');
 
    function Make
@@ -270,7 +271,8 @@ package body PSC.Trees.Invocation is
             when Is_Function_Of =>
                Put (On, " is func");
             when Operation_Call | Container_Indexing |
-              Module_Instantiation | Tuple_Type_Definition =>
+              Module_Instantiation | Tuple_Type_Definition |
+              General_Invocation | Type_Conversion =>
                null;
          end case;
 

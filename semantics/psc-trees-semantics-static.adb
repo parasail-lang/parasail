@@ -3093,6 +3093,7 @@ package body PSC.Trees.Semantics.Static is
                     Invocation.Tree (Parent_Type_Tree).Prefix;
                elsif Parent_Type_Tree not in Identifier.Tree
                  and then Parent_Type_Tree not in Qualified_Name.Tree
+                 and then Parent_Type_Tree not in Selection.Tree
                then
                   Sem_Error
                     (T.Extends_Interface,
@@ -3203,7 +3204,7 @@ package body PSC.Trees.Semantics.Static is
                  --  Potentially updated in second pass
                  Constraint_Annotations => Lists.Empty_List,
                  Value_Is_Optional => False, Obj_Is_Concurrent => False,
-                 Is_Polymorphic | Is_Monomorphic  => False, Root_Type => null,
+                 Is_Polymorphic | Is_Monomorphic => False, Root_Type => null,
                  Corresponding_Polymorphic_Type => null, Is_Universal => False,
                  --  Default initialize to False, but may be updated in
                  --  Builtin_Type_Init
@@ -4837,7 +4838,7 @@ package body PSC.Trees.Semantics.Static is
             when E : others =>
                Sem_Error
                  (Lists.Nth_Element (T.Case_Alt_List, I),
-                  "Internal: " & Ada.Exceptions.Exception_Name (E) &
+                  "Internal: " & Ada.Exceptions.Exception_Information (E) &
                   " raised in");
          end;
       end loop;
@@ -5844,6 +5845,10 @@ package body PSC.Trees.Semantics.Static is
                   return "X is func (...)";
                when Tuple_Type_Definition =>
                   return "tuple type";
+               when General_Invocation =>
+                  return "general invocation";
+               when Type_Conversion =>
+                  return "type conversion";
             end case;
          end;
       elsif Expr_Tree in Binary.Tree then
@@ -7229,7 +7234,8 @@ package body PSC.Trees.Semantics.Static is
                begin
                   Put (Indent_Str (1 .. Indent));
                   case Invoc_Tree.Kind is
-                     when Operation_Call =>
+                     when Operation_Call | General_Invocation |
+                          Type_Conversion =>
                         --  Display operation name and type
                         Put (Subtree_Image (Invoc_Tree.Prefix) & "(");
                         Ending_Char := ')';
@@ -10818,7 +10824,8 @@ package body PSC.Trees.Semantics.Static is
                      end if;
 
                   when Container_Indexing | Module_Instantiation
-                    | Is_Function_Of | Tuple_Type_Definition =>
+                    | Is_Function_Of | Tuple_Type_Definition
+                    | General_Invocation | Type_Conversion =>
                      null;  --  Fall through to produce fall-back message
                end case;
             end;
@@ -16946,7 +16953,8 @@ package body PSC.Trees.Semantics.Static is
                   --  Already handled above
                   return True;
 
-               when Tuple_Type_Definition =>
+               when Tuple_Type_Definition | General_Invocation
+                  | Type_Conversion =>
                   --  Nothing more than operands
                   return True;
             end case;
@@ -19549,7 +19557,7 @@ package body PSC.Trees.Semantics.Static is
                when E : others =>
                   Sem_Error
                     (Lists.Nth_Element (Decl_List, I),
-                     "Internal: " & Ada.Exceptions.Exception_Name (E) &
+                     "Internal: " & Ada.Exceptions.Exception_Information (E) &
                      " raised in");
             end;
          end loop;
@@ -23544,6 +23552,12 @@ package body PSC.Trees.Semantics.Static is
 
          when Tuple_Type_Definition =>
             Sem_Error (T, "NYI: tuple type definition");
+
+         when General_Invocation =>
+            Sem_Error (T, "Internal: general invocation not transformed");
+
+         when Type_Conversion =>
+            Sem_Error (T, "NYI: type conversion");
       end case;
 
       --  Restore context
@@ -24970,7 +24984,7 @@ package body PSC.Trees.Semantics.Static is
             when E : others =>
                Sem_Error
                  (Lists.Nth_Element (Decl_List, I),
-                  "Internal: " & Ada.Exceptions.Exception_Name (E) &
+                  "Internal: " & Ada.Exceptions.Exception_Information (E) &
                   " raised in");
          end;
       end loop;
@@ -25045,7 +25059,7 @@ package body PSC.Trees.Semantics.Static is
             when E : others =>
                Sem_Error
                  (Lists.Nth_Element (Decl_List, I),
-                  "Internal: " & Ada.Exceptions.Exception_Name (E) &
+                  "Internal: " & Ada.Exceptions.Exception_Information (E) &
                   " raised in");
          end;
       end loop;

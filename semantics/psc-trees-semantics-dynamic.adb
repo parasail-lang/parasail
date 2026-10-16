@@ -17208,6 +17208,10 @@ package body PSC.Trees.Semantics.Dynamic is
             Sem_Error (T, "NYI: ""is func (...)"" specification");
          when Tuple_Type_Definition =>
             Sem_Error (T, "NYI: tuple type definition");
+         when General_Invocation =>
+            Sem_Error (T, "Internal: general invocation not transformed");
+         when Type_Conversion =>
+            Sem_Error (T, "NYI: type conversion");
       end case;
    end Invocation_Action;
 

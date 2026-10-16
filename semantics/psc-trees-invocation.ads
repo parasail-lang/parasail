@@ -30,7 +30,9 @@ package PSC.Trees.Invocation is
      Map_Set_Aggregate,
      Module_Instantiation,
      Is_Function_Of,
-     Tuple_Type_Definition);
+     Tuple_Type_Definition,
+     General_Invocation,
+     Type_Conversion);
 
    subtype Aggregate_Kind_Enum is Invocation_Kind_Enum range
      Class_Aggregate .. Map_Set_Aggregate;
