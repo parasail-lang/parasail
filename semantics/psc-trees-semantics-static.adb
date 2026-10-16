@@ -2475,10 +2475,14 @@ package body PSC.Trees.Semantics.Static is
       Mod_Sym : constant Sym_Ptr :=
         Lookup_Standalone_Item (Decl_Region, Mod_Name, Region_For_Imports);
    begin
-      if Mod_Sym = null or else Mod_Sym.Sem_Info = null
-        or else Mod_Sym.Sem_Info.all not in Module_Semantic_Info
-      then
-         --  Not a module
+      if Mod_Sym = null or else Mod_Sym.Sem_Info = null then
+         --  Not found or not processed yet
+         return null;
+      elsif Mod_Sym.Sem_Info.all in Type_Semantic_Info then
+         --  Return module given type
+         return Type_Sem_Ptr (Mod_Sym.Sem_Info).Associated_Module;
+      elsif Mod_Sym.Sem_Info.all not in Module_Semantic_Info then
+         --  Not a module and not a type.
          return null;
       else
          --  Found a module, return its interface

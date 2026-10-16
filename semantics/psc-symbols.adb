@@ -807,9 +807,8 @@ package body PSC.Symbols is
                --  Not found
                return null;
             elsif Name_Tree in Invocation.Tree then
-               --  Lookup in current instance of module
-               return Semantics.Info.Module_Sem_Ptr (Enc_Module.Sem_Info).
-                        Cur_Inst_Sem.Associated_Symbol;
+               --  Prefix of invocation is what we want
+               return Enc_Module;
             else
                --  Use enclosing module's region
                return Lookup_In_Region (Enc_Module.Nested_Region,
