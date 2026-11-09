@@ -113,7 +113,7 @@ package A2X.Core.Univ_Integer is
     function Univ_Integer'Last return Univ_Integer
       with Import, External_Name => #univ_integer_last;
 
-    subtype Univ_Integer_Range is Countable_Range(Univ_Integer).Countable_Range;
+    subtype Univ_Integer_Range is Countable_Ranges(Univ_Integer).Countable_Range;
 
     function ".."(Left, Right : Univ_Integer) return Univ_Integer_Range
       is ((Left, Right));
@@ -186,9 +186,9 @@ package A2X.Core.Integer_64 is
 
     function Integer_64'Last return Integer_64
 
-    function "[..]" return Countable_Range(Integer_64).Countable_Range;
+    function "[..]" return Countable_Ranges(Integer_64).Countable_Range;
 
-    function ".."(Left, Right : Integer_64) return Countable_Range(Integer_64).Countable_Range;
+    function ".."(Left, Right : Integer_64) return Countable_Ranges(Integer_64).Countable_Range;
 
 private
     -- for Countable
@@ -225,12 +225,12 @@ package body A2X.Core.Integer_64 is
         return +Univ_Integer'(2)**63 - Univ_Integer'(1)
     end Integer_64'Last
 
-    function "[..]" return Countable_Range(Integer_64).Countable_Range is
+    function "[..]" return Countable_Ranges(Integer_64).Countable_Range is
       ((-Univ_Integer'(2)**63 + Univ_Integer'(1),
         +Univ_Integer'(2)**63 - Univ_Integer'(1)));
 
     function ".."(Left, Right : Integer_64)
-      return Countable_Range(Integer_64).Countable_Range is
+      return Countable_Ranges(Integer_64).Countable_Range is
       ((Left, Right));
 
 end A2X.Core.Integer_64
@@ -303,7 +303,7 @@ package A2X.Core.Unsigned_64 is
     function Unsigned_64'Last return Unsigned_64
       is ("from_univ"(-1));
 
-    subtype Unsigned_64_Range is Countable_Range(Unsigned_64).Countable_Range;
+    subtype Unsigned_64_Range is Countable_Ranges(Unsigned_64).Countable_Range;
 
     function ".."(Left, Right : Unsigned_64) return Unsigned_64_Range
       is ((Left, Right));
@@ -373,7 +373,7 @@ package A2X.Core.Ordering is
     function Ordering'Max(Left, Right : Ordering) return Ordering
       with Import, External_Name => #max;
 
-    --  function ".."(Left, Right : Ordering) return Countable_Range(Ordering).Countable_Range
+    --  function ".."(Left, Right : Ordering) return Countable_Ranges(Ordering).Countable_Range
 end A2X.Core.Ordering
 
 package A2X.Core.Comparable is
@@ -447,7 +447,7 @@ package A2X.Core.Countable is
     --  TBD: operations (or package?) should be declared abstract
 
     abstract
-      function ".."(Left, Right : Countable) return Countable_Range(Countable).Countable_Range
+      function ".."(Left, Right : Countable) return Countable_Ranges(Countable).Countable_Range
 end A2X.Core.Countable
 
 package body A2X.Core.Ordering is
@@ -489,8 +489,8 @@ package body A2X.Core.Ordering is
     end Ordering'Value
 
     -- NOTE: For implementation reasons, we put these here rather than defining
-    --       them in the interface using "is of Countable_Range(Ordering).Countable_Range"
-    --  function ".."(Left, Right : Ordering) return Countable_Range(Ordering).Countable_Range is
+    --       them in the interface using "is of Countable_Ranges(Ordering).Countable_Range"
+    --  function ".."(Left, Right : Ordering) return Countable_Ranges(Ordering).Countable_Range is
     --     return Ordering_Range.".."(Left, Right)
     --  end ".."
 
@@ -498,7 +498,7 @@ end A2X.Core.Ordering
 
 generic
     type Bound_Type is new Countable
-package A2X.Core.Countable_Range is
+package A2X.Core.Countable_Ranges is
     -- Simple contiguous Countable_Range of integers (i.e. an interval)
     type Countable_Range is record
        First : Bound_Type
@@ -523,9 +523,9 @@ package A2X.Core.Countable_Range is
       return Range_Array
       with Pre => Num_Pieces > 0;
        -- Divide a range into a vector of subranges, each of similar size
-end A2X.Core.Countable_Range
+end A2X.Core.Countable_Ranges;
 
-package body A2X.Core.Countable_Range is
+package body A2X.Core.Countable_Ranges is
     -- function ".."(Left, Right : Bound_Type) return Countable_Range is
         -- return (First => Left, Last => Right)
     -- end ".."
@@ -622,12 +622,12 @@ package body A2X.Core.Countable_Range is
 
        end return;
     end Split;
-end A2X.Core.Countable_Range
+end A2X.Core.Countable_Ranges;
 
 generic
     type Elem_Type is new Assignable;
     type Index_Type is new Countable;
-package A2X.Core.Indexable is
+package A2X.Core.Indexables is
     -- An indexable container
     type Indexable is abstract private
 
@@ -642,14 +642,14 @@ package A2X.Core.Indexable is
     function "magnitude"(A : Indexable) return Univ_Integer
       renames Indexable'Length
     abstract function "index_set"(A : Indexable)
-      return Countable_Range(Index_Type).Countable_Range
-    function Bounds(A : Indexable) return Countable_Range(Index_Type).Countable_Range
+      return Countable_Ranges(Index_Type).Countable_Range
+    function Bounds(A : Indexable) return Countable_Ranges(Index_Type).Countable_Range
       renames "index_set"
-end A2X.Core.Indexable
+end A2X.Core.Indexables;
 
 generic
     type Element_Type is new Assignable  -- tbd "is private"
-package A2X.Containers.Basic_Array is
+package A2X.Containers.Basic_Arrays is
   -- Builtin array type, not extendable, indexed by Univ_Integer, 1..Length
     type Basic_Array is private;
 
@@ -674,13 +674,13 @@ package A2X.Containers.Basic_Array is
       renames Basic_Array'Length
     function "&"(Left, Right : Basic_Array) return Basic_Array
     function "slicing"
-      (V : Basic_Array; Index_Set : Countable_Range(Univ_Integer).Countable_Range)
+      (V : Basic_Array; Index_Set : Countable_Ranges(Univ_Integer).Countable_Range)
       return Basic_Array  -- a "read-only" slice
-    function "index_set"(A : Basic_Array) return Countable_Range(Univ_Integer).Countable_Range
+    function "index_set"(A : Basic_Array) return Countable_Ranges(Univ_Integer).Countable_Range
     procedure "<|=" (Left : in out Basic_Array; Right : in out Element_Type)
-end A2X.Containers.Basic_Array
+end A2X.Containers.Basic_Arrays;
 
-package body A2X.Containers.Basic_Array is
+package body A2X.Containers.Basic_Arrays is
   -- Builtin array type, not extendable, indexed by Univ_Integer, 1..Length
     function "&"(Left, Right : Basic_Array) return Basic_Array is
         Left_Len : constant := Left'Length
@@ -709,12 +709,12 @@ package body A2X.Containers.Basic_Array is
     end "&"
             
     function "index_set"(A : Basic_Array)
-      return Countable_Range(Univ_Integer).Countable_Range is
+      return Countable_Ranges(Univ_Integer).Countable_Range is
         return 1..A'Length
     end "index_set"
 
     function "slicing"
-      (V : Basic_Array; Index_Set : Countable_Range(Univ_Integer).Countable_Range)
+      (V : Basic_Array; Index_Set : Countable_Ranges(Univ_Integer).Countable_Range)
         return Basic_Array
     is
       Len : constant := |Index_Set|
@@ -744,10 +744,10 @@ package body A2X.Containers.Basic_Array is
            Left := Result
         end a_loop
     end "<|=" 
-end A2X.Containers.Basic_Array
+end A2X.Containers.Basic_Arrays;
 
 procedure A2X.Test.Test_Basic_Array is
-    A : Basic_Array(Univ_Integer).Basic_Array := Create(3, 7)
+    A : Basic_Arrays(Univ_Integer).Basic_Array := Create(3, 7)
     A[1] := 42
     A[2] := A[2] + 6
     A[3] := A[3] + A[2]
@@ -766,7 +766,7 @@ generic
     type Element_Type is new Assignable  -- tbd: is private
 package A2X.Core.Vector is
   -- Extendable vector, indexed by Univ_Integer, 1..Length
-    type Vector is new Indexable(Element_Type, Univ_Integer).Indexable with private
+    type Vector is new Indexables(Element_Type, Univ_Integer).Indexable with private
 
     function "[]" return Vector
     function Create(Length : Univ_Integer; Initial_Value : Element_Type)
@@ -777,8 +777,8 @@ package A2X.Core.Vector is
     function "var_indexing"
       (V : aliased in out Vector; Index : Univ_Integer) return 
        aliased Element_Type
-    function "index_set"(V : Vector) return Countable_Range(Univ_Integer).Countable_Range
-    function "slicing"(V : Vector; Index_Set : Countable_Range(Univ_Integer).Countable_Range)
+    function "index_set"(V : Vector) return Countable_Ranges(Univ_Integer).Countable_Range
+    function "slicing"(V : Vector; Index_Set : Countable_Ranges(Univ_Integer).Countable_Range)
       return Vector  -- a "read-only" slice
     function "&"(Left, Right : Vector) return Vector
     function "&"(Left : Vector; Right : Element_Type) return Vector
@@ -796,12 +796,12 @@ package body A2X.Core.Vector is
     Initial_Size : constant := 4
     Leaf_Vec_Capacity : constant := 256
     Vec_Of_Vec_Length : constant := 256
-    Subvec_Capacity : constant Basic_Array(Univ_Integer).Basic_Array :=
+    Subvec_Capacity : constant Basic_Arrays(Univ_Integer).Basic_Array :=
       -- Capacity of each subvec at given level
       [Leaf_Vec_Capacity,
        Vec_Of_Vec_Length * Leaf_Vec_Capacity,
        Vec_Of_Vec_Length ** 2 * Leaf_Vec_Capacity]
-    Ordinal : constant Basic_Array(Univ_String).Basic_Array :=
+    Ordinal : constant Basic_Arrays(Univ_String).Basic_Array :=
       ["th","st","nd","rd","th","th","th","th","th","th"]
 
     type Vector is record       
@@ -809,8 +809,8 @@ package body A2X.Core.Vector is
        Count       : Univ_Integer := 0;  --  Overall count
        Width       : Univ_Integer := 0;  --  Num Subvecs in use;
                                          --  is 0 if level = 0
-       Data        : Basic_Array(Element_Type).Basic_Array := null;
-       Subvecs     : Basic_Array(Vector).Basic_Array := null;
+       Data        : Basic_Arrays(Element_Type).Basic_Array := null;
+       Subvecs     : Basic_Arrays(Vector).Basic_Array := null;
     end record;
 
     procedure Expand_Count(V : in out Vector; Amount : Univ_Integer := 1) is
@@ -843,7 +843,7 @@ package body A2X.Core.Vector is
                               V.Count'Image)
                         end if
 
-                        Old_Data : Basic_Array(Element_Type).Basic_Array := V.Data'Move
+                        Old_Data : Basic_Arrays(Element_Type).Basic_Array := V.Data'Move
 
                         V.Data := Create
                            (Univ_Integer'Min
@@ -1061,14 +1061,14 @@ package body A2X.Core.Vector is
         end if;
     end "var_indexing"
 
-    function "slicing"(V : Vector; Index_Set : Countable_Range(Univ_Integer).Countable_Range)
+    function "slicing"(V : Vector; Index_Set : Countable_Ranges(Univ_Integer).Countable_Range)
       return Vector is
       -- a "read-only" slice
         --Rep_Ok(V, 6);
         return [for I in Index_Set => V[I]]
     end "slicing"
 
-    function "index_set"(V : Vector) return Countable_Range(Univ_Integer).Countable_Range is
+    function "index_set"(V : Vector) return Countable_Ranges(Univ_Integer).Countable_Range is
         --Rep_Ok(V, 7);
         return 1..V'Length
     end "index_set"
@@ -1221,26 +1221,26 @@ package A2X.Core.Univ_Character is
       with Import, External_Name => #max;
 
     function ".."(Left, Right : Univ_Character)
-      return Countable_Range(Univ_Character).Countable_Range;
+      return Countable_Ranges(Univ_Character).Countable_Range;
 end A2X.Core.Univ_Character
     
 generic
     type Elem_Type is new Assignable;
     type Indexed_By is new Countable
 package A2X.Containers.Array is
-    type Array is new Indexable(Elem_Type, Indexed_By).Indexable with private
+    type Array is new Indexables(Elem_Type, Indexed_By).Indexable with private
 
   -- An array abstraction where the index type is not necessarily
   -- Univ_Integer, but instead can be any Countable type (e.g. Enum(...).Enum)
 
     function Create
-      (Bounds : Countable_Range(Indexed_By).Countable_Range; Initial_Value : Elem_Type)
+      (Bounds : Countable_Ranges(Indexed_By).Countable_Range; Initial_Value : Elem_Type)
       return Array
 
     function Array'Length(Arr : Array) return Univ_Integer
     function "magnitude"(Arr : Array) return Univ_Integer renames Array'Length
 
-    function Bounds(Arr : Array) return Countable_Range(Indexed_By).Countable_Range
+    function Bounds(Arr : Array) return Countable_Ranges(Indexed_By).Countable_Range
 
     function Array'First(Arr : Array) return Indexed_By
       is (Bounds(Arr).First);
@@ -1251,10 +1251,10 @@ package A2X.Containers.Array is
       return aliased constant Elem_Type
     function "var_indexing"(Arr : aliased in out Array; Index : Indexed_By) 
       return aliased Elem_Type
-    function "index_set"(Arr : Array) return Countable_Range(Indexed_By).Countable_Range
+    function "index_set"(Arr : Array) return Countable_Ranges(Indexed_By).Countable_Range
     function "slicing"
       (Arr : Array;
-       Bounds : Countable_Range(Indexed_By).Countable_Range) return Array
+       Bounds : Countable_Ranges(Indexed_By).Countable_Range) return Array
     --  A "read-only" slice
     procedure "<|="(Left : in out Array; Right : in out Elem_Type)
     function "|"(Left : Array; Right : Key_Value(Indexed_By, Elem_Type).Key_Value)
@@ -1266,16 +1266,16 @@ end A2X.Containers.Array
 package body A2X.Containers.Array is
   -- An array abstraction where the index type is not necessarily
   -- Univ_Integer, but instead can be any Countable type (e.g. Enum(...).Enum)
-    subtype Elem_Array is Basic_Array(Elem_Type).Basic_Array
+    subtype Elem_Array is Basic_Arrays(Elem_Type).Basic_Array
 
     type Array is record
         Data : Elem_Array
-        Bounds : Countable_Range(Indexed_By).Countable_Range
+        Bounds : Countable_Ranges(Indexed_By).Countable_Range
     end record Array
 
 
     function Create
-      (Bounds : Countable_Range(Indexed_By).Countable_Range; Initial_Value : Elem_Type)
+      (Bounds : Countable_Ranges(Indexed_By).Countable_Range; Initial_Value : Elem_Type)
       return Array is
         return (Data => Create(Bounds'Length, Initial_Value),
           Bounds => Bounds)
@@ -1285,7 +1285,7 @@ package body A2X.Containers.Array is
         return Arr.Data'Length
     end Array'Length
 
-    function Bounds(Arr : Array) return Countable_Range(Indexed_By).Countable_Range is
+    function Bounds(Arr : Array) return Countable_Ranges(Indexed_By).Countable_Range is
         return Arr.Bounds
     end Bounds
 
@@ -1314,13 +1314,13 @@ package body A2X.Containers.Array is
         return Arr.Data[ Index - Arr.Bounds.First + 1 ]
     end "var_indexing"
 
-    function "index_set"(Arr : Array) return Countable_Range(Indexed_By).Countable_Range is
+    function "index_set"(Arr : Array) return Countable_Ranges(Indexed_By).Countable_Range is
         return Arr.Bounds.First .. Arr.Bounds.Last
     end "index_set"
 
     function "slicing"
       (Arr : Array;
-       Bounds : Countable_Range(Indexed_By).Countable_Range)
+       Bounds : Countable_Ranges(Indexed_By).Countable_Range)
       return Array is
         return Result : Array := Create (Bounds, Arr[Bounds.First]) do
            for I in Bounds.First + 1 .. Bounds.Last loop
@@ -1377,7 +1377,7 @@ procedure A2X.Test.Test_Array is
     Yellow : constant RCB := [0, 16#33#, 16#33#]
     White : constant RCB := [16#FF#, 16#FF#, 16#FF#]
     
-    RCBs : constant Basic_Array(RCB).Basic_Array := [Red, Blue, Yellow, White]
+    RCBs : constant Basic_Arrays(RCB).Basic_Array := [Red, Blue, Yellow, White]
 
     for C of RCBs loop
         Println("red => " & C[red]'Image & ", green => " & C[green]'Image &
@@ -1507,11 +1507,11 @@ package A2X.Core.Univ_String is
      -- a "read-only" element, indexed 1 .. |Str|
 
     function "index_set"(Str : Univ_String)
-      return Countable_Range(Univ_Integer).Countable_Range
+      return Countable_Ranges(Univ_Integer).Countable_Range
         -- Return set of indices for string
 
     function "slicing"(Str : Univ_String;
-      Index_Set : Countable_Range(Univ_Integer).Countable_Range) 
+      Index_Set : Countable_Ranges(Univ_Integer).Countable_Range) 
       return Univ_String with Import, External_Name => #string_slicing;
         -- a "read-only" slice
 
@@ -1566,14 +1566,14 @@ procedure Test_Str is
 end Test_Str
 
 package body A2X.Core.Univ_String is
-    subtype Substr_Array is Basic_Array(Univ_String).Basic_Array;
+    subtype Substr_Array is Basic_Arrays(Univ_String).Basic_Array;
 
     type Univ_String is record
         Parts : Substr_Array;
         Dummy : Univ_Integer;  -- make sure this doesn't end up as a wrapper
     end record Univ_String
     function "index_set"(Str : Univ_String)
-      return Countable_Range(Univ_Integer).Countable_Range is
+      return Countable_Ranges(Univ_Integer).Countable_Range is
         -- Return set of indices for string
         return 1..|Str|
     end "index_set"
@@ -1699,8 +1699,8 @@ package body A2X.Core.Univ_Character is
     end Univ_Character'Last
 
     function ".."(Left, Right : Univ_Character)
-      return Countable_Range(Univ_Character).Countable_Range is
-        subtype Char_Range is Countable_Range(Univ_Character).Countable_Range;
+      return Countable_Ranges(Univ_Character).Countable_Range is
+        subtype Char_Range is Countable_Ranges(Univ_Character).Countable_Range;
         return Char_Range'(Left .. Right);
     end "..";
 end A2X.Core.Univ_Character
@@ -1724,7 +1724,7 @@ package A2X.Core.Univ_Enumeration is
     function Hash(Val : Univ_Enumeration) return Univ_Integer
       with Import, External_Name => #hash_enum;
 
-    function "in"(Val : Univ_Enumeration; Arr : Basic_Array(Univ_Enumeration).Basic_Array)
+    function "in"(Val : Univ_Enumeration; Arr : Basic_Arrays(Univ_Enumeration).Basic_Array)
       return Boolean is ((for some A of Arr => Val = A));
 
 end A2X.Core.Univ_Enumeration
@@ -1786,11 +1786,11 @@ package A2X.Core.Boolean is
     function Boolean'Max(Left, Right : Boolean) return Boolean
       with Import, External_Name => #max;
 
-    function ".."(Left, Right : Boolean) return Countable_Range(Boolean).Countable_Range
+    function ".."(Left, Right : Boolean) return Countable_Ranges(Boolean).Countable_Range
 end A2X.Core.Boolean
 
 package body A2X.Core.Boolean is
-    subtype Boolean_Range is Countable_Range(Boolean).Countable_Range
+    subtype Boolean_Range is Countable_Ranges(Boolean).Countable_Range
 
     procedure "and="(Left : in out Boolean; Right : Boolean) is
       Left := Left and Right
@@ -1823,8 +1823,8 @@ package body A2X.Core.Boolean is
     end Boolean'Value
 
     -- NOTE: For implementation reasons, we put these here rather than defining
-    --       them in the interface using "is of Countable_Range(Boolean).Countable_Range"
-    function ".."(Left, Right : Boolean) return Countable_Range(Boolean).Countable_Range is
+    --       them in the interface using "is of Countable_Ranges(Boolean).Countable_Range"
+    function ".."(Left, Right : Boolean) return Countable_Ranges(Boolean).Countable_Range is
         return Boolean_Range'(".."(Left, Right))
     end ".."
 
@@ -1951,7 +1951,7 @@ end A2X.Containers.Key_Value
 -- 
 generic
     type Bound_Type is new Comparable
-package A2X.Core.Closed_Interval is
+package A2X.Core.Closed_Intervals is
     -- This provides a simple "closed" interval X..Y
     -- If a type is countable, then half-open or fully open intervals
     -- can be converted into the equivalent closed interval.
@@ -1962,9 +1962,9 @@ package A2X.Core.Closed_Interval is
 
     function "in"(Left : Bound_Type; Right : Closed_Interval) return Boolean
     function "=?"(Left, Right : Closed_Interval) return Ordering
-end A2X.Core.Closed_Interval
+end A2X.Core.Closed_Intervals;
 
-package body A2X.Core.Closed_Interval is
+package body A2X.Core.Closed_Intervals is
     function "in"(Left : Bound_Type; Right : Closed_Interval) return Boolean is
         return Left >= Right.Low and then Left <= Right.High
     end "in"
@@ -1986,11 +1986,11 @@ package body A2X.Core.Closed_Interval is
         end if
     end "=?"
 
-end A2X.Core.Closed_Interval
+end A2X.Core.Closed_Intervals;
 
 generic
-  Range : Countable_Range(Univ_Integer).Countable_Range := -2**63+1 .. +2**63-1
-package A2X.Core.Integer is
+  Range : Countable_Ranges(Univ_Integer).Countable_Range := -2**63+1 .. +2**63-1
+package A2X.Core.Integers is
     -- NOTE: We restrict Integer to this range so Univ_Integer can use
     --       values outside this range as indices into an extended-range
     --       integer table.
@@ -2059,9 +2059,9 @@ package A2X.Core.Integer is
 
     function Integer'Last return Integer
 
-    function "[..]" return Countable_Range(Integer).Countable_Range;
+    function "[..]" return Countable_Ranges(Integer).Countable_Range;
 
-    function ".."(Left, Right : Integer) return Countable_Range(Integer).Countable_Range;
+    function ".."(Left, Right : Integer) return Countable_Ranges(Integer).Countable_Range;
 
 private
     -- for Countable
@@ -2083,9 +2083,9 @@ private
     function "-"(Left, Right : Integer) return Univ_Integer
       with Import, External_Name => "-";
 
-end A2X.Core.Integer
+end A2X.Core.Integers;
 
-package body A2X.Core.Integer is
+package body A2X.Core.Integers is
     type Integer is record
        Content : Univ_Integer;  -- So this ends up as a wrapper
     end record Integer
@@ -2098,17 +2098,17 @@ package body A2X.Core.Integer is
         return Range.Last
     end Integer'Last
 
-    function "[..]" return Countable_Range(Integer).Countable_Range is
+    function "[..]" return Countable_Ranges(Integer).Countable_Range is
       ((Range.First, Range.Last));
 
-    function ".."(Left, Right : Integer) return Countable_Range(Integer).Countable_Range is
+    function ".."(Left, Right : Integer) return Countable_Ranges(Integer).Countable_Range is
       ((Left, Right));
 
-end A2X.Core.Integer
+end A2X.Core.Integers;
 
 procedure A2X.Test.Test_Integer(X, Y : Univ_Integer) is
-   -- type I6 is new Integer(1..10**6).Integer
-   subtype I6 is Integer(1..10**6).Integer
+   -- type I6 is new Integers(1..10**6).Integer
+   subtype I6 is Integers(1..10**6).Integer
    A : I6 := X
    B : I6 := Y
 
@@ -2118,7 +2118,7 @@ end A2X.Test.Test_Integer
     
 generic
     type Bound_Type is new Comparable
-package A2X.Core.Interval is
+package A2X.Core.Intervals is
     -- This supports closed, half-open, and open intervals.
     -- This is appropriate for uncountable types where you
     -- can't normalize all intervals into closed intervals.
@@ -2128,7 +2128,7 @@ package A2X.Core.Interval is
         Low_Is_Open : Boolean
         High : Bound_Type
         High_Is_Open : Boolean
-    end record Interval
+    end record Interval;
 
     function Singleton(Val : Bound_Type) return Interval
       -- Return interval consisting of a single value
@@ -2190,9 +2190,9 @@ package A2X.Core.Interval is
       -- Must have some overlap to ensure that result can be 
       -- represented as a single interval.
 
-end A2X.Core.Interval
+end A2X.Core.Intervals;
 
-package body A2X.Core.Interval is
+package body A2X.Core.Intervals is
     function Singleton(Val : Bound_Type) return Interval is
       -- Return interval consisting of a single value
         return (Low => Val, Low_Is_Open => False,
@@ -2448,28 +2448,28 @@ package body A2X.Core.Interval is
         end if
     end "<|="
 
-end A2X.Core.Interval
+end A2X.Core.Intervals;
 
 procedure A2X.Test.Test_Interval(X, Y, Z : Univ_Integer) is
-    Y_Up_To_Z : Interval(Univ_Integer).Interval := 
+    Y_Up_To_Z : Intervals(Univ_Integer).Interval := 
       (Low => Y, Low_Is_Open => False, High => Z, High_Is_Open => True)
 
     Println(X'Image & " in " & Y'Image & "..<" & Z'Image & " = " & Boolean'Image(X in Y_Up_To_Z))
 
-    Y_To_Z : Closed_Interval(Univ_Integer).Closed_Interval := (Low => Y, High => Z)
+    Y_To_Z : Closed_Intervals(Univ_Integer).Closed_Interval := (Low => Y, High => Z)
 
     Println(X'Image & " in " & Y'Image & ".." & Z'Image & " = " & Boolean'Image(X in Y_To_Z))
 
-    One_To_X : Closed_Interval(Univ_Integer).Closed_Interval :=
+    One_To_X : Closed_Intervals(Univ_Integer).Closed_Interval :=
       (Low => 1, High => X)
 
     Println(Univ_Integer'Image(1) & ".." & X'Image & "=?" & Y'Image & ".." & Z'Image & " = " & 
       "=?" (One_To_X, Y_To_Z)'Image)
 
-end A2X.Test.Test_Interval
+end A2X.Test.Test_Interval;
 
 generic
-    Literals : Basic_Array(Univ_Enumeration).Basic_Array
+    Literals : Basic_Arrays(Univ_Enumeration).Basic_Array
 package A2X.Core.Enum is
     type Enum is private;
 
@@ -2498,9 +2498,9 @@ package A2X.Core.Enum is
     -- TBD: These should be properties some day (e.g. Color#first).
     function Enum'First return Enum
     function Enum'Last return Enum
-    function Enum'Range return Countable_Range(Enum).Countable_Range;
+    function Enum'Range return Countable_Ranges(Enum).Countable_Range;
 
-    function "[..]" return Countable_Range(Enum).Countable_Range;
+    function "[..]" return Countable_Ranges(Enum).Countable_Range;
 
     function "=?"(Left, Right : Enum) return Ordering
       with Import, External_Name => #compare_optional;
@@ -2508,7 +2508,7 @@ package A2X.Core.Enum is
     function Hash(Val : Enum) return Univ_Integer
       with Import, External_Name => #identity;
 
-    function ".."(Left, Right : Enum) return Countable_Range(Enum).Countable_Range;
+    function ".."(Left, Right : Enum) return Countable_Ranges(Enum).Countable_Range;
 
     function Enum'Min(Left, Right : Enum) return Enum
       with Import, External_Name => #min;
@@ -2556,13 +2556,13 @@ package body A2X.Core.Enum is
         return (Value => |Literals| - 1)
     end Enum'Last
 
-    function Enum'Range return Countable_Range(Enum).Countable_Range is
+    function Enum'Range return Countable_Ranges(Enum).Countable_Range is
        ((Enum'First, Enum'Last));
 
-    function "[..]" return Countable_Range(Enum).Countable_Range is
+    function "[..]" return Countable_Ranges(Enum).Countable_Range is
        ((Enum'First, Enum'Last));
 
-    function ".."(Left, Right : Enum) return Countable_Range(Enum).Countable_Range is
+    function ".."(Left, Right : Enum) return Countable_Ranges(Enum).Countable_Range is
        ((Left, Right));
 
 end A2X.Core.Enum
@@ -2655,10 +2655,10 @@ package A2X.Core.Univ_Real is
     function Int_To_Real(Int : Univ_Integer) return Univ_Real
       with Import, External_Name => #int_to_real;
 
-    --  function "in"(Left : Univ_Real; Right : Interval(Univ_Real).Interval)
+    --  function "in"(Left : Univ_Real; Right : Intervals(Univ_Real).Interval)
       --  return Boolean;
 
-    function ".."(Left, Right : Univ_Real) return Interval(Univ_Real).Interval
+    function ".."(Left, Right : Univ_Real) return Intervals(Univ_Real).Interval
       is ((Low => Left, Low_Is_Open => False,
            High => Right, High_Is_Open => False));
 end A2X.Core.Univ_Real
@@ -2678,9 +2678,9 @@ package body A2X.Core.Univ_Real is
         end loop
     end Sqrt
 
-    --  subtype Real_Interval is Interval(Univ_Real).Interval;
+    --  subtype Real_Interval is Intervals(Univ_Real).Interval;
 
-    --  function "in"(Left : Univ_Real; Right : Interval(Univ_Real).Interval)
+    --  function "in"(Left : Univ_Real; Right : Intervals(Univ_Real).Interval)
       --  return Boolean is (Real_Interval."in"(Left, Right));
 
 end A2X.Core.Univ_Real
@@ -2786,7 +2786,7 @@ package A2X.Core.Float is
     function Float'Value(Str : Univ_String) return Float
             with Import, External_Name => #from_string_real;
 
-    function "in"(Left : Float; Right : Interval(Float).Interval) return Boolean;
+    function "in"(Left : Float; Right : Intervals(Float).Interval) return Boolean;
           
 end A2X.Core.Float
 
@@ -2799,9 +2799,9 @@ package body A2X.Core.Float is
         return Right * Left
     end "*"
 
-    subtype Float_Interval is Interval(Float).Interval;
+    subtype Float_Interval is Intervals(Float).Interval;
 
-    function "in"(Left : Float; Right : Interval(Float).Interval) return Boolean
+    function "in"(Left : Float; Right : Intervals(Float).Interval) return Boolean
             is (Float_Interval."in"(Left, Right));
 end A2X.Core.Float
           
@@ -2897,9 +2897,9 @@ package A2X.Core.Fixed is
 
     function Fixed'Value(Str : Univ_String) return Fixed
 
-    function ".."(Left, Right : Fixed) return Interval(Fixed).Interval;
+    function ".."(Left, Right : Fixed) return Intervals(Fixed).Interval;
 
-    -- function "in"(Left : Fixed; Right : Interval(Fixed).Interval) 
+    -- function "in"(Left : Fixed; Right : Intervals(Fixed).Interval) 
             -- return Boolean;
           
 end A2X.Core.Fixed
@@ -2942,13 +2942,13 @@ package body A2X.Core.Fixed is
         return Univ_Real.Round_To_Int([[Val]])
     end Round_To_Int
 
-    subtype Fixed_Interval is Interval(Fixed).Interval;
+    subtype Fixed_Interval is Intervals(Fixed).Interval;
 
-    function ".."(Left, Right : Fixed) return Interval(Fixed).Interval is
+    function ".."(Left, Right : Fixed) return Intervals(Fixed).Interval is
       ((Low => Left, Low_Is_Open => False,
         High => Right, High_Is_Open => False));
 
-    -- function "in"(Left : Fixed; Right : Interval(Fixed).Interval) 
+    -- function "in"(Left : Fixed; Right : Intervals(Fixed).Interval) 
             -- return Boolean is (Fixed_Interval."in"(Left, Right));
 end A2X.Core.Fixed
 
@@ -2972,7 +2972,7 @@ procedure A2X.Test.Test_Fixed(X : Univ_Real) is
 
     Println("Round_To_Int(X) = " & Round_To_Int(XTI)'Image)
 
-    Rng : constant Interval(My_Fixed).Interval := My_Fixed'(1.0) .. 4.999999999
+    Rng : constant Intervals(My_Fixed).Interval := My_Fixed'(1.0) .. 4.999999999
 
     Print("Rng = " & My_Fixed'Image(Rng.Low) & ".." & My_Fixed'Image(Rng.High))
     Print("\n")
@@ -3305,9 +3305,9 @@ package A2X.Core.Modular is
 
     function Modular'Last return Modular
 
-    function "[..]" return Countable_Range(Modular).Countable_Range;
+    function "[..]" return Countable_Ranges(Modular).Countable_Range;
 
-    function ".."(Left, Right : Modular) return Countable_Range(Modular).Countable_Range;
+    function ".."(Left, Right : Modular) return Countable_Ranges(Modular).Countable_Range;
 
 private
     -- for Countable
@@ -3385,10 +3385,10 @@ package body A2X.Core.Modular is
         return (Content => Modulus-1)
     end Modular'Last
 
-    function "[..]" return Countable_Range(Modular).Countable_Range
+    function "[..]" return Countable_Ranges(Modular).Countable_Range
       is (Modular'First .. Modular'Last)
 
-    function ".."(Left, Right : Modular) return Countable_Range(Modular).Countable_Range
+    function ".."(Left, Right : Modular) return Countable_Ranges(Modular).Countable_Range
       is (Left .. Right)
 
     -- implements -- for Countable
@@ -3481,15 +3481,15 @@ exception
        Put_Line ("Exception_Message: " & Exception_Message (E));
 end A2X.Test.Test_Exceptions
 
-package A2X.Core.Storage_Pool is
+package A2X.Core.Storage_Pools is
    type Storage_Pool is private;
    function Create return Storage_Pool;
-end A2X.Core.Storage_Pool;
+end A2X.Core.Storage_Pools;
 
 
 generic
    type Desig_Type is new Assignable;
-package A2X.Core.Access_Type is
+package A2X.Core.Access_Types is
    --  Access types designate Aliased objects
    --  Aliased objects include a self reference.
    type Access_Type is private;
@@ -3501,14 +3501,14 @@ package A2X.Core.Access_Type is
    function Allocate (Pool : in out Storage_Pool'Class; Val : Desig_Type)
      return Access_Type
      with Import, External_Name => #allocate_from_pool;
-end A2X.Core.Access_Type;
+end A2X.Core.Access_Types;
 
 generic
    type Desig_Type is new Assignable;
-package A2X.Core.Access_All_Type is
+package A2X.Core.Access_All_Types is
    --  Access types designate Aliased objects
    --  Aliased objects include a self reference.
-   type Access_All_Type is new Access_Type(Desig_Type).Access_Type with private;
+   type Access_All_Type is new Access_Types(Desig_Type).Access_Type with private;
 --    function "=?"(Left, Right : Access_All_Type) return Ordering;
 --    function Is_Null (Acc : Access_All_Type) return Boolean;
 --    function Null_Value return Access_All_Type;
@@ -3517,11 +3517,11 @@ package A2X.Core.Access_All_Type is
 --    function Allocate (Pool : in out Storage_Pool'Class; Val : Desig_Type)
 --      return Access_All_Type
 --      with Import, External_Name => #allocate_from_pool;
-end A2X.Core.Access_All_Type;
+end A2X.Core.Access_All_Types;
 
 generic
    type Desig_Type is new Assignable;
-package A2X.Core.Access_Const_Type is
+package A2X.Core.Access_Const_Types is
    --  Access types designate Aliased objects
    --  Aliased objects include a self reference.
    type Access_Const_Type is private;
@@ -3533,12 +3533,12 @@ package A2X.Core.Access_Const_Type is
    function Allocate (Pool : in out Storage_Pool'Class; Val : Desig_Type)
      return Access_Const_Type
      with Import, External_Name => #allocate_from_pool;
-end A2X.Core.Access_Const_Type;
+end A2X.Core.Access_Const_Types;
 
 generic
    type Desig_Type is new Assignable;
-   type Acc is new Access_Type (Desig_Type).Access_Type ;
-package A2X.Core.Aliased_Obj is
+   type Acc is new Access_Types (Desig_Type).Access_Type ;
+package A2X.Core.Aliased_Objs is
    type Aliased_Obj is limited private;
    function Value (Ali : Aliased_Obj) return Desig_Type;
    procedure Set_Value (Ali : in out Aliased_Obj; New_Val : Desig_Type);
@@ -3551,25 +3551,25 @@ package A2X.Core.Aliased_Obj is
    function Create (Val : Desig_Type;
                 Self : Acc := Null_Value) return Aliased_Obj;
 
-end A2X.Core.Aliased_Obj;
+end A2X.Core.Aliased_Objs;
 
-package body A2X.Core.Storage_Pool is
+package body A2X.Core.Storage_Pools is
    type Storage_Pool is record
-      Handle : Aliased_Obj(Integer, Access_Type(Integer).Access_Type).Aliased_Obj := Create(0);
+      Handle : Aliased_Objs(Integer, Access_Types(Integer).Access_Type).Aliased_Obj := Create(0);
    end record;
       
    function Create return Storage_Pool
       is ((Handle => Create(Val => 0, Self => Null_Value)));
            --  TBD: (others => <>)
            --  TBF: fails in code-gen if "Self" is allowed to default
-end A2X.Core.Storage_Pool;
+end A2X.Core.Storage_Pools;
 
-package body A2X.Core.Access_Type is
+package body A2X.Core.Access_Types is
    type Access_Type is record
        Index : Univ_Integer := null;
    end record;
 
-   subtype AO is Aliased_Obj(Desig_Type, Access_Type).Aliased_Obj;
+   subtype AO is Aliased_Objs(Desig_Type, Access_Type).Aliased_Obj;
 
    function "=?"(Left, Right : Access_Type) return Ordering is
      ("=?" (Left.Index, Right.Index));
@@ -3584,14 +3584,14 @@ package body A2X.Core.Access_Type is
 
    function Index (Acc : Access_Type) return Univ_Integer is (Acc.Index);
 
-end A2X.Core.Access_Type;
+end A2X.Core.Access_Types;
 
-package body A2X.Core.Access_Const_Type is
+package body A2X.Core.Access_Const_Types is
    type Access_Const_Type is record
        Index : Univ_Integer := null;
    end record;
 
-   subtype AO is Aliased_Obj(Desig_Type, Access_Const_Type).Aliased_Obj;
+   subtype AO is Aliased_Objs(Desig_Type, Access_Const_Type).Aliased_Obj;
 
    function "=?"(Left, Right : Access_Const_Type) return Ordering is
      ("=?" (Left.Index, Right.Index));
@@ -3606,9 +3606,9 @@ package body A2X.Core.Access_Const_Type is
 
    function Index (Acc : Access_Const_Type) return Univ_Integer is (Acc.Index);
 
-end A2X.Core.Access_Const_Type;
+end A2X.Core.Access_Const_Types;
 
-package body A2X.Core.Aliased_Obj is
+package body A2X.Core.Aliased_Objs is
    type Aliased_Obj is record
        Self : Acc;
        Desig : Desig_Type;
@@ -3627,26 +3627,26 @@ package body A2X.Core.Aliased_Obj is
                 Self : Acc := Null_Value) return Aliased_Obj is
       return (Self => Self, Desig => Val);
    end Create;
-end A2X.Core.Aliased_Obj;
+end A2X.Core.Aliased_Objs;
 
 procedure A2X.Test.Test_Access is
    Put_Line ("Running Test_Access");
    type Acc_Int is access all Integer;
    Pool : Storage_Pool := Create;
    X : Acc_Int := Null_Value;
-   Y : Aliased_Obj(Integer, Acc_Int).Aliased_Obj :=
+   Y : Aliased_Objs(Integer, Acc_Int).Aliased_Obj :=
      Create (42, Self => Null_Value);
    Put_Line ("Value(Y) = " & Value(Y)'Image);
    Set_Value (Y, 35);
    Put_Line ("Value(Y) = " & Value(Y)'Image);
    X := Tick_Access(Y);
    Put_Line ("Y'Access = " & Hex_Image (Index(X)));
-   Z : Aliased_Obj(Integer, Acc_Int).Aliased_Obj := Deref_Const(X);
+   Z : Aliased_Objs(Integer, Acc_Int).Aliased_Obj := Deref_Const(X);
    Put_Line ("Value(Deref_Const(X)) = " & Value(Z)'Image);
    Set_Value(Z, 33);
    Put_Line ("Updating Deref_Const(X) to " & Value(Z)'Image);
    Put_Line ("Value(Y) now = " & Value(Y)'Image);
-   subtype Ali is Aliased_Obj(Integer, Acc_Int).Aliased_Obj;
+   subtype Ali is Aliased_Objs(Integer, Acc_Int).Aliased_Obj;
    Q renames Ali.Deref(X)
    Set_Value (Q, 55);
    Put_Line ("Udating Deref(X) to " & Value(Q)'Image);
@@ -3661,8 +3661,8 @@ end A2X.Test.Test_Access;
 generic
     type Component_Type is new Assignable;
     type Indexed_By is new Countable;
-package A2X.Core.Array_Type is
-    type Array_Type is new Indexable(Component_Type, Indexed_By).Indexable with private
+package A2X.Core.Array_Types is
+    type Array_Type is new Indexables(Component_Type, Indexed_By).Indexable with private
     function "indexing"(A : aliased Array_Type; Index : Indexed_By)
       return aliased constant Component_Type
     function "var_indexing"(Arr : aliased in out Array_Type; Index : Indexed_By)
@@ -3672,8 +3672,8 @@ package A2X.Core.Array_Type is
       renames Array_Type'Length
     function Array_Type'Length(A : Array_Type; Dimension : Univ_Integer)
       return Univ_Integer
-    function "index_set"(A : Array_Type) return Countable_Range(Indexed_By).Countable_Range
-    function Bounds(A : Array_Type) return Countable_Range(Indexed_By).Countable_Range
+    function "index_set"(A : Array_Type) return Countable_Ranges(Indexed_By).Countable_Range
+    function Bounds(A : Array_Type) return Countable_Ranges(Indexed_By).Countable_Range
       renames "index_set"
 
     function Array_Type'First(A : Array_Type) return Indexed_By
@@ -3687,19 +3687,19 @@ package A2X.Core.Array_Type is
       return Indexed_By
       is (Array_Type'Last(A))  --  TBD use Dimension
 
-    function Create(Bounds : Countable_Range(Indexed_By).Countable_Range; Initial_Value : Component_Type)
+    function Create(Bounds : Countable_Ranges(Indexed_By).Countable_Range; Initial_Value : Component_Type)
       return Array_Type
 
     procedure "<|="(Left : in out Array_Type; Right : in out Component_Type)
     function "&"(Left, Right : Array_Type) return Array_Type
     function "[]" return Array_Type
-end A2X.Core.Array_Type
+end A2X.Core.Array_Types;
 
-package body A2X.Core.Array_Type is
-    subtype Elem_Array is Basic_Array(Component_Type).Basic_Array
+package body A2X.Core.Array_Types is
+    subtype Elem_Array is Basic_Arrays(Component_Type).Basic_Array
 
     type Array_Type is record
-        Bounds : Countable_Range (Indexed_By).Countable_Range ;
+        Bounds : Countable_Ranges(Indexed_By).Countable_Range ;
         Data : Elem_Array;
     end record Array_Type
 
@@ -3740,11 +3740,11 @@ package body A2X.Core.Array_Type is
         return A'Length
     end Array_Type'Length
 
-    function "index_set"(A : Array_Type) return Countable_Range(Indexed_By).Countable_Range is
+    function "index_set"(A : Array_Type) return Countable_Ranges(Indexed_By).Countable_Range is
         return A.Bounds
     end "index_set"
 
-    function Create(Bounds : Countable_Range(Indexed_By).Countable_Range; Initial_Value : Component_Type)
+    function Create(Bounds : Countable_Ranges(Indexed_By).Countable_Range; Initial_Value : Component_Type)
       return Array_Type is
         return (Data => Create(Bounds'Length, Initial_Value),
           Bounds => Bounds)
@@ -3777,9 +3777,9 @@ package body A2X.Core.Array_Type is
         return (Data => [],
           Bounds => Indexed_By'First+1 .. Indexed_By'First)
             -- Bounds not meaningful when empty
-    end "[]"
+    end "[]";
 
-end A2X.Core.Array_Type
+end A2X.Core.Array_Types;
 
 procedure A2X.Test.Test_Array_Type is
     type Color is new Enum( [#red, #green, #blue] ).Enum
@@ -3790,7 +3790,7 @@ procedure A2X.Test.Test_Array_Type is
     Yellow : constant RCB := [0, 16#33#, 16#33#]
     White : constant RCB := [16#FF#, 16#FF#, 16#FF#]
     
-    RCBs : constant Basic_Array(RCB).Basic_Array := [Red, Blue, Yellow, White]
+    RCBs : constant Basic_Arrays(RCB).Basic_Array := [Red, Blue, Yellow, White]
 
     for C of RCBs loop
         Println("#red => " & C[#red]'Image &

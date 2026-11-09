@@ -22427,6 +22427,530 @@ package body PSC.Trees.Semantics.Static is
       --  If Ignore_Indexing is True, then do not consider indexing
       --  even if indexing uses parens in the current language.
 
+      procedure Handle_Module_Instantiation
+        (T : in out Invocation.Tree; Context : in Context_Enum) is
+      begin
+         --  Lookup module name
+         Visitor.Context := Module_Context;
+         Visit (T.Prefix, Visitor);
+         if Sem_Info (T.Prefix) = null then
+            --  Some error occurred
+            if Debug_Second_Pass then
+               Put_Line ("No sem info for: " & Subtree_Image (T.Prefix));
+            end if;
+            return;
+         end if;
+
+         declare
+            Prefix_Sem : constant Sem_Ptr := Sem_Ptr (Sem_Info (T.Prefix));
+            Module_Sym : constant Sym_Ptr := Prefix_Sem.Associated_Symbol;
+            Is_Formal_Type : constant Boolean :=
+              Context = Module_Formal_Context
+              or else Context = Module_Formal_Type_Def_Context
+              or else Context = Module_Actual_Of_Formal_Context;
+
+            Associated_Generic_Op : Sym_Ptr := null;
+            --  Indicates that this type is a "generic" type,
+            --  because it contains a type-decl somewhere within it.
+
+            Enclosing_Construct_Is_Abstract : constant Boolean :=
+              Inside_Abstract_Construct (Visitor.Decl_Region);
+
+         begin
+
+            if Not_Null (T.Extends) then
+               Sem_Error
+                 (T.Extends,
+                  "NYI: Specifying base for extension when instantiating");
+               Visitor.Context := Type_Context;
+               Visit (T.Extends, Visitor);
+            end if;
+
+            if Module_Sym = null then
+               --  TBD: Error already reported?
+               null;
+            elsif Module_Sym.Kind /= Module_Sym_Kind then
+               --  TBD: Keep looking for a module name
+               Sem_Error
+                 (T.Prefix, Subtree_Image (T.Prefix) & " is not a module");
+            else
+               --  Initialize type sem info
+               declare
+                  Module_Sem : constant Module_Sem_Ptr :=
+                    Interface_Part (Module_Sem_Ptr (Module_Sym.Sem_Info));
+                  Module_Tree :
+                    Module.Tree renames
+                    Module.Tree (Tree_Ptr_Of (Module_Sem.Definition).all);
+                  Num_Formals : constant Natural :=
+                    Num_Module_Parameters (Module_Sem);
+                  Actuals : array (1 .. Num_Formals) of Optional_Tree;
+                  Defaulted : array (1 .. Num_Formals) of Boolean :=
+                    (others => False);
+                  Actual_Sem_Infos : constant Sem_Info_Array_Ptr :=
+                    new Sem_Info_Array'(1 .. Num_Formals => null);
+                  Num_Actuals : constant Natural :=
+                    Lists.Length (T.Operands);
+                  Enclosing_Type : Type_Sem_Ptr := null;
+                  Seen_Named : Boolean := False;
+
+                  procedure Handle_Nth_Formal
+                    (Formal_Index : Positive; Actual : Optional_Tree;
+                     Is_Default : Boolean := False) is
+                     --  Determine sem info for Nth operand to instantiation
+
+                     Actual_Copy : Optional_Tree := Actual;
+                     Formal : constant Optional_Tree :=
+                       Nth_Module_Parameter (Module_Sem, Formal_Index);
+                     Formal_Tree :
+                       Trees.Tree'Class renames Tree_Ptr_Of (Formal).all;
+                     Resolved_Type : Type_Sem_Ptr;
+                     Context_To_Use : Context_Enum := Operand_Context;
+                     use type Type_Sem_Vectors.Elem_Index;
+                  begin
+                     if Formal_Tree in Param_Decl.Tree'Class then
+                        Resolved_Type :=
+                          Param_Sem_Ptr (Underlying_Sem_Info (Formal))
+                            .Resolved_Type;
+                        if Resolved_Type /= null
+                          and then
+                          (Resolved_Type.Is_Formal_Type
+                           or else Resolved_Type.Nested_Type_Index > 0
+                           or else not Resolved_Type.All_Parameters_Known)
+                        then
+                           --  We are dealing with a type which
+                           --  might be defined by this instantiation
+                           declare
+                              --  Bundle up info needed by
+                              --  Substitute_Actuals_From_Instantiation
+                              Instantiation_Info : aliased constant
+                                Instantiation_Info_Record :=
+                                (Decl_Region => Visitor.Decl_Region,
+                                 Instantiation_Module => Module_Sem,
+                                 Instantiation => Optional (T'Access));
+                           begin
+                              --  Try to substitute in type
+                              if Enclosing_Type = null
+                                and then Resolved_Type.Is_Formal_Type
+                              then
+                                 --  No enclosing type, so use
+                                 --  Substitute_Actuals_From_Instantiation
+                                 --  directly.
+                                 Resolved_Type :=
+                                   Substitute_Actuals_From_Instantiation
+                                     (Decl_Region => Visitor.Decl_Region,
+                                      Formal_Type => Resolved_Type,
+                                      Instantiation_Module => Module_Sem,
+                                      Instantiation => T,
+                                      Enclosing_Type => Enclosing_Type);
+                              else
+                                 --  Use more general Substitute_Actuals
+                                 Resolved_Type :=
+                                   Substitute_Actuals
+                                     (Resolved_Type,
+                                      Assoc_Type_Region =>
+                                        U_Base_Type_Region (Enclosing_Type),
+                                      Instantiation_Info =>
+                                        Instantiation_Info'
+                                          Unchecked_Access);
+                              end if;
+                           end;
+                        end if;
+
+                        if Resolved_Type = null then
+                           Sem_Error (Formal, "Formal type not defined");
+                        elsif Visitor.Mode /= Interface_Params then
+                           if Resolved_Type.Func_Type_Op_Sem /= null then
+                              --  We want an operation name, not
+                              --  a normal object value.
+                              Context_To_Use := Formal_Op_Context;
+                           end if;
+
+                           Second_Pass
+                             (Visitor.Decl_Region, Actual,
+                              Context => Context_To_Use);
+                           Resolve_Expression
+                             (Visitor, Actual, Resolved_Type);
+
+                           --  Record sem-info of actual
+                           Actual_Sem_Infos (Formal_Index) :=
+                             Sem_Ptr (Sem_Info (Actual));
+
+                           pragma Assert
+                             (Tree_Ptr_Of
+                                (Sem_Info (Actual).Definition).all not in
+                                Param_Decl.Tree);
+                        end if;
+
+                     elsif Formal_Tree in Type_Decl.Tree'Class then
+                        --  Expecting a type
+                        declare
+                           Actual_Type : Type_Sem_Ptr;
+                           Context_For_Actual : Context_Enum;
+                           Formal_Prefix_For_Actual : Optional_Tree;
+                        begin
+                           if Is_Formal_Type then
+                              --  Actual of formal is treated specially
+                              declare
+                                 Actual_Of_Formal_Visitor :
+                                   Sem_Second_Pass_Visitor;
+                                 Formal_Id : constant Optional_Tree :=
+                                   Identifier.Make
+                                     (Str =>
+                                        Sem_Ptr (Formal_Tree.Sem_Info)
+                                          .Associated_Symbol
+                                          .Str,
+                                      Source_Pos =>
+                                        Find_Source_Pos (Formal_Tree));
+                                 Prefix_Type_Region : Type_Region_Ptr;
+                              begin
+                                 Context_For_Actual :=
+                                   Module_Actual_Of_Formal_Context;
+
+                                 Actual_Of_Formal_Visitor.Decl_Region :=
+                                   Visitor.Decl_Region;
+                                 Actual_Of_Formal_Visitor.Context :=
+                                   Context_For_Actual;
+                                 --  Set up formal prefix to identify
+                                 --  actual of formal.
+                                 if Not_Null (Visitor.Formal_Prefix) then
+                                    Formal_Prefix_For_Actual :=
+                                      Qualified_Name.Make
+                                        (Prefix => Visitor.Formal_Prefix,
+                                         Id => Formal_Id);
+                                    Prefix_Type_Region :=
+                                      U_Base_Type_Region
+                                        (Type_Sem_Ptr
+                                           (Underlying_Sem_Info
+                                              (Visitor.Formal_Prefix)));
+                                 else
+                                    Formal_Prefix_For_Actual := Formal_Id;
+                                 end if;
+                                 Actual_Of_Formal_Visitor.Formal_Prefix :=
+                                   Formal_Prefix_For_Actual;
+
+                                 --  Set up sym-reference info of formal
+                                 --  prefix to refer to corresponding formal
+                                 Set_Sem_Info
+                                   (Actual_Of_Formal_Visitor.Formal_Prefix,
+                                    new Sym_Reference_Info'
+                                      (Root_Semantic_Info with
+                                       Associated_Symbol =>
+                                         Sem_Ptr (Formal_Tree.Sem_Info)
+                                           .Associated_Symbol,
+                                       Nested_Region => null,
+                                       Context => Context, Interps => null,
+                                       Resolved_Type => null,
+                                       Resolved_Interp =>
+                                         Null_Optional_Tree,
+                                       Hash_Value => 0,
+                                       Target_Result_Type => null,
+                                       Entry_Exit_Info =>
+                                         Null_Entry_Exit_Info,
+                                       Entry_Temp_Info => null,
+                                       Prefix_Type_Region =>
+                                         Prefix_Type_Region,
+                                       Underlying_Sem_Info =>
+                                         Sem_Ptr (Formal_Tree.Sem_Info)));
+
+                                 Visit
+                                   (Actual_Copy, Actual_Of_Formal_Visitor);
+                              end;
+                           else
+                              Context_For_Actual :=
+                                Module_Actual_Type_Context;
+
+                              Second_Pass
+                                (Visitor.Decl_Region, Actual,
+                                 Context => Context_For_Actual);
+                           end if;
+                           --  Get type sem info
+                           --  TBD: Check if type is acceptable at this
+                           --  point
+                           --      rather than waiting until code_gen phase?
+                           Actual_Type :=
+                             Get_Type
+                               (Visitor.Decl_Region, Actual,
+                                Context => Context_For_Actual,
+                                Formal_Prefix => Formal_Prefix_For_Actual);
+
+                           Actual_Sem_Infos (Formal_Index) :=
+                             Sem_Ptr (Actual_Type);
+
+                           if Actual_Type = null
+                             or else
+                              (Visitor.Mode /= Interface_Params
+                                  and then
+                               not Type_Implements_Type
+                                (Actual_Type => Actual_Type,
+                                 Formal_Type =>
+                                   Type_Sem_Ptr
+                                     (Underlying_Sem_Info (Formal)),
+                                 Allow_Abstract =>
+                                   Enclosing_Construct_Is_Abstract))
+                           then
+                              Sem_Error
+                                (Actual,
+                                 "Type " & Type_Image (Actual_Type) &
+                                 " is abstract or does not implement " &
+                                 Type_Image
+                                   (Type_Sem_Ptr
+                                      (Underlying_Sem_Info (Formal)),
+                                    Use_Short_Form => True));
+                           end if;
+
+                           if False and then Actual_Type.Is_Polymorphic then
+                              Sem_Error
+                                (Actual,
+                                 "NYI: Polymorphic actual type (" &
+                                 Type_Image (Actual_Type) &
+                                 ") not supported in " &
+                                 "module instantiation");
+                           end if;
+
+                           if Visitor.Decl_Region.Kind =
+                             Operation_Param_Region_Kind
+                             and then Actual_Type /= null
+                             and then Actual_Type.Associated_Generic_Op =
+                               Visitor.Decl_Region.Associated_Symbol
+                           then
+                              --  If one of the actual parameters is
+                              --  a generic type, then this is a generic
+                              --  type.
+                              pragma Assert
+                                (Associated_Generic_Op = null
+                                 or else Associated_Generic_Op =
+                                   Actual_Type.Associated_Generic_Op);
+                              --  If already set, it should match
+
+                              Associated_Generic_Op :=
+                                Actual_Type.Associated_Generic_Op;
+                           end if;
+                        end;
+
+                     elsif Formal_Tree in Operation.Tree'Class then
+                        Second_Pass
+                          (Visitor.Decl_Region, Actual,
+                           Context => Formal_Op_Context);
+                        Sem_Error
+                          (Formal,
+                           "NYI: Formal operation not yet supported");
+
+                        --  Record sem-info of actual
+                        Actual_Sem_Infos (Formal_Index) :=
+                          Underlying_Sem_Info (Actual);
+
+                     else
+                        Sem_Error
+                          (Formal, "Unrecognized kind of module formal");
+                     end if;
+                     if Actual_Sem_Infos (Formal_Index) = null
+                       and then
+                        Visitor.Mode /= Interface_Params
+                     then
+                        if Is_Default then
+                           Sem_Error
+                             (T,
+                              "Default parameter " &
+                              Subtree_Image (Actual) & " for formal " &
+                              Subtree_Image (Formal) & " not resolved");
+                        else
+                           Sem_Error
+                             (Actual, "Actual parameter not resolved");
+                        end if;
+                     end if;
+
+                  end Handle_Nth_Formal;
+
+               begin
+
+                  if Prefix_Sem.all in Sym_Reference_Info then
+                     Enclosing_Type :=
+                       Type_Sem_Ptr
+                         (Sym_Ref_Ptr (Prefix_Sem).Prefix_Type_Region);
+                  end if;
+
+                  if Enclosing_Type = null
+                    and then Module_Sym.Enclosing_Region /=
+                      Symbols.Library_Region
+                  then
+                     --  We are instantiating a nested module, get
+                     --  cur-inst type of enclosing module
+                     Enclosing_Type :=
+                       Enclosing_Module_Cur_Inst
+                         (Module_Sym.Enclosing_Region);
+                  end if;
+
+                  if Enclosing_Type = null then
+                     if Debug_Second_Pass then
+                        Put_Line
+                          ("Type instantiation not " &
+                           "directly within a module: " &
+                           Subtree_Image (T));
+                     end if;
+                  end if;
+
+                  if Num_Actuals = 0 and then Is_Formal_Type then
+                     --  A formal type need not have any actuals specified
+                     null;
+                  elsif Num_Actuals > Num_Formals then
+                     Sem_Error
+                       (T, "Too many parameters in module instantiation");
+                  else
+                     --  Copy actuals into array indexed by Formal Index
+                     for Actual_Index in 1 .. Num_Actuals loop
+                        declare
+                           Formal_Index : Positive := Actual_Index;
+                           --  NOTE: This will be updated if named notation
+                           --  used
+                           Actual : Optional_Tree :=
+                             Lists.Nth_Element (T.Operands, Actual_Index);
+                           Actual_Tree :
+                             Trees.Tree'Class renames
+                             Tree_Ptr_Of (Actual).all;
+                        begin
+                           if Actual_Tree in Reference.Tree then
+                              --  Named notation
+                              declare
+                                 Formal_Sym : constant Symbols.Sym_Ptr :=
+                                   Symbols.Lookup_In_Region
+                                     (Module_Sem.Nested_Region,
+                                      Identifier.Tree
+                                        (Tree_Ptr_Of
+                                           (Reference.Tree (Actual_Tree)
+                                              .Key).all)
+                                        .Str);
+                                 use type Symbols.Sym_Ptr;
+                              begin
+                                 if Formal_Sym = null
+                                   or else Module_Formal_Index
+                                     (Formal_Sym) not in
+                                     1 .. Num_Formals
+                                 then
+                                    Sem_Error
+                                      (Reference.Tree (Actual_Tree).Key,
+                                       "Does not identify a module formal");
+                                    return; --  Fatal error
+                                 end if;
+                                 Formal_Index :=
+                                   Module_Formal_Index (Formal_Sym);
+                                 Seen_Named := True;
+
+                                 if Not_Null (Actuals (Formal_Index)) then
+                                    Sem_Error
+                                      (Reference.Tree (Actual_Tree).Key,
+                                       "Duplicate definition for formal " &
+                                       Subtree_Image
+                                         (Nth_Module_Parameter
+                                            (Module_Sem, Formal_Index)));
+                                 end if;
+
+                                 Actuals (Formal_Index) :=
+                                   Reference.Tree (Actual_Tree).Referent;
+                              end;
+                           else
+                              --  Positional notation
+                              if Seen_Named then
+                                 Sem_Error
+                                   (Actual,
+                                    "Positional operands must precede " &
+                                    "all named operands in " &
+                                    Subtree_Image (T));
+                              end if;
+                              Actuals (Formal_Index) := Actual;
+                           end if;
+                        end;
+                     end loop;
+
+                     if Num_Actuals < Num_Formals then
+                        --  Process defaults
+                        for I in 1 .. Num_Formals loop
+                           if Is_Null (Actuals (I)) then
+                              --  See whether formal has a default
+                              declare
+                                 Formal_Ot : constant Optional_Tree :=
+                                   Nth_Module_Parameter (Module_Sem, I);
+                                 Formal_Tree :
+                                   Trees.Tree'Class renames
+                                   Tree_Ptr_Of (Formal_Ot).all;
+                              begin
+                                 if Formal_Tree in Type_Decl.Tree then
+                                    Sem_Error
+                                      (T,
+                                       "NYI: Defaults for formal types " &
+                                       "not yet supported; " &
+                                       "missing actual for " &
+                                       Subtree_Image
+                                         (Formal_Tree,
+                                          Use_Short_Form => True));
+                                 elsif Formal_Tree in Param_Decl.Tree
+                                   and then Not_Null
+                                     (Param_Decl.Tree (Formal_Tree)
+                                        .Param_Default)
+                                 then
+                                    --  Substitute in the default
+                                    declare
+                                       Default : constant Optional_Tree :=
+                                         Param_Decl.Tree (Formal_Tree)
+                                           .Param_Default;
+                                    begin
+                                       Defaulted (I) := True;
+                                       Actuals (I) :=
+                                         Substitute_Actuals_In_Operand
+                                           (Optional
+                                              (Tree_Ptr_Of (Default).all),
+                                            U_Base_Type_Region
+                                              (Enclosing_Type));
+                                    end;
+                                 elsif Formal_Tree in Operation.Tree
+                                   and then Not_Null
+                                     (Operation.Tree (Formal_Tree)
+                                        .Statements)
+                                 then
+                                    Sem_Error
+                                      (T,
+                                       "NYI: Defaults for formal operations" &
+                                       " not yet supported; " &
+                                       "missing actual for " &
+                                       Subtree_Image
+                                         (Formal_Tree,
+                                          Use_Short_Form => True));
+                                 else
+                                    Sem_Error
+                                      (T,
+                                       "Missing actual for " &
+                                       Subtree_Image
+                                         (Formal_Tree,
+                                          Use_Short_Form => True));
+                                 end if;
+                              end;
+                           end if;
+                        end loop;
+                     end if;
+
+                     --  Now visit actuals in order of formals,
+                     --  before calling Find_U_[Base_]Type routines.
+                     for Formal_Index in 1 .. Num_Formals loop
+                        Handle_Nth_Formal
+                          (Formal_Index, Actuals (Formal_Index),
+                           Is_Default => Defaulted (Formal_Index));
+                     end loop;
+                  end if;
+
+                  Set_Type_Sem_Info
+                    (T, Module_Sem, Visitor.Decl_Region,
+                     Is_Formal_Type => Is_Formal_Type,
+                     Enclosing_Type => Enclosing_Type,
+                     Formal_Prefix => Visitor.Formal_Prefix,
+                     Actual_Sem_Infos => Actual_Sem_Infos,
+                     Associated_Generic_Op => Associated_Generic_Op,
+                     Use_Primary_Nested_Type => True);
+               end;
+            end if;
+
+         end;
+
+      end Handle_Module_Instantiation;
+
       procedure Handle_Indexing is
       --  Handle indexing/slicing, whether it uses "A[...]" or "A(...)"
       --  notation, or both.
@@ -22532,7 +23056,7 @@ package body PSC.Trees.Semantics.Static is
          --  If Ignore_Indexing is True, then do not consider indexing
          --  even if indexing uses parens in the current language.
          Op_Tree : Trees.Tree'Class renames Tree_Ptr_Of (T.Prefix).all;
-         Prefix_Sem : Root_Sem_Ptr := null;
+         Prefix_Sem : Sem_Ptr := null;
          Call_Context : constant Context_Enum := Visitor.Context;
       begin
          if Op_Tree in Property.Tree then
@@ -22744,7 +23268,34 @@ package body PSC.Trees.Semantics.Static is
             --  Lookup operation name
             Visitor.Context := Op_Context;
             Visit (T.Prefix, Visitor);
-            Prefix_Sem := Sem_Info (T.Prefix);
+            Prefix_Sem := Sem_Ptr (Sem_Info (T.Prefix));
+
+            if Prefix_Sem /= null
+              and then Prefix_Sem.Associated_Symbol /= null
+              and then Prefix_Sem.Associated_Symbol.Kind = Module_Sym_Kind
+            then
+               declare
+                  Equiv_Instantiation : constant Optional_Tree :=
+                    Invocation.Make
+                      (Kind => Invocation.Module_Instantiation,
+                       Prefix => T.Prefix,
+                       Operands => T.Operands,
+                       Source_Pos => T.Source_Pos);
+               begin
+                  if Debug_Second_Pass then
+                     Put_Line ("Treating " & Subtree_Image (T) &
+                       " as a module instantiation: " &
+                       Subtree_Image (Equiv_Instantiation));
+                  end if;
+                  Handle_Module_Instantiation
+                    (Invocation.Tree (Tree_Ptr_Of (Equiv_Instantiation).all),
+                     Context => Type_Context);
+                     --  Type_Context is used presuming this is part
+                     --  of a larger context.
+                  T.Sem_Info := Sem_Info (Equiv_Instantiation);
+                  return;  ----  return now  ----
+               end;
+            end if;
 
             --  In many cases, we won't know where to look
             --  until we know the types of the parameters
@@ -23040,516 +23591,7 @@ package body PSC.Trees.Semantics.Static is
             end if;
 
          when Module_Instantiation =>
-            --  Lookup module name
-            Visitor.Context := Module_Context;
-            Visit (T.Prefix, Visitor);
-            declare
-               Prefix_Sem : constant Sem_Ptr := Sem_Ptr (Sem_Info (T.Prefix));
-               Module_Sym : constant Sym_Ptr := Prefix_Sem.Associated_Symbol;
-               Is_Formal_Type : constant Boolean :=
-                 Context = Module_Formal_Context
-                 or else Context = Module_Formal_Type_Def_Context
-                 or else Context = Module_Actual_Of_Formal_Context;
-
-               Associated_Generic_Op : Sym_Ptr := null;
-               --  Indicates that this type is a "generic" type,
-               --  because it contains a type-decl somewhere within it.
-
-               Enclosing_Construct_Is_Abstract : constant Boolean :=
-                 Inside_Abstract_Construct (Visitor.Decl_Region);
-
-            begin
-
-               if Not_Null (T.Extends) then
-                  Sem_Error
-                    (T.Extends,
-                     "NYI: Specifying base for extension when instantiating");
-                  Visitor.Context := Type_Context;
-                  Visit (T.Extends, Visitor);
-               end if;
-
-               if Module_Sym = null then
-                  --  TBD: Error already reported?
-                  null;
-               elsif Module_Sym.Kind /= Module_Sym_Kind then
-                  --  TBD: Keep looking for a module name
-                  Sem_Error
-                    (T.Prefix, Subtree_Image (T.Prefix) & " is not a module");
-               else
-                  --  Initialize type sem info
-                  declare
-                     Module_Sem : constant Module_Sem_Ptr :=
-                       Interface_Part (Module_Sem_Ptr (Module_Sym.Sem_Info));
-                     Module_Tree :
-                       Module.Tree renames
-                       Module.Tree (Tree_Ptr_Of (Module_Sem.Definition).all);
-                     Num_Formals : constant Natural :=
-                       Num_Module_Parameters (Module_Sem);
-                     Actuals : array (1 .. Num_Formals) of Optional_Tree;
-                     Defaulted : array (1 .. Num_Formals) of Boolean :=
-                       (others => False);
-                     Actual_Sem_Infos : constant Sem_Info_Array_Ptr :=
-                       new Sem_Info_Array'(1 .. Num_Formals => null);
-                     Num_Actuals : constant Natural :=
-                       Lists.Length (T.Operands);
-                     Enclosing_Type : Type_Sem_Ptr := null;
-                     Seen_Named : Boolean := False;
-
-                     procedure Handle_Nth_Formal
-                       (Formal_Index : Positive; Actual : Optional_Tree;
-                        Is_Default : Boolean := False) is
-                        --  Determine sem info for Nth operand to instantiation
-
-                        Actual_Copy : Optional_Tree := Actual;
-                        Formal : constant Optional_Tree :=
-                          Nth_Module_Parameter (Module_Sem, Formal_Index);
-                        Formal_Tree :
-                          Trees.Tree'Class renames Tree_Ptr_Of (Formal).all;
-                        Resolved_Type : Type_Sem_Ptr;
-                        Context_To_Use : Context_Enum := Operand_Context;
-                        use type Type_Sem_Vectors.Elem_Index;
-                     begin
-                        if Formal_Tree in Param_Decl.Tree'Class then
-                           Resolved_Type :=
-                             Param_Sem_Ptr (Underlying_Sem_Info (Formal))
-                               .Resolved_Type;
-                           if Resolved_Type /= null
-                             and then
-                             (Resolved_Type.Is_Formal_Type
-                              or else Resolved_Type.Nested_Type_Index > 0
-                              or else not Resolved_Type.All_Parameters_Known)
-                           then
-                              --  We are dealing with a type which
-                              --  might be defined by this instantiation
-                              declare
-                                 --  Bundle up info needed by
-                                 --  Substitute_Actuals_From_Instantiation
-                                 Instantiation_Info : aliased constant
-                                   Instantiation_Info_Record :=
-                                   (Decl_Region => Visitor.Decl_Region,
-                                    Instantiation_Module => Module_Sem,
-                                    Instantiation => Optional (T'Access));
-                              begin
-                                 --  Try to substitute in type
-                                 if Enclosing_Type = null
-                                   and then Resolved_Type.Is_Formal_Type
-                                 then
-                                    --  No enclosing type, so use
-                                    --  Substitute_Actuals_From_Instantiation
-                                    --  directly.
-                                    Resolved_Type :=
-                                      Substitute_Actuals_From_Instantiation
-                                        (Decl_Region => Visitor.Decl_Region,
-                                         Formal_Type => Resolved_Type,
-                                         Instantiation_Module => Module_Sem,
-                                         Instantiation => T,
-                                         Enclosing_Type => Enclosing_Type);
-                                 else
-                                    --  Use more general Substitute_Actuals
-                                    Resolved_Type :=
-                                      Substitute_Actuals
-                                        (Resolved_Type,
-                                         Assoc_Type_Region =>
-                                           U_Base_Type_Region (Enclosing_Type),
-                                         Instantiation_Info =>
-                                           Instantiation_Info'
-                                             Unchecked_Access);
-                                 end if;
-                              end;
-                           end if;
-
-                           if Resolved_Type = null then
-                              Sem_Error (Formal, "Formal type not defined");
-                           elsif Visitor.Mode /= Interface_Params then
-                              if Resolved_Type.Func_Type_Op_Sem /= null then
-                                 --  We want an operation name, not
-                                 --  a normal object value.
-                                 Context_To_Use := Formal_Op_Context;
-                              end if;
-
-                              Second_Pass
-                                (Visitor.Decl_Region, Actual,
-                                 Context => Context_To_Use);
-                              Resolve_Expression
-                                (Visitor, Actual, Resolved_Type);
-
-                              --  Record sem-info of actual
-                              Actual_Sem_Infos (Formal_Index) :=
-                                Sem_Ptr (Sem_Info (Actual));
-
-                              pragma Assert
-                                (Tree_Ptr_Of
-                                   (Sem_Info (Actual).Definition).all not in
-                                   Param_Decl.Tree);
-                           end if;
-
-                        elsif Formal_Tree in Type_Decl.Tree'Class then
-                           --  Expecting a type
-                           declare
-                              Actual_Type : Type_Sem_Ptr;
-                              Context_For_Actual : Context_Enum;
-                              Formal_Prefix_For_Actual : Optional_Tree;
-                           begin
-                              if Is_Formal_Type then
-                                 --  Actual of formal is treated specially
-                                 declare
-                                    Actual_Of_Formal_Visitor :
-                                      Sem_Second_Pass_Visitor;
-                                    Formal_Id : constant Optional_Tree :=
-                                      Identifier.Make
-                                        (Str =>
-                                           Sem_Ptr (Formal_Tree.Sem_Info)
-                                             .Associated_Symbol
-                                             .Str,
-                                         Source_Pos =>
-                                           Find_Source_Pos (Formal_Tree));
-                                    Prefix_Type_Region : Type_Region_Ptr;
-                                 begin
-                                    Context_For_Actual :=
-                                      Module_Actual_Of_Formal_Context;
-
-                                    Actual_Of_Formal_Visitor.Decl_Region :=
-                                      Visitor.Decl_Region;
-                                    Actual_Of_Formal_Visitor.Context :=
-                                      Context_For_Actual;
-                                    --  Set up formal prefix to identify
-                                    --  actual of formal.
-                                    if Not_Null (Visitor.Formal_Prefix) then
-                                       Formal_Prefix_For_Actual :=
-                                         Qualified_Name.Make
-                                           (Prefix => Visitor.Formal_Prefix,
-                                            Id => Formal_Id);
-                                       Prefix_Type_Region :=
-                                         U_Base_Type_Region
-                                           (Type_Sem_Ptr
-                                              (Underlying_Sem_Info
-                                                 (Visitor.Formal_Prefix)));
-                                    else
-                                       Formal_Prefix_For_Actual := Formal_Id;
-                                    end if;
-                                    Actual_Of_Formal_Visitor.Formal_Prefix :=
-                                      Formal_Prefix_For_Actual;
-
-                                    --  Set up sym-reference info of formal
-                                    --  prefix to refer to corresponding formal
-                                    Set_Sem_Info
-                                      (Actual_Of_Formal_Visitor.Formal_Prefix,
-                                       new Sym_Reference_Info'
-                                         (Root_Semantic_Info with
-                                          Associated_Symbol =>
-                                            Sem_Ptr (Formal_Tree.Sem_Info)
-                                              .Associated_Symbol,
-                                          Nested_Region => null,
-                                          Context => Context, Interps => null,
-                                          Resolved_Type => null,
-                                          Resolved_Interp =>
-                                            Null_Optional_Tree,
-                                          Hash_Value => 0,
-                                          Target_Result_Type => null,
-                                          Entry_Exit_Info =>
-                                            Null_Entry_Exit_Info,
-                                          Entry_Temp_Info => null,
-                                          Prefix_Type_Region =>
-                                            Prefix_Type_Region,
-                                          Underlying_Sem_Info =>
-                                            Sem_Ptr (Formal_Tree.Sem_Info)));
-
-                                    Visit
-                                      (Actual_Copy, Actual_Of_Formal_Visitor);
-                                 end;
-                              else
-                                 Context_For_Actual :=
-                                   Module_Actual_Type_Context;
-
-                                 Second_Pass
-                                   (Visitor.Decl_Region, Actual,
-                                    Context => Context_For_Actual);
-                              end if;
-                              --  Get type sem info
-                              --  TBD: Check if type is acceptable at this
-                              --  point
-                              --      rather than waiting until code_gen phase?
-                              Actual_Type :=
-                                Get_Type
-                                  (Visitor.Decl_Region, Actual,
-                                   Context => Context_For_Actual,
-                                   Formal_Prefix => Formal_Prefix_For_Actual);
-
-                              Actual_Sem_Infos (Formal_Index) :=
-                                Sem_Ptr (Actual_Type);
-
-                              if Actual_Type = null
-                                or else
-                                 (Visitor.Mode /= Interface_Params
-                                     and then
-                                  not Type_Implements_Type
-                                   (Actual_Type => Actual_Type,
-                                    Formal_Type =>
-                                      Type_Sem_Ptr
-                                        (Underlying_Sem_Info (Formal)),
-                                    Allow_Abstract =>
-                                      Enclosing_Construct_Is_Abstract))
-                              then
-                                 Sem_Error
-                                   (Actual,
-                                    "Type " & Type_Image (Actual_Type) &
-                                    " is abstract or does not implement " &
-                                    Type_Image
-                                      (Type_Sem_Ptr
-                                         (Underlying_Sem_Info (Formal)),
-                                       Use_Short_Form => True));
-                              end if;
-
-                              if False and then Actual_Type.Is_Polymorphic then
-                                 Sem_Error
-                                   (Actual,
-                                    "NYI: Polymorphic actual type (" &
-                                    Type_Image (Actual_Type) &
-                                    ") not supported in " &
-                                    "module instantiation");
-                              end if;
-
-                              if Visitor.Decl_Region.Kind =
-                                Operation_Param_Region_Kind
-                                and then Actual_Type /= null
-                                and then Actual_Type.Associated_Generic_Op =
-                                  Visitor.Decl_Region.Associated_Symbol
-                              then
-                                 --  If one of the actual parameters is
-                                 --  a generic type, then this is a generic
-                                 --  type.
-                                 pragma Assert
-                                   (Associated_Generic_Op = null
-                                    or else Associated_Generic_Op =
-                                      Actual_Type.Associated_Generic_Op);
-                                 --  If already set, it should match
-
-                                 Associated_Generic_Op :=
-                                   Actual_Type.Associated_Generic_Op;
-                              end if;
-                           end;
-
-                        elsif Formal_Tree in Operation.Tree'Class then
-                           Second_Pass
-                             (Visitor.Decl_Region, Actual,
-                              Context => Formal_Op_Context);
-                           Sem_Error
-                             (Formal,
-                              "NYI: Formal operation not yet supported");
-
-                           --  Record sem-info of actual
-                           Actual_Sem_Infos (Formal_Index) :=
-                             Underlying_Sem_Info (Actual);
-
-                        else
-                           Sem_Error
-                             (Formal, "Unrecognized kind of module formal");
-                        end if;
-                        if Actual_Sem_Infos (Formal_Index) = null
-                          and then
-                           Visitor.Mode /= Interface_Params
-                        then
-                           if Is_Default then
-                              Sem_Error
-                                (T,
-                                 "Default parameter " &
-                                 Subtree_Image (Actual) & " for formal " &
-                                 Subtree_Image (Formal) & " not resolved");
-                           else
-                              Sem_Error
-                                (Actual, "Actual parameter not resolved");
-                           end if;
-                        end if;
-
-                     end Handle_Nth_Formal;
-
-                  begin
-
-                     if Prefix_Sem.all in Sym_Reference_Info then
-                        Enclosing_Type :=
-                          Type_Sem_Ptr
-                            (Sym_Ref_Ptr (Prefix_Sem).Prefix_Type_Region);
-                     end if;
-
-                     if Enclosing_Type = null
-                       and then Module_Sym.Enclosing_Region /=
-                         Symbols.Library_Region
-                     then
-                        --  We are instantiating a nested module, get
-                        --  cur-inst type of enclosing module
-                        Enclosing_Type :=
-                          Enclosing_Module_Cur_Inst
-                            (Module_Sym.Enclosing_Region);
-                     end if;
-
-                     if Enclosing_Type = null then
-                        if Debug_Second_Pass then
-                           Put_Line
-                             ("Type instantiation not " &
-                              "directly within a module: " &
-                              Subtree_Image (T));
-                        end if;
-                     end if;
-
-                     if Num_Actuals = 0 and then Is_Formal_Type then
-                        --  A formal type need not have any actuals specified
-                        null;
-                     elsif Num_Actuals > Num_Formals then
-                        Sem_Error
-                          (T, "Too many parameters in module instantiation");
-                     else
-                        --  Copy actuals into array indexed by Formal Index
-                        for Actual_Index in 1 .. Num_Actuals loop
-                           declare
-                              Formal_Index : Positive := Actual_Index;
-                              --  NOTE: This will be updated if named notation
-                              --  used
-                              Actual : Optional_Tree :=
-                                Lists.Nth_Element (T.Operands, Actual_Index);
-                              Actual_Tree :
-                                Trees.Tree'Class renames
-                                Tree_Ptr_Of (Actual).all;
-                           begin
-                              if Actual_Tree in Reference.Tree then
-                                 --  Named notation
-                                 declare
-                                    Formal_Sym : constant Symbols.Sym_Ptr :=
-                                      Symbols.Lookup_In_Region
-                                        (Module_Sem.Nested_Region,
-                                         Identifier.Tree
-                                           (Tree_Ptr_Of
-                                              (Reference.Tree (Actual_Tree)
-                                                 .Key).all)
-                                           .Str);
-                                    use type Symbols.Sym_Ptr;
-                                 begin
-                                    if Formal_Sym = null
-                                      or else Module_Formal_Index
-                                        (Formal_Sym) not in
-                                        1 .. Num_Formals
-                                    then
-                                       Sem_Error
-                                         (Reference.Tree (Actual_Tree).Key,
-                                          "Does not identify a module formal");
-                                       return; --  Fatal error
-                                    end if;
-                                    Formal_Index :=
-                                      Module_Formal_Index (Formal_Sym);
-                                    Seen_Named := True;
-
-                                    if Not_Null (Actuals (Formal_Index)) then
-                                       Sem_Error
-                                         (Reference.Tree (Actual_Tree).Key,
-                                          "Duplicate definition for formal " &
-                                          Subtree_Image
-                                            (Nth_Module_Parameter
-                                               (Module_Sem, Formal_Index)));
-                                    end if;
-
-                                    Actuals (Formal_Index) :=
-                                      Reference.Tree (Actual_Tree).Referent;
-                                 end;
-                              else
-                                 --  Positional notation
-                                 if Seen_Named then
-                                    Sem_Error
-                                      (Actual,
-                                       "Positional operands must precede " &
-                                       "all named operands in " &
-                                       Subtree_Image (T));
-                                 end if;
-                                 Actuals (Formal_Index) := Actual;
-                              end if;
-                           end;
-                        end loop;
-
-                        if Num_Actuals < Num_Formals then
-                           --  Process defaults
-                           for I in 1 .. Num_Formals loop
-                              if Is_Null (Actuals (I)) then
-                                 --  See whether formal has a default
-                                 declare
-                                    Formal_Ot : constant Optional_Tree :=
-                                      Nth_Module_Parameter (Module_Sem, I);
-                                    Formal_Tree :
-                                      Trees.Tree'Class renames
-                                      Tree_Ptr_Of (Formal_Ot).all;
-                                 begin
-                                    if Formal_Tree in Type_Decl.Tree then
-                                       Sem_Error
-                                         (T,
-                                          "NYI: Defaults for formal types " &
-                                          "not yet supported; " &
-                                          "missing actual for " &
-                                          Subtree_Image
-                                            (Formal_Tree,
-                                             Use_Short_Form => True));
-                                    elsif Formal_Tree in Param_Decl.Tree
-                                      and then Not_Null
-                                        (Param_Decl.Tree (Formal_Tree)
-                                           .Param_Default)
-                                    then
-                                       --  Substitute in the default
-                                       declare
-                                          Default : constant Optional_Tree :=
-                                            Param_Decl.Tree (Formal_Tree)
-                                              .Param_Default;
-                                       begin
-                                          Defaulted (I) := True;
-                                          Actuals (I) :=
-                                            Substitute_Actuals_In_Operand
-                                              (Optional
-                                                 (Tree_Ptr_Of (Default).all),
-                                               U_Base_Type_Region
-                                                 (Enclosing_Type));
-                                       end;
-                                    elsif Formal_Tree in Operation.Tree
-                                      and then Not_Null
-                                        (Operation.Tree (Formal_Tree)
-                                           .Statements)
-                                    then
-                                       Sem_Error
-                                         (T,
-                                          "NYI: Defaults for formal operations" &
-                                          " not yet supported; " &
-                                          "missing actual for " &
-                                          Subtree_Image
-                                            (Formal_Tree,
-                                             Use_Short_Form => True));
-                                    else
-                                       Sem_Error
-                                         (T,
-                                          "Missing actual for " &
-                                          Subtree_Image
-                                            (Formal_Tree,
-                                             Use_Short_Form => True));
-                                    end if;
-                                 end;
-                              end if;
-                           end loop;
-                        end if;
-
-                        --  Now visit actuals in order of formals,
-                        --  before calling Find_U_[Base_]Type routines.
-                        for Formal_Index in 1 .. Num_Formals loop
-                           Handle_Nth_Formal
-                             (Formal_Index, Actuals (Formal_Index),
-                              Is_Default => Defaulted (Formal_Index));
-                        end loop;
-                     end if;
-
-                     Set_Type_Sem_Info
-                       (T, Module_Sem, Visitor.Decl_Region,
-                        Is_Formal_Type => Is_Formal_Type,
-                        Enclosing_Type => Enclosing_Type,
-                        Formal_Prefix => Visitor.Formal_Prefix,
-                        Actual_Sem_Infos => Actual_Sem_Infos,
-                        Associated_Generic_Op => Associated_Generic_Op,
-                        Use_Primary_Nested_Type => True);
-                  end;
-               end if;
-
-            end;
+            Handle_Module_Instantiation (T, Context => Visitor.Context);
 
          when Is_Function_Of =>
             Sem_Error (T, "NYI: ""is func (...)"" specification");
@@ -23558,7 +23600,9 @@ package body PSC.Trees.Semantics.Static is
             Sem_Error (T, "NYI: tuple type definition");
 
          when General_Invocation =>
-            Sem_Error (T, "Internal: general invocation not transformed");
+            Handle_Operation_Call (T, Ignore_Indexing => False);
+            -- Sem_Error (T, "Internal: general invocation not transformed" &
+            --   ", context = " & Visitor.Context'Image);
 
          when Type_Conversion =>
             Sem_Error (T, "NYI: type conversion");
@@ -24674,9 +24718,53 @@ package body PSC.Trees.Semantics.Static is
       declare
          Prefix_Sem : constant Sem_Ptr := Sem_Ptr (Sem_Info (T.Prefix));
          Interps : Interpretations.Interp_Tree;
+
+         procedure Try_Type_Prefix is
+            Pkg_Type : constant Type_Sem_Ptr :=
+              Get_Type
+                (Visitor.Decl_Region, T.Prefix,
+                 Complain_If_Not_A_Type => False);
+         begin
+            if Pkg_Type = null then
+               --  No interpretation as "<pkg>.<element>"
+               Sel_Sem := null;
+            else
+               --  Create a sym_ref_info
+               Set_Identifier_Sem_Info
+                 (Visitor.Decl_Region, Context, Id_Tree,
+                  Prefix => T.Prefix, Prefix_Type => Pkg_Type,
+                  Use_Selection_Syntax => True);
+
+               Sel_Sem := Operand_Sem_Ptr (Id_Tree.Sem_Info);
+
+               --  Ignore non-component syms found
+               Non_Component_Sym_Found := null;
+            end if;
+
+            if Debug_Second_Pass then
+               if Sel_Sem /= null
+                 and then Interpretations.Has_Interp (Sel_Sem.Interps)
+               then
+                  Put_Line
+                    (" Making package selection interp for " &
+                     Subtree_Image (T) & ": " &
+                     Subtree_Image
+                       (Interpretations.First_Interp (Sel_Sem.Interps)));
+               end if;
+            end if;
+         end Try_Type_Prefix;
+
       begin
-         if Prefix_Sem /= null
-           and then Prefix_Sem.all in Operand_Semantic_Info'Class
+         if Prefix_Sem = null then
+            Sem_Error (T, "Not a valid prefix " & Subtree_Image (T.Prefix));
+            Sel_Sem := null;
+
+         elsif Include_Type_Prefixes
+           and then Prefix_Sem.all in Type_Semantic_Info'Class
+         then
+            Try_Type_Prefix;
+
+         elsif Prefix_Sem.all in Operand_Semantic_Info'Class
          then
             --  Do a lookup of selector in each interp of prefix
             Interps :=
@@ -24703,42 +24791,10 @@ package body PSC.Trees.Semantics.Static is
                   --  Ignore non-component syms found
                   Non_Component_Sym_Found := null;
                end;
+
             elsif Include_Type_Prefixes then
                --  Might be element of a package
-               declare
-                  Pkg_Type : constant Type_Sem_Ptr :=
-                    Get_Type
-                      (Visitor.Decl_Region, T.Prefix,
-                       Complain_If_Not_A_Type => False);
-               begin
-                  if Pkg_Type = null then
-                     --  No interpretation as "<pkg>.<element>"
-                     Sel_Sem := null;
-                  else
-                     --  Create a sym_ref_info
-                     Set_Identifier_Sem_Info
-                       (Visitor.Decl_Region, Context, Id_Tree,
-                        Prefix => T.Prefix, Prefix_Type => Pkg_Type,
-                        Use_Selection_Syntax => True);
-
-                     Sel_Sem := Operand_Sem_Ptr (Id_Tree.Sem_Info);
-
-                     --  Ignore non-component syms found
-                     Non_Component_Sym_Found := null;
-                  end if;
-
-                  if Debug_Second_Pass then
-                     if Sel_Sem /= null
-                       and then Interpretations.Has_Interp (Sel_Sem.Interps)
-                     then
-                        Put_Line
-                          (" Making package selection interp for " &
-                           Subtree_Image (T) & ": " &
-                           Subtree_Image
-                             (Interpretations.First_Interp (Sel_Sem.Interps)));
-                     end if;
-                  end if;
-               end;
+               Try_Type_Prefix;
             end if;
 
             if Sel_Sem = null then
@@ -24771,9 +24827,11 @@ package body PSC.Trees.Semantics.Static is
                   end if;
                end if;
                Sel_Sem := new Selection_Semantic_Info;
+
             end if;
          else
-            Sem_Error (T, "Not a valid prefix " & Subtree_Image (T.Prefix));
+            Sem_Error (T, "Not a valid prefix " & Subtree_Image (T.Prefix) &
+              ", Prefix_Sem'Tag = " & Ada.Tags.Expanded_Name (Prefix_Sem'Tag));
             Sel_Sem := null;
          end if;
 
