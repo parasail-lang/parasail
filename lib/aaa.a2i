@@ -1854,7 +1854,7 @@ end A2X.Test.Test_Boolean
 
 generic
     type Key_Type is new Hashable
-package A2X.Containers.Keyed is
+package A2X.Containers.Keys is
     type Keyed is abstract private
 
     abstract function Key_Of(KV : aliased Keyed)
@@ -1863,7 +1863,7 @@ package A2X.Containers.Keyed is
       -- Return True if Keyed object has a non-null value
     abstract function Key_Only(Key : Key_Type) return Keyed
       -- Return a Keyed object given a key, having no associated value
-end A2X.Containers.Keyed
+end A2X.Containers.Keys;
 
 generic
     type Key_Type_KV is new Hashable;
@@ -1871,7 +1871,7 @@ generic
 package A2X.Containers.Key_Value is
   -- This supports the use of [Key => Value] as a way to
   -- add a single element to an existing indexable container of some sort.
-    type Key_Value is new Keyed(Key_Type_KV).Keyed with record
+    type Key_Value is new Keys(Key_Type_KV).Keyed with record
          Key : Key_Type_KV
          Value : Value_Type
     end record Key_Value
@@ -3481,10 +3481,10 @@ exception
        Put_Line ("Exception_Message: " & Exception_Message (E));
 end A2X.Test.Test_Exceptions
 
-package A2X.Core.Storage_Pools is
+package A2X.Core.Storage_Pool is
    type Storage_Pool is private;
    function Create return Storage_Pool;
-end A2X.Core.Storage_Pools;
+end A2X.Core.Storage_Pool;
 
 
 generic
@@ -3553,7 +3553,7 @@ package A2X.Core.Aliased_Objs is
 
 end A2X.Core.Aliased_Objs;
 
-package body A2X.Core.Storage_Pools is
+package body A2X.Core.Storage_Pool is
    type Storage_Pool is record
       Handle : Aliased_Objs(Integer, Access_Types(Integer).Access_Type).Aliased_Obj := Create(0);
    end record;
@@ -3562,7 +3562,7 @@ package body A2X.Core.Storage_Pools is
       is ((Handle => Create(Val => 0, Self => Null_Value)));
            --  TBD: (others => <>)
            --  TBF: fails in code-gen if "Self" is allowed to default
-end A2X.Core.Storage_Pools;
+end A2X.Core.Storage_Pool;
 
 package body A2X.Core.Access_Types is
    type Access_Type is record

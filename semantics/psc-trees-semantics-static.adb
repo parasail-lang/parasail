@@ -21685,11 +21685,11 @@ package body PSC.Trees.Semantics.Static is
             then
                --  Everything comes from Def_Sem
                if Type_Sem.Is_Formal_Type /= Def_Sem.Is_Formal_Type then
-                  Sem_Error (T, "Internal: Is_Formal_Type mismatch: " &
+                  Sem_Warning ("Is_Formal_Type mismatch: " &
                     Subtree_Image (Type_Sem.Definition) &
                     ".Is_Formal = " & Type_Sem.Is_Formal_Type'Image & "; " &
                     Subtree_Image(Def_Sem.Definition) & ".Is_Formal = " &
-                    Def_Sem.Is_Formal_Type'Image);
+                    Def_Sem.Is_Formal_Type'Image, T.Source_Pos);
                end if;
 
                null;
