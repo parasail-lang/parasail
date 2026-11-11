@@ -764,7 +764,7 @@ end A2X.Test.Test_Basic_Array
     
 generic
     type Element_Type is new Assignable  -- tbd: is private
-package A2X.Core.Vector is
+package A2X.Core.Vectors is
   -- Extendable vector, indexed by Univ_Integer, 1..Length
     type Vector is new Indexables(Element_Type, Univ_Integer).Indexable with private
 
@@ -788,9 +788,9 @@ package A2X.Core.Vector is
     procedure "<|="(V : in out Vector; Elem : in out Element_Type);
     procedure Append(V : in out Vector; Elem : in Element_Type);
     procedure Append_Vector(V : in out Vector; Right : in Vector);
-end A2X.Core.Vector
+end A2X.Core.Vectors;
     
-package body A2X.Core.Vector is
+package body A2X.Core.Vectors is
   -- Extendable vector, indexed by Univ_Integer, 1..Length
     Debug : constant Boolean := #False;
     Initial_Size : constant := 4
@@ -1141,14 +1141,14 @@ package body A2X.Core.Vector is
         --Rep_Ok(Result, 24);
     end "&"
 
-end A2X.Core.Vector
+end A2X.Core.Vectors;
 
 procedure A2X.Test.Test_Vector is
     function Img (Val : Univ_Integer) return Univ_String
       renames Univ_Integer'Image;
 
-    V : Vector(Univ_Integer).Vector := []
-    U : Vector(Univ_Integer).Vector := []
+    V : Vectors(Univ_Integer).Vector := []
+    U : Vectors(Univ_Integer).Vector := []
     V := V & 23
     U := U & 24
     V := V & U
@@ -1227,11 +1227,11 @@ end A2X.Core.Univ_Character
 generic
     type Elem_Type is new Assignable;
     type Indexed_By is new Countable
-package A2X.Containers.Array is
+package A2X.Containers.Arrays is
     type Array is new Indexables(Elem_Type, Indexed_By).Indexable with private
 
   -- An array abstraction where the index type is not necessarily
-  -- Univ_Integer, but instead can be any Countable type (e.g. Enum(...).Enum)
+  -- Univ_Integer, but instead can be any Countable type (e.g. Enums(...).Enum)
 
     function Create
       (Bounds : Countable_Ranges(Indexed_By).Countable_Range; Initial_Value : Elem_Type)
@@ -1261,11 +1261,11 @@ package A2X.Containers.Array is
       return Array
     function "&"(Left, Right : Array) return Array
     function "[]" return Array
-end A2X.Containers.Array
+end A2X.Containers.Arrays;
 
-package body A2X.Containers.Array is
+package body A2X.Containers.Arrays is
   -- An array abstraction where the index type is not necessarily
-  -- Univ_Integer, but instead can be any Countable type (e.g. Enum(...).Enum)
+  -- Univ_Integer, but instead can be any Countable type (e.g. Enums(...).Enum)
     subtype Elem_Array is Basic_Arrays(Elem_Type).Basic_Array
 
     type Array is record
@@ -1365,7 +1365,7 @@ package body A2X.Containers.Array is
             -- Bounds not meaningful when empty
     end "[]"
 
-end A2X.Containers.Array
+end A2X.Containers.Arrays;
 
 procedure A2X.Test.Test_Array is
     type Color is (red, green, blue);
@@ -2470,7 +2470,7 @@ end A2X.Test.Test_Interval;
 
 generic
     Literals : Basic_Arrays(Univ_Enumeration).Basic_Array
-package A2X.Core.Enum is
+package A2X.Core.Enums is
     type Enum is private;
 
     function "from_univ"(Univ : Univ_Enumeration) 
@@ -2514,9 +2514,9 @@ package A2X.Core.Enum is
       with Import, External_Name => #min;
     function Enum'Max(Left, Right : Enum) return Enum
       with Import, External_Name => #max;
-end A2X.Core.Enum
+end A2X.Core.Enums
 
-package body A2X.Core.Enum is
+package body A2X.Core.Enums is
     type Enum is record
         Value : Univ_Integer
     end record;
@@ -2565,7 +2565,7 @@ package body A2X.Core.Enum is
     function ".."(Left, Right : Enum) return Countable_Ranges(Enum).Countable_Range is
        ((Left, Right));
 
-end A2X.Core.Enum
+end A2X.Core.Enums;
 
 procedure A2X.Test.Test_Enum is
     type Color is (red, green, blue);
@@ -2714,7 +2714,7 @@ end A2X.Test.Test_Real
 
 generic
     Digits : Univ_Integer := 15
-package A2X.Core.Float is
+package A2X.Core.Floats is
         -- A floating point type that provides at least the
         -- given number of digits of precision.
     type Float is private
@@ -2788,9 +2788,9 @@ package A2X.Core.Float is
 
     function "in"(Left : Float; Right : Intervals(Float).Interval) return Boolean;
           
-end A2X.Core.Float
+end A2X.Core.Floats;
 
-package body A2X.Core.Float is
+package body A2X.Core.Floats is
     type Float is record
         Value : Univ_Real
     end record;
@@ -2803,7 +2803,7 @@ package body A2X.Core.Float is
 
     function "in"(Left : Float; Right : Intervals(Float).Interval) return Boolean
             is (Float_Interval."in"(Left, Right));
-end A2X.Core.Float
+end A2X.Core.Floats;
           
 procedure A2X.Test.Test_Float is
     type My_Float is digits 8;
@@ -2840,7 +2840,7 @@ end A2X.Test.Test_Float
 
 generic
     Delta : Univ_Real
-package A2X.Core.Fixed is
+package A2X.Core.Fixeds is
   -- Fixed point types, represented as an integer
   -- multiple of the given Delta
     type Fixed is private
@@ -2902,9 +2902,9 @@ package A2X.Core.Fixed is
     -- function "in"(Left : Fixed; Right : Intervals(Fixed).Interval) 
             -- return Boolean;
           
-end A2X.Core.Fixed
+end A2X.Core.Fixeds;
 
-package body A2X.Core.Fixed is
+package body A2X.Core.Fixeds is
     type Fixed is record
         Value : Univ_Integer
     end record;
@@ -2950,7 +2950,7 @@ package body A2X.Core.Fixed is
 
     -- function "in"(Left : Fixed; Right : Intervals(Fixed).Interval) 
             -- return Boolean is (Fixed_Interval."in"(Left, Right));
-end A2X.Core.Fixed
+end A2X.Core.Fixeds;
 
 procedure A2X.Test.Test_Fixed(X : Univ_Real) is
     type My_Fixed is delta 1.0E-6;
@@ -3239,7 +3239,7 @@ end A2X.Test.Test_Clock
 
 generic
     Modulus : Univ_Integer
-package A2X.Core.Modular is
+package A2X.Core.Modulars is
   -- This is an unsigned type whose arithmetic is "modulo" the modulus
     type Modular is private
 
@@ -3324,9 +3324,9 @@ private
 
     function "-"(Left, Right : Modular) return Univ_Integer
 
-end A2X.Core.Modular
+end A2X.Core.Modulars;
 
-package body A2X.Core.Modular is
+package body A2X.Core.Modulars is
     type Modular is record
         Content : Unsigned_64;  -- So this ends up as a wrapper
     end record Modular
@@ -3412,10 +3412,10 @@ package body A2X.Core.Modular is
     function "-"(Left, Right : Modular) return Univ_Integer is
         return (Left.Content - Right.Content) mod Modulus
     end "-"
-end A2X.Core.Modular
+end A2X.Core.Modulars;
     
 procedure A2X.Test.Test_Modular is
-    type Mod16 is new Modular(16).Modular
+    type Mod16 is new Modulars(16).Modular
 
     Println("Testing mod 16")
     Println("0xA + 0xA = " & Mod16'Image(Mod16'(16#A#) + Mod16'(16#A#)))
@@ -3782,7 +3782,7 @@ package body A2X.Core.Array_Types is
 end A2X.Core.Array_Types;
 
 procedure A2X.Test.Test_Array_Type is
-    type Color is new Enum( [#red, #green, #blue] ).Enum
+    type Color is (red, green, blue);
     type RCB is array (Color) of Integer range 0..16#FF#
 
     Red : constant RCB := [#red => 16#33#, #green => 0, #blue => 0]

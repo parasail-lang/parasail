@@ -21483,6 +21483,7 @@ package body PSC.Trees.Semantics.Static is
       Orig_Prefix : constant Optional_Tree := Visitor.Formal_Prefix;
       Orig_Decl_For_Annotations : constant Optional_Tree :=
         Visitor.Decl_For_Annotations;
+      Type_Def_Tree : Tree'Class renames Tree_Ptr_Of (T.Type_Definition).all;
       Associated_Generic_Op : Sym_Ptr := null;
       --  Enclosing operation, if this type-decl is nested within
       --  an operation parameter part.
@@ -21551,8 +21552,13 @@ package body PSC.Trees.Semantics.Static is
       end if;
 
       if Visitor.Context /= Type_Context
-        and then Tree_Ptr_Of (T.Type_Definition).all not in Invocation.Tree
+        and then Type_Def_Tree not in Invocation.Tree
+        and then (Type_Def_Tree not in Selection.Tree
+                    or else
+                  Tree_Ptr_Of (Selection.Tree (Type_Def_Tree).Prefix).all
+                    not in Invocation.Tree)
       then
+         --  Not already an invocation, or a selection from an invocation.
          --  Create an implicit invocation
          T.Type_Definition :=
            Invocation.Make
@@ -21678,8 +21684,13 @@ package body PSC.Trees.Semantics.Static is
               or else Type_Sem.Is_Formal_Type
             then
                --  Everything comes from Def_Sem
-               pragma Assert
-                 (Type_Sem.Is_Formal_Type = Def_Sem.Is_Formal_Type);
+               if Type_Sem.Is_Formal_Type /= Def_Sem.Is_Formal_Type then
+                  Sem_Error (T, "Internal: Is_Formal_Type mismatch: " &
+                    Subtree_Image (Type_Sem.Definition) &
+                    ".Is_Formal = " & Type_Sem.Is_Formal_Type'Image & "; " &
+                    Subtree_Image(Def_Sem.Definition) & ".Is_Formal = " &
+                    Def_Sem.Is_Formal_Type'Image);
+               end if;
 
                null;
 

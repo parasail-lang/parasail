@@ -565,7 +565,7 @@ formal_type_declaration :
 	  Type_Definition => Invocation.Make(
             Kind => Invocation.Module_Instantiation,
             Prefix => PSC.Trees.Identifier.Make
-              ("Integer", Token_Src_Pos ($4)),
+              ("Integers", Token_Src_Pos ($4)),
             Operands => Lists.Empty_List,
             Source_Pos => Token_Src_Pos ($4))));
     }
@@ -576,7 +576,7 @@ formal_type_declaration :
 	  Type_Definition => Invocation.Make(
             Kind => Invocation.Module_Instantiation,
             Prefix => PSC.Trees.Identifier.Make
-              ("Modular", Token_Src_Pos ($4)),
+              ("Modulars", Token_Src_Pos ($4)),
             Operands => Lists.Empty_List,
             Source_Pos => Token_Src_Pos ($4))));
     }
@@ -587,7 +587,7 @@ formal_type_declaration :
 	  Type_Definition => Invocation.Make(
             Kind => Invocation.Module_Instantiation,
             Prefix => PSC.Trees.Identifier.Make
-              ("Float", Token_Src_Pos ($4)),
+              ("Floats", Token_Src_Pos ($4)),
             Operands => Lists.Empty_List,
             Source_Pos => Token_Src_Pos ($4))));
     }
@@ -1886,7 +1886,7 @@ non_derived_type_declaration :
              Is_New_Type => True,
              Type_Definition => Invocation.Make(
                Kind => Invocation.Module_Instantiation,
-               Prefix => PSC.Trees.Identifier.Make ("Enum", $3.Source_Pos),
+               Prefix => PSC.Trees.Identifier.Make ("Enums", $3.Source_Pos),
                Operands => Lists.Make
                  ((1 => Invocation.Make(Invocation.Container_Aggregate,
                            Prefix => Null_Optional_Tree,
@@ -2043,7 +2043,7 @@ non_derived_type_declaration :
 	  Type_Definition => Invocation.Make(
             Kind => Invocation.Module_Instantiation,
             Prefix => PSC.Trees.Identifier.Make
-              ("Integer", Token_Src_Pos ($4)),
+              ("Integers", Token_Src_Pos ($4)),
             Operands => Lists.Make ((1 => $5.Tree)),
             Source_Pos => $4.Source_Pos)))));
     }
@@ -2055,7 +2055,7 @@ non_derived_type_declaration :
 	  Type_Definition => Invocation.Make(
             Kind => Invocation.Module_Instantiation,
             Prefix => PSC.Trees.Identifier.Make
-              ("Modular", Token_Src_Pos ($4)),
+              ("Modulars", Token_Src_Pos ($4)),
             Operands => Lists.Make ((1 => $5.Tree)),
             Source_Pos => $4.Source_Pos)))));
     }
@@ -2067,7 +2067,7 @@ non_derived_type_declaration :
 	  Type_Definition => Invocation.Make(
             Kind => Invocation.Module_Instantiation,
             Prefix => PSC.Trees.Identifier.Make
-              ("Float", Token_Src_Pos ($4)),
+              ("Floats", Token_Src_Pos ($4)),
             Operands => Lists.Make ((1 => $5.Tree)),
             Source_Pos => $4.Source_Pos)))));
     }
@@ -2079,7 +2079,7 @@ non_derived_type_declaration :
 	  Type_Definition => Invocation.Make(
             Kind => Invocation.Module_Instantiation,
             Prefix => PSC.Trees.Identifier.Make
-              ("Fixed", Token_Src_Pos ($4)),
+              ("Fixeds", Token_Src_Pos ($4)),
             Operands => Lists.Make ((1 => $5.Tree)),
             Source_Pos => $4.Source_Pos)))));
     }
@@ -2134,7 +2134,7 @@ array_type_def :
 	  Invocation.Make(
             Kind => Invocation.Module_Instantiation,
             Prefix => PSC.Trees.Identifier.Make
-              ("Array_Type", Token_Src_Pos ($1)),
+              ("Array_Types", Token_Src_Pos ($1)),
             Operands => Lists.Make
                           (($6.Tree, Make_Array_Indexer ($3.List)))));
     }
@@ -2157,7 +2157,7 @@ index_subtype :
            $$ := (One_Tree, Invocation.Make(
                Kind => Invocation.Module_Instantiation,
                Prefix => PSC.Trees.Identifier.Make
-                 ("Integer", Find_Source_Pos ($1.Tree)),
+                 ("Integers", Find_Source_Pos ($1.Tree)),
                Operands => Lists.Make ((1 => $1.Tree))));
         else
            --  Presume we have a simple type name
