@@ -12322,7 +12322,7 @@ package body PSC.Trees.Semantics.Static is
                  Type_Sem_Ptr (Underlying_Sem_Info (Prefix));
                New_Prefix : constant Optional_Tree :=
                  Substitute_In_Tree
-                   (Prefix, Assoc_Type_Region,
+                   (Prefix_Type.Definition, Assoc_Type_Region,
                     Instantiation_Info => Instantiation_Info,
                     Extra_Subst => Extra_Subst,
                     Always_Copy_One_Level => Always_Copy_One_Level,
