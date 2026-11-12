@@ -12312,6 +12312,56 @@ package body PSC.Trees.Semantics.Static is
                   return "null";
                end if;
             end Orig_Sem_Tag;
+
+            procedure Substitute_In_Qualified_Name
+              (Prefix, Id : Optional_Tree; Uses_Selection_Syntax : Boolean)
+               --  This is used for both Qualified_Names and
+               --  Selections that are selecting from a type prefix.
+            is
+               Prefix_Type : constant Type_Sem_Ptr :=
+                 Type_Sem_Ptr (Underlying_Sem_Info (Prefix));
+               New_Prefix : constant Optional_Tree :=
+                 Substitute_In_Tree
+                   (Prefix, Assoc_Type_Region,
+                    Instantiation_Info => Instantiation_Info,
+                    Extra_Subst => Extra_Subst,
+                    Always_Copy_One_Level => Always_Copy_One_Level,
+                    Always_Copy_Tree => Always_Copy_Tree);
+               New_Prefix_Type : constant Type_Sem_Ptr :=
+                 Type_Sem_Ptr (Underlying_Sem_Info (New_Prefix));
+            begin
+               if New_Prefix_Type /= null
+                 and then U_Base_Type_Region (New_Prefix_Type) /=
+                   Assoc_Type_Region
+               then
+                  --  Build a new Id part
+                  declare
+                     Id_Tree :
+                       Identifier.Tree renames
+                       Identifier.Tree (Tree_Ptr_Of (Id).all);
+                     New_Id : constant Optional_Tree :=
+                       Identifier.Substitute_Operands
+                         (Id_Tree, (1 .. 0 => Null_Optional_Tree));
+                  begin
+                     --  Remember new prefix region
+                     Prefix_Type_Region :=
+                       U_Base_Type_Region (New_Prefix_Type);
+                     Result :=
+                       Qualified_Name.Make
+                         (New_Prefix, New_Id, Uses_Selection_Syntax);
+                     if Debug_Substitution then
+                        Put_Line
+                          (" <--Substitute_In_Tree: Qualified_Name Orig = " &
+                           Subtree_Image (OT, Use_Short_Form => True) &
+                           " (Resolved: " &
+                           Subtree_Image
+                             (Resolved_Ot, Use_Short_Form => True) &
+                           "), Result = " &
+                           Subtree_Image (Result, Use_Short_Form => True));
+                     end if;
+                  end;
+               end if;
+            end Substitute_In_Qualified_Name;
          begin
             if Debug_Substitution then
                Put_Line
@@ -12326,51 +12376,32 @@ package body PSC.Trees.Semantics.Static is
                   Qn_Tree :
                     Qualified_Name.Tree renames
                     Qualified_Name.Tree (Orig_Tree);
-                  Prefix_Type : constant Type_Sem_Ptr :=
-                    Type_Sem_Ptr (Underlying_Sem_Info (Qn_Tree.Prefix));
-                  New_Prefix : constant Optional_Tree :=
-                    Substitute_In_Tree
-                      (Qn_Tree.Prefix, Assoc_Type_Region,
-                       Instantiation_Info => Instantiation_Info,
-                       Extra_Subst => Extra_Subst,
-                       Always_Copy_One_Level => Always_Copy_One_Level,
-                       Always_Copy_Tree => Always_Copy_Tree);
-                  New_Prefix_Type : constant Type_Sem_Ptr :=
-                    Type_Sem_Ptr (Underlying_Sem_Info (New_Prefix));
                begin
-                  if New_Prefix_Type /= null
-                    and then U_Base_Type_Region (New_Prefix_Type) /=
-                      Assoc_Type_Region
-                  then
-                     --  Build a new Id part
-                     declare
-                        Id_Tree :
-                          Identifier.Tree renames
-                          Identifier.Tree (Tree_Ptr_Of (Qn_Tree.Id).all);
-                        New_Id : constant Optional_Tree :=
-                          Identifier.Substitute_Operands
-                            (Id_Tree, (1 .. 0 => Null_Optional_Tree));
-                     begin
-                        --  Remember new prefix region
-                        Prefix_Type_Region :=
-                          U_Base_Type_Region (New_Prefix_Type);
-                        Result :=
-                          Substitute_Operands
-                            (Orig_Tree, (New_Prefix, New_Id));
-                        if Debug_Substitution then
-                           Put_Line
-                             (" <--Substitute_In_Tree: Qualified_Name Orig = " &
-                              Subtree_Image (OT, Use_Short_Form => True) &
-                              " (Resolved: " &
-                              Subtree_Image
-                                (Resolved_Ot, Use_Short_Form => True) &
-                              "), Result = " &
-                              Subtree_Image (Result, Use_Short_Form => True));
-                        end if;
-                     end;
-                  end if;
+                  Substitute_In_Qualified_Name
+                    (Prefix => Qn_Tree.Prefix,
+                     Id => Qn_Tree.Id,
+                     Uses_Selection_Syntax => Qn_Tree.Uses_Selection_Syntax);
                end;
 
+            elsif Orig_Tree in Selection.Tree
+              and then
+                (Underlying_Sem_Info
+                  (Selection.Tree (Orig_Tree).Prefix).all in
+                    Type_Semantic_Info
+                   or else
+                 Underlying_Sem_Info
+                  (Selection.Tree (Orig_Tree).Prefix).all in
+                    Module_Semantic_Info)
+            then
+               declare
+                  Sel_Tree : Selection.Tree renames
+                    Selection.Tree (Orig_Tree);
+               begin
+                  Substitute_In_Qualified_Name
+                    (Prefix => Sel_Tree.Prefix,
+                     Id => Sel_Tree.Selector,
+                     Uses_Selection_Syntax => True);
+               end;
             elsif N > 0 or else Copy_This_Level
               or else Orig_Type_Not_Fully_Known
             then
@@ -15784,12 +15815,12 @@ package body PSC.Trees.Semantics.Static is
    procedure Set_Identifier_Sem_Info
      (Decl_Region : Region_Ptr; Context : Context_Enum;
       T : in out Identifier.Tree; Prefix : Optional_Tree;
-      Prefix_Type : Type_Sem_Ptr; Use_Selection_Syntax : Boolean := False;
+      Prefix_Type : Type_Sem_Ptr; Uses_Selection_Syntax : Boolean := False;
       Ignore_Error : Boolean := False) is
       --  Fill in Sem_Info on Identifier node.
       --  Prefix and Prefix_Type are non-null if the
       --  identifier is part of a qualified name.
-      --  If Use_Selection_Syntax is True, then set this flag on any
+      --  If Uses_Selection_Syntax is True, then set this flag on any
       --  created Qualified_Name nodes.
       --  If Ignore_Error is True, then don't complain if there are no
       --  interpretations of the identifier.
@@ -16343,7 +16374,7 @@ package body PSC.Trees.Semantics.Static is
             if Not_Null (Prefix_To_Use) then
                Interp :=
                  Qualified_Name.Make
-                   (Prefix_To_Use, Interp, Use_Selection_Syntax);
+                   (Prefix_To_Use, Interp, Uses_Selection_Syntax);
                Set_Sem_Info (Interp, T.Sem_Info);
             end if;
 
@@ -16552,7 +16583,7 @@ package body PSC.Trees.Semantics.Static is
                                  Id_Interp :=
                                    Qualified_Name.Make
                                      (Prefix_To_Use, Id_Interp,
-                                      Use_Selection_Syntax);
+                                      Uses_Selection_Syntax);
                                  Set_Sem_Info (Id_Interp, New_Sem_Info);
                               end if;
                               if Debug_Second_Pass then
@@ -24744,7 +24775,7 @@ package body PSC.Trees.Semantics.Static is
                Set_Identifier_Sem_Info
                  (Visitor.Decl_Region, Context, Id_Tree,
                   Prefix => T.Prefix, Prefix_Type => Pkg_Type,
-                  Use_Selection_Syntax => True);
+                  Uses_Selection_Syntax => True);
 
                Sel_Sem := Operand_Sem_Ptr (Id_Tree.Sem_Info);
 
