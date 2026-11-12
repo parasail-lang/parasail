@@ -767,12 +767,17 @@ package body PSC.Trees.Semantics.Info is
       --  Return Resolved interp if present, else return original tree
       T_Sem : constant Sem_Ptr := Sem_Ptr (Sem_Info (T));
    begin
-      if T_Sem /= null
-        and then T_Sem.all in Operand_Semantic_Info'Class
+      if T_Sem = null then
+         --  Return the original tree
+         return T;
+      elsif T_Sem.all in Operand_Semantic_Info'Class
         and then Not_Null (Operand_Sem_Ptr (T_Sem).Resolved_Interp)
       then
          --  Return the resolved tree
          return Operand_Sem_Ptr (T_Sem).Resolved_Interp;
+      elsif Not_Null (T_Sem.Definition) then
+         --  Use definition from the sem info
+         return T_Sem.Definition;
       else
          --  Return the original tree
          return T;
