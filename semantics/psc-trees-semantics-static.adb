@@ -12507,15 +12507,19 @@ package body PSC.Trees.Semantics.Static is
                      if New_Sem_Info.all in Operand_Semantic_Info'Class then
                         --  The tree can be an operand
 
-                        --  Substitute into the Resolved_Type
-                        Orig_Resolved_Type :=
-                          Operand_Sem_Ptr (New_Sem_Info).Resolved_Type;
+                        if Underlying_Sem_Info (Sem_Ptr (New_Sem_Info)).all in
+                          Operand_Semantic_Info'Class
+                        then
+                           --  Substitute into the Resolved_Type
+                           Orig_Resolved_Type :=
+                             Operand_Sem_Ptr (New_Sem_Info).Resolved_Type;
 
-                        Operand_Sem_Ptr (New_Sem_Info).Resolved_Type :=
-                          Substitute_Actuals
-                            (Orig_Resolved_Type, Assoc_Type_Region,
-                             Instantiation_Info => Instantiation_Info,
-                             Extra_Subst => Extra_Subst);
+                           Operand_Sem_Ptr (New_Sem_Info).Resolved_Type :=
+                             Substitute_Actuals
+                               (Orig_Resolved_Type, Assoc_Type_Region,
+                                Instantiation_Info => Instantiation_Info,
+                                Extra_Subst => Extra_Subst);
+                        end if;
 
                         if Operand_Sem_Ptr (New_Sem_Info).Resolved_Interp = OT
                           or else

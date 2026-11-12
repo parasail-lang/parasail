@@ -562,34 +562,43 @@ formal_type_declaration :
         $$ := (One_Tree, Type_Decl.Make(
 	  Name => $2.Tree,
 	  Is_New_Type => False,  --  Note, not really a "new" type
-	  Type_Definition => Invocation.Make(
-            Kind => Invocation.Module_Instantiation,
-            Prefix => PSC.Trees.Identifier.Make
-              ("Integers", Token_Src_Pos ($4)),
-            Operands => Lists.Empty_List,
-            Source_Pos => Token_Src_Pos ($4))));
+	  Type_Definition => Qualified_Name.Make(
+            Prefix => Invocation.Make(
+               Kind => Invocation.Module_Instantiation,
+               Prefix => PSC.Trees.Identifier.Make
+                 ("Integers", Token_Src_Pos ($4)),
+               Operands => Lists.Empty_List,
+               Source_Pos => $4.Source_Pos),
+            Id => PSC.Trees.Identifier.Make
+                ("Integer", Token_Src_Pos ($4)))));
     }
   | TYPE_kw id IS_no_indent MOD_kw BOX {
         $$ := (One_Tree, Type_Decl.Make(
 	  Name => $2.Tree,
 	  Is_New_Type => False,  --  Note, not really a "new" type
-	  Type_Definition => Invocation.Make(
-            Kind => Invocation.Module_Instantiation,
-            Prefix => PSC.Trees.Identifier.Make
-              ("Modulars", Token_Src_Pos ($4)),
-            Operands => Lists.Empty_List,
-            Source_Pos => Token_Src_Pos ($4))));
+	  Type_Definition => Qualified_Name.Make(
+            Prefix => Invocation.Make(
+               Kind => Invocation.Module_Instantiation,
+               Prefix => PSC.Trees.Identifier.Make
+                 ("Modulars", Token_Src_Pos ($4)),
+               Operands => Lists.Empty_List,
+               Source_Pos => $4.Source_Pos),
+            Id => PSC.Trees.Identifier.Make
+                ("Modular", Token_Src_Pos ($4)))));
     }
   | TYPE_kw id IS_no_indent DIGITS_kw BOX {
         $$ := (One_Tree, Type_Decl.Make(
 	  Name => $2.Tree,
 	  Is_New_Type => False,  --  Note, not really a "new" type
-	  Type_Definition => Invocation.Make(
-            Kind => Invocation.Module_Instantiation,
-            Prefix => PSC.Trees.Identifier.Make
-              ("Floats", Token_Src_Pos ($4)),
-            Operands => Lists.Empty_List,
-            Source_Pos => Token_Src_Pos ($4))));
+	  Type_Definition => Qualified_Name.Make(
+            Prefix => Invocation.Make(
+               Kind => Invocation.Module_Instantiation,
+               Prefix => PSC.Trees.Identifier.Make
+                 ("Floats", Token_Src_Pos ($4)),
+               Operands => Lists.Empty_List,
+               Source_Pos => $4.Source_Pos),
+            Id => PSC.Trees.Identifier.Make
+                ("Float", Token_Src_Pos ($4)))));
     }
   ;
 
@@ -2040,48 +2049,60 @@ non_derived_type_declaration :
         $$ := (One_List, Lists.Make ((1 => Type_Decl.Make(
 	  Name => $2.Tree,
 	  Is_New_Type => True,
-	  Type_Definition => Invocation.Make(
-            Kind => Invocation.Module_Instantiation,
-            Prefix => PSC.Trees.Identifier.Make
-              ("Integers", Token_Src_Pos ($4)),
-            Operands => Lists.Make ((1 => $5.Tree)),
-            Source_Pos => $4.Source_Pos)))));
+	  Type_Definition => Qualified_Name.Make(
+            Prefix => Invocation.Make(
+               Kind => Invocation.Module_Instantiation,
+               Prefix => PSC.Trees.Identifier.Make
+                 ("Integers", Token_Src_Pos ($4)),
+               Operands => Lists.Make ((1 => $5.Tree)),
+               Source_Pos => $4.Source_Pos),
+            Id => PSC.Trees.Identifier.Make
+                ("Integer", Token_Src_Pos ($4)))))));
     }
   | TYPE_kw type_id IS_no_indent
       MOD_kw expression {
         $$ := (One_List, Lists.Make ((1 => Type_Decl.Make(
 	  Name => $2.Tree,
 	  Is_New_Type => True,
-	  Type_Definition => Invocation.Make(
-            Kind => Invocation.Module_Instantiation,
-            Prefix => PSC.Trees.Identifier.Make
-              ("Modulars", Token_Src_Pos ($4)),
-            Operands => Lists.Make ((1 => $5.Tree)),
-            Source_Pos => $4.Source_Pos)))));
+	  Type_Definition => Qualified_Name.Make(
+            Prefix => Invocation.Make(
+               Kind => Invocation.Module_Instantiation,
+               Prefix => PSC.Trees.Identifier.Make
+                 ("Modulars", Token_Src_Pos ($4)),
+               Operands => Lists.Make ((1 => $5.Tree)),
+               Source_Pos => $4.Source_Pos),
+            Id => PSC.Trees.Identifier.Make
+                ("Modular", Token_Src_Pos ($4)))))));
     }
   | TYPE_kw type_id IS_no_indent
       DIGITS_kw expression {
         $$ := (One_List, Lists.Make ((1 => Type_Decl.Make(
 	  Name => $2.Tree,
 	  Is_New_Type => True,
-	  Type_Definition => Invocation.Make(
-            Kind => Invocation.Module_Instantiation,
-            Prefix => PSC.Trees.Identifier.Make
-              ("Floats", Token_Src_Pos ($4)),
-            Operands => Lists.Make ((1 => $5.Tree)),
-            Source_Pos => $4.Source_Pos)))));
+	  Type_Definition => Qualified_Name.Make(
+            Prefix => Invocation.Make(
+               Kind => Invocation.Module_Instantiation,
+               Prefix => PSC.Trees.Identifier.Make
+                 ("Floats", Token_Src_Pos ($4)),
+               Operands => Lists.Make ((1 => $5.Tree)),
+               Source_Pos => $4.Source_Pos),
+            Id => PSC.Trees.Identifier.Make
+                ("Float", Token_Src_Pos ($4)))))));
     }
   | TYPE_kw type_id IS_no_indent
       DELTA_kw expression {
         $$ := (One_List, Lists.Make ((1 => Type_Decl.Make(
 	  Name => $2.Tree,
 	  Is_New_Type => True,
-	  Type_Definition => Invocation.Make(
-            Kind => Invocation.Module_Instantiation,
-            Prefix => PSC.Trees.Identifier.Make
-              ("Fixeds", Token_Src_Pos ($4)),
-            Operands => Lists.Make ((1 => $5.Tree)),
-            Source_Pos => $4.Source_Pos)))));
+	  Type_Definition => Qualified_Name.Make(
+            Prefix => Invocation.Make(
+               Kind => Invocation.Module_Instantiation,
+               Prefix => PSC.Trees.Identifier.Make
+                 ("Fixeds", Token_Src_Pos ($4)),
+               Operands => Lists.Make ((1 => $5.Tree)),
+               Source_Pos => $4.Source_Pos),
+            Id => PSC.Trees.Identifier.Make
+                ("Fixed", Token_Src_Pos ($4)))))));
     }
   ;
 
