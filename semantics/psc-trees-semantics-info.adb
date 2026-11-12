@@ -770,18 +770,20 @@ package body PSC.Trees.Semantics.Info is
       if T_Sem = null then
          --  Return the original tree
          return T;
-      elsif T_Sem.all in Operand_Semantic_Info'Class
-        and then Not_Null (Operand_Sem_Ptr (T_Sem).Resolved_Interp)
-      then
-         --  Return the resolved tree
-         return Operand_Sem_Ptr (T_Sem).Resolved_Interp;
+
+      elsif T_Sem.all in Operand_Semantic_Info'Class then
+         if Not_Null (Operand_Sem_Ptr (T_Sem).Resolved_Interp) then
+            --  Return the resolved tree
+            return Operand_Sem_Ptr (T_Sem).Resolved_Interp;
+         end if;
+
       elsif Not_Null (T_Sem.Definition) then
          --  Use definition from the sem info
          return T_Sem.Definition;
-      else
-         --  Return the original tree
-         return T;
       end if;
+
+      --  Return the original tree
+      return T;
    end Resolved_Tree;
 
    procedure Visit_Resolved
