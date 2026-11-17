@@ -7154,14 +7154,17 @@ package body PSC.Trees.Semantics.Static is
            or else Result.External_View.Is_Monomorphic /= Result.Is_Monomorphic
          then
             --  Add Optional/Polymorphic/Monomorphic to External_View
-            Result :=
-              Qualify_Type
+            --  and substitute actuals.
+            Result := Substitute_Actuals
+              (Qualify_Type
                 (Result.External_View, Region, Is_Optional => True,
                  Is_Polymorphic => Result.Is_Polymorphic,
-                 Is_Monomorphic => Result.Is_Monomorphic);
+                 Is_Monomorphic => Result.Is_Monomorphic),
+               U_Base_Type_Region (Result));
          else
-            --  External view as-is is fine
-            Result := Result.External_View;
+            --  External view as-is is fine, after substitution
+            Result := Substitute_Actuals
+                        (Result.External_View, U_Base_Type_Region (Result));
          end if;
 
       elsif Value_Is_Optional and then not Result.Value_Is_Optional then
