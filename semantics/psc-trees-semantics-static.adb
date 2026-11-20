@@ -3302,6 +3302,7 @@ package body PSC.Trees.Semantics.Static is
                 Sem_Error
                   (Mod_Sem.Definition, "Cur inst should be first type");
             end if;
+            Cur_Inst_Sem.Root_Type := Cur_Inst_Sem;
             Mod_Sem.Cur_Inst_Sem := Cur_Inst_Sem;
 
             if Debug_First_Pass then
