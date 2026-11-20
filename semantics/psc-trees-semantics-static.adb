@@ -15936,6 +15936,19 @@ package body PSC.Trees.Semantics.Static is
                   null;  --  Ignore for now
             end Add_Param_Less_Invocation;
 
+            function Uninitialized_External_View (Sem : Sem_Ptr)
+               return Boolean is
+               --  True if this has an uninitialized context
+               --  and if it is a type, it is the external view of the type.
+              (Sem.Context = No_Context
+                 and then
+                   (Sem.all not in Type_Semantic_Info
+                       or else
+                    Type_Sem_Ptr (Sem).External_View =
+                      Type_Sem_Ptr (Sem).Full_View
+                       or else
+                    Type_Sem_Ptr (Sem).External_View = Type_Sem_Ptr (Sem)));
+                
          begin
 
             if Prefix_Type /= null then
@@ -16044,8 +16057,8 @@ package body PSC.Trees.Semantics.Static is
                          Module_Parameter_And_Ancestry_Contexts
                        and then Underlying_Sem_Info.Context /=
                          Standalone_Item_Context
-                       and then Underlying_Sem_Info.Context /=
-                         No_Context  --  Not yet initialized
+                       and then
+                         not Uninitialized_External_View (Underlying_Sem_Info)
                      then
                         --  Not a visible declaration
                         declare
