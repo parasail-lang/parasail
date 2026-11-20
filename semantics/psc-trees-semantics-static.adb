@@ -23444,8 +23444,14 @@ package body PSC.Trees.Semantics.Static is
                      --  Type_Context is used presuming this is part
                      --  of a larger context.
                   T.Sem_Info := Sem_Info (Equiv_Instantiation);
+                  T.Kind := Invocation.Module_Instantiation;
                   return;  ----  return now  ----
                end;
+            end if;
+
+            if T.Kind = Invocation.General_Invocation then
+               --  TBD: Need to recognize explicit type conversion eventually
+               T.Kind := Invocation.Operation_Call;
             end if;
 
             --  In many cases, we won't know where to look
