@@ -12388,6 +12388,9 @@ package body PSC.Trees.Semantics.Static is
 
             elsif Orig_Tree in Selection.Tree
               and then
+                Underlying_Sem_Info
+                  (Selection.Tree (Orig_Tree).Prefix) /= null
+              and then
                 (Underlying_Sem_Info
                   (Selection.Tree (Orig_Tree).Prefix).all in
                     Type_Semantic_Info
@@ -23332,7 +23335,8 @@ package body PSC.Trees.Semantics.Static is
             Visit (T.Prefix, Visitor);
             Prefix_Sem := Sem_Ptr (Sem_Info (T.Prefix));
 
-            if Prefix_Sem /= null
+            if T.Kind = Invocation.General_Invocation
+              and then Prefix_Sem /= null
               and then Prefix_Sem.Associated_Symbol /= null
               and then Prefix_Sem.Associated_Symbol.Kind = Module_Sym_Kind
             then
