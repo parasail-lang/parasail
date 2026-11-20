@@ -10984,26 +10984,34 @@ package body PSC.Trees.Semantics.Static is
 
    function Module_Formal_Index
      (Formal_Sym : Symbols.Sym_Ptr) return Natural is
-   --  Return index for formal of module, based on its Symbol index
+   --  Return index for formal of module, based on its Symbol index.
+   --  Returns 0 if Formal_Sym is not a module formal parameter.
    begin
-      if Formal_Sym /= null then
+      if Formal_Sym /= null
+        and then Formal_Sym.Enclosing_Region.Kind = Module_Region_Kind
+      then
          --  Get index of formal, numbered 1 .. Num_Module_Parameters
          declare
-            pragma Assert
-              (Formal_Sym.Enclosing_Region.Kind = Module_Region_Kind);
             Mod_Sem : constant Module_Sem_Ptr :=
               Module_Sem_Ptr
                 (Formal_Sym.Enclosing_Region.Associated_Symbol.Sem_Info);
-            First_Mod_Param : constant Optional_Tree :=
-              Nth_Module_Parameter (Mod_Sem, 1);
-            First_Mod_Param_Sym : constant Sym_Ptr :=
-              Sem_Ptr (Sem_Info (First_Mod_Param)).Associated_Symbol;
          begin
-            --  Should be in range 1 .. Num_Module_Parameters
-            return
-              Positive'
-                (Positive (Formal_Sym.Index) -
-                 Positive (First_Mod_Param_Sym.Index) + 1);
+            if Num_Module_Parameters (Mod_Sem) = 0 then
+               --  Sym is not in a module formals region
+               return 0;
+            end if;
+            declare
+               First_Mod_Param : constant Optional_Tree :=
+                 Nth_Module_Parameter (Mod_Sem, 1);
+               First_Mod_Param_Sym : constant Sym_Ptr :=
+                 Sem_Ptr (Sem_Info (First_Mod_Param)).Associated_Symbol;
+            begin
+               --  Should be in range 1 .. Num_Module_Parameters
+               return
+                 Positive'
+                   (Positive (Formal_Sym.Index) -
+                    Positive (First_Mod_Param_Sym.Index) + 1);
+            end;
          end;
       else
          return 0;
@@ -11028,6 +11036,7 @@ package body PSC.Trees.Semantics.Static is
    function Formal_Type_Index (Formal_Type : Type_Sem_Ptr) return Natural is
       --  Return index for formal type, or 0 if none
       Formal_Base : Type_Sem_Ptr := Formal_Type.U_Base_Type;
+      Idx : Natural := 0;
    begin
       if Formal_Base = null then
          Formal_Base := Formal_Type;
@@ -11040,10 +11049,18 @@ package body PSC.Trees.Semantics.Static is
              (Sym_Ref_Ptr (Sem_Info (Formal_Base.Formal_Prefix))
                 .Associated_Symbol);
       elsif Formal_Base.Associated_Symbol /= null then
-         return Module_Formal_Index (Formal_Base.Associated_Symbol);
-      else
-         return 0;
+         Idx := Module_Formal_Index (Formal_Base.Associated_Symbol);
       end if;
+      if Idx = 0 and then Formal_Type.Is_Formal_Type
+        and then Formal_Type.Associated_Symbol /= null
+        and then Formal_Type.Associated_Symbol /= Formal_Base.Associated_Symbol
+      then
+         --  For Ada-ish formal types, U_Base_Type is the constraint (e.g.,
+         --  Countable<>) whose sym is not in the enclosing module's formals.
+         --  Use Formal_Type.Associated_Symbol directly.
+         Idx := Module_Formal_Index (Formal_Type.Associated_Symbol);
+      end if;
+      return Idx;
    end Formal_Type_Index;
 
    function Substitute_Actuals_In_Nested_Type
@@ -11804,8 +11821,10 @@ package body PSC.Trees.Semantics.Static is
          end if;
          Put_Line (")");
       end if;
-      if Param_Type.Associated_Module.Cur_Inst_Sem = Param_Type.Root_Type then
-         --  We have a current instance;
+      if Param_Type.Associated_Module.Cur_Inst_Sem = Param_Type.Root_Type
+        and then not Param_Type.Is_Formal_Type
+      then
+         --  We have a current instance (not a formal type);
          --  see whether Originating_Type is of same module
          --  or of an enclosing module or enclosed module.
          if Originating_Type.Associated_Module = Param_Type.Associated_Module
@@ -11872,7 +11891,8 @@ package body PSC.Trees.Semantics.Static is
                  Param_Type.Enclosing_Type.Associated_Module.Nested_Region,
                Enclosed => Originating_Type.Associated_Module.Nested_Region))
          then
-            --  Param_Type's module is a nested module and has no parameters.
+            --  Param_Type's module is a nested module with no parameters.
+
             if Originating_Type = Param_Type.Enclosing_Type then
                --  Nothing to be substituted
                return Param_Type;
@@ -12022,6 +12042,7 @@ package body PSC.Trees.Semantics.Static is
 
       elsif Param_Type.All_Parameters_Known and then Extra_Subst = null
         and then not Originating_Type.Is_Formal_Type
+        and then not Param_Type.Is_Formal_Type
       then
          --  Nothing more to be substituted
          return Param_Type;
@@ -12037,6 +12058,7 @@ package body PSC.Trees.Semantics.Static is
 
       elsif Originating_Type.Parent_Type = null and then Extra_Subst = null
         and then Instantiation_Info = null
+        and then not Param_Type.Is_Formal_Type
         and then
         (Tree_Ptr_Of (Originating_Type.U_Base_Structure.Definition).all not in
            Invocation.Tree
@@ -16088,15 +16110,32 @@ package body PSC.Trees.Semantics.Static is
                      end if;
                   end loop;
 
-                  if Underlying_Sem_Info.all in Type_Semantic_Info
-                    and then Prefix_Type_Region /= null
-                  then
-                     --  Substitute actuals now
-                     Underlying_Sem_Info :=
-                       Sem_Ptr
-                         (Substitute_Actuals
-                            (Type_Sem_Ptr (Underlying_Sem_Info),
-                             Prefix_Type_Region));
+                  if Underlying_Sem_Info.all in Type_Semantic_Info then
+                     --  Ensure Prefix_Type has Root_Type set up so that
+                     --  Substitute_Actuals can use it as Assoc_Type_Region.
+                     --  During early processing (e.g. DECLS_ONLY) a module
+                     --  instantiation type may not yet have been finished.
+                     if Prefix_Type_Region = null
+                       and then Prefix_Type /= null
+                       and then not Prefix_Type.All_Parameters_Checked
+                     then
+                        Finish_Type_Sem_Info (Prefix_Type, Decl_Region);
+                        Prefix_Type_Region := U_Base_Type_Region (Prefix_Type);
+                     end if;
+
+                     if Prefix_Type_Region /= null then
+                        --  Substitute actuals now
+                        Underlying_Sem_Info :=
+                          Sem_Ptr
+                            (Substitute_Actuals
+                               (Type_Sem_Ptr (Underlying_Sem_Info),
+                                Prefix_Type_Region));
+                     else
+                        --  Just create a copy of the sem info
+                        --  so can be updated.
+                        Underlying_Sem_Info :=
+                          new Semantic_Info'Class'(Underlying_Sem_Info.all);
+                     end if;
                   else
                      --  Just create a copy of the sem info
                      --  so can be updated.
@@ -21681,7 +21720,8 @@ package body PSC.Trees.Semantics.Static is
                   Outermost_Module_Where_Used =>
                     Def_Sem.Outermost_Module_Where_Used,
                   Is_Formal_Type =>
-                    Def_Sem.Is_Formal_Type
+                    Type_Sem.Is_Formal_Type   --  preserve if already set
+                    or else Def_Sem.Is_Formal_Type
                     or else Context = Module_Formal_Context,  --  see below
                   Actual_Sem_Infos => Def_Sem.Actual_Sem_Infos,
                   Formal_Prefix => Def_Sem.Formal_Prefix,
@@ -21701,9 +21741,11 @@ package body PSC.Trees.Semantics.Static is
                  and then not Type_Def_Has_New_Module (T.Type_Definition)
                then
                   --  Is a new type, so does *not* inherit Is_Formal_Type
-                  --  indication.
+                  --  indication; but preserve if already set True (e.g. during
+                  --  INTERFACE_PARAMS run before DECLS_ONLY re-processes this).
                   Type_Sem.Is_Formal_Type :=
-                    Context = Module_Formal_Context
+                    Type_Sem.Is_Formal_Type
+                    or else Context = Module_Formal_Context
                     or else Context = Module_Formal_Type_Def_Context
                     or else Context = Module_Actual_Of_Formal_Context;
                   --  TBD: Also set Actual_Of_Formal_Index to zero?
@@ -21733,6 +21775,47 @@ package body PSC.Trees.Semantics.Static is
                  Type_Sem.Associated_Symbol;
                Type_Sem.U_Base_Type.Associated_Generic_Op :=
                  Associated_Generic_Op;
+            end if;
+
+            --  For subtypes defined via selection from an inline module
+            --  instantiation (e.g. "subtype S is M(A).T" in Ada 2022 style),
+            --  Def_Sem may be the original uninstantiated type with
+            --  Root_Type = null and Enclosing_Type = null, because
+            --  Selection_Action doesn't re-run during DECLS_ONLY (it cached
+            --  sem_info from INTERFACE_PARAMS before Finish_Type_Sem_Info was
+            --  called on the prefix instantiation type).
+            --  Reconstruct Enclosing_Type from the selection's prefix.
+            --  Only for subtypes (not T.Is_New_Type): "is new M(A).T" uses
+            --  a different path (Finish_Type_Sem_Info with Parent_Type).
+            if not T.Is_New_Type
+              and then Type_Sem.Root_Type = null
+              and then not Is_Null (T.Type_Definition)
+              and then Tree_Ptr_Of (T.Type_Definition).all in Selection.Tree
+            then
+               declare
+                  Sel_Tree : Selection.Tree renames
+                    Selection.Tree (Tree_Ptr_Of (T.Type_Definition).all);
+                  Prefix_Type : constant Type_Sem_Ptr :=
+                    Get_Type (Visitor.Decl_Region, Sel_Tree.Prefix,
+                              Complain_If_Not_A_Type => False);
+               begin
+                  if Prefix_Type /= null then
+                     if not Prefix_Type.All_Parameters_Checked then
+                        --  Finish up the prefix so its Root_Type is set
+                        Finish_Type_Sem_Info (Prefix_Type, Visitor.Decl_Region);
+                     end if;
+                     --  Set Enclosing_Type to the instantiation
+                     Type_Sem.Enclosing_Type := Prefix_Type;
+                     --  Set Root_Type to itself (this subtype IS the base type
+                     --  for this instantiation's view of T)
+                     Type_Sem.Root_Type := Type_Sem_Ptr (T.Sem_Info);
+                     --  Set U_Base_Structure so Substitute_Actuals can pass
+                     --  the "has definition" check (line ~12064)
+                     if Type_Sem.U_Base_Structure = null then
+                        Type_Sem.U_Base_Structure := Type_Sem_Ptr (T.Sem_Info);
+                     end if;
+                  end if;
+               end;
             end if;
 
             if not T.Is_New_Type
