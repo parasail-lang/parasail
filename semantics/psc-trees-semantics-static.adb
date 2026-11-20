@@ -12253,7 +12253,8 @@ package body PSC.Trees.Semantics.Static is
          --  Create a new instantiation of the same module
          --  with the actual substituted.
          pragma Assert
-           (Param_Type.Root_Type.Nested_Type_Index > 0
+           (Param_Type.Root_Type = null  --  tbd:stt  -- avoid CE
+            or else Param_Type.Root_Type.Nested_Type_Index > 0
             or else Param_Type.Associated_Module.Is_Abstract
             or else Param_Type.Associated_Module.Is_Partially_Abstract
             or else Extra_Subst /= null
