@@ -3673,8 +3673,8 @@ package A2X.Core.Array_Types is
     function Array_Type'Length(A : Array_Type; Dimension : Univ_Integer)
       return Univ_Integer
     function "index_set"(A : Array_Type) return Countable_Ranges(Indexed_By).Countable_Range
-    function Bounds(A : Array_Type) return Countable_Ranges(Indexed_By).Countable_Range
-      renames "index_set"
+    --  function Bounds(A : Array_Type) return Countable_Ranges(Indexed_By).Countable_Range
+      --  renames "index_set"
 
     function Array_Type'First(A : Array_Type) return Indexed_By
       is (Bounds (A).First)

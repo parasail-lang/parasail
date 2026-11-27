@@ -1893,14 +1893,18 @@ non_derived_type_declaration :
            $$ := (One_List, Lists.Make ((1 => Type_Decl.Make(
              Name => $2.Tree,
              Is_New_Type => True,
-             Type_Definition => Invocation.Make(
-               Kind => Invocation.Module_Instantiation,
-               Prefix => PSC.Trees.Identifier.Make ("Enums", $3.Source_Pos),
-               Operands => Lists.Make
-                 ((1 => Invocation.Make(Invocation.Container_Aggregate,
-                           Prefix => Null_Optional_Tree,
-                           Operands => Enum_Lits,
-                           Source_Pos => $4.Source_Pos))))))));
+             Type_Definition => Qualified_Name.Make(
+               Prefix =>
+                Invocation.Make(
+                  Kind => Invocation.Module_Instantiation,
+                  Prefix => PSC.Trees.Identifier.Make ("Enums", $3.Source_Pos),
+                  Operands => Lists.Make
+                    ((1 => Invocation.Make(Invocation.Container_Aggregate,
+                              Prefix => Null_Optional_Tree,
+                              Operands => Enum_Lits,
+                              Source_Pos => $4.Source_Pos)))),
+              Id => PSC.Trees.Identifier.Make
+                ("Enum", $4.Source_Pos))))));
 
            --  Now append declarations for enum-lit parameterless functions.
            for I in 1 .. Lists.Length (Enum_Lits) loop
@@ -2152,12 +2156,18 @@ array_type_def :
     ARRAY_kw '(' index_subtype_list ')'
       OF_kw opt_aliased_type_or_access_type_specifier {
         $$ := (One_Tree,
-	  Invocation.Make(
-            Kind => Invocation.Module_Instantiation,
-            Prefix => PSC.Trees.Identifier.Make
-              ("Array_Types", Token_Src_Pos ($1)),
-            Operands => Lists.Make
-                          (($6.Tree, Make_Array_Indexer ($3.List)))));
+	  Qualified_Name.Make(
+            Prefix =>
+             Invocation.Make(
+               Kind => Invocation.Module_Instantiation,
+               Prefix => PSC.Trees.Identifier.Make
+                 ("Array_Types", Token_Src_Pos ($1)),
+               Operands => Lists.Make
+                             (($6.Tree, Make_Array_Indexer ($3.List))),
+               Source_Pos => $1.Source_Pos),
+            Id => PSC.Trees.Identifier.Make(
+               Id => "Array_Type",
+               Source_Pos => Token_Src_Pos ($1))));
     }
   ;
 
