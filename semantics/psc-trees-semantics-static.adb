@@ -14384,6 +14384,29 @@ package body PSC.Trees.Semantics.Static is
         (Nth_Formal => Nth_Formal, Nth_Default => Nth_Default,
          Lookup_Formal_Name => Lookup_Formal_Name);
 
+      function Is_Dot_Dot (OT : Optional_Tree) return Boolean is
+         --  Return True if the OT is ".." (closed interval with null bounds)
+         use Binary;
+      begin
+         if Not_Null (OT) and then Tree_Ptr_Of (OT).all in Binary.Tree then
+            declare
+               Bin_Tree : Binary.Tree renames
+                 Binary.Tree (Tree_Ptr_Of (OT).all);
+            begin
+               return Bin_Tree.Operator = Closed_Interval_Op
+                 and then Is_Null (Bin_Tree.Left_Operand)
+                 and then Is_Null (Bin_Tree.Right_Operand);
+            end;
+         else
+            return False;
+         end if;
+      end Is_Dot_Dot;
+
+      function Is_Others_Ref (OT : Optional_Tree) return Boolean is
+         --  Return True if the OT is a reference with choice being "Others"
+        (Not_Null (OT) and then Tree_Ptr_Of (OT).all in Reference.Tree
+         and then Is_Dot_Dot (Reference.Tree (Tree_Ptr_Of (OT).all).Key));
+      
    begin  --  Create_Class_Agg_Interp
 
       if Debug_Second_Pass then
@@ -14444,6 +14467,10 @@ package body PSC.Trees.Semantics.Static is
             Num_Operands : constant Natural :=
               Lists.Length (Class_Agg.Operands);
             Canonical_Operands : Lists.List;
+            Last_Opnd_Is_Others : constant Boolean :=
+              (if Num_Operands = 0 then False
+               else Is_Others_Ref
+                 (Lists.Nth_Element (Class_Agg.Operands, Num_Operands)));
             Generic_Param_Map : Param_Mapping_Ptr;
             Ambiguity : Ambiguity_List := null;
             Interp_Added : Boolean;
@@ -14455,7 +14482,9 @@ package body PSC.Trees.Semantics.Static is
                Associated_Type_Region => U_Base_Type_Region (Target_Type),
                Interp => Null_Optional_Tree, Interp_Added => Interp_Added);
 
-            if Num_Comps = 0 and then Num_Operands > 0 then
+            if Num_Comps = 0 and then Num_Operands > 0
+              and then not Last_Opnd_Is_Others
+            then
                --  Can't possibly match
                if Debug_Second_Pass then
                   Put_Line
@@ -14468,6 +14497,7 @@ package body PSC.Trees.Semantics.Static is
                        (Target_Type, Use_Short_Form => True,
                         Max_Chars => 100) &
                      " has no components; aggregate should be simply ()",
+                        --  TBD: or "null record" or "others => <>"
                      Src_Pos => Find_Source_Pos (Agg_Sem.Definition),
                      Message_Kind => "Info");
                end if;

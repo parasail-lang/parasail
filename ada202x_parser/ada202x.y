@@ -4269,7 +4269,7 @@ opt_record_component_list :
     record_component_list {
 	$$ := $1;
     }
-  | {
+  | NULL_kw RECORD_kw {
 	$$ := (One_List, Lists.Empty_List);
     }
   ;
